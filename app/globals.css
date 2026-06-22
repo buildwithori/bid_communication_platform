@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* shadcn/ui design tokens — mapped onto the BID palette */
+    --background: 40 14% 97%; /* #f7f6f3 surface */
+    --foreground: 0 0% 10%; /* #1a1a1a ink */
+    --card: 0 0% 100%; /* #ffffff surface-panel */
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 335deg 56% 34%; /* #842751 bid */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 25% 94%; /* #f1efe8 surface-subtle */
+    --secondary-foreground: 0 0% 10%;
+    --muted: 40 25% 94%;
+    --muted-foreground: 0 0% 40%; /* #666 ink-muted */
+    --accent: 335deg 67% 94%; /* #f5e8ef bid-light */
+    --accent-foreground: 335deg 56% 22%; /* #5c1a38 bid-dark */
+    --destructive: 0 70% 41%; /* #A32D2D danger */
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 0% / 12%; /* line default */
+    --input: 0 0% 0% / 22%; /* line strong */
+    --ring: 335deg 56% 34%; /* bid */
+    --chart-1: 335deg 56% 34%; /* bid */
+    --chart-2: 207deg 79% 37%; /* info */
+    --chart-3: 159deg 57% 37%; /* success */
+    --chart-4: 36deg 75% 41%; /* warning */
+    --chart-5: 0 0% 40%;
+    --radius: 0.625rem; /* 10px */
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 335deg 56% 44%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 335deg 30% 20%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 335deg 56% 44%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* Utility for the thin (0.5px) borders used heavily in the mockups. */
+  .border-hairline {
+    border-width: 0.5px;
+  }
+
+  /* The small monospace meta used for timestamps and calendar day labels. */
+  .font-mono-meta {
+    font-family: var(--font-dm-mono), ui-monospace, monospace;
+    font-size: 9px;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Focus ring tuned to the brand color. */
+  .focus-ring {
+    @apply outline-none ring-2 ring-bid ring-offset-2 ring-offset-background;
+  }
+}

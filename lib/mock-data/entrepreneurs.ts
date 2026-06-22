@@ -1,0 +1,198 @@
+import type { Entrepreneur, FundingRound } from '@/types';
+
+/**
+ * Seed entrepreneurs.
+ *
+ * Mirrors the rows surfaced in the admin "Entrepreneurs" table and the
+ * "Recently joined" dashboard card. The shape is deliberately close to a
+ * DB row — `programmeId`, `trainerId`, `sector` / `stage` are ids that
+ * resolve against the lookup tables in `./definitions`.
+ */
+
+const funding: Record<string, FundingRound[]> = {
+  'e-paybridge': [
+    { id: 'f-pb-1', name: 'Pre-seed (pre-BID)', amountUsd: 30000, date: '2023-01-15', source: 'Angel investor' },
+    { id: 'f-pb-2', name: 'Grant – BID', amountUsd: 50000, date: '2023-06-10', source: 'BID grant' },
+    { id: 'f-pb-3', name: 'Seed', amountUsd: 40000, date: '2024-10-02', source: 'Angel investor' },
+  ],
+};
+
+export const entrepreneurs: Entrepreneur[] = [
+  {
+    id: 'e-paybridge',
+    businessName: 'PayBridge Africa Ltd',
+    representative: 'Amara Osei',
+    initials: 'PB',
+    email: 'amara@paybridge.africa',
+    phone: '+233 24 555 0172',
+    country: 'Ghana',
+    sector: 'fintech',
+    stage: 'growth',
+    cohort: 'Cohort 6',
+    programmeId: 'p-accelerator-c6',
+    source: 'invited',
+    goal: {
+      type: 'fundraising',
+      amountUsd: 500000,
+      description:
+        'Raise Series A to expand into 2 new markets by Q4 2025.',
+    },
+    status: 'active',
+    metrics: {
+      trainingProgress: 68,
+      deliverablesDone: 4,
+      deliverablesTotal: 7,
+      jobsCreated: 3,
+      jobsWomen: 2,
+      jobsMen: 1,
+      fundsMobilisedUsd: 120000,
+    },
+    fundingRounds: funding['e-paybridge'],
+    lastUpdateAt: '2024-12-31',
+    trainerId: 't-kofi',
+    joinedAt: '2024-09-01',
+  },
+  {
+    id: 'e-farmlink',
+    businessName: 'FarmLink GH',
+    representative: 'Kwame Mensah',
+    initials: 'FL',
+    email: 'kwame@farmlink.gh',
+    phone: '+233 27 333 0190',
+    country: 'Ghana',
+    sector: 'agritech',
+    stage: 'idea',
+    cohort: 'Cohort 6',
+    programmeId: 'p-accelerator-c6',
+    source: 'invited',
+    goal: { type: 'milestone', description: 'Complete first pilot season' },
+    status: 'active',
+    metrics: {
+      trainingProgress: 32,
+      deliverablesDone: 1,
+      deliverablesTotal: 7,
+      jobsCreated: 0,
+      jobsWomen: 0,
+      jobsMen: 0,
+      fundsMobilisedUsd: 0,
+    },
+    fundingRounds: [],
+    lastUpdateAt: '2024-09-30',
+    trainerId: 't-esi',
+    joinedAt: '2024-09-01',
+  },
+  {
+    id: 'e-healthfirst',
+    businessName: 'HealthFirst',
+    representative: 'Nadia Asante',
+    initials: 'HF',
+    email: 'nadia@healthfirst.ng',
+    phone: '+234 80 555 0144',
+    country: 'Nigeria',
+    sector: 'healthtech',
+    stage: 'scale',
+    programmeId: 'p-readiness-fintech',
+    source: 'invited',
+    goal: {
+      type: 'fundraising',
+      amountUsd: 1200000,
+      description: 'Series A to scale into East African markets.',
+    },
+    status: 'active',
+    metrics: {
+      trainingProgress: 80,
+      deliverablesDone: 5,
+      deliverablesTotal: 8,
+      jobsCreated: 12,
+      jobsWomen: 8,
+      jobsMen: 4,
+      fundsMobilisedUsd: 300000,
+    },
+    fundingRounds: [],
+    trainerId: 't-kofi',
+    joinedAt: '2024-03-01',
+  },
+  {
+    id: 'e-buildit',
+    businessName: 'BuildIt',
+    representative: 'Tunde Kola',
+    initials: 'TK',
+    email: 'tunde@buildit.ng',
+    phone: '+234 81 555 0111',
+    country: 'Nigeria',
+    sector: 'construction',
+    stage: 'idea',
+    source: 'self-registered',
+    goal: { type: 'programme-completion' },
+    status: 'unassigned',
+    metrics: {
+      trainingProgress: 0,
+      deliverablesDone: 0,
+      deliverablesTotal: 0,
+      jobsCreated: 0,
+      jobsWomen: 0,
+      jobsMen: 0,
+      fundsMobilisedUsd: 0,
+    },
+    fundingRounds: [],
+    joinedAt: '2025-04-05',
+  },
+  {
+    id: 'e-mediscan',
+    businessName: 'MediScan',
+    representative: 'Grace Nana',
+    initials: 'GN',
+    email: 'grace@mediscan.ke',
+    phone: '+254 71 555 0123',
+    country: 'Kenya',
+    sector: 'healthtech',
+    stage: 'idea',
+    source: 'self-registered',
+    goal: { type: 'programme-completion' },
+    status: 'unassigned',
+    metrics: {
+      trainingProgress: 0,
+      deliverablesDone: 0,
+      deliverablesTotal: 0,
+      jobsCreated: 0,
+      jobsWomen: 0,
+      jobsMen: 0,
+      fundsMobilisedUsd: 0,
+    },
+    fundingRounds: [],
+    joinedAt: '2025-04-07',
+  },
+  {
+    id: 'e-edify',
+    businessName: 'Edify Learn',
+    representative: 'Ama Twum',
+    initials: 'EL',
+    email: 'ama@edifylearn.gh',
+    phone: '+233 24 555 0199',
+    country: 'Ghana',
+    sector: 'edtech',
+    stage: 'growth',
+    cohort: 'Cohort 6',
+    programmeId: 'p-accelerator-c6',
+    source: 'invited',
+    goal: { type: 'milestone', description: 'Reach 10k active learners' },
+    status: 'active',
+    metrics: {
+      trainingProgress: 48,
+      deliverablesDone: 2,
+      deliverablesTotal: 7,
+      jobsCreated: 4,
+      jobsWomen: 3,
+      jobsMen: 1,
+      fundsMobilisedUsd: 0,
+    },
+    fundingRounds: [],
+    joinedAt: '2024-08-12',
+  },
+];
+
+export const entrepreneurById = (id: string) =>
+  entrepreneurs.find((e) => e.id === id);
+
+/** The entrepreneur used as the signed-in user on the entrepreneur side. */
+export const currentEntrepreneur = entrepreneurs[0];
