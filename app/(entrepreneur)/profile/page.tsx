@@ -5,7 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
+import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
+import { Tabs } from '@/components/shared/Tabs';
 import {
   FormField,
   FormSelect,
@@ -15,6 +17,7 @@ import {
 import { FundingRoundModal } from '@/components/entrepreneur/FundingRoundModal';
 import { PeriodicUpdateModal } from '@/components/entrepreneur/PeriodicUpdateModal';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
+import { programById, programs as allPrograms } from '@/lib/mock-data/programs';
 import {
   businessProfileSchema,
   programmeGoalSchema,
@@ -23,8 +26,11 @@ import {
 } from '@/lib/forms/schemas';
 import { sectors, stages } from '@/lib/mock-data/definitions';
 
+type ProfileTab = 'biz' | 'goal' | 'fund' | 'update';
+
 export default function ProfilePage() {
   const { entrepreneur, updateProfile } = useEntrepreneurStore();
+  const [tab, setTab] = React.useState<ProfileTab>('biz');
   const [fundingOpen, setFundingOpen] = React.useState(false);
   const [updateOpen, setUpdateOpen] = React.useState(false);
 
@@ -76,6 +82,11 @@ export default function ProfilePage() {
     });
   };
 
+  // Programmes the entrepreneur is enrolled in
+  const enrolledProgrammes = entrepreneur.programmeId
+    ? allPrograms.filter((p) => p.id === entrepreneur.programmeId)
+    : [];
+
   return (
     <>
       {/* Banner */}
@@ -89,16 +100,15 @@ export default function ProfilePage() {
             <div className="text-[11px] opacity-80 capitalize">
               {entrepreneur.stage} stage · {entrepreneur.sector} · {entrepreneur.country}
             </div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {entrepreneur.cohort && (
-                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px]">
-                  {entrepreneur.cohort} · 2024
-                </span>
-              )}
-              <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px]">
-                BID Accelerator
-              </span>
-            </div>
+            {enrolledProgrammes.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {enrolledProgrammes.map((p) => (
+                  <span key={p.id} className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px]">
+                    {p.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-5 sm:ml-auto">
@@ -115,8 +125,18 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {/* Business details */}
+      <Tabs
+        value={tab}
+        onChange={(v) => setTab(v as ProfileTab)}
+        tabs={[
+          { value: 'biz', label: 'Business details' },
+          { value: 'goal', label: 'Programme goal' },
+          { value: 'fund', label: 'Fundraising history' },
+          { value: 'update', label: 'Periodic updates' },
+        ]}
+      />
+
+      {tab === 'biz' && (
         <Card>
           <CardHeader title="Business details" />
           <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
@@ -154,8 +174,9 @@ export default function ProfilePage() {
             <Button type="submit">Save changes</Button>
           </form>
         </Card>
+      )}
 
-        {/* Programme goal */}
+      {tab === 'goal' && (
         <Card>
           <CardHeader title="Programme goal" />
           <form onSubmit={goalForm.handleSubmit(onGoalSubmit)}>
@@ -180,8 +201,11 @@ export default function ProfilePage() {
             </FormField>
             <Button type="submit">Save goal</Button>
           </form>
+        </Card>
+      )}
 
-          <div className="my-3 h-px bg-line" />
+      {tab === 'fund' && (
+        <Card>
           <CardHeader
             title="Fundraising history"
             actions={
@@ -189,7 +213,6 @@ export default function ProfilePage() {
                 + Add round
               </Button>
             }
-            className="mb-1.5"
           />
           <div className="overflow-hidden rounded-lg border border-line">
             <table className="w-full border-collapse text-[11px]">
@@ -198,21 +221,27 @@ export default function ProfilePage() {
                   <th className="border-b border-line px-2.5 py-1.5 text-left text-[10px] font-medium text-ink-muted">Round</th>
                   <th className="border-b border-line px-2.5 py-1.5 text-left text-[10px] font-medium text-ink-muted">Amount</th>
                   <th className="border-b border-line px-2.5 py-1.5 text-left text-[10px] font-medium text-ink-muted">Date</th>
+                  <th className="border-b border-line px-2.5 py-1.5" />
                 </tr>
               </thead>
               <tbody>
                 {entrepreneur.fundingRounds.map((r) => (
                   <tr key={r.id}>
-                    <td className="border-b border-line px-2.5 py-2 last:border-b-0">{r.name}</td>
-                    <td className="border-b border-line px-2.5 py-2 last:border-b-0">${(r.amountUsd / 1000).toFixed(0)}k</td>
-                    <td className="border-b border-line px-2.5 py-2 last:border-b-0">
+                    <td className="border-b border-line px-2.5 py-2">{r.name}</td>
+                    <td className="border-b border-line px-2.5 py-2">${(r.amountUsd / 1000).toFixed(0)}k</td>
+                    <td className="border-b border-line px-2.5 py-2">
                       {new Date(r.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="border-b border-line px-2.5 py-2">
+                      <Button variant="outline" size="sm" onClick={() => import('sonner').then(({ toast }) => toast.success('Editing round…'))}>
+                        Edit
+                      </Button>
                     </td>
                   </tr>
                 ))}
                 {entrepreneur.fundingRounds.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-2.5 py-4 text-center text-[11px] text-ink-faint">
+                    <td colSpan={4} className="px-2.5 py-4 text-center text-[11px] text-ink-faint">
                       No funding rounds recorded yet.
                     </td>
                   </tr>
@@ -220,25 +249,27 @@ export default function ProfilePage() {
               </tbody>
             </table>
           </div>
+        </Card>
+      )}
 
-          <div className="my-3 h-px bg-line" />
+      {tab === 'update' && (
+        <Card>
           <CardHeader
-            title="Periodic update (jobs & funding)"
+            title="Periodic updates (jobs & funding)"
             actions={
               <Button size="sm" onClick={() => setUpdateOpen(true)}>
                 + Submit update
               </Button>
             }
-            className="mb-1.5"
           />
-          <div className="text-[10px] text-ink-muted">
+          <div className="text-[11px] text-ink-muted">
             Last submitted:{' '}
             {entrepreneur.lastUpdateAt
-              ? `Q4 2024 · ${entrepreneur.metrics.jobsCreated} jobs created (${entrepreneur.metrics.jobsWomen} women, ${entrepreneur.metrics.jobsMen} man) · $0 mobilised this period`
+              ? `Q4 2024 · ${entrepreneur.metrics.jobsCreated} jobs created (${entrepreneur.metrics.jobsWomen} women, ${entrepreneur.metrics.jobsMen} men) · $0 mobilised this period`
               : 'Never submitted'}
           </div>
         </Card>
-      </div>
+      )}
 
       <FundingRoundModal open={fundingOpen} onOpenChange={setFundingOpen} />
       <PeriodicUpdateModal open={updateOpen} onOpenChange={setUpdateOpen} />

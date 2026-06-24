@@ -145,6 +145,8 @@ export interface Trainer {
   specialisms: SectorId[];
   maxEntrepreneurs: number;
   accessExpiresOn?: string; // ISO date — only when accessLevel === 'guest'
+  calendarProvider?: 'google' | 'calendly' | 'none';
+  calendarLink?: string;
   metrics: {
     entrepreneursCount: number;
     sessionsThisMonth: number;

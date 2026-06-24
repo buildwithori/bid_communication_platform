@@ -11,10 +11,10 @@ const titles: Record<string, string> = {
   '/admin/entrepreneurs': 'Entrepreneurs',
   '/admin/trainers': 'Trainers',
   '/admin/programs': 'Programs',
-  '/admin/assignments': 'Assignments',
   '/admin/content': 'Content Library',
+  '/admin/sessions': 'Sessions',
+  '/admin/tool-requests': 'Tool Requests',
   '/admin/stages-sectors': 'Stages & Sectors',
-  '/admin/documents': 'Generate Documents',
   '/admin/reporting': 'Reporting & Analytics',
 };
 
@@ -28,8 +28,6 @@ function useTitle() {
   return 'BID Admin';
 }
 
-/** Placeholder top-bar action resolver. Each page mounts its own actions
- *  via children; the admin shell itself only renders the title. */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
   return (
@@ -51,11 +49,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminProvider>
       <AdminShell>{children}</AdminShell>

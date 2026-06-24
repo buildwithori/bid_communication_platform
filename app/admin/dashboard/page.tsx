@@ -9,13 +9,13 @@ import { Button } from '@/components/shared/Button';
 import { Avatar } from '@/components/shared/Avatar';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { useAdminStore } from '@/lib/stores/admin-store';
-import { pendingActions } from '@/lib/mock-data';
 import { programById } from '@/lib/mock-data/programs';
 import { sectorById, stageById } from '@/lib/mock-data/definitions';
 import type { Entrepreneur } from '@/types';
 import { useState } from 'react';
 import { AssignEntrepreneurModal } from '@/components/admin/AssignEntrepreneurModal';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 const stageBreakdown = [
   { id: 'idea', label: 'Idea', percent: 28, count: 13 },
@@ -23,13 +23,18 @@ const stageBreakdown = [
   { id: 'scale', label: 'Scale', percent: 17, count: 8 },
 ];
 
+const pendingActions = [
+  { id: 'pa-1', label: 'Deliverables awaiting review', count: 12, tone: 'amber' as const, href: '/admin/entrepreneurs' },
+  { id: 'pa-2', label: 'Self-registered, unassigned', count: 3, tone: 'red' as const, href: '/admin/entrepreneurs' },
+  { id: 'pa-3', label: 'Tool requests pending', count: 2, tone: 'blue' as const, href: '/admin/tool-requests' },
+];
+
 export default function AdminDashboardPage() {
   const { entrepreneurs, programs } = useAdminStore();
+  const router = useRouter();
   const [assignEntId, setAssignEntId] = useState<string | null>(null);
 
-  const active = entrepreneurs.filter((e) => e.status === 'active').length;
   const unassigned = entrepreneurs.filter((e) => e.status === 'unassigned').length;
-  const graduated = entrepreneurs.filter((e) => e.status === 'graduated').length;
   const recentlyJoined = entrepreneurs
     .filter((e) => e.source === 'self-registered' || e.source === 'invited')
     .slice(0, 3);
@@ -85,11 +90,11 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <PageHeader title="Platform overview" description="Live data across all cohorts and programs" />
+      <PageHeader title="Platform overview" description="Live data across all programmes" />
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         <StatCard label="Total entrepreneurs" value={entrepreneurs.length} subline={`${programs.length} active programmes`} dotColor="bid" />
         <StatCard label="Active trainers" value={9} subline="6 programs" dotColor="info" />
-        <StatCard label="Avg. training progress" value={61} subline="+8% vs last cohort" dotColor="success" />
+        <StatCard label="Avg. training progress" value={`61%`} subline="+8% vs last period" dotColor="success" />
         <StatCard label="Unassigned entrepreneurs" value={unassigned} subline="Awaiting programme" dotColor="warning" valueClassName="text-bid" />
       </div>
 
@@ -97,22 +102,20 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader title="Entrepreneurs by stage" />
           {stageBreakdown.map((s) => (
-            <BarChartRow
-              key={s.id}
-              label={s.label}
-              value={String(s.count)}
-              percent={s.percent}
-              accent="bid"
-            />
+            <BarChartRow key={s.id} label={s.label} value={String(s.count)} percent={s.percent} accent="bid" />
           ))}
           <div className="my-3 h-px bg-line" />
           <CardHeader title="Pending actions" className="mb-2" />
           <div className="flex flex-col gap-1.5">
             {pendingActions.map((a) => (
-              <div key={a.id} className="flex items-center justify-between text-[11px]">
+              <button
+                key={a.id}
+                onClick={() => router.push(a.href)}
+                className="flex items-center justify-between text-[11px] transition-colors hover:text-bid"
+              >
                 <span>{a.label}</span>
                 <Badge tone={a.tone}>{a.count}</Badge>
-              </div>
+              </button>
             ))}
           </div>
         </Card>

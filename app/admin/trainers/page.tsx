@@ -58,6 +58,7 @@ function TrainerCardRow({
             (from {trainer.metrics.satisfactionRatingsCount} ratings)
           </span>
         </div>
+        <CalendarStatusLine provider={trainer.calendarProvider} />
         <div className="mt-2 flex gap-1">
           <Button variant="outline" size="sm" onClick={onEdit}>
             Edit
@@ -69,6 +70,16 @@ function TrainerCardRow({
       </div>
     </Card>
   );
+}
+
+function CalendarStatusLine({ provider }: { provider?: 'google' | 'calendly' | 'none' }) {
+  if (provider === 'google') {
+    return <div className="mt-1.5 text-[10px] font-medium text-success-dark">● Google Calendar connected</div>;
+  }
+  if (provider === 'calendly') {
+    return <div className="mt-1.5 text-[10px] font-medium text-success-dark">● Calendly connected</div>;
+  }
+  return <div className="mt-1.5 text-[10px] font-medium text-danger">● No calendar connected</div>;
 }
 
 export default function AdminTrainersPage() {

@@ -3,14 +3,14 @@ import {
   Users,
   GraduationCap,
   FolderKanban,
-  ArrowRightLeft,
   PlayCircle,
+  CalendarDays,
+  Wrench,
   Star,
   BarChart3,
 } from 'lucide-react';
 import type { NavSection } from '@/components/layout/NavSidebar';
 
-/** Admin-side navigation tree. */
 export const adminNav: NavSection[] = [
   {
     heading: 'Overview',
@@ -29,13 +29,19 @@ export const adminNav: NavSection[] = [
     heading: 'Programs',
     items: [
       { href: '/admin/programs', label: 'Programs', icon: FolderKanban },
-      { href: '/admin/assignments', label: 'Assignments', icon: ArrowRightLeft },
     ],
   },
   {
     heading: 'Content',
     items: [
       { href: '/admin/content', label: 'Content Library', icon: PlayCircle },
+    ],
+  },
+  {
+    heading: 'Requests',
+    items: [
+      { href: '/admin/sessions', label: 'Sessions', icon: CalendarDays },
+      { href: '/admin/tool-requests', label: 'Tool Requests', icon: Wrench },
     ],
   },
   {

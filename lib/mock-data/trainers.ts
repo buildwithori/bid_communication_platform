@@ -15,6 +15,8 @@ export const trainers: Trainer[] = [
     accessLevel: 'full',
     specialisms: ['fintech'],
     maxEntrepreneurs: 10,
+    calendarProvider: 'google',
+    calendarLink: 'kofi.mensah@bid.org',
     metrics: {
       entrepreneursCount: 8,
       sessionsThisMonth: 14,
@@ -32,6 +34,8 @@ export const trainers: Trainer[] = [
     accessLevel: 'full',
     specialisms: ['agritech'],
     maxEntrepreneurs: 10,
+    calendarProvider: 'calendly',
+    calendarLink: 'calendly.com/esi-bid',
     metrics: {
       entrepreneursCount: 6,
       sessionsThisMonth: 9,
@@ -67,6 +71,7 @@ export const trainers: Trainer[] = [
     specialisms: [],
     maxEntrepreneurs: 5,
     accessExpiresOn: '2025-06-30',
+    calendarProvider: 'none',
     metrics: {
       entrepreneursCount: 0,
       sessionsThisMonth: 2,

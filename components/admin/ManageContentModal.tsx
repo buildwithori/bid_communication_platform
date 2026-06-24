@@ -52,9 +52,18 @@ export function ManageContentModal({
                 </div>
                 <div className="mt-0.5 text-[10px] text-ink-muted">{item.durationLabel}</div>
               </div>
-              <Button variant="outline" size="sm">
-                Edit
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => import('sonner').then(({ toast }) => toast.info(`Previewing: ${item.title}`))}
+                >
+                  Preview
+                </Button>
+                <Button variant="outline" size="sm">
+                  Edit
+                </Button>
+              </div>
             </div>
           );
         })}

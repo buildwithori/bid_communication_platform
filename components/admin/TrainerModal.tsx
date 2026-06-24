@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
@@ -10,6 +11,7 @@ import {
   FormRow2,
 } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
+import { Notice } from '@/components/shared/PageHeader';
 import { trainerSchema, type TrainerForm } from '@/lib/forms/schemas';
 import { useAdminStore } from '@/lib/stores/admin-store';
 import type { Trainer } from '@/types';
@@ -43,6 +45,10 @@ export function TrainerModal({
   });
 
   const accessLevel = form.watch('accessLevel');
+  const [calProvider, setCalProvider] = React.useState<'google' | 'calendly' | 'none'>(
+    trainer?.calendarProvider ?? 'none',
+  );
+  const [calLink, setCalLink] = React.useState(trainer?.calendarLink ?? '');
 
   const onSubmit = (values: TrainerForm) => {
     if (isEdit && trainer) {
@@ -61,7 +67,11 @@ export function TrainerModal({
   };
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={mode === 'edit' ? `Edit trainer${trainer ? ` – ${trainer.fullName}` : ''}` : 'Add trainer'}>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={mode === 'edit' ? `Edit trainer${trainer ? ` – ${trainer.fullName}` : ''}` : 'Add trainer'}
+    >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormRow2>
           <FormField label="First name" error={form.formState.errors.firstName?.message}>
@@ -107,6 +117,48 @@ export function TrainerModal({
         <FormField label="Max entrepreneurs">
           <FormInput type="number" {...form.register('maxEntrepreneurs')} />
         </FormField>
+
+        <div className="my-3 h-px bg-line" />
+
+        <FormField label="Calendar integration" optional>
+          <FormSelect
+            value={calProvider}
+            onValueChange={(v) => {
+              setCalProvider(v as typeof calProvider);
+              if (v === 'google') setCalLink('');
+              if (v === 'none') setCalLink('');
+            }}
+            options={[
+              { value: 'google', label: 'Google Calendar' },
+              { value: 'calendly', label: 'Calendly' },
+              { value: 'none', label: 'Not connected' },
+            ]}
+          />
+        </FormField>
+        {calProvider === 'calendly' && (
+          <FormField label="Calendly link">
+            <FormInput
+              placeholder="e.g. calendly.com/kofi-bid"
+              value={calLink}
+              onChange={(e) => setCalLink(e.target.value)}
+            />
+          </FormField>
+        )}
+        {calProvider === 'google' && (
+          <FormField label="Google Calendar email">
+            <FormInput
+              placeholder="calendar@gmail.com"
+              value={calLink}
+              onChange={(e) => setCalLink(e.target.value)}
+            />
+          </FormField>
+        )}
+        <Notice>
+          Entrepreneurs book sessions against whatever this trainer&apos;s calendar
+          shows as available. If this isn&apos;t connected, bookings will be requests
+          the trainer has to manually confirm.
+        </Notice>
+
         <Button type="submit" className="w-full">
           {mode === 'edit' ? 'Save changes' : 'Add trainer'}
         </Button>
@@ -114,3 +166,5 @@ export function TrainerModal({
     </Modal>
   );
 }
+
+
