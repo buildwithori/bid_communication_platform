@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { BidLogo } from '@/components/shared/BidLogo';
+import { GoogleIcon } from '@/components/shared/GoogleIcon';
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Incorrect email or password.',
@@ -20,6 +21,15 @@ export default function AdminLoginPage() {
     errorKey ? ERROR_MESSAGES[errorKey] ?? null : null,
   );
   const [pending, setPending] = React.useState(false);
+  const [googlePending, setGooglePending] = React.useState(false);
+
+  async function handleGoogleSignIn() {
+    setGooglePending(true);
+    // Production: await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: '/admin/dashboard' } })
+    await new Promise((r) => setTimeout(r, 800));
+    setGooglePending(false);
+    router.push('/admin/dashboard');
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -116,6 +126,27 @@ export default function AdminLoginPage() {
               </div>
             )}
 
+            {/* Google SSO */}
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googlePending || pending}
+              className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-line bg-surface px-4 py-2.5 text-[13px] font-medium text-ink transition-all hover:bg-surface-hover hover:border-ink-muted active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {googlePending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <GoogleIcon className="h-4 w-4" />
+              )}
+              Continue with Google
+            </button>
+
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-[11px] text-ink-faint">or sign in with email</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label htmlFor="email" className="block text-[12px] font-medium text-ink">
@@ -149,7 +180,7 @@ export default function AdminLoginPage() {
 
               <button
                 type="submit"
-                disabled={pending}
+                disabled={pending || googlePending}
                 className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-bid px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-bid-dark active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
