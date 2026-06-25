@@ -1,58 +1,22 @@
-'use client';
-
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
-import { AppShell } from '@/components/layout/AppShell';
+import { cookies } from 'next/headers';
+import { AdminShell, TrainerShell } from './AdminShell';
 import { AdminProvider } from '@/lib/stores/admin-store';
-import { adminNav } from '@/lib/nav/admin-nav';
+import { SESSION_COOKIE, decodeSession } from '@/lib/auth/config';
 
-const titles: Record<string, string> = {
-  '/admin/dashboard': 'Admin Dashboard',
-  '/admin/entrepreneurs': 'Entrepreneurs',
-  '/admin/trainers': 'Trainers',
-  '/admin/programs': 'Programs',
-  '/admin/content': 'Content Library',
-  '/admin/sessions': 'Sessions',
-  '/admin/tool-requests': 'Tool Requests',
-  '/admin/stages-sectors': 'Stages & Sectors',
-  '/admin/reporting': 'Reporting & Analytics',
-};
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(SESSION_COOKIE)?.value;
+  const session = raw ? decodeSession(raw) : null;
+  const role = session?.role ?? 'admin';
 
-function useTitle() {
-  const pathname = usePathname();
-  if (titles[pathname]) return titles[pathname];
-  if (pathname.startsWith('/admin/')) {
-    const seg = pathname.split('/')[2] ?? '';
-    return seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' ');
-  }
-  return 'BID Admin';
-}
-
-export function AdminShell({ children }: { children: React.ReactNode }) {
-  const title = useTitle();
-  return (
-    <AppShell
-      brandTitle="BID Admin"
-      brandSubtitle="Management Console"
-      role="admin"
-      sections={adminNav}
-      user={{
-        initials: 'AD',
-        name: 'Ama Darko',
-        subtitle: 'Programme Lead',
-        tone: 'brand',
-      }}
-      title={title}
-    >
-      {children}
-    </AppShell>
-  );
-}
-
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminProvider>
-      <AdminShell>{children}</AdminShell>
+      {role === 'trainer' ? (
+        <TrainerShell session={session}>{children}</TrainerShell>
+      ) : (
+        <AdminShell>{children}</AdminShell>
+      )}
     </AdminProvider>
   );
 }

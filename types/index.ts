@@ -6,7 +6,7 @@
  * touching the components that consume these types.
  */
 
-export type Role = 'entrepreneur' | 'admin';
+export type Role = 'entrepreneur' | 'admin' | 'trainer';
 
 export type SectorId =
   | 'fintech'
