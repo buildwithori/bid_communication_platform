@@ -2,21 +2,18 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import { BidLogo } from '@/components/shared/BidLogo';
-import { registerAction } from '@/lib/auth/actions';
 
 const COUNTRIES = ['Ghana', 'Nigeria', 'Kenya', 'South Africa', 'Rwanda', 'Uganda'];
 
-const ERROR_MESSAGES: Record<string, string> = {
-  missing_fields: 'Please fill in all required fields.',
-};
-
 export default function EntrepreneurRegisterPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const errorKey = searchParams.get('error');
-  const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] : null;
+  const [error, setError] = React.useState<string | null>(
+    searchParams.get('error') === 'missing_fields' ? 'Please fill in all required fields.' : null,
+  );
   const [pending, setPending] = React.useState(false);
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -30,15 +27,35 @@ export default function EntrepreneurRegisterPage() {
     }
     setPasswordMismatch(false);
     setPending(true);
+    setError(null);
+
     const fd = new FormData(e.currentTarget);
-    await registerAction(fd);
-    setPending(false);
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: fd.get('email'),
+        businessName: fd.get('businessName'),
+        representativeName: fd.get('representativeName'),
+        phone: fd.get('phone'),
+        country: fd.get('country'),
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error === 'missing_fields' ? 'Please fill in all required fields.' : 'Something went wrong. Please try again.');
+      setPending(false);
+      return;
+    }
+
+    router.push('/pending');
   }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-[460px]">
-        {/* Brand header */}
         <div className="mb-8 flex flex-col items-center text-center">
           <BidLogo size={52} className="mb-4" />
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">
@@ -49,12 +66,11 @@ export default function EntrepreneurRegisterPage() {
           </p>
         </div>
 
-        {/* Card */}
         <div className="rounded-bid border border-line bg-surface-panel p-8 shadow-sm">
-          {errorMessage && (
+          {error && (
             <div className="mb-5 flex items-start gap-2.5 rounded-lg bg-danger-light px-3.5 py-3 text-[12px] text-danger">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {errorMessage}
+              {error}
             </div>
           )}
 
@@ -192,14 +208,12 @@ export default function EntrepreneurRegisterPage() {
             </button>
           </form>
 
-          {/* Review note */}
           <p className="mt-4 rounded-lg bg-bid-light px-3.5 py-3 text-[11px] leading-relaxed text-bid-dark">
             Your account will be reviewed by the BID team before you can access the platform. This
             typically takes 2–3 business days.
           </p>
         </div>
 
-        {/* Sign in link */}
         <p className="mt-4 text-center text-[12px] text-ink-muted">
           Already have an account?{' '}
           <Link

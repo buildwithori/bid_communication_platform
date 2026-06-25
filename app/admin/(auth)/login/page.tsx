@@ -1,10 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { BidLogo } from '@/components/shared/BidLogo';
-import { loginAction } from '@/lib/auth/actions';
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Incorrect email or password.',
@@ -14,25 +13,45 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function AdminLoginPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const errorKey = searchParams.get('error');
-  const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] : null;
+  const [error, setError] = React.useState<string | null>(
+    errorKey ? ERROR_MESSAGES[errorKey] ?? null : null,
+  );
   const [pending, setPending] = React.useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
+    setError(null);
+
     const fd = new FormData(e.currentTarget);
-    fd.set('subdomain', 'admin');
-    await loginAction(fd);
-    setPending(false);
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: fd.get('email'),
+        password: fd.get('password'),
+        subdomain: 'admin',
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(ERROR_MESSAGES[data.error] ?? 'Something went wrong. Please try again.');
+      setPending(false);
+      return;
+    }
+
+    router.push('/admin/dashboard');
   }
 
   return (
     <div className="flex min-h-screen">
       {/* Left panel — brand / hero */}
       <div className="relative hidden flex-col justify-between overflow-hidden bg-bid p-10 lg:flex lg:w-[45%]">
-        {/* Geometric background detail */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden"
@@ -42,7 +61,6 @@ export default function AdminLoginPage() {
           <div className="absolute bottom-32 right-8 h-40 w-40 rounded-full bg-white/5" />
         </div>
 
-        {/* Logo */}
         <div className="relative flex items-center gap-3">
           <BidLogo size={40} className="bg-white/20" />
           <div>
@@ -51,7 +69,6 @@ export default function AdminLoginPage() {
           </div>
         </div>
 
-        {/* Central message */}
         <div className="relative">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
             <ShieldCheck className="h-6 w-6 text-white" />
@@ -66,7 +83,6 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Footer */}
         <div className="relative text-[11px] text-white/40">
           BID Hub · Confidential staff access only
         </div>
@@ -74,7 +90,6 @@ export default function AdminLoginPage() {
 
       {/* Right panel — form */}
       <div className="flex flex-1 flex-col items-center justify-center bg-surface px-6 py-12">
-        {/* Mobile logo (shown below lg) */}
         <div className="mb-8 flex items-center gap-3 lg:hidden">
           <BidLogo size={40} />
           <div>
@@ -94,10 +109,10 @@ export default function AdminLoginPage() {
           </div>
 
           <div className="rounded-bid border border-line bg-surface-panel p-7 shadow-sm">
-            {errorMessage && (
+            {error && (
               <div className="mb-5 flex items-start gap-2.5 rounded-lg bg-danger-light px-3.5 py-3 text-[12px] text-danger">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {errorMessage}
+                {error}
               </div>
             )}
 

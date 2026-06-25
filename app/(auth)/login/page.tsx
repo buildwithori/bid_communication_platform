@@ -2,10 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { BidLogo } from '@/components/shared/BidLogo';
-import { loginAction } from '@/lib/auth/actions';
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Incorrect email or password. Please try again.',
@@ -15,18 +14,43 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function EntrepreneurLoginPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const errorKey = searchParams.get('error');
-  const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] : null;
+  const [error, setError] = React.useState<string | null>(
+    errorKey ? ERROR_MESSAGES[errorKey] ?? null : null,
+  );
   const [pending, setPending] = React.useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
+    setError(null);
+
     const fd = new FormData(e.currentTarget);
-    fd.set('subdomain', 'app');
-    await loginAction(fd);
-    setPending(false);
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: fd.get('email'),
+        password: fd.get('password'),
+        subdomain: 'app',
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(ERROR_MESSAGES[data.error] ?? 'Something went wrong. Please try again.');
+      setPending(false);
+      return;
+    }
+
+    if (data.status === 'pending') {
+      router.push('/pending');
+    } else {
+      router.push('/dashboard');
+    }
   }
 
   return (
@@ -45,10 +69,10 @@ export default function EntrepreneurLoginPage() {
 
         {/* Card */}
         <div className="rounded-bid border border-line bg-surface-panel p-8 shadow-sm">
-          {errorMessage && (
+          {error && (
             <div className="mb-5 flex items-start gap-2.5 rounded-lg bg-danger-light px-3.5 py-3 text-[12px] text-danger">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {errorMessage}
+              {error}
             </div>
           )}
 
@@ -113,8 +137,18 @@ export default function EntrepreneurLoginPage() {
           </Link>
         </p>
 
+        <p className="mt-4 text-center text-[11px] text-ink-faint">
+          Forgot password?{' '}
+          <Link
+            href="/forgot-password"
+            className="underline underline-offset-2 hover:text-ink-muted transition-colors"
+          >
+            Reset it here
+          </Link>
+        </p>
+
         {/* Support */}
-        <p className="mt-10 text-center text-[11px] text-ink-faint">
+        <p className="mt-6 text-center text-[11px] text-ink-faint">
           Having trouble?{' '}
           <a
             href="mailto:support@bid.org"

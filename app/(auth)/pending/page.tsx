@@ -1,23 +1,23 @@
 'use client';
 
-import { BidLogo } from '@/components/shared/BidLogo';
-import { logoutAction } from '@/lib/auth/actions';
-import { Clock, Loader2 } from 'lucide-react';
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
+import { BidLogo } from '@/components/shared/BidLogo';
+import { Clock, Loader2 } from 'lucide-react';
 
 export default function PendingPage() {
+  const router = useRouter();
   const [pending, setPending] = React.useState(false);
 
   async function handleSignOut() {
     setPending(true);
-    await logoutAction();
-    setPending(false);
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
   }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-[420px] text-center">
-        {/* Icon + Brand */}
         <div className="mb-6 flex flex-col items-center">
           <BidLogo size={52} className="mb-4" />
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-bid-light">
