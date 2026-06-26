@@ -22,8 +22,8 @@ export const metadata: Metadata = {
   description:
     'BID Hub — a platform for entrepreneurs and programme administrators to manage training, deliverables, mentoring, and reporting.',
   icons: {
-    icon: '/BIDCP_LOGO_(1).png',
-    apple: '/BIDCP_LOGO_(1).png',
+    icon: '/BIDCP_ISOTYPE_(1).png',
+    apple: '/BIDCP_ISOTYPE_(1).png',
   },
 };
 

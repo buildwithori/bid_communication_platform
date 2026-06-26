@@ -68,7 +68,7 @@ export default function EntrepreneurLoginPage() {
       <div className="w-full max-w-[400px]">
         {/* Brand header */}
         <div className="mb-8 flex flex-col items-center text-center">
-          <BidLogo size={52} className="mb-4" />
+          <BidLogo size={68} variant="full" className="mb-4" />
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">
             Welcome to BID Hub
           </h1>

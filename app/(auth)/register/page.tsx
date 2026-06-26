@@ -57,7 +57,7 @@ export default function EntrepreneurRegisterPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-[460px]">
         <div className="mb-8 flex flex-col items-center text-center">
-          <BidLogo size={52} className="mb-4" />
+          <BidLogo size={68} variant="full" className="mb-4" />
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">
             Register your business
           </h1>

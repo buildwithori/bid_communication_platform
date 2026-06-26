@@ -8,7 +8,7 @@ export default function HomePage() {
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 py-12">
         {/* Brand */}
         <header className="mb-10 flex flex-col items-center text-center">
-          <BidLogo size={56} />
+          <BidLogo size={72} variant="full" />
           <h1 className="mt-4 text-[26px] font-semibold tracking-tight">BID Hub</h1>
           <p className="mt-1 text-[13px] text-ink-muted">
             Entrepreneur &amp; Programme Management Platform

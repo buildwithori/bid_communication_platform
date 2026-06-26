@@ -59,7 +59,7 @@ export function NavSidebar({
     <div className="flex h-full flex-col bg-surface-panel">
       {/* Brand */}
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5">
-        <BidLogo size={32} />
+        <BidLogo size={40} variant="isotype" />
         <div>
           <div className="text-sm font-semibold leading-tight">{brandTitle}</div>
           <div className="font-mono text-[9px] text-ink-faint">{brandSubtitle}</div>

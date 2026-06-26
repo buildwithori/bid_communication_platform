@@ -19,7 +19,7 @@ export default function PendingPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-[420px] text-center">
         <div className="mb-6 flex flex-col items-center">
-          <BidLogo size={52} className="mb-4" />
+          <BidLogo size={68} variant="full" className="mb-4" />
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-bid-light">
             <Clock className="h-6 w-6 text-bid" />
           </div>

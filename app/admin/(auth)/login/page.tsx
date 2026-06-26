@@ -72,7 +72,7 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="relative flex items-center gap-3">
-          <BidLogo size={40} className="bg-white/20" />
+          <BidLogo size={48} variant="isotype" className="bg-white/20" />
           <div>
             <div className="text-[15px] font-semibold text-white">BID Hub</div>
             <div className="font-mono text-[10px] text-white/60">Management Console</div>
@@ -101,7 +101,7 @@ export default function AdminLoginPage() {
       {/* Right panel — form */}
       <div className="flex flex-1 flex-col items-center justify-center bg-surface px-6 py-12">
         <div className="mb-8 flex items-center gap-3 lg:hidden">
-          <BidLogo size={40} />
+          <BidLogo size={48} variant="isotype" />
           <div>
             <div className="text-[15px] font-semibold text-ink">BID Hub</div>
             <div className="font-mono text-[10px] text-ink-faint">Management Console</div>
