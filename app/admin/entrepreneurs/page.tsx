@@ -4,9 +4,18 @@ import * as React from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
+import { MetricGrid } from '@/components/shared/MetricGrid';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
+import {
+  TableEmptyState,
+  TableFilterInput,
+  TableFilterSelect,
+  TablePagination,
+  TableToolbar,
+  RowActions,
+} from '@/components/shared/DataTable';
 import { EntrepreneurModal } from '@/components/admin/EntrepreneurModal';
 import { AssignEntrepreneurModal } from '@/components/admin/AssignEntrepreneurModal';
 import { ViewEntrepreneurModal } from '@/components/admin/ViewEntrepreneurModal';
@@ -65,6 +74,8 @@ export default function AdminEntrepreneursPage() {
   const [sortDir, setSortDir] = React.useState<SortDir>(null);
   const [textFilters, setTextFilters] = React.useState<Partial<Record<ColKey, string>>>({});
   const [selectFilters, setSelectFilters] = React.useState<Partial<Record<ColKey, string>>>({});
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(10);
 
   const selectOptions = React.useMemo<Partial<Record<ColKey, string[]>>>(() => {
     const opts: Partial<Record<ColKey, string[]>> = {};
@@ -106,6 +117,15 @@ export default function AdminEntrepreneursPage() {
     return rows;
   }, [entrepreneurs, textFilters, selectFilters, sortCol, sortDir]);
 
+  React.useEffect(() => {
+    setPage(1);
+  }, [textFilters, selectFilters, sortCol, sortDir, pageSize]);
+
+  const pageRows = React.useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
   const toggleSort = (col: ColKey) => {
     if (sortCol !== col) { setSortCol(col); setSortDir('asc'); return; }
     if (sortDir === 'asc') { setSortDir('desc'); return; }
@@ -135,128 +155,157 @@ export default function AdminEntrepreneursPage() {
         choose), or they self-register from the website and arrive{' '}
         <strong>unassigned</strong> until you assign them to a programme.
       </Notice>
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <MetricGrid>
         <StatCard label="Total" value={entrepreneurs.length} />
         <StatCard label="Active" value={active} />
         <StatCard label="Unassigned" value={unassigned} valueClassName="text-bid" />
         <StatCard label="Graduated" value={graduated} />
-      </div>
+      </MetricGrid>
 
       <Card className="mt-3">
         <CardHeader
           title="All entrepreneurs"
+          description={`${filtered.length} of ${entrepreneurs.length} entrepreneurs shown`}
           actions={
             hasFilters ? (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 text-[11px] font-medium text-bid hover:opacity-80"
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-bid transition-colors hover:bg-bid-light"
               >
-                <X className="h-3 w-3" /> Clear all filters
+                <X className="h-4 w-4" /> Clear filters
               </button>
             ) : undefined
           }
         />
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[11px]">
+        <TableToolbar>
+          <div>
+            <div className="text-sm font-medium text-ink">Filter and sort the entrepreneur pipeline</div>
+            <div className="mt-0.5 text-sm text-ink-muted">
+              Use column filters for quick operational slicing.
+            </div>
+          </div>
+          <div className="text-sm text-ink-muted">
+            {hasFilters ? 'Filtered view active' : 'No filters applied'}
+          </div>
+        </TableToolbar>
+        <div className="overflow-hidden rounded-xl border border-black/[0.08] bg-white">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[1240px] border-separate border-spacing-0 text-sm">
             <thead>
-              <tr>
+              <tr className="bg-surface-subtle/80">
+                <th className="whitespace-nowrap border-b border-line px-4 py-3 text-left text-xs font-medium uppercase tracking-[0.04em] text-ink-muted first:pl-5">
+                  Action
+                </th>
                 {cols.map((c) => (
                   <th
                     key={c.key}
                     onClick={() => toggleSort(c.key)}
-                    className="cursor-pointer select-none border-b border-line px-2.5 py-2 text-left text-[10px] font-medium text-ink-muted hover:bg-surface-subtle whitespace-nowrap"
+                    className="cursor-pointer select-none whitespace-nowrap border-b border-line px-4 py-3 text-left text-xs font-medium uppercase tracking-[0.04em] text-ink-muted transition-colors first:pl-5 hover:bg-surface-subtle"
                   >
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       {c.label}
                       <SortIcon dir={sortCol === c.key ? sortDir : null} />
                     </span>
                   </th>
                 ))}
-                <th className="border-b border-line px-2.5 py-2" />
               </tr>
-              <tr className="bg-surface-subtle">
+              <tr className="bg-white">
+                <th className="border-b border-line px-2 py-2 first:pl-5" />
                 {cols.map((c) => (
-                  <th key={c.key} className="border-b border-line px-1.5 py-1.5">
+                  <th key={c.key} className="border-b border-line px-2 py-2 first:pl-5">
                     {c.isSelect ? (
-                      <select
+                      <TableFilterSelect
                         value={selectFilters[c.key] ?? ''}
                         onChange={(e) => setSelectFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                        className="w-full rounded-md border border-line bg-white px-1.5 py-1 text-[10px] text-ink focus:border-bid focus:outline-none"
                       >
                         <option value="">All</option>
                         {(selectOptions[c.key] ?? []).map((v) => (
                           <option key={v} value={v}>{v}</option>
                         ))}
-                      </select>
+                      </TableFilterSelect>
                     ) : (
-                      <input
+                      <TableFilterInput
                         type="text"
                         placeholder="Filter…"
                         value={textFilters[c.key] ?? ''}
                         onChange={(e) => setTextFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                        className="w-full rounded-md border border-line bg-white px-1.5 py-1 text-[10px] text-ink placeholder:text-ink-faint focus:border-bid focus:outline-none"
                       />
                     )}
                   </th>
                 ))}
-                <th className="border-b border-line px-1.5 py-1.5" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => (
-                <tr key={e.id} className="transition-colors hover:bg-surface-subtle">
-                  <td className="border-b border-line px-2.5 py-2 font-medium">{e.businessName}</td>
-                  <td className="border-b border-line px-2.5 py-2">{e.representative}</td>
-                  <td className="border-b border-line px-2.5 py-2">
+              {pageRows.map((e) => (
+                <tr key={e.id} className="group transition-colors hover:bg-surface-subtle/70">
+                  <td className="border-b border-line/80 px-4 py-4 first:pl-5">
+                    <RowActions
+                      actions={[
+                        { label: 'Edit entrepreneur', onSelect: () => setEditTarget(e) },
+                        e.status === 'unassigned'
+                          ? { label: 'Assign to programme', onSelect: () => setAssignTarget(e) }
+                          : { label: 'View profile', onSelect: () => setViewTarget(e) },
+                      ]}
+                    />
+                  </td>
+                  <td className="border-b border-line/80 px-4 py-4 font-medium">{e.businessName}</td>
+                  <td className="border-b border-line/80 px-4 py-4">{e.representative}</td>
+                  <td className="border-b border-line/80 px-4 py-4">
                     <Badge tone={sectorById[e.sector]?.color ?? 'neutral'}>{sectorById[e.sector]?.label ?? e.sector}</Badge>
                   </td>
-                  <td className="border-b border-line px-2.5 py-2">{e.country}</td>
-                  <td className="border-b border-line px-2.5 py-2">
+                  <td className="border-b border-line/80 px-4 py-4">{e.country}</td>
+                  <td className="border-b border-line/80 px-4 py-4">
                     <Badge tone={stageById[e.stage]?.color ?? 'neutral'}>{stageById[e.stage]?.label ?? e.stage}</Badge>
                   </td>
-                  <td className="border-b border-line px-2.5 py-2 whitespace-nowrap">
+                  <td className="whitespace-nowrap border-b border-line/80 px-4 py-4">
                     {programById(e.programmeId)?.name ?? <span className="text-ink-faint">—</span>}
                   </td>
-                  <td className="border-b border-line px-2.5 py-2">
+                  <td className="border-b border-line/80 px-4 py-4">
                     <Badge tone={e.source === 'invited' ? 'brand' : 'neutral'}>
                       {e.source === 'invited' ? 'Invited' : 'Self-registered'}
                     </Badge>
                   </td>
-                  <td className="border-b border-line px-2.5 py-2">
+                  <td className="border-b border-line/80 px-4 py-4">
                     {e.goal.type === 'fundraising' && e.goal.amountUsd
                       ? `Fundraising $${(e.goal.amountUsd / 1000).toFixed(0)}k`
                       : e.goal.type === 'milestone' ? 'Milestone-based' : 'Programme completion'}
                   </td>
-                  <td className="border-b border-line px-2.5 py-2">
+                  <td className="border-b border-line/80 px-4 py-4">
                     <Badge tone={e.status === 'active' ? 'green' : e.status === 'unassigned' ? 'red' : 'neutral'}>
                       {e.status === 'active' ? 'Active' : e.status === 'unassigned' ? 'Unassigned' : 'Graduated'}
                     </Badge>
-                  </td>
-                  <td className="border-b border-line px-2.5 py-2">
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => setEditTarget(e)}>Edit</Button>
-                      {e.status === 'unassigned' ? (
-                        <Button size="sm" onClick={() => setAssignTarget(e)}>Assign</Button>
-                      ) : (
-                        <Button size="sm" onClick={() => setViewTarget(e)}>View</Button>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-2.5 py-8 text-center text-[11px] text-ink-faint">
-                    No entrepreneurs match these filters.{' '}
-                    <button onClick={clearFilters} className="font-medium text-bid hover:opacity-80">
-                      Clear filters
-                    </button>
+                  <td colSpan={10} className="px-5 py-8">
+                    <TableEmptyState
+                      title="No entrepreneurs match these filters"
+                      description="Clear the active filters or adjust the column search."
+                      action={
+                        <Button variant="outline" size="sm" onClick={clearFilters}>
+                          Clear filters
+                        </Button>
+                      }
+                    />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+          </div>
         </div>
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       </Card>
 
       <EntrepreneurModal open={addOpen} onOpenChange={setAddOpen} mode="add" />

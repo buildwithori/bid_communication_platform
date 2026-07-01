@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, Download } from 'lucide-react';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
+import { MetricGrid } from '@/components/shared/MetricGrid';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { BarChartRow } from '@/components/shared/BarChartRow';
 import { Button } from '@/components/shared/Button';
-import { DataTable, type Column } from '@/components/shared/DataTable';
+import {
+  DataTable,
+  RowActions,
+  TableFilterInput,
+  TablePagination,
+  TableToolbar,
+  type Column,
+} from '@/components/shared/DataTable';
 import {
   reportingMetrics,
   jobsByProgram,
@@ -24,6 +32,9 @@ const ALL = 'all';
 export default function AdminReportingPage() {
   const [selectedProgramme, setSelectedProgramme] = useState<string>(ALL);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [overdueQuery, setOverdueQuery] = useState('');
+  const [overduePage, setOverduePage] = useState(1);
+  const [overduePageSize, setOverduePageSize] = useState(10);
 
   const programmeData =
     selectedProgramme !== ALL ? reportingByProgramme[selectedProgramme] : null;
@@ -32,10 +43,26 @@ export default function AdminReportingPage() {
   const jobs = programmeData?.jobsByProgram ?? jobsByProgram;
   const funds = programmeData?.fundsByProgram ?? fundsByProgram;
 
-  const filteredOverdue =
+  const programmeOverdue =
     selectedProgramme === ALL
       ? overdueUpdaters
       : overdueUpdaters.filter((u) => u.programmeId === selectedProgramme);
+  const filteredOverdue = useMemo(() => {
+    const needle = overdueQuery.trim().toLowerCase();
+    if (!needle) return programmeOverdue;
+    return programmeOverdue.filter((u) => {
+      const ent = entrepreneurs.find((e) => e.id === u.entrepreneurId);
+      const prog = programs.find((p) => p.id === u.programmeId);
+      return [ent?.businessName, ent?.representative, prog?.name, u.lastUpdateLabel]
+        .join(' ')
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [overdueQuery, programmeOverdue]);
+  const overduePageRows = filteredOverdue.slice(
+    (overduePage - 1) * overduePageSize,
+    overduePage * overduePageSize,
+  );
 
   const selectedLabel =
     selectedProgramme === ALL
@@ -43,6 +70,18 @@ export default function AdminReportingPage() {
       : programs.find((p) => p.id === selectedProgramme)?.name ?? 'All programmes';
 
   const columns: Column<(typeof overdueUpdaters)[number]>[] = [
+    {
+      key: 'action',
+      header: 'Action',
+      cell: () => (
+        <RowActions
+          actions={[
+            { label: 'Send reminder', onSelect: () => toast.success('Reminder sent!') },
+          ]}
+        />
+      ),
+      className: 'w-[84px]',
+    },
     {
       key: 'ent',
       header: 'Entrepreneur',
@@ -60,15 +99,6 @@ export default function AdminReportingPage() {
       },
     },
     { key: 'last', header: 'Last update', cell: (u) => u.lastUpdateLabel },
-    {
-      key: 'action',
-      header: '',
-      cell: () => (
-        <Button variant="outline" size="sm" onClick={() => toast.success('Reminder sent!')}>
-          Send reminder
-        </Button>
-      ),
-    },
   ];
 
   return (
@@ -82,7 +112,7 @@ export default function AdminReportingPage() {
             <div className="relative">
               <button
                 onClick={() => setDropdownOpen((o) => !o)}
-                className="flex h-9 items-center gap-2 rounded-lg border border-border bg-white px-3 text-xs font-medium text-ink shadow-sm transition hover:bg-surface-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+                className="flex h-10 items-center gap-2 rounded-lg border border-black/[0.1] bg-white px-3 text-sm font-medium text-ink shadow-sm transition hover:bg-surface-subtle focus:outline-none focus:ring-2 focus:ring-bid/20"
               >
                 <span className="max-w-[180px] truncate">{selectedLabel}</span>
                 <ChevronDown
@@ -97,7 +127,7 @@ export default function AdminReportingPage() {
                     className="fixed inset-0 z-10"
                     onClick={() => setDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 top-full z-20 mt-1.5 min-w-[220px] overflow-hidden rounded-lg border border-border bg-white shadow-lg">
+                  <div className="absolute right-0 top-full z-20 mt-1.5 min-w-[260px] overflow-hidden rounded-xl border border-black/[0.08] bg-white shadow-lg">
                     <DropdownItem
                       label="All programmes"
                       active={selectedProgramme === ALL}
@@ -136,7 +166,7 @@ export default function AdminReportingPage() {
         data prior to this feature launching is not available.
       </Notice>
 
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <MetricGrid>
         <StatCard
           label="Jobs created (period)"
           value={metrics.jobsCreated}
@@ -159,11 +189,11 @@ export default function AdminReportingPage() {
           label="Training completion rate"
           value={`${metrics.trainingCompletionRate}%`}
         />
-      </div>
+      </MetricGrid>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Jobs created by programme" />
+          <CardHeader title="Jobs created by programme" description="Employment impact by active programme" />
           {jobs.map((r) => (
             <BarChartRow
               key={r.programName}
@@ -175,7 +205,7 @@ export default function AdminReportingPage() {
           ))}
         </Card>
         <Card>
-          <CardHeader title="Funds mobilised by programme" />
+          <CardHeader title="Funds mobilised by programme" description="Reported capital raised by entrepreneurs" />
           {funds.map((r) => (
             <BarChartRow
               key={r.programName}
@@ -188,13 +218,45 @@ export default function AdminReportingPage() {
         </Card>
       </div>
 
-      <Card className="mt-3">
-        <CardHeader title="Entrepreneurs with overdue updates" />
+      <Card className="mt-4">
+        <CardHeader
+          title="Entrepreneurs with overdue updates"
+          description="Follow-up list for missing quarterly reporting data"
+        />
+        <TableToolbar>
+          <div>
+            <div className="text-sm font-medium text-ink">Search overdue updates</div>
+            <div className="mt-0.5 text-sm text-ink-muted">
+              Find entrepreneurs by business, representative, programme, or last update.
+            </div>
+          </div>
+          <div className="w-full sm:w-[320px]">
+            <TableFilterInput
+              icon
+              placeholder="Search overdue updates..."
+              value={overdueQuery}
+              onChange={(event) => {
+                setOverdueQuery(event.target.value);
+                setOverduePage(1);
+              }}
+            />
+          </div>
+        </TableToolbar>
         <DataTable
           columns={columns}
-          rows={filteredOverdue}
+          rows={overduePageRows}
           rowKey={(u) => u.entrepreneurId}
           emptyMessage="No overdue updates for this programme."
+        />
+        <TablePagination
+          page={overduePage}
+          pageSize={overduePageSize}
+          totalItems={filteredOverdue.length}
+          onPageChange={setOverduePage}
+          onPageSizeChange={(next) => {
+            setOverduePageSize(next);
+            setOverduePage(1);
+          }}
         />
       </Card>
     </>
@@ -213,11 +275,11 @@ function DropdownItem({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center px-3 py-2 text-left text-xs transition hover:bg-surface-subtle ${
-        active ? 'font-medium text-brand' : 'text-ink'
+      className={`flex w-full items-center px-3 py-2.5 text-left text-sm transition hover:bg-surface-subtle ${
+        active ? 'font-medium text-bid' : 'text-ink'
       }`}
     >
-      {active && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-brand" />}
+      {active && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-bid" />}
       <span className={active ? '' : 'ml-3.5'}>{label}</span>
     </button>
   );
