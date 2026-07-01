@@ -17,6 +17,7 @@ import {
 } from '@/lib/mock-data/programs';
 import { cn } from '@/lib/utils';
 import type { ContentItem, ContentType } from '@/types';
+import { routes } from '@/lib/routes';
 
 const typeMeta: Record<
   ContentType,
@@ -43,26 +44,26 @@ export default function ModuleContentPage({
 }: {
   params: { programmeId: string; moduleId: string };
 }) {
-  const program = programById(params.programmeId);
-  const module = moduleById(params.moduleId);
-  if (!program || !module) return notFound();
-  const items = contentForModule(module.id);
-
   const [activeVideo, setActiveVideo] = React.useState<ContentItem | null>(null);
   const [activeTool, setActiveTool] = React.useState<ContentItem | null>(null);
   const [ratingItem, setRatingItem] = React.useState<ContentItem | null>(null);
+
+  const program = programById(params.programmeId);
+  const trainingModule = moduleById(params.moduleId);
+  if (!program || !trainingModule) return notFound();
+  const items = contentForModule(trainingModule.id);
 
   return (
     <>
       <Breadcrumb
         items={[
-          { label: 'Training Library', href: '/training' },
-          { label: program.name, href: `/training/${program.id}` },
-          { label: module.title },
+          { label: 'Training Library', href: routes.entrepreneur.training },
+          { label: program.name, href: routes.entrepreneur.trainingProgram(program.id) },
+          { label: trainingModule.title },
         ]}
       />
       <PageHeader
-        title={module.title}
+        title={trainingModule.title}
         description={`${items.length} content items in this module`}
       />
 

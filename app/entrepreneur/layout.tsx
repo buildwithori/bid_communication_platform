@@ -10,14 +10,15 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
 import { NotificationsModal } from '@/components/entrepreneur/NotificationsModal';
+import { routes } from '@/lib/routes';
 
 const titles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/training': 'Training Library',
-  '/profile': 'My Profile',
-  '/deliverables': 'Deliverables',
-  '/schedule': 'Schedule',
-  '/tools': 'Entrepreneur Tools',
+  [routes.entrepreneur.dashboard]: 'Dashboard',
+  [routes.entrepreneur.training]: 'Training Library',
+  [routes.entrepreneur.profile]: 'My Profile',
+  [routes.entrepreneur.deliverables]: 'Deliverables',
+  [routes.entrepreneur.schedule]: 'Schedule',
+  [routes.entrepreneur.tools]: 'Entrepreneur Tools',
 };
 
 /** Resolves the top-bar title from the active pathname. */
@@ -25,8 +26,8 @@ function useTitle() {
   const pathname = usePathname();
   const exact = titles[pathname];
   if (exact) return exact;
-  if (pathname.startsWith('/training')) return 'Training Library';
-  if (pathname.startsWith('/deliverables')) return 'Deliverables';
+  if (pathname.startsWith(routes.entrepreneur.training)) return 'Training Library';
+  if (pathname.startsWith(routes.entrepreneur.deliverables)) return 'Deliverables';
   return 'BID Hub';
 }
 

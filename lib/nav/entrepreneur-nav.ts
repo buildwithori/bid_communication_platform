@@ -7,33 +7,34 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { NavSection } from '@/components/layout/NavSidebar';
+import { routes } from '@/lib/routes';
 
 /** Entrepreneur-side navigation tree. */
 export const entrepreneurNav: NavSection[] = [
   {
     heading: 'Overview',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: routes.entrepreneur.dashboard, label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
   {
     heading: 'Learn',
     items: [
-      { href: '/training', label: 'Training Library', icon: PlayCircle },
+      { href: routes.entrepreneur.training, label: 'Training Library', icon: PlayCircle },
     ],
   },
   {
     heading: 'My work',
     items: [
-      { href: '/profile', label: 'My Profile', icon: UserSquare },
-      { href: '/deliverables', label: 'Deliverables', icon: FileText },
-      { href: '/schedule', label: 'Schedule', icon: CalendarDays },
+      { href: routes.entrepreneur.profile, label: 'My Profile', icon: UserSquare },
+      { href: routes.entrepreneur.deliverables, label: 'Deliverables', icon: FileText },
+      { href: routes.entrepreneur.schedule, label: 'Schedule', icon: CalendarDays },
     ],
   },
   {
     heading: 'Resources',
     items: [
-      { href: '/tools', label: 'Entrepreneur Tools', icon: Wrench },
+      { href: routes.entrepreneur.tools, label: 'Entrepreneur Tools', icon: Wrench },
     ],
   },
 ];

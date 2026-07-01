@@ -9,6 +9,13 @@ import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Tabs } from '@/components/shared/Tabs';
 import {
+  DataTable,
+  RowActions,
+  TableFilterInput,
+  TableToolbar,
+  type Column,
+} from '@/components/shared/DataTable';
+import {
   FormField,
   FormSelect,
   FormInput,
@@ -25,6 +32,7 @@ import {
   type ProgrammeGoalForm,
 } from '@/lib/forms/schemas';
 import { sectors, stages } from '@/lib/mock-data/definitions';
+import type { FundingRound } from '@/types';
 
 type ProfileTab = 'biz' | 'goal' | 'fund' | 'update';
 
@@ -33,6 +41,7 @@ export default function ProfilePage() {
   const [tab, setTab] = React.useState<ProfileTab>('biz');
   const [fundingOpen, setFundingOpen] = React.useState(false);
   const [updateOpen, setUpdateOpen] = React.useState(false);
+  const [fundingQuery, setFundingQuery] = React.useState('');
 
   const profileForm = useForm<BusinessProfileForm>({
     resolver: zodResolver(businessProfileSchema),
@@ -86,6 +95,39 @@ export default function ProfilePage() {
   const enrolledProgrammes = entrepreneur.programmeId
     ? allPrograms.filter((p) => p.id === entrepreneur.programmeId)
     : [];
+  const filteredFundingRounds = entrepreneur.fundingRounds.filter((round) => {
+    const needle = fundingQuery.trim().toLowerCase();
+    if (!needle) return true;
+    return [round.name, round.source ?? '', round.date, String(round.amountUsd)]
+      .join(' ')
+      .toLowerCase()
+      .includes(needle);
+  });
+  const fundingColumns: Column<FundingRound>[] = [
+    {
+      key: 'action',
+      header: 'Action',
+      cell: () => (
+        <RowActions
+          actions={[
+            {
+              label: 'Edit round',
+              onSelect: () => setFundingOpen(true),
+            },
+          ]}
+        />
+      ),
+      className: 'w-[84px]',
+    },
+    { key: 'round', header: 'Round', cell: (round) => <span className="font-medium">{round.name}</span> },
+    { key: 'amount', header: 'Amount', cell: (round) => `$${(round.amountUsd / 1000).toFixed(0)}k` },
+    {
+      key: 'date',
+      header: 'Date',
+      cell: (round) => new Date(round.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    },
+    { key: 'source', header: 'Source', cell: (round) => round.source ?? 'Not recorded' },
+  ];
 
   return (
     <>
@@ -214,41 +256,28 @@ export default function ProfilePage() {
               </Button>
             }
           />
-          <div className="overflow-hidden rounded-lg border border-line">
-            <table className="w-full border-collapse text-[11px]">
-              <thead>
-                <tr>
-                  <th className="border-b border-line px-2.5 py-1.5 text-left text-[10px] font-medium text-ink-muted">Round</th>
-                  <th className="border-b border-line px-2.5 py-1.5 text-left text-[10px] font-medium text-ink-muted">Amount</th>
-                  <th className="border-b border-line px-2.5 py-1.5 text-left text-[10px] font-medium text-ink-muted">Date</th>
-                  <th className="border-b border-line px-2.5 py-1.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {entrepreneur.fundingRounds.map((r) => (
-                  <tr key={r.id}>
-                    <td className="border-b border-line px-2.5 py-2">{r.name}</td>
-                    <td className="border-b border-line px-2.5 py-2">${(r.amountUsd / 1000).toFixed(0)}k</td>
-                    <td className="border-b border-line px-2.5 py-2">
-                      {new Date(r.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="border-b border-line px-2.5 py-2">
-                      <Button variant="outline" size="sm" onClick={() => import('sonner').then(({ toast }) => toast.success('Editing round…'))}>
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {entrepreneur.fundingRounds.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-2.5 py-4 text-center text-[11px] text-ink-faint">
-                      No funding rounds recorded yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <TableToolbar>
+            <div>
+              <div className="text-sm font-medium text-ink">Search fundraising records</div>
+              <div className="mt-0.5 text-sm text-ink-muted">
+                Track rounds by name, source, date, or amount.
+              </div>
+            </div>
+            <div className="w-full sm:w-[320px]">
+              <TableFilterInput
+                icon
+                placeholder="Search funding rounds..."
+                value={fundingQuery}
+                onChange={(event) => setFundingQuery(event.target.value)}
+              />
+            </div>
+          </TableToolbar>
+          <DataTable
+            columns={fundingColumns}
+            rows={filteredFundingRounds}
+            rowKey={(round) => round.id}
+            emptyMessage="No funding rounds match this search."
+          />
         </Card>
       )}
 

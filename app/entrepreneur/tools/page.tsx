@@ -17,6 +17,11 @@ import { Button } from '@/components/shared/Button';
 import { Tabs } from '@/components/shared/Tabs';
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
+import {
+  TableFilterInput,
+  TablePagination,
+  TableToolbar,
+} from '@/components/shared/DataTable';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toolRequestSchema, type ToolRequestForm } from '@/lib/forms/schemas';
@@ -136,10 +141,34 @@ function EmbedToolInlineModal({
 
 export default function ToolsPage() {
   const [tab, setTab] = React.useState<'all' | 'pdf' | 'embed'>('all');
+  const [query, setQuery] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(6);
   const [requestOpen, setRequestOpen] = React.useState(false);
   const [activeTool, setActiveTool] = React.useState<Tool | null>(null);
 
-  const filtered = tools.filter((t) => tab === 'all' || t.type === tab);
+  const filtered = React.useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return tools.filter((tool) => {
+      const matchesTab = tab === 'all' || tool.type === tab;
+      const matchesQuery =
+        !needle ||
+        [tool.name, tool.description, tool.type]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle);
+      return matchesTab && matchesQuery;
+    });
+  }, [query, tab]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [query, tab, pageSize]);
+
+  const pageRows = React.useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   return (
     <>
@@ -161,8 +190,24 @@ export default function ToolsPage() {
           { value: 'embed', label: 'Online tools' },
         ]}
       />
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((t) => (
+      <TableToolbar>
+        <div>
+          <div className="text-sm font-medium text-ink">Browse tools</div>
+          <div className="mt-0.5 text-sm text-ink-muted">
+            {filtered.length} tool{filtered.length === 1 ? '' : 's'} available in this view.
+          </div>
+        </div>
+        <div className="w-full sm:w-[320px]">
+          <TableFilterInput
+            icon
+            placeholder="Search tools..."
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+      </TableToolbar>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {pageRows.map((t) => (
           <ToolCard
             key={t.id}
             tool={t}
@@ -174,6 +219,17 @@ export default function ToolsPage() {
           />
         ))}
       </div>
+      <TablePagination
+        page={page}
+        pageSize={pageSize}
+        totalItems={filtered.length}
+        pageSizeOptions={[6, 12, 24]}
+        onPageChange={setPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next);
+          setPage(1);
+        }}
+      />
 
       <RequestToolModal open={requestOpen} onOpenChange={setRequestOpen} />
       <EmbedToolInlineModal tool={activeTool} onClose={() => setActiveTool(null)} />

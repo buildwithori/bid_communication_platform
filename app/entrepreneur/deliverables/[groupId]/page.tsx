@@ -11,6 +11,7 @@ import { Button } from '@/components/shared/Button';
 import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { deliverableGroups, deliverablesForGroup } from '@/lib/mock-data';
+import { routes } from '@/lib/routes';
 
 export default function DeliverableListPage({
   params,
@@ -18,19 +19,19 @@ export default function DeliverableListPage({
   params: { groupId: string };
 }) {
   const { deliverables: userDeliverables } = useEntrepreneurStore();
+  const [uploadOpen, setUploadOpen] = React.useState(false);
   const group = deliverableGroups.find((g) => g.id === params.groupId);
   if (!group) return notFound();
 
   const seedItems = deliverablesForGroup(group.id);
   // Merge in any deliverable the user submitted this session (general).
   const items = [...seedItems, ...userDeliverables.filter((d) => d.group === 'general' && group.id === 'g-general')];
-  const [uploadOpen, setUploadOpen] = React.useState(false);
 
   return (
     <>
       <Breadcrumb
         items={[
-          { label: 'Deliverables', href: '/deliverables' },
+          { label: 'Deliverables', href: routes.entrepreneur.deliverables },
           { label: group.label },
         ]}
       />
