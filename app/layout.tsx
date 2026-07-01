@@ -1,21 +1,7 @@
 import type { Metadata } from 'next';
-import { Sora, DM_Mono } from 'next/font/google';
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from 'sonner';
+import { AppProviders } from '@/app/providers';
 import './globals.css';
-
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
-  variable: '--font-sora',
-  display: 'swap',
-});
-
-const dmMono = DM_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-dm-mono',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'BID Hub — Entrepreneur & Admin Platform',
@@ -33,10 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${sora.variable} ${dmMono.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        {children}
-        <Toaster richColors position="bottom-right" />
+        <AppProviders>
+          {children}
+          <Toaster richColors position="bottom-right" />
+        </AppProviders>
       </body>
     </html>
   );
