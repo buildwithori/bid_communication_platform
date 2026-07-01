@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormSelect, FormTextarea, FormInput } from '@/components/shared/FormField';
+import { FormField, FormInput, FormRow2, FormSelect, FormTextarea } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import {
   periodicUpdateSchema,
@@ -49,14 +49,14 @@ export function PeriodicUpdateModal({
             ]}
           />
         </FormField>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <FormRow2>
           <FormField label="Jobs created — women">
             <FormInput type="number" {...form.register('jobsWomen')} />
           </FormField>
           <FormField label="Jobs created — men">
             <FormInput type="number" {...form.register('jobsMen')} />
           </FormField>
-        </div>
+        </FormRow2>
         <FormField label="Funds mobilised this period (USD)">
           <FormInput type="number" {...form.register('fundsMobilisedUsd')} />
         </FormField>

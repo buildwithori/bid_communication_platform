@@ -10,8 +10,23 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-sora)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-dm-mono)', 'ui-monospace', 'monospace'],
+        sans: [
+          'Inter',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'sans-serif',
+        ],
+        mono: [
+          'JetBrains Mono',
+          'SFMono-Regular',
+          'Consolas',
+          'Liberation Mono',
+          'ui-monospace',
+          'monospace',
+        ],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

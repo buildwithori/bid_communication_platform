@@ -135,6 +135,67 @@ export const programmeGoalSchema = z.object({
 });
 export type ProgrammeGoalForm = z.infer<typeof programmeGoalSchema>;
 
+export const loginSchema = z.object({
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
+});
+export type LoginForm = z.infer<typeof loginSchema>;
+
+export const signupSchema = z.object({
+  businessName: z.string().min(1, 'Business name is required'),
+  representative: z.string().min(1, 'Representative name is required'),
+  email: z.string().email('Enter a valid email'),
+  country: z.string().min(1, 'Country is required'),
+  phone: z.string().min(1, 'Phone number is required'),
+});
+export type SignupForm = z.infer<typeof signupSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Enter a valid email'),
+});
+export type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z
+  .object({
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Confirm your password'),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+export type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
+
+export const contentItemSchema = z.object({
+  title: z.string().min(1, 'Content title is required'),
+  type: z.enum(['video', 'pdf', 'tool']),
+});
+export type ContentItemForm = z.infer<typeof contentItemSchema>;
+
+export const requiredDeliverableSchema = z.object({
+  name: z.string().min(1, 'Deliverable name is required'),
+  due: z.string().min(1, 'Due rule is required'),
+  requiredFor: z.string().min(1, 'Audience is required'),
+});
+export type RequiredDeliverableForm = z.infer<typeof requiredDeliverableSchema>;
+
+export const documentGeneratorSchema = z.object({
+  title: z.string().min(1, 'Document title is required'),
+  entrepreneurId: z.string().optional(),
+  cohort: z.string().optional(),
+});
+export type DocumentGeneratorForm = z.infer<typeof documentGeneratorSchema>;
+
+export const reuseModuleSchema = z.object({
+  moduleId: z.string().min(1, 'Select a module'),
+});
+export type ReuseModuleForm = z.infer<typeof reuseModuleSchema>;
+
+export const deliverableReviewSchema = z.object({
+  feedback: z.string().min(1, 'Add feedback before requesting changes'),
+});
+export type DeliverableReviewForm = z.infer<typeof deliverableReviewSchema>;
+
 /** Parse a string field from a form value into a number, defaulting to 0. */
 export const toNumber = (v: string | number | undefined | null, fallback = 0): number => {
   if (v == null) return fallback;

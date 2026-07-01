@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +13,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 /**
  * Form field primitives that match the `.frow / .flabel / .input / .select`
@@ -19,10 +33,10 @@ import {
  * `name` and they forward refs/value via `Controller` at the call site.
  */
 
-const formRowBase = 'mb-[11px] block';
+const formRowBase = 'mb-4 block min-w-0';
 
 const labelBase =
-  'mb-1 block text-[10px] font-medium text-ink-muted leading-tight';
+  'mb-1.5 flex min-h-5 items-center gap-1.5 text-sm font-medium leading-5 text-ink-muted';
 
 /** Renders a label with an italic muted `(optional)` hint. */
 export function FieldLabel({
@@ -38,17 +52,17 @@ export function FieldLabel({
     <Label htmlFor={htmlFor} className={cn(labelBase)}>
       {children}
       {optional && (
-        <span className="font-normal italic text-ink-faint"> (optional)</span>
+        <span className="shrink-0 font-normal italic text-ink-faint">(optional)</span>
       )}
     </Label>
   );
 }
 
 const inputClass =
-  'h-[34px] rounded-[7px] border-[0.5px] border-line-strong bg-surface-panel px-2.5 text-[11px] text-ink placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0';
+  'h-10 w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0';
 
 const textareaClass =
-  'rounded-[7px] border-[0.5px] border-line-strong bg-surface-panel px-2.5 py-2 text-[11px] text-ink placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0';
+  'w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 py-2.5 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0';
 
 /** Field that owns its own label + error slot (simplest API for modals). */
 export interface FormFieldProps {
@@ -75,7 +89,7 @@ export function FormField({
       </FieldLabel>
       {children}
       {error && (
-        <p className="mt-1 text-[10px] text-danger" role="alert">
+        <p className="mt-1.5 text-xs text-danger" role="alert">
           {error}
         </p>
       )}
@@ -123,20 +137,101 @@ export function FormSelect({
       <SelectTrigger
         id={id}
         className={cn(
-          'h-[34px] rounded-[7px] border-[0.5px] border-line-strong bg-surface-panel px-2.5 text-[11px] text-ink focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0',
+          'h-10 rounded-[7px] border border-line-strong bg-surface-panel px-3 text-sm text-ink focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0',
+          'h-10 w-full rounded-lg border-black/[0.1] font-normal shadow-sm focus-visible:ring-2 focus-visible:ring-bid/10 [&>span]:truncate',
           className,
         )}
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent className="text-[11px]">
+      <SelectContent className="text-sm">
         {options.map((o) => (
-          <SelectItem key={o.value} value={o.value} className="text-[11px]">
+          <SelectItem key={o.value} value={o.value} className="text-sm">
             {o.label}
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+export interface FormAutocompleteProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  options: { value: string; label: string; description?: string }[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+export function FormAutocomplete({
+  value,
+  onValueChange,
+  options,
+  placeholder = 'Select option',
+  searchPlaceholder = 'Search...',
+  emptyMessage = 'No results found.',
+  className,
+  disabled,
+}: FormAutocompleteProps) {
+  const [open, setOpen] = React.useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(
+            'flex h-10 w-full min-w-0 items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal text-ink shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:pointer-events-none disabled:opacity-55',
+            !selected && 'text-ink-faint',
+            className,
+          )}
+        >
+          <span className="truncate">{selected?.label ?? placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-ink-faint" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={`${option.label} ${option.description ?? ''}`}
+                  onSelect={() => {
+                    onValueChange(option.value);
+                    setOpen(false);
+                  }}
+                  className="flex items-start gap-2 px-3 py-2.5"
+                >
+                  <Check
+                    className={cn(
+                      'mt-0.5 h-4 w-4 shrink-0 text-bid',
+                      option.value === value ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm text-ink">{option.label}</span>
+                    {option.description && (
+                      <span className="mt-0.5 block truncate text-xs text-ink-muted">
+                        {option.description}
+                      </span>
+                    )}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -151,7 +246,7 @@ export function FormRow2({
   return (
     <div
       className={cn(
-        'grid grid-cols-1 gap-2.5 sm:grid-cols-2',
+        'grid grid-cols-1 gap-x-3 gap-y-0 sm:grid-cols-2',
         className,
       )}
     >

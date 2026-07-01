@@ -39,7 +39,7 @@ export function UploadDeliverableModal({
         </FormField>
         <button
           type="button"
-          onClick={() => import('sonner').then(({ toast }) => toast.info('File picker opened (demo)'))}
+          onClick={() => import('sonner').then(({ toast }) => toast.info('File picker will connect when storage is added.'))}
           className="mb-3 flex w-full flex-col items-center rounded-bid border-[1.5px] border-dashed border-line-strong px-5 py-5 text-center transition-colors hover:border-bid hover:bg-bid-light"
           aria-label="Upload file"
         >

@@ -23,7 +23,7 @@ export interface AppShellProps {
 /**
  * The two-column shell used by both the entrepreneur and admin sides.
  *
- * On desktop: a fixed 226px sidebar (sticky full-height).
+ * On desktop: a fixed 260px sidebar (sticky full-height).
  * On mobile (< lg): the sidebar lives in a slide-in drawer toggled by
  * the TopBar hamburger; it stays mounted for transition fidelity.
  */
@@ -53,7 +53,7 @@ export function AppShell({
   return (
     <div className="flex h-screen w-full overflow-hidden bg-surface">
       {/* Desktop sidebar */}
-      <aside className="hidden w-[226px] shrink-0 border-r border-line lg:block">
+      <aside className="hidden w-[260px] shrink-0 border-r border-line lg:block">
         {sidebar}
       </aside>
 
@@ -83,7 +83,7 @@ export function AppShell({
           onMenuClick={() => setDrawerOpen(true)}
           rightSlot={topRightSlot}
         />
-        <main className="flex-1 overflow-y-auto px-4 py-5 lg:px-[22px] lg:py-5">
+        <main className="flex-1 overflow-y-auto px-5 py-6 lg:px-7 lg:py-7">
           {children}
         </main>
       </div>

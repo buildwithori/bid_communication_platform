@@ -18,14 +18,14 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        'mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between',
+        'mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between',
         className,
       )}
     >
       <div>
-        <h2 className="text-base font-medium">{title}</h2>
+        <h2 className="text-3xl font-semibold tracking-tight text-ink">{title}</h2>
         {description && (
-          <p className="mt-0.5 text-[11px] text-ink-muted">{description}</p>
+          <p className="mt-2 max-w-3xl text-base leading-7 text-ink-muted">{description}</p>
         )}
       </div>
       {actions && (
@@ -48,7 +48,7 @@ export function Notice({
   return (
     <div
       className={cn(
-        'mb-3 rounded-lg bg-surface-subtle px-3 py-2.5 text-[10px] leading-relaxed text-ink-muted',
+        'mb-4 rounded-lg bg-surface-subtle px-4 py-3 text-sm leading-6 text-ink-muted',
         className,
       )}
     >

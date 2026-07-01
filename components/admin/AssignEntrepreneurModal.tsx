@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormSelect } from '@/components/shared/FormField';
+import { FormAutocomplete, FormField, FormInput } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import { assignToProgramSchema, type AssignToProgramForm } from '@/lib/forms/schemas';
 import { useAdminStore } from '@/lib/stores/admin-store';
@@ -37,30 +37,34 @@ export function AssignEntrepreneurModal({
     <Modal open={open} onOpenChange={onOpenChange} title="Assign entrepreneur">
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Entrepreneur">
-          <input
+          <FormInput
             disabled
             value={`${entrepreneur.representative} – ${entrepreneur.businessName}`}
-            className="h-[34px] w-full rounded-[7px] border-[0.5px] border-line-strong bg-surface-subtle px-2.5 text-[11px] text-ink-muted"
           />
         </FormField>
         <FormField label="Programme">
-          <FormSelect
+          <FormAutocomplete
             value={form.watch('programmeId')}
             onValueChange={(v) => form.setValue('programmeId', v)}
             options={programs.map((p) => ({ value: p.id, label: p.name }))}
+            placeholder="Search programme"
+            searchPlaceholder="Search programmes..."
           />
         </FormField>
         <FormField label="Trainer" optional>
-          <FormSelect
+          <FormAutocomplete
             value={form.watch('trainerId') ?? 'none'}
             onValueChange={(v) => form.setValue('trainerId', v)}
             options={[
-              { value: 'none', label: '— Unassigned —' },
+              { value: 'none', label: 'Unassigned' },
               ...trainers.map((t) => ({
                 value: t.id,
-                label: `${t.fullName} – ${t.role} (${t.metrics.entrepreneursCount} assigned)`,
+                label: t.fullName,
+                description: `${t.role} · ${t.metrics.entrepreneursCount} assigned`,
               })),
             ]}
+            placeholder="Search trainer"
+            searchPlaceholder="Search trainers..."
           />
         </FormField>
         <Button type="submit" className="w-full">

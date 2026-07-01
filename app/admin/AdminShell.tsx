@@ -5,18 +5,24 @@ import { usePathname } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { adminNav } from '@/lib/nav/admin-nav';
 import { trainerNav } from '@/lib/nav/trainer-nav';
-import type { BidSession } from '@/lib/auth/config';
+import { routes } from '@/lib/routes';
+
+interface TrainerSession {
+  name?: string;
+}
 
 const titles: Record<string, string> = {
-  '/admin/dashboard': 'Admin Dashboard',
-  '/admin/entrepreneurs': 'Entrepreneurs',
-  '/admin/trainers': 'Trainers',
-  '/admin/programs': 'Programs',
-  '/admin/content': 'Content Library',
-  '/admin/sessions': 'Sessions',
-  '/admin/tool-requests': 'Tool Requests',
-  '/admin/stages-sectors': 'Stages & Sectors',
-  '/admin/reporting': 'Reporting & Analytics',
+  [routes.admin.dashboard]: 'Admin Dashboard',
+  [routes.admin.entrepreneurs]: 'Entrepreneurs',
+  [routes.admin.trainers]: 'Trainers',
+  [routes.admin.programs]: 'Programs',
+  [routes.admin.content]: 'Content Library',
+  [routes.admin.documents]: 'Documents',
+  [routes.admin.deliverableReviews]: 'Deliverable Reviews',
+  [routes.admin.sessions]: 'Sessions',
+  [routes.admin.toolRequests]: 'Tool Requests',
+  [routes.admin.stagesSectors]: 'Stages & Sectors',
+  [routes.admin.reporting]: 'Reporting & Analytics',
 };
 
 function useTitle() {
@@ -55,7 +61,7 @@ export function TrainerShell({
   session,
 }: {
   children: React.ReactNode;
-  session: BidSession | null;
+  session: TrainerSession | null;
 }) {
   const title = useTitle();
   const name = session?.name ?? 'Trainer';

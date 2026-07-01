@@ -5,13 +5,6 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/**
- * BID-styled modal. Built on Radix Dialog so we get focus-trapping,
- * ESC-to-close, scroll-lock, and ARIA semantics for free, but styled
- * to match the `.ov / .mo` containers from the mockups.
- *
- * Controlled by `open` + `onOpenChange`.
- */
 export interface ModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,15 +30,15 @@ export function Modal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="modal-overlay fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto rounded-xl border border-line bg-surface-panel p-[22px] shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-y-auto rounded-2xl border border-black/[0.08] bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
             widthClass[width],
           )}
         >
           <div className="mb-4 flex items-center justify-between">
-            <DialogPrimitive.Title className="text-sm font-medium">
+            <DialogPrimitive.Title className="text-lg font-semibold">
               {title}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close

@@ -2,14 +2,11 @@
 
 import { cn } from '@/lib/utils';
 
-/**
- * Thin BID card: white panel, hairline border, 10px radius, 16px padding.
- * Mirrors `.card` in the mockups.
- */
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Optional accent stripe on the left edge (used on program cards). */
   accent?: 'bid' | 'info' | 'success';
   dashed?: boolean;
+  padding?: 'sm' | 'md' | 'lg';
 }
 
 const accentBorder: Record<NonNullable<CardProps['accent']>, string> = {
@@ -21,6 +18,7 @@ const accentBorder: Record<NonNullable<CardProps['accent']>, string> = {
 export function Card({
   accent,
   dashed,
+  padding = 'md',
   className,
   children,
   ...props
@@ -28,10 +26,13 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-bid bg-surface-panel p-4',
+        'rounded-xl bg-surface-panel shadow-[0_18px_45px_rgba(26,26,26,0.055)] transition-shadow',
+        padding === 'sm' && 'p-4',
+        padding === 'md' && 'p-5',
+        padding === 'lg' && 'p-6',
         dashed
           ? 'border-[1.5px] border-dashed border-line-strong'
-          : 'border border-line',
+          : 'border border-black/[0.08]',
         accent && accentBorder[accent],
         className,
       )}
@@ -42,27 +43,30 @@ export function Card({
   );
 }
 
-/**
- * Card header row — title on the left, optional actions on the right.
- * Mirrors `.ch` / `.ctit`.
- */
 export function CardHeader({
   title,
+  description,
   actions,
   className,
 }: {
   title: React.ReactNode;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        'mb-3 flex items-center justify-between',
+        'mb-4 flex items-start justify-between gap-3',
         className,
       )}
     >
-      <span className="text-xs font-medium">{title}</span>
+      <div className="min-w-0">
+        <div className="text-base font-semibold tracking-[-0.01em]">{title}</div>
+        {description && (
+          <div className="mt-1 text-sm leading-5 text-ink-muted">{description}</div>
+        )}
+      </div>
       {actions && <div className="flex items-center gap-1.5">{actions}</div>}
     </div>
   );

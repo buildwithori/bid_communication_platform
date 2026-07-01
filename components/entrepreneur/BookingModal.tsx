@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormSelect, FormTextarea, FormInput } from '@/components/shared/FormField';
+import { FormAutocomplete, FormField, FormInput, FormRow2, FormSelect, FormTextarea } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import { bookingSchema, type BookingForm } from '@/lib/forms/schemas';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
@@ -69,28 +69,33 @@ export function BookingModal({
 
         {recipient === 'specific' && (
           <FormField label="Trainer">
-            <FormSelect
+            <FormAutocomplete
               value={form.watch('trainerId') ?? ''}
               onValueChange={(v) => form.setValue('trainerId', v)}
               options={trainers.map((t) => ({
                 value: t.id,
-                label: `${t.fullName} – ${t.role}`,
+                label: t.fullName,
+                description: t.role,
               }))}
+              placeholder="Search trainer"
+              searchPlaceholder="Search trainers..."
             />
           </FormField>
         )}
 
-        <FormField label="Date" error={form.formState.errors.date?.message}>
-          <FormInput type="date" {...form.register('date')} />
-        </FormField>
+        <FormRow2>
+          <FormField label="Date" error={form.formState.errors.date?.message}>
+            <FormInput type="date" {...form.register('date')} />
+          </FormField>
 
-        <FormField label="Time">
-          <FormSelect
-            value={form.watch('time')}
-            onValueChange={(v) => form.setValue('time', v)}
-            options={timeSlots.map((t) => ({ value: t, label: t }))}
-          />
-        </FormField>
+          <FormField label="Time">
+            <FormSelect
+              value={form.watch('time')}
+              onValueChange={(v) => form.setValue('time', v)}
+              options={timeSlots.map((t) => ({ value: t, label: t }))}
+            />
+          </FormField>
+        </FormRow2>
 
         <FormField label="Notes" optional>
           <FormTextarea

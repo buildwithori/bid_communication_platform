@@ -13,6 +13,7 @@ export interface StatCardProps {
   /** When set, the big value renders in this color (e.g. unassigned count). */
   valueClassName?: string;
   className?: string;
+  accent?: 'bid' | 'info' | 'success' | 'warning' | 'neutral';
 }
 
 const dotClasses: Record<NonNullable<StatCardProps['dotColor']>, string> = {
@@ -30,24 +31,35 @@ export function StatCard({
   dotColor,
   valueClassName,
   className,
+  accent = 'neutral',
 }: StatCardProps) {
   return (
     <div
       className={cn(
-        'rounded-bid border border-line bg-surface-panel px-4 py-3.5',
+        'group relative overflow-hidden rounded-xl border border-black/[0.08] bg-surface-panel px-5 py-4 shadow-[0_14px_34px_rgba(26,26,26,0.045)]',
         className,
       )}
     >
-      <div className="mb-1.5 text-[10px] text-ink-muted">{label}</div>
-      <div className={cn('text-[22px] font-medium leading-none', valueClassName)}>
+      <div
+        className={cn(
+          'absolute inset-x-0 top-0 h-1',
+          accent === 'bid' && 'bg-bid',
+          accent === 'info' && 'bg-info',
+          accent === 'success' && 'bg-success',
+          accent === 'warning' && 'bg-warning',
+          accent === 'neutral' && 'bg-line',
+        )}
+      />
+      <div className="mb-3 text-sm font-medium text-ink-muted">{label}</div>
+      <div className={cn('text-3xl font-semibold leading-none tracking-[-0.02em]', valueClassName)}>
         {value}
       </div>
       {subline && (
-        <div className="mt-1.5 flex items-center text-[10px] text-ink-muted">
+        <div className="mt-3 flex items-center text-sm text-ink-muted">
           {dotColor && (
             <span
               className={cn(
-                'mr-1 inline-block h-[5px] w-[5px] rounded-full',
+                'mr-2 inline-block h-2 w-2 rounded-full',
                 dotClasses[dotColor],
               )}
             />

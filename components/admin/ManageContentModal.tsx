@@ -1,12 +1,15 @@
 'use client';
 
 import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { PlayCircle, FileText, Wrench, Check } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormInput, FormSelect } from '@/components/shared/FormField';
 import { Notice } from '@/components/shared/PageHeader';
 import { Button } from '@/components/shared/Button';
 import { useAdminStore } from '@/lib/stores/admin-store';
+import { contentItemSchema, type ContentItemForm } from '@/lib/forms/schemas';
 import type { Module, ContentItem } from '@/types';
 
 const typeMeta = {
@@ -90,51 +93,52 @@ export function AddContentItemModal({
   module?: Module;
 }) {
   const { addContentItem } = useAdminStore();
-  const [title, setTitle] = React.useState('');
-  const [type, setType] = React.useState<ContentItem['type']>('video');
+  const form = useForm<ContentItemForm>({
+    resolver: zodResolver(contentItemSchema),
+    defaultValues: { title: '', type: 'video' },
+  });
 
   if (!module) return null;
 
-  const handleSubmit = () => {
-    if (!title) return;
-    addContentItem(module.id, title, type);
-    setTitle('');
-    setType('video');
+  const handleSubmit = (values: ContentItemForm) => {
+    addContentItem(module.id, values.title, values.type);
+    form.reset({ title: '', type: 'video' });
     onOpenChange(false);
   };
 
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Add content item">
-      <FormField label="Chapter title">
-        <FormInput
-          placeholder="e.g. Chapter 3: Testing your hypothesis"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </FormField>
-      <FormField label="Content type">
-        <FormSelect
-          value={type}
-          onValueChange={(v) => setType(v as ContentItem['type'])}
-          options={[
-            { value: 'video', label: 'Video' },
-            { value: 'pdf', label: 'PDF resource' },
-            { value: 'tool', label: 'Embedded tool' },
-          ]}
-        />
-      </FormField>
-      <button
-        type="button"
-        onClick={() => import('sonner').then(({ toast }) => toast.info('File picker opened (demo)'))}
-        className="mb-3 flex w-full flex-col items-center rounded-bid border-[1.5px] border-dashed border-line-strong px-5 py-5 text-center transition-colors hover:border-bid hover:bg-bid-light"
-        aria-label="Upload file"
-      >
-        <span className="text-[11px] text-ink-muted">Upload or select from content library</span>
-        <strong className="mt-0.5 text-[11px] text-bid">MP4, PDF, or paste tool link</strong>
-      </button>
-      <Button className="w-full" onClick={handleSubmit}>
-        Add to module
-      </Button>
+      <form onSubmit={form.handleSubmit(handleSubmit)}>
+        <FormField label="Chapter title" error={form.formState.errors.title?.message}>
+          <FormInput
+            placeholder="e.g. Chapter 3: Testing your hypothesis"
+            {...form.register('title')}
+          />
+        </FormField>
+        <FormField label="Content type" error={form.formState.errors.type?.message}>
+          <FormSelect
+            value={form.watch('type')}
+            onValueChange={(value) => form.setValue('type', value as ContentItem['type'], { shouldValidate: true })}
+            options={[
+              { value: 'video', label: 'Video' },
+              { value: 'pdf', label: 'PDF resource' },
+              { value: 'tool', label: 'Embedded tool' },
+            ]}
+          />
+        </FormField>
+        <button
+          type="button"
+          onClick={() => import('sonner').then(({ toast }) => toast.info('File picker will connect when storage is added.'))}
+          className="mb-3 flex w-full flex-col items-center rounded-bid border-[1.5px] border-dashed border-line-strong px-5 py-5 text-center transition-colors hover:border-bid hover:bg-bid-light"
+          aria-label="Upload file"
+        >
+          <span className="text-sm text-ink-muted">Upload or select from content library</span>
+          <strong className="mt-0.5 text-sm text-bid">MP4, PDF, or paste tool link</strong>
+        </button>
+        <Button type="submit" className="w-full">
+          Add to module
+        </Button>
+      </form>
     </Modal>
   );
 }

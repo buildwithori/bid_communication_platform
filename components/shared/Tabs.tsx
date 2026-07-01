@@ -23,7 +23,7 @@ export function Tabs<T extends string>({
     <div
       role="tablist"
       className={cn(
-        'mb-3.5 flex w-fit gap-0.5 rounded-[7px] bg-surface-subtle p-0.5',
+        'mb-4 flex w-fit gap-1 rounded-lg bg-surface-subtle p-1',
         className,
       )}
     >
@@ -37,7 +37,7 @@ export function Tabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(tab.value)}
             className={cn(
-              'cursor-pointer rounded-[5px] px-3.5 py-1.5 text-[11px] transition-colors',
+              'cursor-pointer rounded-md px-4 py-2 text-sm transition-colors',
               active
                 ? 'border border-line bg-surface-panel font-medium text-ink'
                 : 'text-ink-muted hover:text-ink',

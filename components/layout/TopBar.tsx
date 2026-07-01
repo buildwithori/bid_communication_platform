@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { cn } from '@/lib/utils';
 
@@ -18,24 +18,20 @@ export interface TopBarProps {
   className?: string;
 }
 
-/** Mockup search box; reads as input with a leading icon. */
 function SearchBox() {
   return (
     <label
       className={cn(
-        'hidden items-center gap-1.5 rounded-[7px] border border-line bg-surface-subtle px-2.5',
-        'w-[180px] md:flex',
+        'hidden h-10 items-center gap-2 rounded-lg border border-black/[0.08] bg-surface-subtle px-3 shadow-sm',
+        'w-[240px] md:flex',
       )}
     >
-      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-        <circle cx="5" cy="5" r="3.5" stroke="#999" strokeWidth="1.2" />
-        <path d="M8.5 8.5L11 11" stroke="#999" strokeWidth="1.2" strokeLinecap="round" />
-      </svg>
+      <Search className="h-4 w-4 text-ink-faint" aria-hidden="true" />
       <span className="sr-only">Search</span>
       <input
         type="text"
         placeholder="Search…"
-        className="h-[30px] w-full border-0 bg-transparent text-[11px] text-ink outline-none placeholder:text-ink-faint"
+        className="h-full w-full border-0 bg-transparent text-sm font-normal text-ink outline-none placeholder:font-normal placeholder:text-ink-faint"
       />
     </label>
   );
@@ -45,7 +41,7 @@ export function TopBar({ title, actions, onMenuClick, rightSlot, className }: To
   return (
     <header
       className={cn(
-        'flex h-[50px] shrink-0 items-center gap-3 border-b border-line bg-surface-panel px-4 lg:px-[22px]',
+        'flex h-16 shrink-0 items-center gap-3 border-b border-black/[0.08] bg-surface-panel/95 px-4 backdrop-blur lg:px-6',
         className,
       )}
     >
@@ -60,7 +56,7 @@ export function TopBar({ title, actions, onMenuClick, rightSlot, className }: To
           <Menu className="h-4 w-4" />
         </Button>
       )}
-      <div className="flex-1 truncate text-[13px] font-medium">{title}</div>
+      <div className="flex-1 truncate text-lg font-semibold">{title}</div>
       <SearchBox />
       {rightSlot}
       {actions && <div className="flex items-center gap-2">{actions}</div>}

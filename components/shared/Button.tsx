@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
 
 /**
  * BID button. Variants mirror the `.bp / .bo / .bd / .bg2` classes from
- * the mockups. Sizes default to the mockup's compact pill.
+ * the mockups, with larger sizing for production readability.
  */
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 font-sans',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 font-sans',
   {
     variants: {
       variant: {
@@ -27,10 +27,10 @@ const buttonVariants = cva(
         ghost: 'bg-transparent text-ink-muted hover:bg-surface-subtle hover:text-ink',
       },
       size: {
-        sm: 'px-2 py-0.5 text-[9px]',
-        md: 'px-3.5 py-1.5 text-[11px]',
-        lg: 'px-4 py-2 text-xs',
-        icon: 'h-8 w-8 p-0',
+        sm: 'h-8 px-3 text-xs',
+        md: 'h-9 px-4 text-sm',
+        lg: 'h-10 px-5 text-sm',
+        icon: 'h-9 w-9 p-0',
       },
     },
     defaultVariants: {

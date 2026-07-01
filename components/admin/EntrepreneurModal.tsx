@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import {
   FormField,
+  FormAutocomplete,
   FormInput,
   FormSelect,
   FormRow2,
@@ -85,7 +86,7 @@ export function EntrepreneurModal({
       open={open}
       onOpenChange={onOpenChange}
       title={mode === 'edit' ? 'Edit entrepreneur' : 'Add entrepreneur'}
-      width={isEdit ? 'sm' : 'md'}
+      width="md"
     >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Business name" error={form.formState.errors.businessName?.message}>
@@ -152,24 +153,32 @@ export function EntrepreneurModal({
           </FormField>
         )}
         <FormRow2>
-          <FormField label="Assign to programme" optional>
-            <FormSelect
+          <FormField label="Programme" optional>
+            <FormAutocomplete
               value={form.watch('programmeId') ?? 'none'}
               onValueChange={(v) => form.setValue('programmeId', v)}
               options={[
-                { value: 'none', label: '— Leave unassigned —' },
+                { value: 'none', label: 'Leave unassigned' },
                 ...programs.map((p) => ({ value: p.id, label: p.name })),
               ]}
+              placeholder="Search programme"
+              searchPlaceholder="Search programmes..."
             />
           </FormField>
-          <FormField label="Assign trainer" optional>
-            <FormSelect
+          <FormField label="Trainer" optional>
+            <FormAutocomplete
               value={form.watch('trainerId') ?? 'none'}
               onValueChange={(v) => form.setValue('trainerId', v)}
               options={[
-                { value: 'none', label: '— Unassigned —' },
-                ...trainers.map((t) => ({ value: t.id, label: t.fullName })),
+                { value: 'none', label: 'Unassigned' },
+                ...trainers.map((t) => ({
+                  value: t.id,
+                  label: t.fullName,
+                  description: `${t.role} · ${t.metrics.entrepreneursCount} assigned`,
+                })),
               ]}
+              placeholder="Search trainer"
+              searchPlaceholder="Search trainers..."
             />
           </FormField>
         </FormRow2>

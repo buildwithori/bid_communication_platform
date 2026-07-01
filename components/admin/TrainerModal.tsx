@@ -154,9 +154,9 @@ export function TrainerModal({
           </FormField>
         )}
         <Notice>
-          Entrepreneurs book sessions against whatever this trainer&apos;s calendar
-          shows as available. If this isn&apos;t connected, bookings will be requests
-          the trainer has to manually confirm.
+          Entrepreneurs can book any available slot on this trainer&apos;s connected
+          calendar. If no calendar is connected, each booking request must be
+          confirmed manually by the trainer.
         </Notice>
 
         <Button type="submit" className="w-full">
@@ -166,5 +166,4 @@ export function TrainerModal({
     </Modal>
   );
 }
-
 
