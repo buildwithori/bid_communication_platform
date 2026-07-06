@@ -2,6 +2,7 @@ export const routes = {
   home: '/',
   auth: {
     login: '/auth/login',
+    signup: '/auth/signup',
     forgotPassword: '/auth/forgot-password',
     resetPassword: '/auth/reset-password',
     verifyEmail: '/auth/verify-email',
@@ -25,10 +26,11 @@ export const routes = {
     programs: '/admin/programs',
     content: '/admin/content',
     deliverableReviews: '/admin/deliverable-reviews',
-    documents: '/admin/documents',
     sessions: '/admin/sessions',
     toolRequests: '/admin/tool-requests',
     stagesSectors: '/admin/stages-sectors',
+    settingsStages: '/admin/settings/stages',
+    settingsSectors: '/admin/settings/sectors',
     reporting: '/admin/reporting',
   },
 } as const;

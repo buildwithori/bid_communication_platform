@@ -44,6 +44,7 @@ export type ContentProgress = 'not-started' | 'in-progress' | 'completed';
 export type DeliverableStatus =
   | 'pending'
   | 'submitted'
+  | 'changes-requested'
   | 'reviewed'
   | 'overdue';
 
@@ -61,10 +62,6 @@ export type SessionType =
 export type SessionStatus = 'confirmed' | 'pending' | 'cancelled';
 
 export type ToolType = 'pdf' | 'embed';
-
-export type DocumentType = 'memo' | 'report';
-
-export type DocumentStatus = 'draft' | 'final' | 'sent';
 
 export type GoalType = 'fundraising' | 'programme-completion' | 'milestone';
 
@@ -209,7 +206,17 @@ export interface Deliverable {
   fileType?: 'pdf' | 'pptx' | 'docx' | 'xlsx';
   notes?: string;
   reviewFeedback?: string;
+  feedbackHistory?: DeliverableFeedback[];
+  reviewer?: string;
   status: DeliverableStatus;
+}
+
+export interface DeliverableFeedback {
+  id: string;
+  message: string;
+  reviewer: string;
+  createdAt: string;
+  readAt?: string;
 }
 
 export interface DeliverableGroup {
@@ -242,16 +249,6 @@ export interface Tool {
   type: ToolType;
   /** Icon key used by the rendering layer. */
   iconKey: 'canvas' | 'document' | 'timer' | 'star' | 'plus' | 'calendar';
-}
-
-export interface PlatformDocument {
-  id: string;
-  title: string;
-  type: DocumentType;
-  entrepreneurId?: string;
-  cohort?: string;
-  generatedAt: string; // ISO date
-  status: DocumentStatus;
 }
 
 export interface ActivityEntry {

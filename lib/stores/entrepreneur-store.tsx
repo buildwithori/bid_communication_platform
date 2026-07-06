@@ -24,6 +24,7 @@ interface EntrepreneurStore {
   notifications: { id: string; title: string; meta: string }[];
   bookSession: (input: BookingForm) => void;
   submitDeliverable: (input: DeliverableForm) => void;
+  markDeliverableFeedbackRead: (deliverableId: string, feedbackIds: string[]) => void;
   addFundingRound: (input: FundingRoundForm) => void;
   submitPeriodicUpdate: (input: PeriodicUpdateForm) => void;
   requestTool: (name: string, reason: string) => void;
@@ -65,17 +66,60 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const submitDeliverable: EntrepreneurStore['submitDeliverable'] = React.useCallback((input) => {
+    if (input.deliverableId) {
+      setDeliverables((curr) =>
+        curr.map((deliverable) =>
+          deliverable.id === input.deliverableId
+            ? {
+                ...deliverable,
+                name: input.name || deliverable.name,
+                fileName: input.fileName,
+                fileType: inferFileType(input.fileName),
+                submittedAt: new Date().toISOString().slice(0, 10),
+                notes: input.notes,
+                status: 'submitted',
+                reviewFeedback: undefined,
+              }
+            : deliverable,
+        ),
+      );
+      toast.success('Deliverable submitted for review!');
+      return;
+    }
+
     const newDeliverable: Deliverable = {
       id: 'd-' + Date.now(),
-      name: input.name,
+      name: input.name || 'General deliverable',
       group: 'general',
       groupLabel: 'General deliverables',
       submittedAt: new Date().toISOString().slice(0, 10),
+      fileName: input.fileName,
+      fileType: inferFileType(input.fileName),
       notes: input.notes,
       status: 'submitted',
     };
     setDeliverables((curr) => [...curr, newDeliverable]);
     toast.success('Deliverable uploaded!');
+  }, []);
+
+  const markDeliverableFeedbackRead: EntrepreneurStore['markDeliverableFeedbackRead'] = React.useCallback((deliverableId, feedbackIds) => {
+    if (feedbackIds.length === 0) return;
+    const readAt = new Date().toISOString().slice(0, 10);
+    setDeliverables((curr) =>
+      curr.map((deliverable) => {
+        if (deliverable.id !== deliverableId || !deliverable.feedbackHistory?.length) {
+          return deliverable;
+        }
+        return {
+          ...deliverable,
+          feedbackHistory: deliverable.feedbackHistory.map((feedback) =>
+            feedbackIds.includes(feedback.id) && !feedback.readAt
+              ? { ...feedback, readAt }
+              : feedback,
+          ),
+        };
+      }),
+    );
   }, []);
 
   const addFundingRound: EntrepreneurStore['addFundingRound'] = React.useCallback((input) => {
@@ -123,12 +167,13 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
       notifications,
       bookSession,
       submitDeliverable,
+      markDeliverableFeedbackRead,
       addFundingRound,
       submitPeriodicUpdate,
       requestTool,
       updateProfile,
     }),
-    [entrepreneur, sessions, deliverables, notifications, bookSession, submitDeliverable, addFundingRound, submitPeriodicUpdate, requestTool, updateProfile],
+    [entrepreneur, sessions, deliverables, notifications, bookSession, submitDeliverable, markDeliverableFeedbackRead, addFundingRound, submitPeriodicUpdate, requestTool, updateProfile],
   );
 
   return (
@@ -142,4 +187,10 @@ export function useEntrepreneurStore() {
   const ctx = React.useContext(EntrepreneurContext);
   if (!ctx) throw new Error('useEntrepreneurStore must be used inside an EntrepreneurProvider');
   return ctx;
+}
+
+function inferFileType(fileName: string): Deliverable['fileType'] {
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  if (extension === 'pptx' || extension === 'docx' || extension === 'xlsx') return extension;
+  return 'pdf';
 }

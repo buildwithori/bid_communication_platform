@@ -8,7 +8,6 @@ import type {
   Program,
   Module,
   ContentItem,
-  PlatformDocument,
   Sector,
   Stage,
   SectorId,
@@ -18,7 +17,6 @@ import {
 } from '@/lib/mock-data/entrepreneurs';
 import { trainers as seedTrainers } from '@/lib/mock-data/trainers';
 import { programs as seedPrograms, modules as seedModules, contentItems as seedContent } from '@/lib/mock-data/programs';
-import { platformDocuments as seedDocs } from '@/lib/mock-data';
 import { sectors as seedSectors, stages as seedStages } from '@/lib/mock-data/definitions';
 import type {
   EntrepreneurForm,
@@ -30,7 +28,7 @@ import type {
 /**
  * Admin-side in-memory store. Mirrors what a Supabase backend would
  * own: entrepreneurs, trainers, programmes + modules, content items,
- * documents, and the sector / stage lookup tables. All mutations
+ * and the sector / stage lookup tables. All mutations
  * happen through this context so the UI stays decoupled from the
  * data source.
  */
@@ -40,7 +38,6 @@ interface AdminStore {
   programs: Program[];
   modules: Module[];
   contentItems: ContentItem[];
-  documents: PlatformDocument[];
   sectors: Sector[];
   stages: Stage[];
   addEntrepreneur: (input: EntrepreneurForm) => void;
@@ -53,9 +50,9 @@ interface AdminStore {
   addModule: (programId: string, title: string, description?: string) => void;
   addContentItem: (moduleId: string, title: string, type: ContentItem['type']) => void;
   addSector: (label: string) => void;
+  updateSector: (id: string, label: string) => void;
   removeSector: (id: string) => void;
   updateStageDefinitions: (defs: Record<string, string>) => void;
-  generateDocument: (input: { title: string; type: 'memo' | 'report'; entrepreneurId?: string; cohort?: string }) => void;
 }
 
 const AdminContext = React.createContext<AdminStore | null>(null);
@@ -82,7 +79,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [programs, setPrograms] = React.useState<Program[]>(seedPrograms);
   const [modules, setModules] = React.useState<Module[]>(seedModules);
   const [contentItems, setContentItems] = React.useState<ContentItem[]>(seedContent);
-  const [documents, setDocuments] = React.useState<PlatformDocument[]>(seedDocs);
   const [sectors, setSectors] = React.useState<Sector[]>(seedSectors);
   const [stages, setStages] = React.useState<Stage[]>(seedStages);
 
@@ -256,6 +252,13 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     toast.success('Sector added!');
   }, []);
 
+  const updateSector: AdminStore['updateSector'] = React.useCallback((id, label) => {
+    setSectors((curr) =>
+      curr.map((sector) => (sector.id === id ? { ...sector, label } : sector)),
+    );
+    toast.success('Sector updated!');
+  }, []);
+
   const removeSector: AdminStore['removeSector'] = React.useCallback((id) => {
     setSectors((curr) => curr.filter((s) => s.id !== id));
     toast.success('Sector removed!');
@@ -268,25 +271,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     toast.success('Stage definitions updated!');
   }, []);
 
-  const generateDocument: AdminStore['generateDocument'] = React.useCallback((input) => {
-    const id = makeId('doc');
-    const doc: PlatformDocument = {
-      id,
-      title: input.title,
-      type: input.type,
-      entrepreneurId: input.entrepreneurId,
-      cohort: input.cohort,
-      generatedAt: new Date().toISOString().slice(0, 10),
-      status: 'draft',
-    };
-    setDocuments((curr) => [doc, ...curr]);
-    toast.success(
-      input.type === 'memo'
-        ? 'Memo generated from template — opening for edits…'
-        : 'Progress report generated!',
-    );
-  }, []);
-
   const value = React.useMemo<AdminStore>(
     () => ({
       entrepreneurs,
@@ -294,7 +278,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       programs,
       modules,
       contentItems,
-      documents,
       sectors,
       stages,
       addEntrepreneur,
@@ -307,11 +290,11 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       addModule,
       addContentItem,
       addSector,
+      updateSector,
       removeSector,
       updateStageDefinitions,
-      generateDocument,
     }),
-    [entrepreneurs, trainers, programs, modules, contentItems, documents, sectors, stages, addEntrepreneur, updateEntrepreneur, assignEntrepreneur, addTrainer, updateTrainer, addProgram, updateProgram, addModule, addContentItem, addSector, removeSector, updateStageDefinitions, generateDocument],
+    [entrepreneurs, trainers, programs, modules, contentItems, sectors, stages, addEntrepreneur, updateEntrepreneur, assignEntrepreneur, addTrainer, updateTrainer, addProgram, updateProgram, addModule, addContentItem, addSector, updateSector, removeSector, updateStageDefinitions],
   );
 
   return (

@@ -23,8 +23,8 @@ export const deliverableReviews: DeliverableReview[] = [
     programme: 'BID Accelerator - Cohort 6',
     deliverable: 'Business Model Canvas',
     fileName: 'FarmLink_BMC_v2.pdf',
-    submittedAt: '2025-04-14',
-    dueAt: '2025-04-18',
+    submittedAt: '2026-07-05',
+    dueAt: '2026-07-13',
     status: 'pending-review',
   },
   {
@@ -34,8 +34,8 @@ export const deliverableReviews: DeliverableReview[] = [
     programme: 'BID Accelerator - Cohort 6',
     deliverable: 'Financial Statements Q1',
     fileName: 'Edify_Financials_Q1.xlsx',
-    submittedAt: '2025-04-09',
-    dueAt: '2025-04-12',
+    submittedAt: '2026-07-03',
+    dueAt: '2026-07-02',
     status: 'pending-review',
   },
   {
@@ -45,8 +45,8 @@ export const deliverableReviews: DeliverableReview[] = [
     programme: 'Investment Readiness for Fintech',
     deliverable: 'Investor Pitch Deck',
     fileName: 'HealthFirst_Pitch_v5.pdf',
-    submittedAt: '2025-04-03',
-    dueAt: '2025-04-05',
+    submittedAt: '2026-07-01',
+    dueAt: '2026-07-04',
     status: 'changes-requested',
     reviewer: 'Ama Darko',
   },
@@ -57,7 +57,7 @@ export const deliverableReviewStatusMeta: Record<
   { label: string; tone: BadgeTone }
 > = {
   'pending-review': { label: 'Pending review', tone: 'amber' },
-  'changes-requested': { label: 'Changes requested', tone: 'blue' },
+  'changes-requested': { label: 'Changes required', tone: 'blue' },
   approved: { label: 'Approved', tone: 'green' },
 };
 

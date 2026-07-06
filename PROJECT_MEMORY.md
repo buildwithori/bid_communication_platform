@@ -7,16 +7,18 @@ This file is the persistent working memory for the BID Hub application. Read it 
 BID Hub is an entrepreneur support platform with two primary workspaces:
 
 - Entrepreneur workspace: learning, deliverables, profile, funding updates, sessions, tools.
-- Admin workspace: programme operations, entrepreneurs, trainers, content, deliverable reviews, sessions, documents, reporting, tool requests.
+- Admin workspace: programme operations, entrepreneurs, trainers, content, deliverable reviews, sessions, reporting, tool requests.
 
 The current phase is UI-first. Backend/auth/storage APIs are intentionally not wired yet. Build screens and flows so they are ready for backend integration later.
 
 ## Standing Direction
 
 - Think like a senior frontend engineer and UI/UX engineer.
+- Think business-first on every UI change. The app is currently UI-only, so screens must still model the real BID workflow, roles, data relationships, and growth paths instead of being decorative mockups.
+- Derive labels, statuses, categories, and visual states from business meaning first. Do not let colors, mock accents, or temporary UI styling become the source of product logic.
 - Reusability, system design, SOLID principles, and scalability matter on every change.
 - Rebuild weak pages when needed instead of patching awkward UI.
-- Do not assume small data. Lists, tables, programmes, modules, training content, documents, requests, and users can grow quickly.
+- Do not assume small data. Lists, tables, programmes, modules, training content, requests, and users can grow quickly.
 - Every table or table-like data surface should have search. Growing data surfaces also need filtering and pagination/page size where appropriate.
 - Avoid dead-end actions. Buttons and row actions should open a modal, navigate to a real page, update local UI state, or clearly represent a backend-ready placeholder.
 - Use shared components whenever possible before inventing page-specific UI.
@@ -52,7 +54,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 
 - Backend/API folders were removed for now. The app is UI/in-memory-state first.
 - TanStack Query is installed and wired through `app/providers.tsx`; current mock stores still own data until backend integration begins.
-- Auth includes login/signup tabs, forgot password, reset password, and email verification.
+- Auth includes separate `/auth/login` and `/auth/signup` pages with shared tabs that navigate between URLs, plus forgot password, reset password, and email verification.
 - Admin dashboard and entrepreneur dashboard include charts via Recharts.
 - Tables use a leading `Action` column with `RowActions` dropdowns.
 - Programmes and Training Library are core content surfaces and must be robust:
@@ -73,12 +75,11 @@ Admin should be able to:
 - Review submitted deliverables.
 - Manage content library.
 - Manage sessions and tool requests.
-- Generate/manage documents.
 - Review reporting and overdue updates.
 
 Entrepreneurs should be able to:
 
-- View dashboard progress, upcoming sessions, deliverables, and funding goal.
+- View dashboard progress, upcoming sessions, and deliverables.
 - Browse training programmes and resources.
 - Open a programme and continue through modules/content.
 - Submit deliverables.

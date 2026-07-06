@@ -1,10 +1,11 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField, FormInput, FormRow2, FormSelect, FormTextarea } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
+import { DatePicker } from '@/components/shared/DatePicker';
 import { bookingSchema, type BookingForm } from '@/lib/forms/schemas';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { trainers } from '@/lib/mock-data/trainers';
@@ -31,7 +32,7 @@ export function BookingModal({
       sessionType: 'mentor-checkin',
       recipient: 'specific',
       trainerId: trainers[0]?.id ?? '',
-      date: '2025-04-14',
+      date: '2026-07-08',
       time: '10:00',
       notes: '',
     },
@@ -85,7 +86,17 @@ export function BookingModal({
 
         <FormRow2>
           <FormField label="Date" error={form.formState.errors.date?.message}>
-            <FormInput type="date" {...form.register('date')} />
+            <Controller
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <DatePicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </FormField>
 
           <FormField label="Time">

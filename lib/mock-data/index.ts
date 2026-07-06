@@ -3,7 +3,6 @@ import type {
   DeliverableGroup,
   Session,
   Tool,
-  PlatformDocument,
   ActivityEntry,
   PendingAction,
   ReportingMetrics,
@@ -53,6 +52,15 @@ export const deliverables: Deliverable[] = [
     fileType: 'pdf',
     notes: 'Quarterly update with revenue figures',
     reviewFeedback: 'BID team left feedback — strong revenue trajectory.',
+    feedbackHistory: [
+      {
+        id: 'fb-q1-approved',
+        message: 'Strong revenue trajectory. BID has accepted this report.',
+        reviewer: 'Ama Darko',
+        createdAt: '2025-04-05',
+        readAt: '2025-04-06',
+      },
+    ],
     status: 'reviewed',
   },
   {
@@ -61,7 +69,7 @@ export const deliverables: Deliverable[] = [
     programmeId: 'p-accelerator-c6',
     group: 'programme',
     groupLabel: 'BID Accelerator – Cohort 6',
-    dueDate: '2025-04-18',
+    dueDate: '2026-07-13',
     status: 'pending',
   },
   {
@@ -70,8 +78,28 @@ export const deliverables: Deliverable[] = [
     programmeId: 'p-accelerator-c6',
     group: 'programme',
     groupLabel: 'BID Accelerator – Cohort 6',
-    dueDate: '2025-05-01',
-    status: 'pending',
+    dueDate: '2026-07-20',
+    submittedAt: '2026-07-01',
+    fileName: 'PayBridge_financial_model_v1.xlsx',
+    fileType: 'xlsx',
+    reviewFeedback: 'Current feedback: add monthly cash-flow assumptions and separate revenue lines by customer segment before resubmitting.',
+    feedbackHistory: [
+      {
+        id: 'fb-finmodel-current',
+        message: 'Please add monthly cash-flow assumptions and separate revenue lines by customer segment. Once updated, resubmit this file for another BID review.',
+        reviewer: 'Ama Darko',
+        createdAt: '2026-07-03',
+      },
+      {
+        id: 'fb-finmodel-earlier',
+        message: 'The model structure is clear. Before approval, BID needs more detail on the revenue assumptions behind each customer segment.',
+        reviewer: 'Kofi Mensah',
+        createdAt: '2026-07-01',
+        readAt: '2026-07-02',
+      },
+    ],
+    reviewer: 'Ama Darko',
+    status: 'changes-requested',
   },
   {
     id: 'd-readiness-deck',
@@ -108,8 +136,8 @@ export const deliverablesForGroup = (groupId: string) => {
 };
 
 /**
- * Seed sessions / calendar events. `accent` drives the left border
- * colour on the upcoming-sessions cards.
+ * Seed bookable/support sessions. Deliverable deadlines live on
+ * deliverables and are merged into the schedule UI separately.
  */
 export const sessions: Session[] = [
   {
@@ -117,7 +145,7 @@ export const sessions: Session[] = [
     type: 'mentor-checkin',
     title: 'Mentor check-in – Kofi Mensah',
     trainerId: 't-kofi',
-    date: '2025-04-14',
+    date: '2026-07-08',
     startTime: '10:00',
     endTime: '10:45',
     status: 'confirmed',
@@ -127,7 +155,7 @@ export const sessions: Session[] = [
     id: 's-office',
     type: 'office-hours',
     title: 'BID Office Hours (group)',
-    date: '2025-04-16',
+    date: '2026-07-10',
     startTime: '14:00',
     endTime: '15:30',
     location: 'virtual',
@@ -135,13 +163,15 @@ export const sessions: Session[] = [
     accent: 'info',
   },
   {
-    id: 's-bmc-due',
-    type: 'deadline',
-    title: 'Business Model Canvas – due',
-    date: '2025-04-18',
-    accent: 'warning',
-    status: 'pending',
-    isDeadline: true,
+    id: 's-investor-prep',
+    type: 'investor-prep',
+    title: 'Investor prep session',
+    date: '2026-07-15',
+    startTime: '11:00',
+    endTime: '12:00',
+    location: 'virtual',
+    status: 'confirmed',
+    accent: 'success',
   },
 ];
 
@@ -197,36 +227,6 @@ export const tools: Tool[] = [
 export const toolById = (id: string) => tools.find((t) => t.id === id);
 
 /**
- * Seed generated documents shown in the admin "Generate documents" table.
- */
-export const platformDocuments: PlatformDocument[] = [
-  {
-    id: 'doc-hf-memo',
-    title: 'HealthFirst – Investment Memo',
-    type: 'memo',
-    entrepreneurId: 'e-healthfirst',
-    generatedAt: '2025-04-09',
-    status: 'final',
-  },
-  {
-    id: 'doc-pb-memo',
-    title: 'PayBridge Africa – Investment Memo',
-    type: 'memo',
-    entrepreneurId: 'e-paybridge',
-    generatedAt: '2025-03-22',
-    status: 'draft',
-  },
-  {
-    id: 'doc-c6-q1',
-    title: 'Cohort 6 – Q1 Progress Report',
-    type: 'report',
-    cohort: 'Cohort 6',
-    generatedAt: '2025-04-01',
-    status: 'sent',
-  },
-];
-
-/**
  * Seed recent activity for the entrepreneur dashboard.
  */
 export const recentActivity: ActivityEntry[] = [
@@ -268,7 +268,6 @@ export const pendingActions: PendingAction[] = [
   { id: 'pa-1', label: 'Deliverables awaiting review', count: 12, tone: 'amber' },
   { id: 'pa-2', label: 'Self-registered, unassigned', count: 3, tone: 'red' },
   { id: 'pa-3', label: 'Tool requests pending', count: 2, tone: 'blue' },
-  { id: 'pa-4', label: 'Documents to generate', count: 4, tone: 'neutral' },
 ];
 
 /**

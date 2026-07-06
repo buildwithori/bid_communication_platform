@@ -14,9 +14,10 @@ import {
 } from '@/components/shared/DataTable';
 import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
 import { programs } from '@/lib/mock-data/programs';
-import { deliverableGroups, deliverablesForGroup } from '@/lib/mock-data';
+import { deliverableGroups } from '@/lib/mock-data';
+import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { cn } from '@/lib/utils';
-import type { Program } from '@/types';
+import type { Deliverable, Program } from '@/types';
 import { routes } from '@/lib/routes';
 
 const groupProgrammeMap: Record<string, Program | undefined> = {};
@@ -27,6 +28,7 @@ programs.forEach((p) => {
 
 export default function DeliverablesPage() {
   const router = useRouter();
+  const { deliverables } = useEntrepreneurStore();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'pending' | 'done'>('all');
@@ -36,8 +38,8 @@ export default function DeliverablesPage() {
   const filteredGroups = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return deliverableGroups.filter((group) => {
-      const items = deliverablesForGroup(group.id);
-      const pending = items.some((item) => item.status === 'pending' || item.status === 'overdue');
+      const items = getDeliverablesForGroup(group, deliverables);
+      const pending = items.some((item) => item.status === 'pending' || item.status === 'overdue' || item.status === 'changes-requested');
       const done = items.some((item) => item.status === 'reviewed');
       const program = groupProgrammeMap[group.id];
       const matchesStatus =
@@ -52,7 +54,7 @@ export default function DeliverablesPage() {
           .includes(needle);
       return matchesStatus && matchesQuery;
     });
-  }, [query, statusFilter]);
+  }, [deliverables, query, statusFilter]);
 
   React.useEffect(() => {
     setPage(1);
@@ -100,8 +102,10 @@ export default function DeliverablesPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {pageRows.map((g) => {
           const program = groupProgrammeMap[g.id];
-          const items = deliverablesForGroup(g.id);
-          const pending = items.filter((d) => d.status === 'pending').length;
+          const items = getDeliverablesForGroup(g, deliverables);
+          const pending = items.filter((d) => d.status === 'pending' || d.status === 'overdue').length;
+          const changes = items.filter((d) => d.status === 'changes-requested').length;
+          const submitted = items.filter((d) => d.status === 'submitted').length;
           const done = items.filter((d) => d.status === 'reviewed').length;
           const accentBg =
             g.accent === 'bid' ? 'bg-bid-light' : g.accent === 'info' ? 'bg-info-light' : 'bg-success-light';
@@ -130,8 +134,12 @@ export default function DeliverablesPage() {
               <div className="mb-2.5 text-[10px] text-ink-muted">
                 {program?.description ?? 'Not tied to a specific programme'}
               </div>
-              {pending > 0 ? (
-                <Badge tone="amber">{pending} pending</Badge>
+              {changes > 0 ? (
+                <Badge tone="amber">{changes} changes required</Badge>
+              ) : pending > 0 ? (
+                <Badge tone="amber">{pending} not submitted</Badge>
+              ) : submitted > 0 ? (
+                <Badge tone="blue">{submitted} under review</Badge>
               ) : (
                 <Badge tone="brand">{done} done</Badge>
               )}
@@ -154,4 +162,14 @@ export default function DeliverablesPage() {
       <UploadDeliverableModal open={uploadOpen} onOpenChange={setUploadOpen} />
     </>
   );
+}
+
+function getDeliverablesForGroup(
+  group: (typeof deliverableGroups)[number],
+  deliverables: Deliverable[],
+) {
+  if (group.id === 'g-general') {
+    return deliverables.filter((item) => item.group === 'general');
+  }
+  return deliverables.filter((item) => item.programmeId === group.programmeId);
 }

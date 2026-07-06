@@ -42,7 +42,6 @@ const pendingActions = [
   { id: 'pa-1', label: 'Deliverables awaiting review', count: 12, tone: 'amber' as const, href: routes.admin.deliverableReviews },
   { id: 'pa-2', label: 'Self-registered, unassigned', count: 3, tone: 'red' as const, href: routes.admin.entrepreneurs },
   { id: 'pa-3', label: 'Tool requests pending', count: 2, tone: 'blue' as const, href: routes.admin.toolRequests },
-  { id: 'pa-4', label: 'Documents to generate', count: 4, tone: 'neutral' as const, href: routes.admin.documents },
 ];
 
 const impactTrend = [

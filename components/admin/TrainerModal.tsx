@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import {
@@ -11,6 +11,7 @@ import {
   FormRow2,
 } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
+import { DatePicker } from '@/components/shared/DatePicker';
 import { Notice } from '@/components/shared/PageHeader';
 import { trainerSchema, type TrainerForm } from '@/lib/forms/schemas';
 import { useAdminStore } from '@/lib/stores/admin-store';
@@ -108,7 +109,17 @@ export function TrainerModal({
         </FormField>
         {accessLevel === 'guest' && (
           <FormField label="Access expires">
-            <FormInput type="date" {...form.register('accessExpiresOn')} />
+            <Controller
+              control={form.control}
+              name="accessExpiresOn"
+              render={({ field }) => (
+                <DatePicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </FormField>
         )}
         <FormField label="Specialisms (comma separated)">
@@ -166,4 +177,3 @@ export function TrainerModal({
     </Modal>
   );
 }
-

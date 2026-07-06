@@ -1,10 +1,11 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormInput, FormTextarea, FormRow2 } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
+import { DatePicker } from '@/components/shared/DatePicker';
 import { programSchema, type ProgramForm } from '@/lib/forms/schemas';
 import { useAdminStore } from '@/lib/stores/admin-store';
 import type { Program } from '@/types';
@@ -61,10 +62,30 @@ export function ProgramModal({
         </FormField>
         <FormRow2>
           <FormField label="Start date" error={form.formState.errors.startDate?.message}>
-            <FormInput type="date" {...form.register('startDate')} />
+            <Controller
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <DatePicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </FormField>
           <FormField label="End date" error={form.formState.errors.endDate?.message}>
-            <FormInput type="date" {...form.register('endDate')} />
+            <Controller
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <DatePicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </FormField>
         </FormRow2>
         <FormField label="Max entrepreneurs">

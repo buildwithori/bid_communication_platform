@@ -12,6 +12,7 @@ import {
   DataTable,
   RowActions,
   TableFilterInput,
+  TablePagination,
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
@@ -42,6 +43,8 @@ export default function ProfilePage() {
   const [fundingOpen, setFundingOpen] = React.useState(false);
   const [updateOpen, setUpdateOpen] = React.useState(false);
   const [fundingQuery, setFundingQuery] = React.useState('');
+  const [fundingPage, setFundingPage] = React.useState(1);
+  const [fundingPageSize, setFundingPageSize] = React.useState(5);
 
   const profileForm = useForm<BusinessProfileForm>({
     resolver: zodResolver(businessProfileSchema),
@@ -103,6 +106,13 @@ export default function ProfilePage() {
       .toLowerCase()
       .includes(needle);
   });
+  React.useEffect(() => {
+    setFundingPage(1);
+  }, [fundingQuery, fundingPageSize]);
+  const fundingPageRows = React.useMemo(() => {
+    const start = (fundingPage - 1) * fundingPageSize;
+    return filteredFundingRounds.slice(start, start + fundingPageSize);
+  }, [filteredFundingRounds, fundingPage, fundingPageSize]);
   const fundingColumns: Column<FundingRound>[] = [
     {
       key: 'action',
@@ -274,9 +284,20 @@ export default function ProfilePage() {
           </TableToolbar>
           <DataTable
             columns={fundingColumns}
-            rows={filteredFundingRounds}
+            rows={fundingPageRows}
             rowKey={(round) => round.id}
             emptyMessage="No funding rounds match this search."
+          />
+          <TablePagination
+            page={fundingPage}
+            pageSize={fundingPageSize}
+            totalItems={filteredFundingRounds.length}
+            pageSizeOptions={[5, 10, 25]}
+            onPageChange={setFundingPage}
+            onPageSizeChange={(next) => {
+              setFundingPageSize(next);
+              setFundingPage(1);
+            }}
           />
         </Card>
       )}

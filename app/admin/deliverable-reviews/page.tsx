@@ -29,6 +29,21 @@ import {
   type DeliverableReviewStatus,
 } from '@/lib/mock-data/admin-workflows';
 
+const today = new Date('2026-07-06');
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function daysBetween(start: string, end: Date) {
+  const startDate = new Date(start);
+  return Math.max(Math.floor((end.getTime() - startDate.getTime()) / 86_400_000), 0);
+}
+
 export default function DeliverableReviewsPage() {
   const [reviews, setReviews] = React.useState(deliverableReviews);
   const [active, setActive] = React.useState<DeliverableReview | null>(null);
@@ -47,7 +62,7 @@ export default function DeliverableReviewsPage() {
 
   const pending = reviews.filter((row) => row.status === 'pending-review').length;
   const changes = reviews.filter((row) => row.status === 'changes-requested').length;
-  const overdue = reviews.filter((row) => row.status !== 'approved' && new Date(row.dueAt) < new Date('2025-04-15')).length;
+  const overdue = reviews.filter((row) => row.status !== 'approved' && new Date(row.dueAt) < today).length;
   const programmeOptions = React.useMemo(
     () => Array.from(new Set(reviews.map((row) => row.programme))).sort(),
     [reviews],
@@ -114,7 +129,27 @@ export default function DeliverableReviewsPage() {
     {
       key: 'submitted',
       header: 'Submitted',
-      cell: (row) => new Date(row.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      cell: (row) => (
+        <div>
+          <div>{formatDate(row.submittedAt)}</div>
+          <div className="text-sm text-ink-muted">
+            {daysBetween(row.submittedAt, today)} day{daysBetween(row.submittedAt, today) === 1 ? '' : 's'} waiting
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'due',
+      header: 'Due date',
+      cell: (row) => {
+        const isLate = row.status !== 'approved' && new Date(row.dueAt) < today;
+        return (
+          <div>
+            <div>{formatDate(row.dueAt)}</div>
+            {isLate && <div className="text-sm font-medium text-danger">Late</div>}
+          </div>
+        );
+      },
     },
     {
       key: 'status',
@@ -140,9 +175,9 @@ export default function DeliverableReviewsPage() {
 
       <MetricGrid>
         <StatCard label="Pending review" value={pending} dotColor="warning" />
-        <StatCard label="Changes requested" value={changes} dotColor="info" />
+        <StatCard label="Changes required" value={changes} dotColor="info" />
         <StatCard label="Overdue review" value={overdue} dotColor="bid" />
-        <StatCard label="Target SLA" value="48h" dotColor="success" />
+        <StatCard label="Review time goal" value="48h" dotColor="success" />
       </MetricGrid>
 
       <Card className="mt-4">

@@ -78,7 +78,9 @@ export const bookingSchema = z.object({
 export type BookingForm = z.infer<typeof bookingSchema>;
 
 export const deliverableSchema = z.object({
-  name: z.string().min(1, 'Name the deliverable'),
+  deliverableId: z.string().min(1, 'Select the deliverable requirement'),
+  name: z.string().optional(),
+  fileName: z.string().min(1, 'Add a file name for this UI flow'),
   notes: z.string().optional(),
 });
 export type DeliverableForm = z.infer<typeof deliverableSchema>;
@@ -110,6 +112,11 @@ export const newSectorSchema = z.object({
   label: z.string().min(1, 'Sector name is required'),
 });
 export type NewSectorForm = z.infer<typeof newSectorSchema>;
+
+export const stageDefinitionEditSchema = z.object({
+  definition: z.string().min(1, 'Definition is required'),
+});
+export type StageDefinitionEditForm = z.infer<typeof stageDefinitionEditSchema>;
 
 export const stageDefinitionSchema = z.object({
   idea: z.string().min(1, 'Definition is required'),
@@ -178,13 +185,6 @@ export const requiredDeliverableSchema = z.object({
   requiredFor: z.string().min(1, 'Audience is required'),
 });
 export type RequiredDeliverableForm = z.infer<typeof requiredDeliverableSchema>;
-
-export const documentGeneratorSchema = z.object({
-  title: z.string().min(1, 'Document title is required'),
-  entrepreneurId: z.string().optional(),
-  cohort: z.string().optional(),
-});
-export type DocumentGeneratorForm = z.infer<typeof documentGeneratorSchema>;
 
 export const reuseModuleSchema = z.object({
   moduleId: z.string().min(1, 'Select a module'),

@@ -2,9 +2,11 @@
 
 BID Hub is a frontend application for managing entrepreneur support programmes. It gives entrepreneurs a workspace for learning, deliverables, profile updates, sessions, and tools, while giving programme teams an admin workspace for operations, content, reporting, and reviews.
 
-The project is currently in a UI-first phase. Backend authentication, persistence, storage, and document generation are not wired yet. The application uses mock data and in-memory stores so the product flows can be designed, tested, and refined before backend integration.
+The project is currently in a UI-first phase. Backend authentication, persistence, and storage are not wired yet. The application uses mock data and in-memory stores so the product flows can be designed, tested, and refined before backend integration.
 
 > Before making product, UI, routing, or frontend architecture changes, read [PROJECT_MEMORY.md](./PROJECT_MEMORY.md). It captures the standing decisions and long-running context for this application.
+>
+> Before backend design or implementation work, read [BACKEND_MEMORY.md](./BACKEND_MEMORY.md) and the collaborative backend design doc at [docs/backend-design.md](./docs/backend-design.md).
 
 ## Tech Stack
 
@@ -60,11 +62,12 @@ Known note: the build may show an outdated Browserslist warning. It is not curre
 Auth pages live under `/auth`.
 
 - `/auth/login`
+- `/auth/signup`
 - `/auth/forgot-password`
 - `/auth/reset-password`
 - `/auth/verify-email`
 
-The login page includes login and entrepreneur signup tabs. Entrepreneur signup is direct. Backend auth is not connected yet.
+Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Entrepreneur signup is direct. Backend auth is not connected yet.
 
 ### Entrepreneur Workspace
 
@@ -92,13 +95,13 @@ Admin pages live under `/admin`.
 - `/admin/programs`
 - `/admin/content`
 - `/admin/deliverable-reviews`
-- `/admin/documents`
 - `/admin/sessions`
 - `/admin/tool-requests`
-- `/admin/stages-sectors`
+- `/admin/settings/stages`
+- `/admin/settings/sectors`
 - `/admin/reporting`
 
-Admins can manage entrepreneurs, trainers, programmes, content, deliverable reviews, sessions, tool requests, generated documents, stage/sector definitions, and reporting.
+Admins can manage entrepreneurs, trainers, programmes, content, deliverable reviews, sessions, tool requests, business stages, sectors, and reporting.
 
 ## Project Structure
 
@@ -113,7 +116,7 @@ app/
 
 components/
   admin/                Admin-specific modals and flows
-  auth/                 Auth entry and recovery screens
+  auth/                 Shared auth primitives used by auth route views
   entrepreneur/         Entrepreneur-specific modals and content
   layout/               App shell, sidebar, top bar
   shared/               Reusable BID UI system
@@ -132,6 +135,8 @@ types/
   index.ts              Core domain types
 
 PROJECT_MEMORY.md       Long-running product and engineering context
+BACKEND_MEMORY.md       Long-running backend architecture and implementation rules
+docs/backend-design.md  Collaborative backend architecture design document
 ```
 
 ## UI System
@@ -179,7 +184,6 @@ The mock data is intentionally shaped close to backend tables, including:
 - deliverables
 - sessions
 - tools
-- documents
 - reporting data
 - sectors and stages
 
@@ -198,7 +202,7 @@ Implemented:
 - Dashboard charts
 - Programme builder UI
 - Training library and learning path UI
-- Content, deliverable, sessions, tools, documents, and reporting flows
+- Content, deliverable, sessions, tools, and reporting flows
 
 Not implemented yet:
 
@@ -206,7 +210,6 @@ Not implemented yet:
 - API routes
 - Persistent database writes
 - File storage
-- Real document/PDF generation
 - Real notifications
 - Real top-bar global search
 - Role-based route protection
@@ -230,7 +233,6 @@ Future backend work should connect around the current boundaries:
 - Auth: replace UI-only auth with a real auth provider and role-based routing.
 - Data: replace `lib/stores` in-memory mutations with backend calls.
 - Storage: wire upload controls to file storage.
-- Documents: connect document generation to a server-side process.
 - Notifications: connect bell/activity updates to real events.
 - Search: replace local filtering with backend-backed search where needed.
 

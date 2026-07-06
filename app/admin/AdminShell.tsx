@@ -17,11 +17,12 @@ const titles: Record<string, string> = {
   [routes.admin.trainers]: 'Trainers',
   [routes.admin.programs]: 'Programs',
   [routes.admin.content]: 'Content Library',
-  [routes.admin.documents]: 'Documents',
   [routes.admin.deliverableReviews]: 'Deliverable Reviews',
   [routes.admin.sessions]: 'Sessions',
   [routes.admin.toolRequests]: 'Tool Requests',
   [routes.admin.stagesSectors]: 'Stages & Sectors',
+  [routes.admin.settingsStages]: 'Business Stages',
+  [routes.admin.settingsSectors]: 'Sectors',
   [routes.admin.reporting]: 'Reporting & Analytics',
 };
 

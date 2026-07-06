@@ -9,7 +9,7 @@ import {
   Star,
   BarChart3,
   ClipboardCheck,
-  FileText,
+  Tags,
 } from 'lucide-react';
 import type { NavSection } from '@/components/layout/NavSidebar';
 import { routes } from '@/lib/routes';
@@ -38,7 +38,6 @@ export const adminNav: NavSection[] = [
     heading: 'Content',
     items: [
       { href: routes.admin.content, label: 'Content Library', icon: PlayCircle },
-      { href: routes.admin.documents, label: 'Documents', icon: FileText },
     ],
   },
   {
@@ -52,7 +51,8 @@ export const adminNav: NavSection[] = [
   {
     heading: 'Settings',
     items: [
-      { href: routes.admin.stagesSectors, label: 'Stages & Sectors', icon: Star },
+      { href: routes.admin.settingsStages, label: 'Business Stages', icon: Star },
+      { href: routes.admin.settingsSectors, label: 'Sectors', icon: Tags },
     ],
   },
   {

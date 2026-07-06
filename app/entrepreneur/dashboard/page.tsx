@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowRight, CalendarPlus } from 'lucide-react';
+import { ArrowRight, CalendarPlus, CheckCircle2, Clock3 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
 import { MetricGrid } from '@/components/shared/MetricGrid';
@@ -17,12 +17,8 @@ import { routes } from '@/lib/routes';
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -36,38 +32,43 @@ const accentDot: Record<string, string> = {
   neutral: 'bg-ink-muted',
 };
 
+function toLocalDateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function EntrepreneurDashboardPage() {
   const { entrepreneur, sessions, deliverables } = useEntrepreneurStore();
   const [bookOpen, setBookOpen] = React.useState(false);
   const greeting = `Good morning, ${entrepreneur.businessName}`;
-  const upcoming = sessions.slice(0, 3);
-  const goalAmount = entrepreneur.goal.amountUsd ?? 0;
-  const goalProgress = goalAmount
-    ? Math.min(Math.round((entrepreneur.metrics.fundsMobilisedUsd / goalAmount) * 100), 100)
-    : entrepreneur.metrics.trainingProgress;
+  const todayValue = React.useMemo(() => toLocalDateValue(new Date()), []);
+  const upcoming = React.useMemo(
+    () =>
+      [...sessions]
+        .filter((session) => session.date >= todayValue)
+        .sort((a, b) => `${a.date} ${a.startTime ?? '00:00'}`.localeCompare(`${b.date} ${b.startTime ?? '00:00'}`))
+        .slice(0, 3),
+    [sessions, todayValue],
+  );
+  const nextSession = upcoming[0];
   const pendingDeliverables = deliverables.filter((d) => d.status === 'pending' || d.status === 'overdue').length;
-  const submittedDeliverables = deliverables.filter((d) => d.status === 'submitted' || d.status === 'reviewed').length;
+  const activeDeliverables = deliverables
+    .filter((d) => d.status === 'pending' || d.status === 'overdue' || d.status === 'submitted')
+    .slice(0, 4);
   const progressTrend = [
-    { week: 'W1', training: 32, deliverables: 1 },
-    { week: 'W2', training: 44, deliverables: 2 },
-    { week: 'W3', training: 57, deliverables: 3 },
-    { week: 'W4', training: entrepreneur.metrics.trainingProgress, deliverables: entrepreneur.metrics.deliverablesDone },
-  ];
-  const workloadData = [
-    { name: 'Submitted', value: submittedDeliverables },
-    { name: 'Pending', value: pendingDeliverables },
-    { name: 'Sessions', value: upcoming.length },
-  ];
-  const goalData = [
-    { name: 'Mobilised', value: goalProgress },
-    { name: 'Remaining', value: Math.max(100 - goalProgress, 0) },
+    { week: 'W1', training: 32 },
+    { week: 'W2', training: 44 },
+    { week: 'W3', training: 57 },
+    { week: 'W4', training: entrepreneur.metrics.trainingProgress },
   ];
 
   return (
     <>
       <PageHeader
         title={greeting}
-        description="Your learning, deliverables, funding goal, and upcoming support in one place."
+        description="Your learning progress, deliverables, and upcoming support in one place."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setBookOpen(true)} variant="outline">
@@ -84,7 +85,7 @@ export default function EntrepreneurDashboardPage() {
         }
       />
 
-      <MetricGrid>
+      <MetricGrid columns={3}>
         <StatCard
           label="Training progress"
           value={
@@ -111,31 +112,25 @@ export default function EntrepreneurDashboardPage() {
         />
         <StatCard
           label="Next session"
-          value={<span className="mt-0.5 text-sm">Apr 14</span>}
-          subline="Mentor check-in"
+          value={
+            <span className="mt-0.5 text-sm">
+              {nextSession
+                ? new Date(nextSession.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'None'}
+            </span>
+          }
+          subline={nextSession?.title ?? 'No upcoming session'}
           dotColor="info"
           accent="info"
         />
-        <StatCard
-          label="Current goal"
-          value={
-            <span className="mt-0.5 text-sm">
-              ${(entrepreneur.goal.amountUsd ?? 0) / 1000}k
-            </span>
-          }
-          subline="Series A target"
-          dotColor="bid"
-          accent="success"
-        />
       </MetricGrid>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.85fr]">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
         <ChartCard
-          title="Progress momentum"
-          description="Your training and submission pace across the month"
+          title="Training progress trend"
+          description="How your completed training has moved across the month"
           legend={[
             { label: 'Training progress', colorClassName: 'bg-bid' },
-            { label: 'Deliverables completed', colorClassName: 'bg-info' },
           ]}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -145,90 +140,43 @@ export default function EntrepreneurDashboardPage() {
                   <stop offset="5%" stopColor="#842751" stopOpacity={0.24} />
                   <stop offset="95%" stopColor="#842751" stopOpacity={0} />
                 </linearGradient>
-                <linearGradient id="entrepreneurDeliverables" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#185FA5" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#185FA5" stopOpacity={0} />
-                </linearGradient>
               </defs>
               <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
               <XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
+              <YAxis
+                domain={[0, 100]}
+                tickFormatter={(value) => `${value}%`}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: '#666', fontSize: 12 }}
+              />
+              <Tooltip
+                formatter={(value) => [`${value}%`, 'Training progress']}
+                contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }}
+              />
+              <ReferenceLine y={100} stroke="rgba(132,39,81,0.18)" strokeDasharray="4 4" />
               <Area type="monotone" dataKey="training" name="Training %" stroke="#842751" fill="url(#entrepreneurTraining)" strokeWidth={3} />
-              <Area type="monotone" dataKey="deliverables" name="Deliverables" stroke="#185FA5" fill="url(#entrepreneurDeliverables)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard
-          title="Funding goal"
-          description={`$${Math.round(entrepreneur.metrics.fundsMobilisedUsd / 1000)}k of $${Math.round(goalAmount / 1000)}k mobilised`}
-        >
-          <div className="relative h-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={goalData} dataKey="value" nameKey="name" innerRadius={62} outerRadius={88} startAngle={90} endAngle={-270}>
-                  <Cell fill="#842751" />
-                  <Cell fill="#f1efe8" />
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-3xl font-semibold tracking-[-0.02em]">{goalProgress}%</div>
-                <div className="text-sm text-ink-muted">complete</div>
-              </div>
-            </div>
-          </div>
-        </ChartCard>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <ChartCard
-          title="Weekly workload"
-          description="What needs attention before the next review"
-          legend={[
-            { label: 'Completed work', colorClassName: 'bg-success' },
-            { label: 'Open work', colorClassName: 'bg-warning' },
-            { label: 'Sessions', colorClassName: 'bg-info' },
-          ]}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={workloadData} layout="vertical" margin={{ top: 12, right: 16, left: 4, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(0,0,0,0.08)" horizontal={false} />
-              <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} tick={{ fill: '#666', fontSize: 12 }} />
-              <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={88} tick={{ fill: '#666', fontSize: 12 }} />
-              <Tooltip cursor={{ fill: 'rgba(132,39,81,0.06)' }} contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
-              <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                {workloadData.map((entry) => (
-                  <Cell
-                    key={entry.name}
-                    fill={entry.name === 'Submitted' ? '#1D9E75' : entry.name === 'Pending' ? '#BA7517' : '#185FA5'}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <Card>
+        <Card className="flex min-h-[360px] flex-col">
           <CardHeader
-            title="Recent activity"
-            description="Updates from BID, deliverables, and learning progress"
+            title="Activity feed"
+            description="The latest updates from BID and your programme work"
             actions={<Badge tone="brand">Live</Badge>}
           />
-          <div className="flex flex-col">
+          <div className="flex flex-1 flex-col justify-center">
             {recentActivity.map((a) => (
               <div
                 key={a.id}
-                className="flex gap-2 border-b border-line py-1.5 last:border-b-0"
+                className="flex gap-3 border-b border-line py-3 last:border-b-0"
               >
                 <span
-                  className={`mt-1 h-[7px] w-[7px] shrink-0 rounded-full ${accentDot[a.accent]}`}
+                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${accentDot[a.accent]}`}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[11px] leading-relaxed">
+                  <div className="text-sm leading-relaxed text-ink">
                     {a.text}
                     {a.emphasis && (
                       <strong>
@@ -238,7 +186,7 @@ export default function EntrepreneurDashboardPage() {
                       </strong>
                     )}
                   </div>
-                  <div className="mt-0.5 font-mono text-[9px] text-ink-faint">
+                  <div className="mt-1 font-mono text-xs text-ink-faint">
                     {a.timestamp}
                   </div>
                 </div>
@@ -248,11 +196,11 @@ export default function EntrepreneurDashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-4">
-        <Card>
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)]">
+        <Card className="flex flex-col">
           <CardHeader
             title="Upcoming sessions"
-            description="Your next support moments and deadlines"
+            description="Your next support moments and due dates"
             actions={
               <Link href={routes.entrepreneur.schedule}>
                 <Button variant="outline" size="sm">
@@ -261,7 +209,7 @@ export default function EntrepreneurDashboardPage() {
               </Link>
             }
           />
-          <div className="flex flex-col gap-1.5">
+          <div className="grid gap-2">
             {upcoming.map((s) => {
               const borderClass =
                 s.accent === 'bid'
@@ -274,7 +222,8 @@ export default function EntrepreneurDashboardPage() {
                   key={s.id}
                   className={`rounded-md border-l-[3px] ${borderClass} bg-surface-subtle px-3 py-2`}
                 >
-                  <div className="font-mono text-[10px] text-ink-muted">
+                  <div className="flex items-center gap-1.5 font-mono text-xs text-ink-muted">
+                    <Clock3 className="h-3.5 w-3.5" />
                     {new Date(s.date).toLocaleDateString('en-US', {
                       weekday: 'short',
                       month: 'short',
@@ -282,10 +231,51 @@ export default function EntrepreneurDashboardPage() {
                     })}
                     {s.startTime ? ` · ${s.startTime}` : ''}
                   </div>
-                  <div className="text-[11px] font-medium">{s.title}</div>
+                  <div className="mt-1 text-sm font-medium">{s.title}</div>
                 </div>
               );
             })}
+          </div>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Active deliverables"
+            description="Open submissions and items waiting for your attention"
+            actions={
+              <Link href={routes.entrepreneur.deliverables}>
+                <Button variant="outline" size="sm">
+                  View all
+                </Button>
+              </Link>
+            }
+          />
+          <div className="flex flex-col gap-2">
+            {activeDeliverables.map((deliverable) => (
+              <div
+                key={deliverable.id}
+                className="flex items-center gap-3 rounded-md border border-line bg-surface-subtle px-3 py-2.5"
+              >
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-bid shadow-sm">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{deliverable.name}</div>
+                  <div className="mt-0.5 text-xs text-ink-muted">
+                    {deliverable.groupLabel}
+                    {deliverable.dueDate
+                      ? ` · Due ${new Date(deliverable.dueDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}`
+                      : ''}
+                  </div>
+                </div>
+                <Badge tone={deliverable.status === 'overdue' ? 'red' : deliverable.status === 'submitted' ? 'blue' : 'amber'}>
+                  {deliverable.status === 'pending' ? 'Due' : deliverable.status.replace('-', ' ')}
+                </Badge>
+              </div>
+            ))}
           </div>
         </Card>
       </div>

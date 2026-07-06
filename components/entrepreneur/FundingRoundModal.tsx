@@ -1,10 +1,11 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormInput } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
+import { DatePicker } from '@/components/shared/DatePicker';
 import { fundingRoundSchema, type FundingRoundForm } from '@/lib/forms/schemas';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 
@@ -37,7 +38,17 @@ export function FundingRoundModal({
           <FormInput placeholder="e.g. 50000" {...form.register('amountUsd')} />
         </FormField>
         <FormField label="Date" error={form.formState.errors.date?.message}>
-          <FormInput type="date" {...form.register('date')} />
+          <Controller
+            control={form.control}
+            name="date"
+            render={({ field }) => (
+              <DatePicker
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
         </FormField>
         <FormField label="Source" optional>
           <FormInput
