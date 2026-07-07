@@ -104,6 +104,8 @@ export type PeriodicUpdateForm = z.infer<typeof periodicUpdateSchema>;
 
 export const toolRequestSchema = z.object({
   name: z.string().min(1, 'Tool name or idea is required'),
+  category: z.string().min(1, 'Select a tool area'),
+  neededBy: z.string().optional(),
   reason: z.string().optional(),
 });
 export type ToolRequestForm = z.infer<typeof toolRequestSchema>;

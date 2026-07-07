@@ -18,6 +18,18 @@ import {
 import { toast } from 'sonner';
 import { adminSessions, type AdminSession } from '@/lib/mock-data/admin-workflows';
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatTimeRange(session: AdminSession) {
+  return `${session.startTime}${session.endTime ? `-${session.endTime}` : ''}`;
+}
+
 const columns: Column<AdminSession>[] = [
   {
     key: 'actions',
@@ -33,10 +45,37 @@ const columns: Column<AdminSession>[] = [
     ),
     className: 'w-[84px]',
   },
-  { key: 'ent', header: 'Entrepreneur', cell: (s) => s.entrepreneurName },
-  { key: 'trainer', header: 'Trainer', cell: (s) => s.trainerName },
-  { key: 'dt', header: 'Date / time', cell: (s) => s.dateTime },
-  { key: 'topic', header: 'Topic', cell: (s) => s.topic },
+  {
+    key: 'ent',
+    header: 'Entrepreneur',
+    cell: (s) => (
+      <div>
+        <div className="font-medium text-ink">{s.entrepreneurName}</div>
+        <div className="mt-1 text-sm text-ink-muted">{s.source === 'entrepreneur-request' ? 'Requested by entrepreneur' : 'Scheduled by BID'}</div>
+      </div>
+    ),
+  },
+  { key: 'trainer', header: 'Trainer / team', cell: (s) => s.trainerName },
+  {
+    key: 'dt',
+    header: 'Date / time',
+    cell: (s) => (
+      <div>
+        <div>{formatDate(s.date)}</div>
+        <div className="text-sm text-ink-muted">{formatTimeRange(s)}</div>
+      </div>
+    ),
+  },
+  {
+    key: 'topic',
+    header: 'Session',
+    cell: (s) => (
+      <div>
+        <div className="font-medium text-ink">{s.topic}</div>
+        <div className="mt-1 text-sm text-ink-muted">{s.sessionType}</div>
+      </div>
+    ),
+  },
   {
     key: 'status',
     header: 'Status',
@@ -61,7 +100,7 @@ export default function AdminSessionsPage() {
     return adminSessions.filter((session) => {
       const matchesQuery =
         !needle ||
-        [session.entrepreneurName, session.trainerName, session.dateTime, session.topic]
+        [session.entrepreneurName, session.trainerName, session.date, session.startTime, session.topic, session.sessionType]
           .join(' ')
           .toLowerCase()
           .includes(needle);
@@ -78,12 +117,10 @@ export default function AdminSessionsPage() {
     <>
       <PageHeader
         title="Sessions"
-        description="All booked mentor/trainer sessions across the platform"
+        description="Track entrepreneur session requests, group sessions, trainer confirmation, and what is already on the calendar"
       />
       <Notice>
-        Each trainer connects their own Google Calendar or Calendly from their profile
-        (Trainers → Edit). Sessions booked by entrepreneurs sync here once a trainer
-        accepts them.
+        Entrepreneur bookings should land here as requests. Admins can see whether the session came from an entrepreneur request or was scheduled by BID, then follow up with the trainer/team if it is not confirmed.
       </Notice>
       <MetricGrid columns={3}>
         <StatCard label="Upcoming sessions" value={upcoming} dotColor="bid" />
@@ -99,7 +136,7 @@ export default function AdminSessionsPage() {
           <div>
             <div className="text-sm font-medium text-ink">Filter sessions</div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search by entrepreneur, trainer, topic, or date.
+              Search by entrepreneur, trainer/team, session type, topic, or date.
             </div>
           </div>
           <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[260px_180px]">

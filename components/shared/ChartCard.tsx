@@ -16,6 +16,7 @@ export function ChartCard({
   legend,
   children,
   className,
+  bodyClassName,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -23,11 +24,12 @@ export function ChartCard({
   legend?: ChartLegendItem[];
   children: React.ReactNode;
   className?: string;
+  bodyClassName?: string;
 }) {
   return (
     <Card className={cn('min-h-[320px]', className)}>
       <CardHeader title={title} description={description} actions={actions} />
-      <div className="h-[230px]">{children}</div>
+      <div className={cn('h-[230px]', bodyClassName)}>{children}</div>
       {legend && legend.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3">
           {legend.map((item) => (

@@ -9,8 +9,8 @@ export interface ModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  /** Renders a `.mo` (460px) or `.mo.wide` (620px) container. */
-  width?: 'sm' | 'md' | 'wide';
+  /** Controls the max modal width while preserving mobile gutters. */
+  width?: 'sm' | 'md' | 'wide' | 'xl';
   children: React.ReactNode;
 }
 
@@ -18,6 +18,7 @@ const widthClass: Record<NonNullable<ModalProps['width']>, string> = {
   sm: 'w-[460px]',
   md: 'w-[500px]',
   wide: 'w-[620px]',
+  xl: 'w-[min(960px,calc(100vw-32px))]',
 };
 
 export function Modal({

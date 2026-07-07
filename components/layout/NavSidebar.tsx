@@ -29,7 +29,7 @@ export interface SidebarUser {
 export interface NavSidebarProps {
   brandTitle: string;
   brandSubtitle: string;
-  role?: 'entrepreneur' | 'admin';
+  role?: 'entrepreneur' | 'admin' | 'trainer';
   sections: NavSection[];
   user: SidebarUser;
 }
@@ -66,6 +66,11 @@ export function NavSidebar({
           {role === 'admin' && (
             <Badge tone="brand" className="mt-0.5">
               Admin
+            </Badge>
+          )}
+          {role === 'trainer' && (
+            <Badge tone="blue" className="mt-0.5">
+              Trainer
             </Badge>
           )}
         </div>

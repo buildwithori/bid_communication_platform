@@ -19,6 +19,12 @@ export const routes = {
     schedule: '/entrepreneur/schedule',
     tools: '/entrepreneur/tools',
   },
+  trainer: {
+    dashboard: '/trainer/dashboard',
+    entrepreneurs: '/trainer/entrepreneurs',
+    programmes: '/trainer/programmes',
+    sessions: '/trainer/sessions',
+  },
   admin: {
     dashboard: '/admin/dashboard',
     entrepreneurs: '/admin/entrepreneurs',

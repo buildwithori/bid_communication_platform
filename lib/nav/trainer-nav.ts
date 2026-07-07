@@ -12,15 +12,15 @@ export const trainerNav: NavSection[] = [
   {
     heading: 'Overview',
     items: [
-      { href: routes.admin.dashboard, label: 'Dashboard', icon: LayoutDashboard },
+      { href: routes.trainer.dashboard, label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
   {
     heading: 'My Work',
     items: [
-      { href: routes.admin.entrepreneurs, label: 'My Entrepreneurs', icon: Users },
-      { href: routes.admin.programs, label: 'My Programmes', icon: FolderKanban },
-      { href: routes.admin.sessions, label: 'My Sessions', icon: CalendarDays },
+      { href: routes.trainer.entrepreneurs, label: 'My Entrepreneurs', icon: Users },
+      { href: routes.trainer.programmes, label: 'My Programmes', icon: FolderKanban },
+      { href: routes.trainer.sessions, label: 'My Sessions', icon: CalendarDays },
     ],
   },
 ];

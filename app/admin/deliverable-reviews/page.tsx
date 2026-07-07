@@ -29,7 +29,7 @@ import {
   type DeliverableReviewStatus,
 } from '@/lib/mock-data/admin-workflows';
 
-const today = new Date('2026-07-06');
+const today = new Date('2026-07-07');
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -53,9 +53,19 @@ export default function DeliverableReviewsPage() {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
 
-  const updateStatus = (id: string, status: DeliverableReviewStatus) => {
+  const updateStatus = (id: string, status: DeliverableReviewStatus, feedback?: string) => {
     setReviews((rows) =>
-      rows.map((row) => (row.id === id ? { ...row, status, reviewer: 'Ama Darko' } : row)),
+      rows.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              status,
+              reviewer: 'Ama Darko',
+              latestFeedback: feedback?.trim() || row.latestFeedback,
+              feedbackReadAt: status === 'changes-requested' ? undefined : row.feedbackReadAt,
+            }
+          : row,
+      ),
     );
     toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
   };
@@ -99,7 +109,7 @@ export default function DeliverableReviewsPage() {
         <RowActions
           actions={[
             { label: 'Preview file', onSelect: () => toast.success('Opening file preview...') },
-            { label: 'Review deliverable', onSelect: () => setActive(row) },
+            { label: row.status === 'approved' ? 'View review' : 'Review deliverable', onSelect: () => setActive(row) },
           ]}
         />
       ),
@@ -109,10 +119,19 @@ export default function DeliverableReviewsPage() {
       key: 'deliverable',
       header: 'Deliverable',
       cell: (row) => (
-        <div>
-          <div className="font-semibold">{row.deliverable}</div>
-          <div className="text-sm text-ink-muted">{row.fileName}</div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActive(row)}
+          className="block min-w-[230px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+        >
+          <span className="block font-semibold text-ink">{row.deliverable}</span>
+          <span className="mt-1 block text-sm text-ink-muted">{row.fileName}</span>
+          {row.latestFeedback && (
+            <span className="mt-1 block text-sm text-ink-muted">
+              Feedback {row.feedbackReadAt ? `read ${formatDate(row.feedbackReadAt)}` : 'unread'}
+            </span>
+          )}
+        </button>
       ),
     },
     {
@@ -177,7 +196,6 @@ export default function DeliverableReviewsPage() {
         <StatCard label="Pending review" value={pending} dotColor="warning" />
         <StatCard label="Changes required" value={changes} dotColor="info" />
         <StatCard label="Overdue review" value={overdue} dotColor="bid" />
-        <StatCard label="Review time goal" value="48h" dotColor="success" />
       </MetricGrid>
 
       <Card className="mt-4">
@@ -239,8 +257,8 @@ export default function DeliverableReviewsPage() {
           updateStatus(id, 'approved');
           setActive(null);
         }}
-        onRequestChanges={(id) => {
-          updateStatus(id, 'changes-requested');
+        onRequestChanges={(id, feedback) => {
+          updateStatus(id, 'changes-requested', feedback);
           setActive(null);
         }}
       />
@@ -257,7 +275,7 @@ function ReviewModal({
   review: DeliverableReview | null;
   onClose: () => void;
   onApprove: (id: string) => void;
-  onRequestChanges: (id: string) => void;
+  onRequestChanges: (id: string, feedback: string) => void;
 }) {
   const form = useForm<DeliverableReviewForm>({
     resolver: zodResolver(deliverableReviewSchema),
@@ -277,8 +295,8 @@ function ReviewModal({
     >
       {review && (
         <form
-          onSubmit={form.handleSubmit(() => {
-            onRequestChanges(review.id);
+          onSubmit={form.handleSubmit((values) => {
+            onRequestChanges(review.id, values.feedback);
           })}
         >
           <div className="mb-4 rounded-lg border border-line bg-surface px-4 py-4">
@@ -286,7 +304,19 @@ function ReviewModal({
             <div className="mt-1 text-sm text-ink-muted">
               Submitted by {review.businessName} for {review.programme}
             </div>
+            <div className="mt-1 text-sm text-ink-muted">
+              Submitted {formatDate(review.submittedAt)} · Due {formatDate(review.dueAt)}
+            </div>
           </div>
+          {review.latestFeedback && (
+            <div className="mb-4 rounded-xl border border-warning/20 bg-warning-light px-4 py-3">
+              <div className="text-sm font-semibold text-warning-dark">Latest feedback sent to entrepreneur</div>
+              <p className="mt-2 text-sm leading-6 text-warning-dark">{review.latestFeedback}</p>
+              <div className="mt-2 text-xs text-warning-dark/80">
+                {review.feedbackReadAt ? `Read by entrepreneur ${formatDate(review.feedbackReadAt)}` : 'Not read yet'}
+              </div>
+            </div>
+          )}
           <FormField label="Feedback to entrepreneur" error={form.formState.errors.feedback?.message}>
             <FormTextarea
               rows={4}

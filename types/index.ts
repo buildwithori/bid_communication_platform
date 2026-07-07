@@ -163,8 +163,11 @@ export interface Program {
   description?: string;
   /** Accent color used for the left border on the card. */
   accent: 'bid' | 'info' | 'success';
+  /** Number of entrepreneurs currently active/enrolled in the programme. */
   entrepreneursCount: number;
   moduleIds: string[];
+  /** Entrepreneurs who left the programme before completing it. */
+  leftEntrepreneursCount?: number;
   /** Calculated aggregate progress 0-100 across the programme's modules. */
   progress: number;
 }

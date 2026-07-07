@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 export interface AppShellProps {
   brandTitle: string;
   brandSubtitle: string;
-  role?: 'entrepreneur' | 'admin';
+  role?: 'entrepreneur' | 'admin' | 'trainer';
   sections: NavSection[];
   user: SidebarUser;
   title: string;

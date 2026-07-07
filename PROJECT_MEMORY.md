@@ -8,6 +8,7 @@ BID Hub is an entrepreneur support platform with two primary workspaces:
 
 - Entrepreneur workspace: learning, deliverables, profile, funding updates, sessions, tools.
 - Admin workspace: programme operations, entrepreneurs, trainers, content, deliverable reviews, sessions, reporting, tool requests.
+- Trainer workspace: assigned entrepreneurs, session work, feedback/review support, and programme context for the entrepreneurs they support.
 
 The current phase is UI-first. Backend/auth/storage APIs are intentionally not wired yet. Build screens and flows so they are ready for backend integration later.
 
@@ -15,6 +16,9 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 
 - Think like a senior frontend engineer and UI/UX engineer.
 - Think business-first on every UI change. The app is currently UI-only, so screens must still model the real BID workflow, roles, data relationships, and growth paths instead of being decorative mockups.
+- Every feature must be reviewed from entrepreneur, admin, and trainer perspectives when trainers are part of the workflow. If one side submits, requests, uploads, books, or changes something, define how the other side receives it, reviews it, tracks it, responds, and reports on it.
+- Mock workflow records must connect across roles with the same entrepreneur, programme, deliverable/session/tool IDs, dates, and status meaning. Avoid isolated demo rows that make admin and entrepreneur screens tell different business stories.
+- Fields shown in admin should come from entrepreneur input, admin action, or clear system-generated data. Do not invent admin-only fields without defining the source and the matching entrepreneur/admin workflow.
 - Derive labels, statuses, categories, and visual states from business meaning first. Do not let colors, mock accents, or temporary UI styling become the source of product logic.
 - Reusability, system design, SOLID principles, and scalability matter on every change.
 - Rebuild weak pages when needed instead of patching awkward UI.
@@ -28,6 +32,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Root `/` redirects to `/auth/login`.
 - All auth pages live under `/auth`.
 - Entrepreneur pages live under `/entrepreneur`.
+- Trainer pages live under `/trainer`.
 - Admin pages live under `/admin`.
 - There should not be multiple competing login pages.
 - Entrepreneur signup is direct. Do not show copy saying admin/trainers cannot self-register or will be invited unless explicitly requested again.
@@ -56,7 +61,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - TanStack Query is installed and wired through `app/providers.tsx`; current mock stores still own data until backend integration begins.
 - Auth includes separate `/auth/login` and `/auth/signup` pages with shared tabs that navigate between URLs, plus forgot password, reset password, and email verification.
 - Admin dashboard and entrepreneur dashboard include charts via Recharts.
-- Tables use a leading `Action` column with `RowActions` dropdowns.
+- Tables use a leading `Action` column with `RowActions` dropdowns. The primary entity column (name/request/programme/business/deliverable) should also be clickable to open the main detail/view flow when one exists, so users do not have to use the action menu for the common view action.
 - Programmes and Training Library are core content surfaces and must be robust:
   - Admin Programs should support growing programme portfolios with search, status filters, pagination, and module search/pagination.
   - Entrepreneur Training Library should feel learner-facing, with featured programme cards, searchable catalogue, standalone resources, and detailed programme learning paths.

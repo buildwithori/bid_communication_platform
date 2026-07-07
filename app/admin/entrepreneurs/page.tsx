@@ -241,14 +241,23 @@ export default function AdminEntrepreneursPage() {
                   <td className="border-b border-line/80 px-4 py-4 first:pl-5">
                     <RowActions
                       actions={[
+                        { label: 'View profile', onSelect: () => setViewTarget(e) },
                         { label: 'Edit entrepreneur', onSelect: () => setEditTarget(e) },
-                        e.status === 'unassigned'
-                          ? { label: 'Assign to programme', onSelect: () => setAssignTarget(e) }
-                          : { label: 'View profile', onSelect: () => setViewTarget(e) },
+                        ...(e.status === 'unassigned'
+                          ? [{ label: 'Assign to programme', onSelect: () => setAssignTarget(e) }]
+                          : []),
                       ]}
                     />
                   </td>
-                  <td className="border-b border-line/80 px-4 py-4 font-medium">{e.businessName}</td>
+                  <td className="border-b border-line/80 px-4 py-4">
+                    <button
+                      type="button"
+                      onClick={() => setViewTarget(e)}
+                      className="rounded-lg text-left font-medium text-ink outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+                    >
+                      {e.businessName}
+                    </button>
+                  </td>
                   <td className="border-b border-line/80 px-4 py-4">{e.representative}</td>
                   <td className="border-b border-line/80 px-4 py-4">
                     <Badge tone={sectorById[e.sector]?.color ?? 'neutral'}>{sectorById[e.sector]?.label ?? e.sector}</Badge>

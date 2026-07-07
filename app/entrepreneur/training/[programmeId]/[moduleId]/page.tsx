@@ -170,7 +170,7 @@ function VideoPlayerModal({
       open={!!item}
       onOpenChange={(o) => !o && onClose()}
       title={item ? `${item.chapter}: ${item.title}` : ''}
-      width="wide"
+      width="xl"
     >
       {item && (
         <>
@@ -219,11 +219,11 @@ function EmbedToolModal({
       open={!!item}
       onOpenChange={(o) => !o && onClose()}
       title={item ? `${item.title} — online tool` : ''}
-      width="wide"
+      width="xl"
     >
       {item && (
         <>
-          <div className="mb-3.5 flex h-[220px] flex-col items-center justify-center gap-2 rounded-lg bg-surface-subtle">
+          <div className="mb-3.5 flex h-[420px] flex-col items-center justify-center gap-2 rounded-lg bg-surface-subtle">
             <Wrench className="h-8 w-8 text-ink-faint" />
             <div className="text-[11px] text-ink-muted">
               Embedded tool would render here

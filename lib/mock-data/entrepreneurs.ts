@@ -15,6 +15,9 @@ const funding: Record<string, FundingRound[]> = {
     { id: 'f-pb-2', name: 'Grant – BID', amountUsd: 50000, date: '2023-06-10', source: 'BID grant' },
     { id: 'f-pb-3', name: 'Seed', amountUsd: 40000, date: '2024-10-02', source: 'Angel investor' },
   ],
+  'e-healthfirst': [
+    { id: 'f-hf-1', name: 'Series A', amountUsd: 300000, date: '2024-11-15', source: 'Institutional investor' },
+  ],
 };
 
 export const entrepreneurs: Entrepreneur[] = [
@@ -108,7 +111,7 @@ export const entrepreneurs: Entrepreneur[] = [
       jobsMen: 4,
       fundsMobilisedUsd: 300000,
     },
-    fundingRounds: [],
+    fundingRounds: funding['e-healthfirst'],
     trainerId: 't-kofi',
     joinedAt: '2024-03-01',
   },
