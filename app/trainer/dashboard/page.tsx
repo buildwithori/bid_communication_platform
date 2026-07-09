@@ -1,34 +1,36 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarDays, CheckCircle2, Clock3, FileText, MessageSquareText, Users } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetricGrid } from '@/components/shared/MetricGrid';
 import { StatCard } from '@/components/shared/StatCard';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { ChartCard } from '@/components/shared/ChartCard';
 import { Badge } from '@/components/shared/Badge';
-import { Avatar } from '@/components/shared/Avatar';
 import { Button } from '@/components/shared/Button';
-import {
-  DataTable,
-  RowActions,
-  TableFilterInput,
-  TablePagination,
-  TableToolbar,
-  type Column,
-} from '@/components/shared/DataTable';
-import { ViewEntrepreneurModal } from '@/components/admin/ViewEntrepreneurModal';
 import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { programById } from '@/lib/mock-data/programs';
+import { contentItems, modulesForProgram, programById, programs } from '@/lib/mock-data/programs';
 import { trainerById } from '@/lib/mock-data/trainers';
-import { sectorById, stageById } from '@/lib/mock-data/definitions';
-import { adminSessions, deliverableReviews } from '@/lib/mock-data/admin-workflows';
+import { getDaysWithoutPeriodicReport } from '@/lib/reporting/overdue-updates';
+import { useCompanyConfigStore } from '@/lib/stores/company-config-store';
+import { getEntrepreneurProgrammes } from '@/lib/programme-access';
+import { getTrainerContentItems, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
+import {
+  adminSessions,
+  deliverableReviews,
+  type AdminSessionStatus,
+} from '@/lib/mock-data/admin-workflows';
 import type { Entrepreneur } from '@/types';
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -37,6 +39,7 @@ import {
 
 const currentTrainerId = 't-kofi';
 const today = new Date('2026-07-07');
+const chartColors = ['#842751', '#185FA5', '#1D9E75', '#BA7517'];
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -46,306 +49,342 @@ function formatDate(value: string) {
   });
 }
 
-function daysSince(value?: string) {
-  if (!value) return null;
-  return Math.max(Math.floor((today.getTime() - new Date(value).getTime()) / 86_400_000), 0);
+function isNeedsAttention(entrepreneur: Entrepreneur, overdueAfterDays: number) {
+  const updateAge = getDaysWithoutPeriodicReport(entrepreneur, today);
+  return entrepreneur.metrics.trainingProgress < 50 || updateAge > overdueAfterDays;
 }
 
-function isNeedsAttention(entrepreneur: Entrepreneur) {
-  const updateAge = daysSince(entrepreneur.lastUpdateAt);
-  return entrepreneur.metrics.trainingProgress < 50 || updateAge == null || updateAge > 60;
+function sessionStatusLabel(status: AdminSessionStatus) {
+  return status === 'confirmed' ? 'Confirmed' : 'Awaiting trainer';
 }
 
 export default function TrainerDashboardPage() {
   const trainer = trainerById(currentTrainerId);
-  const [query, setQuery] = React.useState('');
-  const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(5);
-  const [viewTarget, setViewTarget] = React.useState<Entrepreneur | null>(null);
+  const { companyConfig } = useCompanyConfigStore();
+  const overdueAfterDays = companyConfig.reporting.periodicUpdateOverdueAfterDays;
+  const [sessionPage, setSessionPage] = React.useState(1);
 
-  const assignedEntrepreneurs = React.useMemo(
-    () => entrepreneurs.filter((entrepreneur) => entrepreneur.trainerId === currentTrainerId),
+  const supportedLearners = React.useMemo(
+    () => entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)),
     [],
   );
-  const assignedIds = new Set(assignedEntrepreneurs.map((entrepreneur) => entrepreneur.id));
-  const trainerSessions = adminSessions
-    .filter((session) => session.trainerId === currentTrainerId || session.trainerName === trainer?.fullName)
-    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
-  const upcomingSessions = trainerSessions.filter((session) => session.date >= '2026-07-07');
-  const reviewQueue = deliverableReviews.filter((review) => assignedIds.has(review.entrepreneurId));
+  const supportedIds = React.useMemo(
+    () => new Set(supportedLearners.map((entrepreneur) => entrepreneur.id)),
+    [supportedLearners],
+  );
+  const trainerContent = React.useMemo(() => getTrainerContentItems(currentTrainerId), []);
+  const trainerSessions = React.useMemo(
+    () =>
+      adminSessions
+        .filter((session) => session.trainerId === currentTrainerId || session.trainerName === trainer?.fullName)
+        .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)),
+    [trainer?.fullName],
+  );
+  const upcomingSessions = React.useMemo(
+    () => trainerSessions.filter((session) => session.date >= '2026-07-07'),
+    [trainerSessions],
+  );
+  const reviewQueue = React.useMemo(
+    () => deliverableReviews.filter((review) => supportedIds.has(review.entrepreneurId)),
+    [supportedIds],
+  );
+
   const pendingReviews = reviewQueue.filter((review) => review.status === 'pending-review').length;
   const changesRequested = reviewQueue.filter((review) => review.status === 'changes-requested').length;
-  const attentionList = assignedEntrepreneurs.filter(isNeedsAttention);
+  const attentionList = supportedLearners.filter((entrepreneur) =>
+    isNeedsAttention(entrepreneur, overdueAfterDays),
+  );
   const avgTraining = Math.round(
-    assignedEntrepreneurs.reduce((sum, entrepreneur) => sum + entrepreneur.metrics.trainingProgress, 0) /
-      Math.max(assignedEntrepreneurs.length, 1),
+    supportedLearners.reduce((sum, entrepreneur) => sum + entrepreneur.metrics.trainingProgress, 0) /
+      Math.max(supportedLearners.length, 1),
   );
-  const filteredEntrepreneurs = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return assignedEntrepreneurs;
-    return assignedEntrepreneurs.filter((entrepreneur) =>
-      [
-        entrepreneur.businessName,
-        entrepreneur.representative,
-        entrepreneur.email,
-        sectorById[entrepreneur.sector]?.label ?? entrepreneur.sector,
-        stageById[entrepreneur.stage]?.label ?? entrepreneur.stage,
-        programById(entrepreneur.programmeId)?.name ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle),
+  const avgRating = trainer?.metrics.satisfactionAvg ?? 0;
+
+  const visibleSessionCount = 3;
+  const visibleSessions = React.useMemo(() => {
+    const start = (sessionPage - 1) * visibleSessionCount;
+    return upcomingSessions.slice(start, start + visibleSessionCount);
+  }, [sessionPage, upcomingSessions]);
+
+  const programmeProgress = React.useMemo(() => {
+    return Object.values(
+      supportedLearners.reduce<Record<string, { name: string; learners: number; avgProgress: number; progressTotal: number }>>((acc, entrepreneur) => {
+        const learnerProgrammes = getEntrepreneurProgrammes(entrepreneur).filter((programme) => programme.accessType !== 'free');
+        const programmeIds = learnerProgrammes.length > 0 ? learnerProgrammes.map((programme) => programme.id) : ['free-resources'];
+
+        programmeIds.forEach((id) => {
+          const programme = id === 'free-resources' ? null : programById(id);
+          const key = programme?.id ?? 'free-resources';
+          const current = acc[key] ?? {
+            name: programme?.name.replace('BID ', '') ?? 'Free resources',
+            learners: 0,
+            avgProgress: 0,
+            progressTotal: 0,
+          };
+          current.learners += 1;
+          current.progressTotal += entrepreneur.metrics.trainingProgress;
+          current.avgProgress = Math.round(current.progressTotal / current.learners);
+          acc[key] = current;
+        });
+        return acc;
+      }, {}),
     );
-  }, [assignedEntrepreneurs, query]);
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredEntrepreneurs.slice(start, start + pageSize);
-  }, [filteredEntrepreneurs, page, pageSize]);
+  }, [supportedLearners]);
 
-  const programmeCoverage = Object.values(
-    assignedEntrepreneurs.reduce<Record<string, { name: string; entrepreneurs: number; avgProgress: number; progressTotal: number }>>((acc, entrepreneur) => {
-      const programme = programById(entrepreneur.programmeId);
-      const key = programme?.id ?? 'unassigned';
-      const current = acc[key] ?? {
-        name: programme?.name.replace('BID ', '') ?? 'Unassigned',
-        entrepreneurs: 0,
-        avgProgress: 0,
-        progressTotal: 0,
-      };
-      current.entrepreneurs += 1;
-      current.progressTotal += entrepreneur.metrics.trainingProgress;
-      current.avgProgress = Math.round(current.progressTotal / current.entrepreneurs);
-      acc[key] = current;
-      return acc;
-    }, {}),
-  );
+  const progressBands = React.useMemo(() => {
+    const bands = [
+      { name: '0-25%', value: 0 },
+      { name: '26-50%', value: 0 },
+      { name: '51-75%', value: 0 },
+      { name: '76-100%', value: 0 },
+    ];
+    supportedLearners.forEach((learner) => {
+      const progress = learner.metrics.trainingProgress;
+      if (progress <= 25) bands[0].value += 1;
+      else if (progress <= 50) bands[1].value += 1;
+      else if (progress <= 75) bands[2].value += 1;
+      else bands[3].value += 1;
+    });
+    return bands;
+  }, [supportedLearners]);
 
-  const entrepreneurColumns: Column<Entrepreneur>[] = [
-    {
-      key: 'action',
-      header: 'Action',
-      cell: (entrepreneur) => (
-        <RowActions actions={[{ label: 'View profile', onSelect: () => setViewTarget(entrepreneur) }]} />
+  const reviewStatusData = React.useMemo(() => ([
+    { name: 'Pending', value: pendingReviews, fill: '#BA7517' },
+    { name: 'Changes', value: changesRequested, fill: '#185FA5' },
+    { name: 'Approved', value: reviewQueue.filter((review) => review.status === 'approved').length, fill: '#1D9E75' },
+    { name: 'Late', value: reviewQueue.filter((review) => review.status === 'pending-review' && review.dueAt < '2026-07-07').length, fill: '#842751' },
+  ]), [changesRequested, pendingReviews, reviewQueue]);
+
+  const contentImpactTrend = React.useMemo(() => {
+    const ownedContentIds = new Set(trainerContent.map((item) => item.id));
+    const ownedModules = programs.flatMap((programme) =>
+      modulesForProgram(programme.id).filter((module) =>
+        module.contentItemIds.some((contentId) => ownedContentIds.has(contentId)),
       ),
-      className: 'w-[84px]',
-    },
-    {
-      key: 'business',
-      header: 'Business',
-      cell: (entrepreneur) => (
-        <button
-          type="button"
-          onClick={() => setViewTarget(entrepreneur)}
-          className="flex min-w-[240px] items-center gap-3 rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
-        >
-          <Avatar initials={entrepreneur.initials} size={30} />
-          <span className="min-w-0">
-            <span className="block font-medium text-ink">{entrepreneur.businessName}</span>
-            <span className="mt-1 block text-sm text-ink-muted">{entrepreneur.representative}</span>
-          </span>
-        </button>
-      ),
-    },
-    {
-      key: 'programme',
-      header: 'Programme',
-      cell: (entrepreneur) => programById(entrepreneur.programmeId)?.name ?? 'Not assigned',
-    },
-    {
-      key: 'progress',
-      header: 'Training',
-      cell: (entrepreneur) => `${entrepreneur.metrics.trainingProgress}%`,
-    },
-    {
-      key: 'followup',
-      header: 'Follow-up',
-      cell: (entrepreneur) => {
-        const updateAge = daysSince(entrepreneur.lastUpdateAt);
-        if (entrepreneur.metrics.trainingProgress < 50) return <Badge tone="amber">Low progress</Badge>;
-        if (updateAge == null || updateAge > 60) return <Badge tone="red">Update overdue</Badge>;
-        return <Badge tone="green">On track</Badge>;
-      },
-    },
-  ];
+    );
+    const moduleCount = Math.max(new Set(ownedModules.map((module) => module.id)).size, 1);
+    const completedContent = trainerContent.filter((item) => item.progress === 'completed').length;
+    const inProgressContent = trainerContent.filter((item) => item.progress === 'in-progress').length;
+
+    return [
+      { date: 'Jul 1', completions: Math.max(completedContent - 3, 0), rating: Math.max(avgRating - 0.2, 0), modules: moduleCount },
+      { date: 'Jul 3', completions: Math.max(completedContent - 2, 0), rating: Math.max(avgRating - 0.1, 0), modules: moduleCount },
+      { date: 'Jul 5', completions: completedContent + inProgressContent, rating: avgRating, modules: moduleCount },
+      { date: 'Jul 7', completions: completedContent + inProgressContent + 1, rating: avgRating, modules: moduleCount },
+    ];
+  }, [avgRating, trainerContent]);
 
   return (
     <>
       <PageHeader
         title={`Welcome back, ${trainer?.fullName ?? 'Trainer'}`}
-        description="Your assigned entrepreneurs, upcoming sessions, and review work in one place."
+        description="Track learner progress, content impact, sessions, and review workload from one place."
       />
 
       <MetricGrid columns={4}>
-        <StatCard label="Assigned entrepreneurs" value={assignedEntrepreneurs.length} subline={`${attentionList.length} need attention`} dotColor="bid" accent="bid" />
+        <StatCard label="Learners reached" value={supportedLearners.length} subline={`${attentionList.length} need attention`} dotColor="bid" accent="bid" />
         <StatCard label="Upcoming sessions" value={upcomingSessions.length} subline="On your calendar" dotColor="info" accent="info" />
         <StatCard label="Pending reviews" value={pendingReviews} subline={`${changesRequested} changes requested`} dotColor="warning" accent="warning" />
-        <StatCard label="Avg. training progress" value={`${avgTraining}%`} subline="Across your portfolio" dotColor="success" accent="success" />
+        <StatCard label="Content rating" value={avgRating ? `${avgRating.toFixed(1)}/5` : '—'} subline={`${trainer?.metrics.satisfactionRatingsCount ?? 0} ratings received`} dotColor="success" accent="success" />
       </MetricGrid>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
         <ChartCard
-          title="Programme coverage"
-          description="How your assigned entrepreneurs are progressing by programme"
+          title="Learner progress by programme"
+          description="Average training progress from learners reached through your content"
           legend={[
-            { label: 'Assigned entrepreneurs', colorClassName: 'bg-info' },
+            { label: 'Learners', colorClassName: 'bg-info' },
             { label: 'Average progress %', colorClassName: 'bg-bid' },
           ]}
+          className="min-h-[380px]"
+          bodyClassName="h-[270px]"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={programmeCoverage} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+            <BarChart data={programmeProgress} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
               <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
               <YAxis tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
               <Tooltip cursor={{ fill: 'rgba(132,39,81,0.06)' }} contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
-              <Bar dataKey="entrepreneurs" name="Assigned entrepreneurs" fill="#185FA5" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="learners" name="Learners" fill="#185FA5" radius={[8, 8, 0, 0]} />
               <Bar dataKey="avgProgress" name="Average progress %" fill="#842751" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <Card>
-          <CardHeader
-            title="Trainer workbench"
-            description="The core trainer workflow BID needs to support"
-          />
-          <div className="grid gap-3">
-            <FeatureRow icon={Users} title="Coach assigned entrepreneurs" text="Track training progress, business context, and who needs follow-up." />
-            <FeatureRow icon={CalendarDays} title="Run sessions" text="See confirmed sessions and requests waiting for trainer confirmation." />
-            <FeatureRow icon={MessageSquareText} title="Give feedback" text="Review assigned deliverables and make feedback visible to entrepreneurs." />
-            <FeatureRow icon={FileText} title="Use programme context" text="Understand which curriculum and deliverables each entrepreneur is working through." />
-          </div>
-        </Card>
+        <ChartCard
+          title="Learner progress mix"
+          description="Where learners currently sit across progress bands"
+          legend={progressBands.map((band, index) => ({ label: band.name, colorClassName: ['bg-bid', 'bg-info', 'bg-success', 'bg-warning'][index] }))}
+          className="min-h-[380px]"
+          bodyClassName="h-[270px]"
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <text x="50%" y="47%" textAnchor="middle" className="fill-ink text-3xl font-semibold">
+                {supportedLearners.length}
+              </text>
+              <text x="50%" y="56%" textAnchor="middle" className="fill-ink-muted text-sm">
+                Learners
+              </text>
+              <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
+              <Pie data={progressBands} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={3}>
+                {progressBands.map((entry, index) => (
+                  <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <Card>
-          <CardHeader title="Next sessions" description="Upcoming support moments assigned to you" />
-          <div className="grid gap-2">
-            {upcomingSessions.map((session) => (
-              <div key={session.id} className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="font-medium text-ink">{session.topic}</div>
-                    <div className="mt-1 text-sm text-ink-muted">{session.entrepreneurName}</div>
-                  </div>
-                  <Badge tone={session.status === 'confirmed' ? 'green' : 'amber'}>
-                    {session.status === 'confirmed' ? 'Confirmed' : 'Awaiting trainer'}
-                  </Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-3 text-sm text-ink-muted">
-                  <span className="inline-flex items-center gap-1.5">
-                    <CalendarDays className="h-4 w-4" />
-                    {formatDate(session.date)}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock3 className="h-4 w-4" />
-                    {session.startTime}{session.endTime ? `-${session.endTime}` : ''}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {upcomingSessions.length === 0 && (
-              <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-                No upcoming sessions assigned to this trainer.
-              </div>
-            )}
-          </div>
-        </Card>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <ChartCard
+          title="Content impact trend"
+          description="Completion movement across the content you own"
+          legend={[
+            { label: 'Content completions', colorClassName: 'bg-bid' },
+            { label: 'Rating', colorClassName: 'bg-success' },
+          ]}
+          bodyClassName="h-[240px]"
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={contentImpactTrend} margin={{ top: 8, right: 16, left: -18, bottom: 0 }}>
+              <defs>
+                <linearGradient id="trainerContentCompletions" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#842751" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#842751" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
+              <Area type="monotone" dataKey="completions" name="Content completions" stroke="#842751" fill="url(#trainerContentCompletions)" strokeWidth={2.5} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        <Card>
-          <CardHeader title="Review and feedback queue" description="Deliverables from entrepreneurs assigned to you" />
-          <div className="grid gap-2">
-            {reviewQueue.map((review) => (
-              <div key={review.id} className="flex flex-col gap-3 rounded-xl border border-line bg-surface-subtle px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium text-ink">{review.deliverable}</div>
-                  <div className="mt-1 text-sm text-ink-muted">{review.businessName} · Submitted {formatDate(review.submittedAt)}</div>
-                  {review.latestFeedback && <div className="mt-1 line-clamp-1 text-sm text-ink-muted">{review.latestFeedback}</div>}
-                </div>
-                <Badge tone={review.status === 'approved' ? 'green' : review.status === 'changes-requested' ? 'blue' : 'amber'}>
-                  {review.status === 'pending-review' ? 'Pending review' : review.status === 'changes-requested' ? 'Changes required' : 'Approved'}
-                </Badge>
-              </div>
-            ))}
-            {reviewQueue.length === 0 && (
-              <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-                No deliverables are assigned to this trainer yet.
-              </div>
-            )}
-          </div>
-        </Card>
+        <ChartCard
+          title="Review workload"
+          description="Deliverable review status for learners reached through your content"
+          legend={reviewStatusData.map((item) => ({ label: item.name, colorClassName: item.name === 'Pending' ? 'bg-warning' : item.name === 'Changes' ? 'bg-info' : item.name === 'Approved' ? 'bg-success' : 'bg-bid' }))}
+          bodyClassName="h-[240px]"
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={reviewStatusData} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
+              <Tooltip cursor={{ fill: 'rgba(132,39,81,0.06)' }} contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }} />
+              <Bar dataKey="value" name="Reviews" radius={[8, 8, 0, 0]}>
+                {reviewStatusData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
       <Card className="mt-4">
-        <CardHeader
-          title="My entrepreneurs"
-          description="Assigned portfolio with progress and follow-up status"
-        />
-        <TableToolbar>
-          <div>
-            <div className="text-sm font-medium text-ink">Search assigned entrepreneurs</div>
-            <div className="mt-0.5 text-sm text-ink-muted">Find by business, representative, sector, programme, or stage.</div>
-          </div>
-          <div className="w-full sm:w-[320px]">
-            <TableFilterInput
-              icon
-              placeholder="Search entrepreneurs..."
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-        </TableToolbar>
-        <DataTable
-          columns={entrepreneurColumns}
-          rows={pageRows}
-          rowKey={(entrepreneur) => entrepreneur.id}
-          emptyMessage="No assigned entrepreneurs match this search."
-          tableClassName="min-w-[920px]"
-        />
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filteredEntrepreneurs.length}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <CardHeader
+            title="Next sessions"
+            description="Upcoming support moments in your session queue"
+            className="mb-0"
+          />
+          <DashboardPager
+            page={sessionPage}
+            pageSize={visibleSessionCount}
+            totalItems={upcomingSessions.length}
+            onPageChange={setSessionPage}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {visibleSessions.map((session) => (
+            <button
+              key={session.id}
+              type="button"
+              className="flex min-h-[164px] flex-col rounded-xl border border-line bg-surface-subtle p-4 text-left transition hover:border-bid/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
+                    {session.sessionType}
+                  </div>
+                  <div className="mt-2 text-base font-semibold text-ink">{session.topic}</div>
+                  <div className="mt-1 text-sm text-ink-muted">{session.entrepreneurName}</div>
+                </div>
+                <Badge tone={session.status === 'confirmed' ? 'green' : 'amber'}>
+                  {sessionStatusLabel(session.status)}
+                </Badge>
+              </div>
+              <div className="mt-auto flex flex-wrap gap-3 pt-5 text-sm text-ink-muted">
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="h-4 w-4" />
+                  {formatDate(session.date)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock3 className="h-4 w-4" />
+                  {session.startTime}
+                  {session.endTime ? `-${session.endTime}` : ''}
+                </span>
+              </div>
+            </button>
+          ))}
+          {upcomingSessions.length === 0 && (
+            <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted lg:col-span-3">
+              No upcoming sessions in this trainer queue.
+            </div>
+          )}
+        </div>
       </Card>
-
-      {viewTarget && (
-        <ViewEntrepreneurModal
-          open={!!viewTarget}
-          onOpenChange={(open) => !open && setViewTarget(null)}
-          entrepreneur={viewTarget}
-        />
-      )}
     </>
   );
 }
 
-function FeatureRow({
-  icon: Icon,
-  title,
-  text,
+function DashboardPager({
+  page,
+  pageSize,
+  totalItems,
+  onPageChange,
 }: {
-  icon: typeof CheckCircle2;
-  title: string;
-  text: string;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
 }) {
+  const totalPages = Math.max(Math.ceil(totalItems / pageSize), 1);
+  const currentPage = Math.min(page, totalPages);
+  const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+
   return (
-    <div className="flex gap-3 rounded-xl border border-line bg-surface-subtle px-4 py-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-info-light text-info">
-        <Icon className="h-4 w-4" />
+    <div className="flex shrink-0 items-center gap-2 text-sm text-ink-muted">
+      <span className="hidden sm:inline">
+        Showing <span className="font-medium text-ink">{start}-{end}</span> of{' '}
+        <span className="font-medium text-ink">{totalItems}</span>
       </span>
-      <span>
-        <span className="block text-sm font-semibold text-ink">{title}</span>
-        <span className="mt-1 block text-sm leading-6 text-ink-muted">{text}</span>
-      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        disabled={currentPage <= 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        aria-label="Previous items"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        disabled={currentPage >= totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+        aria-label="Next items"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

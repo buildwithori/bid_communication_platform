@@ -1,19 +1,33 @@
 'use client';
 
 import * as React from 'react';
-import { BookOpen, FileText, Layers3, PlayCircle, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { BookOpen, FileText, PlayCircle, Wrench } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetricGrid } from '@/components/shared/MetricGrid';
 import { StatCard } from '@/components/shared/StatCard';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { ProgressBar } from '@/components/shared/ProgressBar';
-import { DataTable, RowActions, TablePagination, type Column } from '@/components/shared/DataTable';
+import {
+  DataTable,
+  RowActions,
+  TableFilterAutocomplete,
+  TableFilterInput,
+  TablePagination,
+  TableToolbar,
+  type Column,
+} from '@/components/shared/DataTable';
 import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { contentItems, modulesForProgram, programById } from '@/lib/mock-data/programs';
-import type { Program } from '@/types';
+import { contentItems, modulesForProgram } from '@/lib/mock-data/programs';
+import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
+import { entrepreneurHasProgramme } from '@/lib/programme-access';
+import { getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
+import { routes } from '@/lib/routes';
+import type { ContentItem, Program, ProgramStatus } from '@/types';
 
 const currentTrainerId = 't-kofi';
+const ALL_FILTER = 'all';
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -21,48 +35,126 @@ function formatDate(value: string) {
 
 function getProgramStats(program: Program) {
   const modules = modulesForProgram(program.id);
-  const items = modules.flatMap((module) => module.contentItemIds.map((id) => contentItems.find((item) => item.id === id)).filter(Boolean) as typeof contentItems);
+  const items = modules.flatMap((module) =>
+    module.contentItemIds
+      .map((id) => contentItems.find((item) => item.id === id))
+      .filter(Boolean) as ContentItem[],
+  );
+
   return {
     modules,
+    items,
     videos: items.filter((item) => item.type === 'video').length,
     files: items.filter((item) => item.type === 'pdf').length,
     tools: items.filter((item) => item.type === 'tool').length,
+    modulesWithoutContent: modules.filter((module) => module.contentItemIds.length === 0).length,
   };
 }
 
+function StatusBadge({ program }: { program: Program }) {
+  const status = getProgrammeStatus(program);
+
+  return (
+    <Badge tone={getProgrammeStatusTone(status)}>
+      {getProgrammeStatusLabel(status)}
+    </Badge>
+  );
+}
+
 export default function TrainerProgrammesPage() {
-  const assigned = React.useMemo(() => entrepreneurs.filter((entrepreneur) => entrepreneur.trainerId === currentTrainerId), []);
-  const programmes = React.useMemo(() => {
-    const ids = Array.from(new Set(assigned.map((entrepreneur) => entrepreneur.programmeId).filter(Boolean) as string[]));
-    return ids.map((id) => programById(id)).filter(Boolean) as Program[];
-  }, [assigned]);
+  const router = useRouter();
+  const assigned = React.useMemo(
+    () => entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)),
+    [],
+  );
+  const programmes = React.useMemo(() => getTrainerProgrammes(currentTrainerId), []);
+
+  const [query, setQuery] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<typeof ALL_FILTER | ProgramStatus>(ALL_FILTER);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
-  const pageRows = programmes.slice((page - 1) * pageSize, page * pageSize);
+
+  const openProgramme = React.useCallback((programme: Program) => {
+    router.push(routes.trainer.programme(programme.id));
+  }, [router]);
+
+  const filteredProgrammes = React.useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return programmes.filter((programme) => {
+      const stats = getProgramStats(programme);
+      const derivedStatus = getProgrammeStatus(programme);
+      const assignedCount = assigned.filter((entrepreneur) => entrepreneurHasProgramme(entrepreneur, programme.id)).length;
+      const matchesStatus = statusFilter === ALL_FILTER || derivedStatus === statusFilter;
+      const matchesSearch =
+        !needle ||
+        [
+          programme.name,
+          programme.description,
+          getProgrammeStatusLabel(derivedStatus),
+          String(assignedCount),
+          String(stats.modules.length),
+          ...stats.modules.map((module) => module.title),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [assigned, programmes, query, statusFilter]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, pageSize]);
+
+  const pageRows = React.useMemo(
+    () => filteredProgrammes.slice((page - 1) * pageSize, page * pageSize),
+    [filteredProgrammes, page, pageSize],
+  );
   const avgProgress = Math.round(programmes.reduce((sum, programme) => sum + programme.progress, 0) / Math.max(programmes.length, 1));
   const totalModules = programmes.reduce((sum, programme) => sum + modulesForProgram(programme.id).length, 0);
+  const totalContentAssets = programmes.reduce((sum, programme) => sum + getProgramStats(programme).items.length, 0);
+  const contentOwned = programmes.reduce((sum, programme) => {
+    const stats = getProgramStats(programme);
+    return sum + stats.items.filter((item) => item.trainerId === currentTrainerId).length;
+  }, 0);
 
   const columns: Column<Program>[] = [
     {
       key: 'action',
       header: 'Action',
-      cell: (programme) => <RowActions actions={[{ label: 'Open programme context', onSelect: () => {} }]} />,
+      cell: (programme) => (
+        <RowActions
+          actions={[
+            { label: 'Open programme', onSelect: () => openProgramme(programme) },
+          ]}
+        />
+      ),
       className: 'w-[84px]',
     },
     {
       key: 'programme',
       header: 'Programme',
       cell: (programme) => (
-        <div className="min-w-[280px]">
-          <div className="font-medium text-ink">{programme.name}</div>
-          <div className="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">{programme.description}</div>
-        </div>
+        <button
+          type="button"
+          onClick={() => openProgramme(programme)}
+          className="block min-w-[320px] max-w-[500px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+        >
+          <span className="block font-semibold text-ink transition-colors group-hover:text-bid">{programme.name}</span>
+          <span className="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">{programme.description}</span>
+        </button>
       ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (programme) => <StatusBadge program={programme} />,
     },
     {
       key: 'assigned',
       header: 'My entrepreneurs',
-      cell: (programme) => assigned.filter((entrepreneur) => entrepreneur.programmeId === programme.id).length,
+      cell: (programme) => assigned.filter((entrepreneur) => entrepreneurHasProgramme(entrepreneur, programme.id)).length,
     },
     {
       key: 'progress',
@@ -75,69 +167,103 @@ export default function TrainerProgrammesPage() {
       ),
     },
     {
-      key: 'modules',
-      header: 'Learning assets',
+      key: 'curriculum',
+      header: 'Curriculum',
       cell: (programme) => {
         const stats = getProgramStats(programme);
-        return `${stats.modules.length} modules · ${stats.videos} videos · ${stats.files + stats.tools} files/tools`;
+        return (
+          <div className="min-w-[240px] text-sm text-ink-muted">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge tone="neutral"><BookOpen className="h-3.5 w-3.5" /> {stats.modules.length} modules</Badge>
+              <Badge tone="blue"><PlayCircle className="h-3.5 w-3.5" /> {stats.videos} videos</Badge>
+              <Badge tone="neutral"><FileText className="h-3.5 w-3.5" /> {stats.files} files</Badge>
+              <Badge tone="brand"><Wrench className="h-3.5 w-3.5" /> {stats.tools} tools</Badge>
+            </div>
+          </div>
+        );
       },
     },
     {
       key: 'timeline',
       header: 'Timeline',
-      cell: (programme) => `${formatDate(programme.startDate)} - ${formatDate(programme.endDate)}`,
+      cell: (programme) => (
+        <span className="whitespace-nowrap text-sm text-ink-muted">
+          {formatDate(programme.startDate)} - {formatDate(programme.endDate)}
+        </span>
+      ),
     },
   ];
 
   return (
     <>
-      <PageHeader title="My Programmes" description="Programmes where you support at least one entrepreneur." />
+      <PageHeader
+        title="My programmes"
+        description="Programmes connected to the learning content you support."
+      />
       <MetricGrid columns={4}>
-        <StatCard label="Programmes" value={programmes.length} subline="In your trainer scope" dotColor="bid" accent="bid" />
-        <StatCard label="Assigned entrepreneurs" value={assigned.length} subline="Across these programmes" dotColor="info" accent="info" />
-        <StatCard label="Modules" value={totalModules} subline="Curriculum to reference" dotColor="warning" accent="warning" />
-        <StatCard label="Avg. progress" value={`${avgProgress}%`} subline="Programme completion" dotColor="success" accent="success" />
+        <StatCard label="Programmes" value={programmes.length} subline="Programmes you support" dotColor="bid" accent="bid" />
+        <StatCard label="My entrepreneurs" value={assigned.length} subline="Inferred from programme access" dotColor="info" accent="info" />
+        <StatCard label="Learning assets" value={totalContentAssets} subline={`${totalModules} modules`} dotColor="warning" accent="warning" />
+        <StatCard label="Content you own" value={contentOwned} subline={`${avgProgress}% average progress`} dotColor="success" accent="success" />
       </MetricGrid>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {programmes.map((programme) => {
-          const stats = getProgramStats(programme);
-          const assignedCount = assigned.filter((entrepreneur) => entrepreneur.programmeId === programme.id).length;
-          return (
-            <Card key={programme.id} accent={programme.accent}>
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-lg font-semibold text-ink">{programme.name}</div>
-                  <p className="mt-2 text-sm leading-6 text-ink-muted">{programme.description}</p>
-                </div>
-                <Badge tone={programme.status === 'active' ? 'green' : 'neutral'}>{programme.status}</Badge>
-              </div>
-              <ProgressBar value={programme.progress} width="100%" className="h-2" />
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <MiniStat icon={Users} label="My entrepreneurs" value={assignedCount} />
-                <MiniStat icon={BookOpen} label="Modules" value={stats.modules.length} />
-                <MiniStat icon={PlayCircle} label="Videos" value={stats.videos} />
-                <MiniStat icon={FileText} label="Files/tools" value={stats.files + stats.tools} />
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
       <Card className="mt-4">
-        <CardHeader title="Programme context" description="Use this to understand the curriculum and timing behind your assigned entrepreneurs." />
-        <DataTable columns={columns} rows={pageRows} rowKey={(programme) => programme.id} emptyMessage="No programmes assigned to this trainer." tableClassName="min-w-[1000px]" />
-        <TablePagination page={page} pageSize={pageSize} totalItems={programmes.length} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
+        <CardHeader
+          title="Programme directory"
+          description={`${filteredProgrammes.length} programmes in this view`}
+        />
+        <TableToolbar>
+          <div>
+            <div className="text-sm font-medium text-ink">Filter programmes</div>
+            <div className="mt-0.5 text-sm text-ink-muted">
+              Search by programme, module, status, or entrepreneur count.
+            </div>
+          </div>
+          <div className="grid w-full gap-2 md:grid-cols-[minmax(220px,1fr)_170px] lg:w-[560px]">
+            <TableFilterInput
+              icon
+              placeholder="Search programmes..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <TableFilterAutocomplete
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
+              options={[
+                { value: ALL_FILTER, label: 'All statuses' },
+                { value: 'active', label: 'Active' },
+                { value: 'scheduled', label: 'Scheduled' },
+                { value: 'draft', label: 'Draft' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'archived', label: 'Archived' },
+              ]}
+              placeholder="All statuses"
+              searchPlaceholder="Search statuses..."
+            />
+          </div>
+        </TableToolbar>
+        <DataTable
+          columns={columns}
+          rows={pageRows}
+          rowKey={(programme) => programme.id}
+          rowProps={(programme) => ({
+            onDoubleClick: () => openProgramme(programme),
+          })}
+          emptyMessage="No programmes match these filters."
+          tableClassName="min-w-[1120px]"
+        />
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={filteredProgrammes.length}
+          pageSizeOptions={[10, 25, 50]}
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
+        />
       </Card>
     </>
-  );
-}
-
-function MiniStat({ icon: Icon, label, value }: { icon: typeof Layers3; label: string; value: number }) {
-  return (
-    <div className="rounded-lg bg-surface-subtle px-3 py-2">
-      <div className="flex items-center gap-1.5 text-xs text-ink-muted"><Icon className="h-3.5 w-3.5" />{label}</div>
-      <div className="mt-1 text-lg font-semibold text-ink">{value}</div>
-    </div>
   );
 }

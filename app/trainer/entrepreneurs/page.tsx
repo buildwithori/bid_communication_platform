@@ -6,11 +6,14 @@ import { MetricGrid } from '@/components/shared/MetricGrid';
 import { StatCard } from '@/components/shared/StatCard';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
+import { ProgrammeAccessList } from '@/components/shared/ProgrammeAccessList';
+import { ToolAccessList, getVisibleToolsForEntrepreneur } from '@/components/shared/ToolAccessList';
 import { Avatar } from '@/components/shared/Avatar';
 import { ProgressBar } from '@/components/shared/ProgressBar';
 import {
   DataTable,
   RowActions,
+  TableFilterAutocomplete,
   TableFilterInput,
   TableFilterSelect,
   TablePagination,
@@ -19,27 +22,30 @@ import {
 } from '@/components/shared/DataTable';
 import { ViewEntrepreneurModal } from '@/components/admin/ViewEntrepreneurModal';
 import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { programById } from '@/lib/mock-data/programs';
 import { sectorById, stageById } from '@/lib/mock-data/definitions';
+import { getDaysWithoutPeriodicReport } from '@/lib/reporting/overdue-updates';
+import { useCompanyConfigStore } from '@/lib/stores/company-config-store';
+import {
+  entrepreneurHasProgramme,
+  getEntrepreneurProgrammes,
+} from '@/lib/programme-access';
+import { getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
 import type { Entrepreneur } from '@/types';
 
 const currentTrainerId = 't-kofi';
 const today = new Date('2026-07-07');
 const ALL = 'all';
 
-function daysSince(value?: string) {
-  if (!value) return null;
-  return Math.max(Math.floor((today.getTime() - new Date(value).getTime()) / 86_400_000), 0);
-}
-
-function getFollowUp(entrepreneur: Entrepreneur) {
-  const updateAge = daysSince(entrepreneur.lastUpdateAt);
+function getFollowUp(entrepreneur: Entrepreneur, overdueAfterDays: number) {
+  const updateAge = getDaysWithoutPeriodicReport(entrepreneur, today);
   if (entrepreneur.metrics.trainingProgress < 50) return { label: 'Low progress', tone: 'amber' as const };
-  if (updateAge == null || updateAge > 60) return { label: 'Update overdue', tone: 'red' as const };
+  if (updateAge > overdueAfterDays) return { label: 'Update overdue', tone: 'red' as const };
   return { label: 'On track', tone: 'green' as const };
 }
 
 export default function TrainerEntrepreneursPage() {
+  const { companyConfig } = useCompanyConfigStore();
+  const overdueAfterDays = companyConfig.reporting.periodicUpdateOverdueAfterDays;
   const [query, setQuery] = React.useState('');
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [followUpFilter, setFollowUpFilter] = React.useState(ALL);
@@ -48,34 +54,35 @@ export default function TrainerEntrepreneursPage() {
   const [viewTarget, setViewTarget] = React.useState<Entrepreneur | null>(null);
 
   const assigned = React.useMemo(
-    () => entrepreneurs.filter((entrepreneur) => entrepreneur.trainerId === currentTrainerId),
+    () => entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)),
     [],
   );
   const programmeOptions = React.useMemo(
-    () => Array.from(new Set(assigned.map((entrepreneur) => entrepreneur.programmeId).filter(Boolean) as string[])),
-    [assigned],
+    () => getTrainerProgrammes(currentTrainerId),
+    [],
   );
-  const needsAttention = assigned.filter((entrepreneur) => getFollowUp(entrepreneur).tone !== 'green').length;
+  const needsAttention = assigned.filter((entrepreneur) => getFollowUp(entrepreneur, overdueAfterDays).tone !== 'green').length;
   const avgTraining = Math.round(assigned.reduce((sum, entrepreneur) => sum + entrepreneur.metrics.trainingProgress, 0) / Math.max(assigned.length, 1));
   const submittedDeliverables = assigned.reduce((sum, entrepreneur) => sum + entrepreneur.metrics.deliverablesDone, 0);
 
   const filtered = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return assigned.filter((entrepreneur) => {
-      const followUp = getFollowUp(entrepreneur);
+      const followUp = getFollowUp(entrepreneur, overdueAfterDays);
       const matchesQuery = !needle || [
         entrepreneur.businessName,
         entrepreneur.representative,
         entrepreneur.email,
         sectorById[entrepreneur.sector]?.label ?? entrepreneur.sector,
         stageById[entrepreneur.stage]?.label ?? entrepreneur.stage,
-        programById(entrepreneur.programmeId)?.name ?? '',
+        getEntrepreneurProgrammes(entrepreneur).map((programme) => programme.name).join(' '),
+        getVisibleToolsForEntrepreneur(entrepreneur).map((tool) => tool.name).join(' '),
       ].join(' ').toLowerCase().includes(needle);
-      const matchesProgramme = programmeFilter === ALL || entrepreneur.programmeId === programmeFilter;
+      const matchesProgramme = programmeFilter === ALL || entrepreneurHasProgramme(entrepreneur, programmeFilter);
       const matchesFollowUp = followUpFilter === ALL || followUp.label === followUpFilter;
       return matchesQuery && matchesProgramme && matchesFollowUp;
     });
-  }, [assigned, followUpFilter, programmeFilter, query]);
+  }, [assigned, followUpFilter, overdueAfterDays, programmeFilter, query]);
 
   React.useEffect(() => {
     setPage(1);
@@ -100,7 +107,7 @@ export default function TrainerEntrepreneursPage() {
         <button type="button" onClick={() => setViewTarget(entrepreneur)} className="flex min-w-[250px] items-center gap-3 rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20">
           <Avatar initials={entrepreneur.initials} size={32} />
           <span className="min-w-0">
-            <span className="block font-medium text-ink">{entrepreneur.businessName}</span>
+            <span className="block font-medium text-ink transition-colors group-hover:text-bid">{entrepreneur.businessName}</span>
             <span className="mt-1 block text-sm text-ink-muted">{entrepreneur.representative}</span>
           </span>
         </button>
@@ -108,8 +115,26 @@ export default function TrainerEntrepreneursPage() {
     },
     {
       key: 'programme',
-      header: 'Programme',
-      cell: (entrepreneur) => <span className="min-w-[220px] block">{programById(entrepreneur.programmeId)?.name ?? 'Not assigned'}</span>,
+      header: 'Programme access',
+      cell: (entrepreneur) => (
+        <ProgrammeAccessList
+          programmes={getEntrepreneurProgrammes(entrepreneur)}
+          maxVisible={2}
+          modalTitle={`${entrepreneur.businessName} programme access`}
+          className="min-w-[240px] max-w-[340px]"
+        />
+      ),
+    },
+    {
+      key: 'tools',
+      header: 'Tools',
+      cell: (entrepreneur) => (
+        <ToolAccessList
+          entrepreneur={entrepreneur}
+          className="min-w-[230px] max-w-[320px]"
+          chipClassName="max-w-[155px]"
+        />
+      ),
     },
     {
       key: 'stage',
@@ -140,7 +165,7 @@ export default function TrainerEntrepreneursPage() {
       key: 'followup',
       header: 'Follow-up',
       cell: (entrepreneur) => {
-        const followUp = getFollowUp(entrepreneur);
+        const followUp = getFollowUp(entrepreneur, overdueAfterDays);
         return <Badge tone={followUp.tone}>{followUp.label}</Badge>;
       },
     },
@@ -148,28 +173,35 @@ export default function TrainerEntrepreneursPage() {
 
   return (
     <>
-      <PageHeader title="My Entrepreneurs" description="Your assigned entrepreneur portfolio, progress, and coaching follow-ups." />
+      <PageHeader title="My Entrepreneurs" description="Entrepreneurs you support, with progress and coaching follow-ups." />
 
       <MetricGrid columns={4}>
-        <StatCard label="Assigned" value={assigned.length} subline="Entrepreneurs in your portfolio" dotColor="bid" accent="bid" />
+        <StatCard label="My entrepreneurs" value={assigned.length} subline="Entrepreneurs you support" dotColor="bid" accent="bid" />
         <StatCard label="Need attention" value={needsAttention} subline="Low progress or overdue updates" dotColor="warning" accent="warning" />
         <StatCard label="Avg. progress" value={`${avgTraining}%`} subline="Training completion" dotColor="success" accent="success" />
-        <StatCard label="Deliverables approved" value={submittedDeliverables} subline="Across assigned entrepreneurs" dotColor="info" accent="info" />
+        <StatCard label="Deliverables approved" value={submittedDeliverables} subline="Across my entrepreneurs" dotColor="info" accent="info" />
       </MetricGrid>
 
       <Card className="mt-4">
-        <CardHeader title="Assigned portfolio" description={`${filtered.length} entrepreneur${filtered.length === 1 ? '' : 's'} in this view`} />
+        <CardHeader title="My entrepreneurs" description={`${filtered.length} entrepreneur${filtered.length === 1 ? '' : 's'} in this view`} />
         <TableToolbar>
           <div>
             <div className="text-sm font-medium text-ink">Filter entrepreneurs</div>
-            <div className="mt-0.5 text-sm text-ink-muted">Search by business, representative, programme, stage, or sector.</div>
+            <div className="mt-0.5 text-sm text-ink-muted">Search by business, representative, programme, tool, stage, or sector.</div>
           </div>
           <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[280px_220px_180px]">
             <TableFilterInput icon placeholder="Search entrepreneurs..." value={query} onChange={(event) => setQuery(event.target.value)} />
-            <TableFilterSelect value={programmeFilter} onChange={(event) => setProgrammeFilter(event.target.value)}>
-              <option value={ALL}>All programmes</option>
-              {programmeOptions.map((programmeId) => <option key={programmeId} value={programmeId}>{programById(programmeId)?.name}</option>)}
-            </TableFilterSelect>
+            <TableFilterAutocomplete
+              value={programmeFilter}
+              onValueChange={setProgrammeFilter}
+              options={[
+                { value: ALL, label: 'All programmes' },
+                ...programmeOptions.map((programme) => ({ value: programme.id, label: programme.name })),
+              ]}
+              placeholder="All programmes"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No programme found."
+            />
             <TableFilterSelect value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)}>
               <option value={ALL}>All follow-ups</option>
               <option value="On track">On track</option>
@@ -178,7 +210,7 @@ export default function TrainerEntrepreneursPage() {
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        <DataTable columns={columns} rows={pageRows} rowKey={(entrepreneur) => entrepreneur.id} emptyMessage="No assigned entrepreneurs match this view." tableClassName="min-w-[1120px]" />
+        <DataTable columns={columns} rows={pageRows} rowKey={(entrepreneur) => entrepreneur.id} emptyMessage="No entrepreneurs match this view." tableClassName="min-w-[1340px]" />
         <TablePagination page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
       </Card>
 
