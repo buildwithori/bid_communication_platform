@@ -21,8 +21,8 @@ export function AuthShell({
   cardClassName?: string;
 }) {
   return (
-    <main className="min-h-screen overflow-y-auto bg-surface text-ink">
-      <section className="flex min-h-screen items-center justify-center px-5 py-8 sm:px-8">
+    <main className="h-screen h-[100dvh] overflow-y-auto bg-surface text-ink">
+      <section className="flex min-h-full items-center justify-center px-5 py-8 sm:px-8">
         <div className={cn('w-full max-w-[500px]', className)}>
           <div className="mb-6 flex flex-col items-center text-center">
             <BidLogo size={76} variant="full" />

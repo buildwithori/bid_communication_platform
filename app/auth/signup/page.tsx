@@ -9,11 +9,16 @@ import { AuthModeTabs } from '@/components/auth/AuthModeTabs';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
+import { FormAutocomplete } from '@/components/shared/FormField';
 import {
   signupSchema,
   type SignupForm as SignupFormValues,
 } from '@/lib/forms/schemas';
+import { countries } from '@/lib/mock-data/definitions';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+const countryOptions = countries.map((country) => ({ value: country, label: country }));
 
 export default function AuthSignupPage() {
   return (
@@ -77,12 +82,26 @@ function SignupForm() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <AuthTextField
-          label="Country"
-          placeholder="Ghana"
-          error={form.formState.errors.country?.message}
-          {...form.register('country')}
-        />
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink">Country</span>
+          <FormAutocomplete
+            value={form.watch('country')}
+            onValueChange={(value) => form.setValue('country', value, { shouldValidate: true })}
+            options={countryOptions}
+            placeholder="Select country"
+            searchPlaceholder="Search countries..."
+            emptyMessage="No country found."
+            className={cn(
+              'h-11 border-line bg-white',
+              form.formState.errors.country && 'border-danger focus:border-danger focus:ring-danger/10',
+            )}
+          />
+          {form.formState.errors.country?.message && (
+            <span className="mt-1.5 block text-xs text-danger">
+              {form.formState.errors.country.message}
+            </span>
+          )}
+        </label>
         <AuthTextField
           label="Phone"
           type="tel"
