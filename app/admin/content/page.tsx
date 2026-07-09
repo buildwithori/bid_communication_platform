@@ -23,14 +23,7 @@ import { programs, modules as seedModules } from '@/lib/mock-data/programs';
 import type { ContentItem } from '@/types';
 import { toast } from 'sonner';
 
-type Tab = 'video' | 'pdf' | 'tool' | 'templates';
-
-const tabTypeMap: Record<string, ContentItem['type']> = {
-  video: 'video',
-  pdf: 'pdf',
-  tool: 'tool',
-  templates: 'pdf',
-};
+type Tab = ContentItem['type'];
 
 export default function AdminContentPage() {
   const { contentItems } = useAdminStore();
@@ -46,10 +39,7 @@ export default function AdminContentPage() {
   const [targetModule, setTargetModule] = React.useState('new');
 
   const filtered = React.useMemo(() => {
-    const rows =
-      tab === 'templates'
-        ? contentItems.filter((c) => c.type === 'pdf')
-        : contentItems.filter((c) => c.type === tabTypeMap[tab]);
+    const rows = contentItems.filter((c) => c.type === tab);
     const needle = query.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((item) =>
@@ -144,7 +134,6 @@ export default function AdminContentPage() {
         tabs={[
           { value: 'video', label: 'Videos' },
           { value: 'pdf', label: 'PDFs' },
-          { value: 'templates', label: 'Templates' },
           { value: 'tool', label: 'Tools' },
         ]}
       />

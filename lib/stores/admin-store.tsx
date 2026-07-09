@@ -17,12 +17,14 @@ import {
 } from '@/lib/mock-data/entrepreneurs';
 import { trainers as seedTrainers } from '@/lib/mock-data/trainers';
 import { programs as seedPrograms, modules as seedModules, contentItems as seedContent } from '@/lib/mock-data/programs';
-import { sectors as seedSectors, stages as seedStages } from '@/lib/mock-data/definitions';
+import { toolById } from '@/lib/mock-data';
+import { programmeGoalTypes, sectors as seedSectors, stages as seedStages } from '@/lib/mock-data/definitions';
 import type {
   EntrepreneurForm,
   TrainerForm,
   ProgramForm,
   AssignToProgramForm,
+  ContentItemForm,
 } from '@/lib/forms/schemas';
 
 /**
@@ -43,16 +45,23 @@ interface AdminStore {
   addEntrepreneur: (input: EntrepreneurForm) => void;
   updateEntrepreneur: (id: string, patch: Partial<Entrepreneur>) => void;
   assignEntrepreneur: (input: AssignToProgramForm) => void;
+  removeProgrammeEnrollment: (entrepreneurId: string, programmeId: string) => void;
   addTrainer: (input: TrainerForm) => void;
   updateTrainer: (id: string, patch: Partial<Trainer>) => void;
   addProgram: (input: ProgramForm) => void;
   updateProgram: (id: string, patch: Partial<Program>) => void;
   addModule: (programId: string, title: string, description?: string) => void;
-  addContentItem: (moduleId: string, title: string, type: ContentItem['type']) => void;
+  addExistingModuleToProgram: (programId: string, moduleId: string) => void;
+  reorderProgramModule: (programId: string, activeModuleId: string, overModuleId: string) => void;
+  moveProgramModule: (programId: string, moduleId: string, direction: 'up' | 'down') => void;
+  moveProgramModuleToPosition: (programId: string, moduleId: string, position: number) => void;
+  reorderModuleContent: (moduleId: string, activeContentId: string, overContentId: string) => void;
+  addContentItem: (moduleId: string, input: ContentItemForm) => void;
   addSector: (label: string) => void;
   updateSector: (id: string, label: string) => void;
   removeSector: (id: string) => void;
-  updateStageDefinitions: (defs: Record<string, string>) => void;
+  addStage: (label: string, definition: string) => void;
+  updateStage: (id: string, patch: Partial<Stage>) => void;
 }
 
 const AdminContext = React.createContext<AdminStore | null>(null);
@@ -73,6 +82,18 @@ function initialsFrom(name: string) {
 const sectorByLabel = (label: string, sectors: Sector[]): SectorId | undefined =>
   sectors.find((s) => s.label.toLowerCase() === label.toLowerCase())?.id;
 
+const goalTypeDescription = (id: string) =>
+  programmeGoalTypes.find((goalType) => goalType.id === id)?.label;
+
+function contentIdsForProgramme(programmeId: string, programmes: Program[], contentItems: ContentItem[]) {
+  const programme = programmes.find((item) => item.id === programmeId);
+  if (!programme) return [];
+  const moduleIds = new Set(programme.moduleIds);
+  return contentItems
+    .filter((item) => moduleIds.has(item.moduleId))
+    .map((item) => item.id);
+}
+
 export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [entrepreneurs, setEntrepreneurs] = React.useState<Entrepreneur[]>(seedEntrepreneurs);
   const [trainers, setTrainers] = React.useState<Trainer[]>(seedTrainers);
@@ -84,6 +105,10 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   const addEntrepreneur: AdminStore['addEntrepreneur'] = React.useCallback((input) => {
     const id = makeId('e');
+    const selectedProgrammeId = input.programmeId && input.programmeId !== 'none' ? input.programmeId : undefined;
+    const initialContentItemIds = selectedProgrammeId
+      ? contentIdsForProgramme(selectedProgrammeId, programs, contentItems)
+      : [];
     const newEnt: Entrepreneur = {
       id,
       businessName: input.businessName,
@@ -98,11 +123,12 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       goal: {
         type: input.goalType,
         amountUsd: input.goalAmountUsd ? Number(input.goalAmountUsd) : undefined,
-        description: input.goalType === 'fundraising' ? 'Fundraising target' : undefined,
+        description: goalTypeDescription(input.goalType),
       },
-      status: input.programmeId && input.programmeId !== 'none' ? 'active' : 'unassigned',
-      programmeId: input.programmeId && input.programmeId !== 'none' ? input.programmeId : undefined,
-      trainerId: input.trainerId && input.trainerId !== 'none' ? input.trainerId : undefined,
+      status: selectedProgrammeId ? 'active' : 'unassigned',
+      contentItemIds: initialContentItemIds,
+      programmeIds: selectedProgrammeId ? [selectedProgrammeId] : [],
+      programmeId: selectedProgrammeId,
       metrics: {
         trainingProgress: 0,
         deliverablesDone: 0,
@@ -117,7 +143,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     };
     setEntrepreneurs((curr) => [newEnt, ...curr]);
     toast.success('Entrepreneur added!');
-  }, []);
+  }, [contentItems, programs]);
 
   const updateEntrepreneur: AdminStore['updateEntrepreneur'] = React.useCallback((id, patch) => {
     setEntrepreneurs((curr) =>
@@ -127,20 +153,49 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const assignEntrepreneur: AdminStore['assignEntrepreneur'] = React.useCallback((input) => {
+    const grantedContentIds = contentIdsForProgramme(input.programmeId, programs, contentItems);
     setEntrepreneurs((curr) =>
       curr.map((e) =>
         e.id === input.entrepreneurId
           ? {
               ...e,
-              programmeId: input.programmeId,
-              trainerId: input.trainerId && input.trainerId !== 'none' ? input.trainerId : e.trainerId,
+              contentItemIds: Array.from(new Set([...(e.contentItemIds ?? []), ...grantedContentIds])),
+              programmeIds: Array.from(new Set([...(e.programmeIds ?? []), ...(e.programmeId ? [e.programmeId] : []), input.programmeId])),
+              programmeId: e.programmeId ?? input.programmeId,
               status: 'active',
             }
           : e,
       ),
     );
-    toast.success('Entrepreneur assigned!');
-  }, []);
+    toast.success('Programme added');
+  }, [contentItems, programs]);
+
+  const removeProgrammeEnrollment: AdminStore['removeProgrammeEnrollment'] = React.useCallback((entrepreneurId, programmeId) => {
+    setEntrepreneurs((curr) =>
+      curr.map((e) => {
+        if (e.id !== entrepreneurId) return e;
+
+        const remainingProgrammeIds = Array.from(
+          new Set([...(e.programmeIds ?? []), ...(e.programmeId ? [e.programmeId] : [])]),
+        ).filter((id) => id !== programmeId);
+        const removedContentIds = new Set(contentIdsForProgramme(programmeId, programs, contentItems));
+        const remainingContentItemIds = (e.contentItemIds ?? []).filter((id) => !removedContentIds.has(id));
+        const nextStatus =
+          remainingContentItemIds.length === 0 && e.status === 'active'
+            ? 'unassigned'
+            : e.status;
+
+        return {
+          ...e,
+          contentItemIds: remainingContentItemIds,
+          programmeIds: remainingProgrammeIds,
+          programmeId: remainingProgrammeIds[0],
+          status: nextStatus,
+        };
+      }),
+    );
+    toast.success('Programme removed');
+  }, [contentItems, programs]);
 
   const addTrainer: AdminStore['addTrainer'] = React.useCallback((input) => {
     const id = makeId('t');
@@ -184,9 +239,10 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     const newProg: Program = {
       id,
       name: input.name,
+      accessType: input.accessType,
       startDate: input.startDate,
       endDate: input.endDate,
-      status: 'active',
+      publishedAt: input.publishState === 'published' ? new Date().toISOString() : undefined,
       maxEntrepreneurs: Number(input.maxEntrepreneurs) || 20,
       description: input.description,
       accent: 'bid',
@@ -225,16 +281,100 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     toast.success('Module created! Add content next.');
   }, [programs]);
 
-  const addContentItem: AdminStore['addContentItem'] = React.useCallback((moduleId, title, type) => {
+  const addExistingModuleToProgram: AdminStore['addExistingModuleToProgram'] = React.useCallback((programId, moduleId) => {
+    const module = modules.find((item) => item.id === moduleId);
+
+    setPrograms((curr) =>
+      curr.map((p) => {
+        if (p.id !== programId || p.moduleIds.includes(moduleId)) return p;
+        return { ...p, moduleIds: [...p.moduleIds, moduleId] };
+      }),
+    );
+    setModules((curr) =>
+      curr.map((item) =>
+        item.id === moduleId
+          ? { ...item, reuseCount: Math.max(item.reuseCount ?? 1, 1) + 1 }
+          : item,
+      ),
+    );
+    toast.success(module ? `${module.title} added to programme` : 'Module added to programme');
+  }, [modules]);
+
+  const reorderProgramModule: AdminStore['reorderProgramModule'] = React.useCallback((programId, activeModuleId, overModuleId) => {
+    if (activeModuleId === overModuleId) return;
+
+    setPrograms((curr) =>
+      curr.map((program) => {
+        if (program.id !== programId) return program;
+        const nextModuleIds = [...program.moduleIds];
+        const activeIndex = nextModuleIds.indexOf(activeModuleId);
+        const overIndex = nextModuleIds.indexOf(overModuleId);
+        if (activeIndex < 0 || overIndex < 0) return program;
+
+        nextModuleIds.splice(activeIndex, 1);
+        const overIndexAfterRemoval = nextModuleIds.indexOf(overModuleId);
+        const insertIndex = activeIndex < overIndex ? overIndexAfterRemoval + 1 : overIndexAfterRemoval;
+        nextModuleIds.splice(insertIndex, 0, activeModuleId);
+        return { ...program, moduleIds: nextModuleIds };
+      }),
+    );
+    toast.success('Module order updated');
+  }, []);
+
+  const moveProgramModule: AdminStore['moveProgramModule'] = React.useCallback((programId, moduleId, direction) => {
+    setPrograms((curr) =>
+      curr.map((program) => {
+        if (program.id !== programId) return program;
+        const nextModuleIds = [...program.moduleIds];
+        const currentIndex = nextModuleIds.indexOf(moduleId);
+        const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= nextModuleIds.length) return program;
+
+        [nextModuleIds[currentIndex], nextModuleIds[nextIndex]] = [nextModuleIds[nextIndex], nextModuleIds[currentIndex]];
+        return { ...program, moduleIds: nextModuleIds };
+      }),
+    );
+    toast.success('Module order updated');
+  }, []);
+
+  const moveProgramModuleToPosition: AdminStore['moveProgramModuleToPosition'] = React.useCallback((programId, moduleId, position) => {
+    setPrograms((curr) =>
+      curr.map((program) => {
+        if (program.id !== programId) return program;
+        const nextModuleIds = [...program.moduleIds];
+        const currentIndex = nextModuleIds.indexOf(moduleId);
+        if (currentIndex < 0) return program;
+
+        const targetIndex = Math.min(Math.max(position - 1, 0), nextModuleIds.length - 1);
+        nextModuleIds.splice(currentIndex, 1);
+        nextModuleIds.splice(targetIndex, 0, moduleId);
+        return { ...program, moduleIds: nextModuleIds };
+      }),
+    );
+    toast.success(`Module moved to position ${position}`);
+  }, []);
+
+  const addContentItem: AdminStore['addContentItem'] = React.useCallback((moduleId, input) => {
     const id = makeId('c');
     const newItem: ContentItem = {
       id,
-      title,
+      title: input.title,
       chapter: 'Chapter 1',
-      type,
+      type: input.type,
       durationLabel:
-        type === 'video' ? '10 min' : type === 'pdf' ? 'Downloadable' : 'Embedded tool',
+        input.type === 'video' ? '10 min' : input.type === 'pdf' ? 'Downloadable' : 'Embedded tool',
       moduleId,
+      trainerId: input.trainerId,
+      muxPlaybackId: input.type === 'video' ? 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' : undefined,
+      pdfFileName: input.type === 'pdf' ? input.pdfFileName?.trim() : undefined,
+      fileUrl: input.type === 'pdf' ? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' : undefined,
+      linkedToolId: input.type === 'tool' && input.toolSource === 'library' ? input.linkedToolId : undefined,
+      toolUrl:
+        input.type === 'tool'
+          ? input.toolSource === 'library'
+            ? toolById(input.linkedToolId ?? '')?.embedUrl
+            : input.toolUrl?.trim()
+          : undefined,
       progress: 'not-started',
     };
     setContentItems((curr) => [...curr, newItem]);
@@ -243,7 +383,28 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         m.id === moduleId ? { ...m, contentItemIds: [...m.contentItemIds, id] } : m,
       ),
     );
-    toast.success('Content item added!');
+    toast.success('Content item added with trainer ownership');
+  }, []);
+
+  const reorderModuleContent: AdminStore['reorderModuleContent'] = React.useCallback((moduleId, activeContentId, overContentId) => {
+    if (activeContentId === overContentId) return;
+
+    setModules((curr) =>
+      curr.map((module) => {
+        if (module.id !== moduleId) return module;
+        const nextContentItemIds = [...module.contentItemIds];
+        const activeIndex = nextContentItemIds.indexOf(activeContentId);
+        const overIndex = nextContentItemIds.indexOf(overContentId);
+        if (activeIndex < 0 || overIndex < 0) return module;
+
+        nextContentItemIds.splice(activeIndex, 1);
+        const overIndexAfterRemoval = nextContentItemIds.indexOf(overContentId);
+        const insertIndex = activeIndex < overIndex ? overIndexAfterRemoval + 1 : overIndexAfterRemoval;
+        nextContentItemIds.splice(insertIndex, 0, activeContentId);
+        return { ...module, contentItemIds: nextContentItemIds };
+      }),
+    );
+    toast.success('Content order updated');
   }, []);
 
   const addSector: AdminStore['addSector'] = React.useCallback((label) => {
@@ -264,11 +425,17 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     toast.success('Sector removed!');
   }, []);
 
-  const updateStageDefinitions: AdminStore['updateStageDefinitions'] = React.useCallback((defs) => {
+  const addStage: AdminStore['addStage'] = React.useCallback((label, definition) => {
+    const id = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    setStages((curr) => [...curr, { id, label, definition, color: 'neutral' }]);
+    toast.success('Stage added!');
+  }, []);
+
+  const updateStage: AdminStore['updateStage'] = React.useCallback((id, patch) => {
     setStages((curr) =>
-      curr.map((s) => ({ ...s, definition: defs[s.id] ?? s.definition })),
+      curr.map((stage) => (stage.id === id ? { ...stage, ...patch } : stage)),
     );
-    toast.success('Stage definitions updated!');
+    toast.success('Stage updated!');
   }, []);
 
   const value = React.useMemo<AdminStore>(
@@ -283,18 +450,25 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       addEntrepreneur,
       updateEntrepreneur,
       assignEntrepreneur,
+      removeProgrammeEnrollment,
       addTrainer,
       updateTrainer,
       addProgram,
       updateProgram,
       addModule,
+      addExistingModuleToProgram,
+      reorderProgramModule,
+      moveProgramModule,
+      moveProgramModuleToPosition,
+      reorderModuleContent,
       addContentItem,
       addSector,
       updateSector,
       removeSector,
-      updateStageDefinitions,
+      addStage,
+      updateStage,
     }),
-    [entrepreneurs, trainers, programs, modules, contentItems, sectors, stages, addEntrepreneur, updateEntrepreneur, assignEntrepreneur, addTrainer, updateTrainer, addProgram, updateProgram, addModule, addContentItem, addSector, updateSector, removeSector, updateStageDefinitions],
+    [entrepreneurs, trainers, programs, modules, contentItems, sectors, stages, addEntrepreneur, updateEntrepreneur, assignEntrepreneur, removeProgrammeEnrollment, addTrainer, updateTrainer, addProgram, updateProgram, addModule, addExistingModuleToProgram, reorderProgramModule, moveProgramModule, moveProgramModuleToPosition, reorderModuleContent, addContentItem, addSector, updateSector, removeSector, addStage, updateStage],
   );
 
   return (

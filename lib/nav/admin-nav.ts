@@ -5,11 +5,14 @@ import {
   FolderKanban,
   PlayCircle,
   CalendarDays,
+  ShieldCheck,
   Wrench,
   Star,
   BarChart3,
   ClipboardCheck,
   Tags,
+  Target,
+  Settings,
 } from 'lucide-react';
 import type { NavSection } from '@/components/layout/NavSidebar';
 import { routes } from '@/lib/routes';
@@ -24,6 +27,7 @@ export const adminNav: NavSection[] = [
   {
     heading: 'People',
     items: [
+      { href: routes.admin.admins, label: 'Admins', icon: ShieldCheck },
       { href: routes.admin.entrepreneurs, label: 'Entrepreneurs', icon: Users },
       { href: routes.admin.trainers, label: 'Trainers', icon: GraduationCap },
     ],
@@ -38,6 +42,7 @@ export const adminNav: NavSection[] = [
     heading: 'Content',
     items: [
       { href: routes.admin.content, label: 'Content Library', icon: PlayCircle },
+      { href: routes.admin.entrepreneurTools, label: 'Entrepreneur Tools', icon: Wrench },
     ],
   },
   {
@@ -49,16 +54,19 @@ export const adminNav: NavSection[] = [
     ],
   },
   {
-    heading: 'Settings',
-    items: [
-      { href: routes.admin.settingsStages, label: 'Business Stages', icon: Star },
-      { href: routes.admin.settingsSectors, label: 'Sectors', icon: Tags },
-    ],
-  },
-  {
     heading: 'Analytics',
     items: [
       { href: routes.admin.reporting, label: 'Reporting', icon: BarChart3 },
+    ],
+  },
+  {
+    heading: 'Settings',
+    items: [
+      { href: routes.admin.settings, label: 'Admin Settings', icon: Settings },
+      { href: routes.admin.settingsStages, label: 'Business Stages', icon: Star },
+      { href: routes.admin.settingsSectors, label: 'Sectors', icon: Tags },
+      { href: routes.admin.settingsGoalTypes, label: 'Goal Types', icon: Target },
+      { href: routes.admin.settingsCompany, label: 'Company Settings', icon: Settings },
     ],
   },
 ];

@@ -10,6 +10,7 @@ import { Avatar } from '@/components/shared/Avatar';
 import {
   DataTable,
   RowActions,
+  TableFilterAutocomplete,
   TableFilterInput,
   TablePagination,
   TableToolbar,
@@ -54,6 +55,19 @@ const fundsMobilisedTrend = [
 ];
 
 const chartColors = ['#842751', '#185FA5', '#1D9E75', '#BA7517', '#5c1a38', '#666666'];
+const ALL_FILTER = 'all';
+
+const recentSourceOptions = [
+  { value: ALL_FILTER, label: 'All sources' },
+  { value: 'invited', label: 'Admin-invited' },
+  { value: 'self-registered', label: 'Self-registered' },
+];
+
+const recentStatusOptions = [
+  { value: ALL_FILTER, label: 'All statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'unassigned', label: 'Unassigned' },
+];
 
 export default function AdminDashboardPage() {
   const { entrepreneurs, programs } = useAdminStore();
@@ -61,6 +75,8 @@ export default function AdminDashboardPage() {
   const [assignEntId, setAssignEntId] = useState<string | null>(null);
   const [viewEntId, setViewEntId] = useState<string | null>(null);
   const [recentQuery, setRecentQuery] = useState('');
+  const [recentSource, setRecentSource] = useState(ALL_FILTER);
+  const [recentStatus, setRecentStatus] = useState(ALL_FILTER);
   const [recentPage, setRecentPage] = useState(1);
   const [recentPageSize, setRecentPageSize] = useState(5);
 
@@ -68,8 +84,11 @@ export default function AdminDashboardPage() {
   const recentlyJoined = entrepreneurs.filter((e) => e.source === 'self-registered' || e.source === 'invited');
   const filteredRecentJoiners = recentlyJoined.filter((e) => {
     const needle = recentQuery.trim().toLowerCase();
-    if (!needle) return true;
-    return [
+    const matchesSource = recentSource === ALL_FILTER || e.source === recentSource;
+    const matchesStatus = recentStatus === ALL_FILTER || e.status === recentStatus;
+    const matchesSearch =
+      !needle ||
+      [
       e.businessName,
       e.representative,
       e.email,
@@ -81,6 +100,8 @@ export default function AdminDashboardPage() {
       .join(' ')
       .toLowerCase()
       .includes(needle);
+
+    return matchesSource && matchesStatus && matchesSearch;
   });
   const recentPageRows = filteredRecentJoiners.slice(
     (recentPage - 1) * recentPageSize,
@@ -114,7 +135,7 @@ export default function AdminDashboardPage() {
     }
     return acc;
   }, []).sort((a, b) => b.value - a.value);
-  const leadingSector = sectorBreakdown[0];
+  const totalActiveBusinesses = activeEntrepreneurs.length;
   const programmeHealth = programs.map((program) => {
     const activeCount = program.entrepreneursCount;
     const leftCount = program.leftEntrepreneursCount ?? 0;
@@ -147,7 +168,7 @@ export default function AdminDashboardPage() {
           actions={[
             { label: 'View profile', onSelect: () => setViewEntId(e.id) },
             ...(e.status === 'unassigned'
-              ? [{ label: 'Assign to programme', onSelect: () => setAssignEntId(e.id) }]
+              ? [{ label: 'Manage programmes', onSelect: () => setAssignEntId(e.id) }]
               : []),
           ]}
         />
@@ -200,7 +221,7 @@ export default function AdminDashboardPage() {
         <StatCard label="Total entrepreneurs" value={entrepreneurs.length} subline={`${programs.length} active programmes`} dotColor="bid" accent="bid" />
         <StatCard label="Funds mobilised" value={`$${Math.round(fundsMobilised / 1000)}k`} subline="Tracked across cohorts" dotColor="info" accent="info" />
         <StatCard label="Avg. training progress" value={`${avgProgress}%`} subline="+8% vs last period" dotColor="success" accent="success" />
-        <StatCard label="Unassigned entrepreneurs" value={unassigned} subline="Awaiting programme" dotColor="warning" valueClassName="text-bid" accent="warning" />
+        <StatCard label="Without programme" value={unassigned} subline="Needs programme" dotColor="warning" valueClassName="text-bid" accent="warning" />
       </MetricGrid>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.85fr]">
@@ -240,13 +261,10 @@ export default function AdminDashboardPage() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" className="fill-ink text-3xl font-semibold">
-                {leadingSector?.value ?? 0}
+                {totalActiveBusinesses}
               </text>
               <text x="50%" y="55%" textAnchor="middle" dominantBaseline="middle" className="fill-ink-muted text-xs">
-                Top sector
-              </text>
-              <text x="50%" y="63%" textAnchor="middle" dominantBaseline="middle" className="fill-ink-muted text-xs font-medium">
-                {leadingSector?.name ?? 'No data'}
+                Active businesses
               </text>
               <Pie data={sectorBreakdown} dataKey="value" nameKey="name" innerRadius={58} outerRadius={86} paddingAngle={3}>
                 {sectorBreakdown.map((entry, index) => (
@@ -356,7 +374,7 @@ export default function AdminDashboardPage() {
                 Find entrepreneurs by name, source, sector, stage, or status.
               </div>
             </div>
-            <div className="w-full sm:w-[320px]">
+            <div className="grid w-full gap-2 sm:grid-cols-[minmax(220px,1fr)_180px_180px] lg:w-[720px]">
               <TableFilterInput
                 icon
                 placeholder="Search recent joiners..."
@@ -365,6 +383,28 @@ export default function AdminDashboardPage() {
                   setRecentQuery(event.target.value);
                   resetRecentPage();
                 }}
+              />
+              <TableFilterAutocomplete
+                value={recentSource}
+                onValueChange={(value) => {
+                  setRecentSource(value);
+                  resetRecentPage();
+                }}
+                options={recentSourceOptions}
+                placeholder="All sources"
+                searchPlaceholder="Search sources..."
+                emptyMessage="No source found."
+              />
+              <TableFilterAutocomplete
+                value={recentStatus}
+                onValueChange={(value) => {
+                  setRecentStatus(value);
+                  resetRecentPage();
+                }}
+                options={recentStatusOptions}
+                placeholder="All statuses"
+                searchPlaceholder="Search statuses..."
+                emptyMessage="No status found."
               />
             </div>
           </TableToolbar>

@@ -6,16 +6,30 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import {
   FormField,
+  FormAutocomplete,
   FormInput,
   FormSelect,
   FormRow2,
 } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
+import { Badge } from '@/components/shared/Badge';
 import { DatePicker } from '@/components/shared/DatePicker';
-import { Notice } from '@/components/shared/PageHeader';
 import { trainerSchema, type TrainerForm } from '@/lib/forms/schemas';
 import { useAdminStore } from '@/lib/stores/admin-store';
-import type { Trainer } from '@/types';
+import { sectors } from '@/lib/mock-data/definitions';
+import type { SectorId, Trainer } from '@/types';
+
+function parseSectorSpecialisms(value?: string): SectorId[] {
+  const validSectorIds = new Set<string>(sectors.map((sector) => sector.id));
+  return (value ?? '')
+    .split(',')
+    .map((specialism) => specialism.trim())
+    .filter((specialism): specialism is SectorId => validSectorIds.has(specialism));
+}
+
+function isSectorId(value: string): value is SectorId {
+  return sectors.some((sector) => sector.id === value);
+}
 
 export function TrainerModal({
   open,
@@ -46,10 +60,20 @@ export function TrainerModal({
   });
 
   const accessLevel = form.watch('accessLevel');
-  const [calProvider, setCalProvider] = React.useState<'google' | 'calendly' | 'none'>(
-    trainer?.calendarProvider ?? 'none',
-  );
-  const [calLink, setCalLink] = React.useState(trainer?.calendarLink ?? '');
+  const selectedSpecialisms = parseSectorSpecialisms(form.watch('specialisms'));
+
+  const setSpecialisms = (nextSpecialisms: string[]) => {
+    form.setValue('specialisms', nextSpecialisms.join(', '), { shouldValidate: true });
+  };
+
+  const addSpecialism = (value: string) => {
+    if (!isSectorId(value) || selectedSpecialisms.includes(value)) return;
+    setSpecialisms([...selectedSpecialisms, value]);
+  };
+
+  const removeSpecialism = (value: string) => {
+    setSpecialisms(selectedSpecialisms.filter((specialism) => specialism !== value));
+  };
 
   const onSubmit = (values: TrainerForm) => {
     if (isEdit && trainer) {
@@ -59,6 +83,7 @@ export function TrainerModal({
         role: values.role,
         accessLevel: values.accessLevel,
         accessExpiresOn: values.accessLevel === 'guest' ? values.accessExpiresOn : undefined,
+        specialisms: parseSectorSpecialisms(values.specialisms),
       });
     } else {
       addTrainer(values);
@@ -72,6 +97,7 @@ export function TrainerModal({
       open={open}
       onOpenChange={onOpenChange}
       title={mode === 'edit' ? `Edit trainer${trainer ? ` – ${trainer.fullName}` : ''}` : 'Add trainer'}
+      width="wide"
     >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormRow2>
@@ -122,53 +148,39 @@ export function TrainerModal({
             />
           </FormField>
         )}
-        <FormField label="Specialisms (comma separated)">
-          <FormInput placeholder="e.g. Fintech, Fundraising, Strategy" {...form.register('specialisms')} />
+        <FormField label="Specialisms">
+          <FormAutocomplete
+            value=""
+            onValueChange={addSpecialism}
+            options={sectors
+              .filter((sector) => !selectedSpecialisms.includes(sector.id))
+              .map((sector) => ({ value: sector.id, label: sector.label }))}
+            placeholder="Add sector specialism"
+            searchPlaceholder="Search sectors..."
+            emptyMessage="No sector found."
+          />
+          {selectedSpecialisms.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {selectedSpecialisms.map((specialism) => {
+                const sector = sectors.find((item) => item.id === specialism);
+                return (
+                  <button
+                    key={specialism}
+                    type="button"
+                    onClick={() => removeSpecialism(specialism)}
+                    className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+                    aria-label={`Remove ${sector?.label ?? specialism}`}
+                  >
+                    <Badge tone={sector?.color ?? 'neutral'}>{sector?.label ?? specialism} ×</Badge>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </FormField>
         <FormField label="Max entrepreneurs">
           <FormInput type="number" {...form.register('maxEntrepreneurs')} />
         </FormField>
-
-        <div className="my-3 h-px bg-line" />
-
-        <FormField label="Calendar integration" optional>
-          <FormSelect
-            value={calProvider}
-            onValueChange={(v) => {
-              setCalProvider(v as typeof calProvider);
-              if (v === 'google') setCalLink('');
-              if (v === 'none') setCalLink('');
-            }}
-            options={[
-              { value: 'google', label: 'Google Calendar' },
-              { value: 'calendly', label: 'Calendly' },
-              { value: 'none', label: 'Not connected' },
-            ]}
-          />
-        </FormField>
-        {calProvider === 'calendly' && (
-          <FormField label="Calendly link">
-            <FormInput
-              placeholder="e.g. calendly.com/kofi-bid"
-              value={calLink}
-              onChange={(e) => setCalLink(e.target.value)}
-            />
-          </FormField>
-        )}
-        {calProvider === 'google' && (
-          <FormField label="Google Calendar email">
-            <FormInput
-              placeholder="calendar@gmail.com"
-              value={calLink}
-              onChange={(e) => setCalLink(e.target.value)}
-            />
-          </FormField>
-        )}
-        <Notice>
-          Entrepreneurs can book any available slot on this trainer&apos;s connected
-          calendar. If no calendar is connected, each booking request must be
-          confirmed manually by the trainer.
-        </Notice>
 
         <Button type="submit" className="w-full">
           {mode === 'edit' ? 'Save changes' : 'Add trainer'}

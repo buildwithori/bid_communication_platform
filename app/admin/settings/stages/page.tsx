@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
@@ -17,26 +16,27 @@ import {
   type Column,
 } from '@/components/shared/DataTable';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormTextarea } from '@/components/shared/FormField';
+import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
 import { useAdminStore } from '@/lib/stores/admin-store';
 import {
-  stageDefinitionEditSchema,
-  type StageDefinitionEditForm,
+  businessStageSchema,
+  type BusinessStageForm,
 } from '@/lib/forms/schemas';
 import type { Stage } from '@/types';
 
 export default function AdminBusinessStagesPage() {
-  const { stages, updateStageDefinitions } = useAdminStore();
+  const { stages, addStage, updateStage } = useAdminStore();
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
+  const [createOpen, setCreateOpen] = React.useState(false);
   const [activeStage, setActiveStage] = React.useState<Stage | null>(null);
 
   const filteredStages = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return stages;
     return stages.filter((stage) =>
-      [stage.label, stage.definition].join(' ').toLowerCase().includes(needle),
+      [stage.label, stage.id, stage.definition].join(' ').toLowerCase().includes(needle),
     );
   }, [query, stages]);
 
@@ -56,11 +56,7 @@ export default function AdminBusinessStagesPage() {
       cell: (stage) => (
         <RowActions
           actions={[
-            { label: 'Edit definition', onSelect: () => setActiveStage(stage) },
-            {
-              label: 'Add new stage',
-              onSelect: () => toast.success('Stage creation will be connected when backend settings are added.'),
-            },
+            { label: 'Edit stage', onSelect: () => setActiveStage(stage) },
           ]}
         />
       ),
@@ -69,13 +65,14 @@ export default function AdminBusinessStagesPage() {
     {
       key: 'stage',
       header: 'Stage',
-      cell: (stage) => (
-        <div className="flex items-center gap-2">
-          <Badge tone={stage.color}>{stage.label}</Badge>
-          <span className="font-mono text-xs text-ink-faint">{stage.id}</span>
-        </div>
-      ),
+      cell: (stage) => <Badge tone={stage.color}>{stage.label}</Badge>,
       className: 'w-[220px]',
+    },
+    {
+      key: 'key',
+      header: 'Key',
+      cell: (stage) => <span className="font-mono text-xs text-ink-muted">{stage.id}</span>,
+      className: 'w-[180px]',
     },
     {
       key: 'definition',
@@ -88,12 +85,11 @@ export default function AdminBusinessStagesPage() {
     },
   ];
 
-  const saveDefinition = (stage: Stage, values: StageDefinitionEditForm) => {
-    const nextDefinitions = stages.reduce<Record<string, string>>((defs, item) => {
-      defs[item.id] = item.id === stage.id ? values.definition.trim() : item.definition;
-      return defs;
-    }, {});
-    updateStageDefinitions(nextDefinitions);
+  const saveStage = (stage: Stage, values: BusinessStageForm) => {
+    updateStage(stage.id, {
+      label: values.label.trim(),
+      definition: values.definition.trim(),
+    });
     setActiveStage(null);
   };
 
@@ -110,8 +106,7 @@ export default function AdminBusinessStagesPage() {
           description={`${filteredStages.length} stage${filteredStages.length === 1 ? '' : 's'} in this view`}
           actions={
             <Button
-              variant="outline"
-              onClick={() => toast.success('Stage creation will be connected when backend settings are added.')}
+              onClick={() => setCreateOpen(true)}
             >
               + Add stage
             </Button>
@@ -153,7 +148,16 @@ export default function AdminBusinessStagesPage() {
       <StageDefinitionModal
         stage={activeStage}
         onClose={() => setActiveStage(null)}
-        onSubmit={saveDefinition}
+        onSubmit={saveStage}
+      />
+      <StageFormModal
+        title="Add stage"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSubmit={(values) => {
+          addStage(values.label.trim(), values.definition.trim());
+          setCreateOpen(false);
+        }}
       />
     </>
   );
@@ -166,15 +170,15 @@ function StageDefinitionModal({
 }: {
   stage: Stage | null;
   onClose: () => void;
-  onSubmit: (stage: Stage, values: StageDefinitionEditForm) => void;
+  onSubmit: (stage: Stage, values: BusinessStageForm) => void;
 }) {
-  const form = useForm<StageDefinitionEditForm>({
-    resolver: zodResolver(stageDefinitionEditSchema),
-    defaultValues: { definition: '' },
+  const form = useForm<BusinessStageForm>({
+    resolver: zodResolver(businessStageSchema),
+    defaultValues: { label: '', definition: '' },
   });
 
   React.useEffect(() => {
-    if (stage) form.reset({ definition: stage.definition });
+    if (stage) form.reset({ label: stage.label, definition: stage.definition });
   }, [form, stage]);
 
   return (
@@ -186,6 +190,9 @@ function StageDefinitionModal({
     >
       {stage && (
         <form onSubmit={form.handleSubmit((values) => onSubmit(stage, values))}>
+          <FormField label="Stage name" error={form.formState.errors.label?.message}>
+            <FormInput placeholder="e.g. Expansion" {...form.register('label')} />
+          </FormField>
           <FormField label="Stage definition" error={form.formState.errors.definition?.message}>
             <FormTextarea rows={5} {...form.register('definition')} />
           </FormField>
@@ -197,6 +204,50 @@ function StageDefinitionModal({
           </div>
         </form>
       )}
+    </Modal>
+  );
+}
+
+function StageFormModal({
+  title,
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  title: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: BusinessStageForm) => void;
+}) {
+  const form = useForm<BusinessStageForm>({
+    resolver: zodResolver(businessStageSchema),
+    defaultValues: { label: '', definition: '' },
+  });
+
+  React.useEffect(() => {
+    if (open) form.reset({ label: '', definition: '' });
+  }, [form, open]);
+
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} title={title} width="wide">
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField label="Stage name" error={form.formState.errors.label?.message}>
+          <FormInput placeholder="e.g. Expansion" {...form.register('label')} />
+        </FormField>
+        <FormField label="Stage definition" error={form.formState.errors.definition?.message}>
+          <FormTextarea
+            rows={5}
+            placeholder="Describe when an entrepreneur belongs in this stage."
+            {...form.register('definition')}
+          />
+        </FormField>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit">Save stage</Button>
+        </div>
+      </form>
     </Modal>
   );
 }

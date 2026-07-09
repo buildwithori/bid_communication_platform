@@ -13,6 +13,7 @@ import { Button } from '@/components/shared/Button';
 import {
   DataTable,
   RowActions,
+  TableFilterAutocomplete,
   TableFilterInput,
   TableFilterSelect,
   TablePagination,
@@ -21,6 +22,7 @@ import {
 } from '@/components/shared/DataTable';
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormTextarea } from '@/components/shared/FormField';
+import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
 import {
   deliverableReviews,
@@ -47,6 +49,8 @@ function daysBetween(start: string, end: Date) {
 export default function DeliverableReviewsPage() {
   const [reviews, setReviews] = React.useState(deliverableReviews);
   const [active, setActive] = React.useState<DeliverableReview | null>(null);
+  const [previewTarget, setPreviewTarget] = React.useState<DeliverableReview | null>(null);
+  const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReview | null>(null);
   const [query, setQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | DeliverableReviewStatus>('all');
   const [programmeFilter, setProgrammeFilter] = React.useState('all');
@@ -70,9 +74,28 @@ export default function DeliverableReviewsPage() {
     toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
   };
 
+  const updateDueDate = (id: string, dueAt: string) => {
+    setReviews((rows) =>
+      rows.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              dueAt,
+              dueSource: 'manual-override',
+              dueUpdatedAt: new Date().toISOString(),
+              dueUpdatedBy: 'Ama Darko',
+            }
+          : row,
+      ),
+    );
+    setDueDateTarget(null);
+    toast.success('Due date override saved');
+  };
+
   const pending = reviews.filter((row) => row.status === 'pending-review').length;
   const changes = reviews.filter((row) => row.status === 'changes-requested').length;
   const overdue = reviews.filter((row) => row.status !== 'approved' && new Date(row.dueAt) < today).length;
+  const approved = reviews.filter((row) => row.status === 'approved').length;
   const programmeOptions = React.useMemo(
     () => Array.from(new Set(reviews.map((row) => row.programme))).sort(),
     [reviews],
@@ -108,8 +131,9 @@ export default function DeliverableReviewsPage() {
       cell: (row) => (
         <RowActions
           actions={[
-            { label: 'Preview file', onSelect: () => toast.success('Opening file preview...') },
+            { label: 'Preview file', onSelect: () => setPreviewTarget(row) },
             { label: row.status === 'approved' ? 'View review' : 'Review deliverable', onSelect: () => setActive(row) },
+            { label: 'Override due date', onSelect: () => setDueDateTarget(row) },
           ]}
         />
       ),
@@ -124,7 +148,7 @@ export default function DeliverableReviewsPage() {
           onClick={() => setActive(row)}
           className="block min-w-[230px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
         >
-          <span className="block font-semibold text-ink">{row.deliverable}</span>
+          <span className="block font-semibold text-ink transition-colors group-hover:text-bid">{row.deliverable}</span>
           <span className="mt-1 block text-sm text-ink-muted">{row.fileName}</span>
           {row.latestFeedback && (
             <span className="mt-1 block text-sm text-ink-muted">
@@ -165,7 +189,11 @@ export default function DeliverableReviewsPage() {
         return (
           <div>
             <div>{formatDate(row.dueAt)}</div>
-            {isLate && <div className="text-sm font-medium text-danger">Late</div>}
+            <div className="mt-1 line-clamp-1 text-sm text-ink-muted">
+              {row.dueSource === 'manual-override' ? 'Manual override' : 'Programme rule'}
+            </div>
+            <div className="mt-1 line-clamp-1 text-xs text-ink-faint">{row.dueRule}</div>
+            {isLate && <div className="mt-1 text-sm font-medium text-danger">Late</div>}
           </div>
         );
       },
@@ -196,6 +224,7 @@ export default function DeliverableReviewsPage() {
         <StatCard label="Pending review" value={pending} dotColor="warning" />
         <StatCard label="Changes required" value={changes} dotColor="info" />
         <StatCard label="Overdue review" value={overdue} dotColor="bid" />
+        <StatCard label="Approved" value={approved} dotColor="success" />
       </MetricGrid>
 
       <Card className="mt-4">
@@ -226,15 +255,17 @@ export default function DeliverableReviewsPage() {
                 <option key={value} value={value}>{meta.label}</option>
               ))}
             </TableFilterSelect>
-            <TableFilterSelect
+            <TableFilterAutocomplete
               value={programmeFilter}
-              onChange={(event) => setProgrammeFilter(event.target.value)}
-            >
-              <option value="all">All programmes</option>
-              {programmeOptions.map((programme) => (
-                <option key={programme} value={programme}>{programme}</option>
-              ))}
-            </TableFilterSelect>
+              onValueChange={setProgrammeFilter}
+              options={[
+                { value: 'all', label: 'All programmes' },
+                ...programmeOptions.map((programme) => ({ value: programme, label: programme })),
+              ]}
+              placeholder="All programmes"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No programme found."
+            />
           </div>
         </TableToolbar>
         <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} />
@@ -262,7 +293,58 @@ export default function DeliverableReviewsPage() {
           setActive(null);
         }}
       />
+      <FilePreviewModal
+        review={previewTarget}
+        onClose={() => setPreviewTarget(null)}
+      />
+      <UpdateDeliverableDueDateModal
+        review={dueDateTarget}
+        onClose={() => setDueDateTarget(null)}
+        onSave={updateDueDate}
+      />
     </>
+  );
+}
+
+function FilePreviewModal({
+  review,
+  onClose,
+}: {
+  review: DeliverableReview | null;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      open={!!review}
+      onOpenChange={(open) => !open && onClose()}
+      title={review ? `Preview ${review.fileName}` : 'Preview file'}
+      width="wide"
+    >
+      {review && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-line bg-surface px-4 py-4">
+            <div className="font-semibold text-ink">{review.fileName}</div>
+            <div className="mt-1 text-sm text-ink-muted">
+              {review.businessName} · {review.deliverable}
+            </div>
+            <div className="mt-1 text-sm text-ink-muted">
+              Submitted {formatDate(review.submittedAt)}
+            </div>
+          </div>
+          <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-line bg-surface-subtle p-6 text-center">
+            <div>
+              <div className="text-sm font-semibold text-ink">File preview area</div>
+              <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
+                When storage is connected, this panel will render the submitted file preview or secure download.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" onClick={onClose}>Close preview</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -305,7 +387,7 @@ function ReviewModal({
               Submitted by {review.businessName} for {review.programme}
             </div>
             <div className="mt-1 text-sm text-ink-muted">
-              Submitted {formatDate(review.submittedAt)} · Due {formatDate(review.dueAt)}
+              Submitted {formatDate(review.submittedAt)} · Due {formatDate(review.dueAt)} · Source: {review.dueSource === 'manual-override' ? 'manual override' : 'programme rule'}
             </div>
           </div>
           {review.latestFeedback && (

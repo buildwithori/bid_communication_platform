@@ -22,7 +22,7 @@ import { newSectorSchema, type NewSectorForm } from '@/lib/forms/schemas';
 import type { Sector } from '@/types';
 
 export default function AdminSectorsPage() {
-  const { sectors, addSector, updateSector, removeSector } = useAdminStore();
+  const { sectors, addSector, updateSector } = useAdminStore();
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
@@ -54,8 +54,6 @@ export default function AdminSectorsPage() {
         <RowActions
           actions={[
             { label: 'Rename sector', onSelect: () => setActiveSector(sector) },
-            'separator',
-            { label: 'Remove sector', destructive: true, onSelect: () => removeSector(sector.id) },
           ]}
         />
       ),
@@ -72,15 +70,6 @@ export default function AdminSectorsPage() {
       header: 'Key',
       cell: (sector) => <span className="font-mono text-xs text-ink-muted">{sector.id}</span>,
       className: 'w-[220px]',
-    },
-    {
-      key: 'usage',
-      header: 'Used for',
-      cell: () => (
-        <span className="text-sm text-ink-muted">
-          Entrepreneur profiles, trainer specialisms, filters, and reporting.
-        </span>
-      ),
     },
   ];
 

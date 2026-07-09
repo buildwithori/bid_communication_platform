@@ -7,7 +7,6 @@ import {
   FormField,
   FormAutocomplete,
   FormInput,
-  FormSelect,
   FormRow2,
 } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
@@ -16,11 +15,15 @@ import {
   type EntrepreneurForm,
 } from '@/lib/forms/schemas';
 import { useAdminStore } from '@/lib/stores/admin-store';
-import { sectors } from '@/lib/mock-data/definitions';
+import { countries, programmeGoalTypes, sectors, stages } from '@/lib/mock-data/definitions';
+import { getAssignedProgrammes } from '@/lib/programme-access';
 import type { Entrepreneur } from '@/types';
 
-const programmeOptions = (ids: string[]) => ids;
-const trainerOptions = ['none', 't-kofi', 't-esi', 't-james'];
+const activeGoalTypes = programmeGoalTypes.filter((goalType) => goalType.active);
+
+function goalTypeRequiresTarget(value: string) {
+  return programmeGoalTypes.find((goalType) => goalType.id === value)?.requiresTargetAmount ?? false;
+}
 
 export function EntrepreneurModal({
   open,
@@ -33,7 +36,8 @@ export function EntrepreneurModal({
   mode?: 'add' | 'edit';
   entrepreneur?: Entrepreneur;
 }) {
-  const { addEntrepreneur, updateEntrepreneur, programs, trainers } = useAdminStore();
+  const { addEntrepreneur, updateEntrepreneur, programs } = useAdminStore();
+  const assignableProgrammes = getAssignedProgrammes(programs);
 
   const isEdit = mode === 'edit' && entrepreneur;
 
@@ -47,10 +51,9 @@ export function EntrepreneurModal({
       country: entrepreneur?.country ?? 'Ghana',
       sector: entrepreneur?.sector ?? 'fintech',
       stage: entrepreneur?.stage ?? 'idea',
-      goalType: entrepreneur?.goal.type ?? 'fundraising',
+      goalType: entrepreneur?.goal.type ?? activeGoalTypes[0]?.id ?? '',
       goalAmountUsd: entrepreneur?.goal.amountUsd ? String(entrepreneur.goal.amountUsd) : '',
-      programmeId: entrepreneur?.programmeId ?? 'none',
-      trainerId: entrepreneur?.trainerId ?? 'none',
+      programmeId: entrepreneur?.programmeId ?? '',
     },
   });
 
@@ -66,13 +69,6 @@ export function EntrepreneurModal({
         country: values.country,
         sector: values.sector as Entrepreneur['sector'],
         stage: values.stage,
-        goal: {
-          type: values.goalType,
-          amountUsd: values.goalAmountUsd ? Number(values.goalAmountUsd) : undefined,
-          description: entrepreneur.goal.description,
-        },
-        programmeId: values.programmeId && values.programmeId !== 'none' ? values.programmeId : undefined,
-        trainerId: values.trainerId && values.trainerId !== 'none' ? values.trainerId : undefined,
       });
     } else {
       addEntrepreneur(values);
@@ -86,7 +82,7 @@ export function EntrepreneurModal({
       open={open}
       onOpenChange={onOpenChange}
       title={mode === 'edit' ? 'Edit entrepreneur' : 'Add entrepreneur'}
-      width="md"
+      width="wide"
     >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Business name" error={form.formState.errors.businessName?.message}>
@@ -105,83 +101,80 @@ export function EntrepreneurModal({
             <FormInput placeholder="+233 24 555 0000" {...form.register('phone')} />
           </FormField>
           <FormField label="Country">
-            <FormSelect
+            <FormAutocomplete
               value={form.watch('country')}
-              onValueChange={(v) => form.setValue('country', v as 'Ghana' | 'Nigeria' | 'Kenya')}
-              options={[
-                { value: 'Ghana', label: 'Ghana' },
-                { value: 'Nigeria', label: 'Nigeria' },
-                { value: 'Kenya', label: 'Kenya' },
-              ]}
+              onValueChange={(v) => form.setValue('country', v as EntrepreneurForm['country'])}
+              options={countries.map((country) => ({ value: country, label: country }))}
+              placeholder="Select country"
+              searchPlaceholder="Search countries..."
+              emptyMessage="No country found."
             />
           </FormField>
         </FormRow2>
         <FormRow2>
           <FormField label="Sector">
-            <FormSelect
+            <FormAutocomplete
               value={form.watch('sector')}
               onValueChange={(v) => form.setValue('sector', v)}
               options={sectors.map((s) => ({ value: s.id, label: s.label }))}
+              placeholder="Select sector"
+              searchPlaceholder="Search sectors..."
+              emptyMessage="No sector found."
             />
           </FormField>
           <FormField label="Stage">
-            <FormSelect
+            <FormAutocomplete
               value={form.watch('stage')}
-              onValueChange={(v) => form.setValue('stage', v as 'idea' | 'growth' | 'scale')}
-              options={[
-                { value: 'idea', label: 'Idea' },
-                { value: 'growth', label: 'Growth' },
-                { value: 'scale', label: 'Scale' },
-              ]}
+              onValueChange={(v) => form.setValue('stage', v)}
+              options={stages.map((stage) => ({
+                value: stage.id,
+                label: stage.label,
+                description: stage.definition,
+              }))}
+              placeholder="Select stage"
+              searchPlaceholder="Search stages..."
+              emptyMessage="No stage found."
             />
           </FormField>
         </FormRow2>
-        <FormField label="Current need / goal">
-          <FormSelect
-            value={form.watch('goalType')}
-            onValueChange={(v) => form.setValue('goalType', v as 'fundraising' | 'programme-completion' | 'milestone')}
-            options={[
-              { value: 'fundraising', label: 'Fundraising' },
-              { value: 'programme-completion', label: 'Programme completion' },
-              { value: 'milestone', label: 'Milestone completion' },
-            ]}
-          />
-        </FormField>
-        {goalType === 'fundraising' && (
-          <FormField label="Amount to raise (USD)">
-            <FormInput placeholder="e.g. 500000" {...form.register('goalAmountUsd')} />
+        {!isEdit && (
+          <>
+            <FormField label="Primary goal type">
+              <FormAutocomplete
+                value={form.watch('goalType')}
+                onValueChange={(v) => form.setValue('goalType', v, { shouldValidate: true })}
+                options={activeGoalTypes.map((goalTypeOption) => ({
+                  value: goalTypeOption.id,
+                  label: goalTypeOption.label,
+                  description: goalTypeOption.description,
+                }))}
+                placeholder="Select goal type"
+                searchPlaceholder="Search goal types..."
+                emptyMessage="No goal type found."
+              />
+            </FormField>
+            {goalTypeRequiresTarget(goalType) && (
+              <FormField label="Amount to raise (USD)">
+                <FormInput placeholder="e.g. 500000" {...form.register('goalAmountUsd')} />
+              </FormField>
+            )}
+          </>
+        )}
+        {!isEdit && (
+          <FormField label="Initial programme" optional>
+            <FormAutocomplete
+              value={form.watch('programmeId') ?? ''}
+              onValueChange={(v) => form.setValue('programmeId', v)}
+              options={assignableProgrammes.map((p) => ({ value: p.id, label: p.name }))}
+              placeholder="Select programme"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No programme found."
+            />
+            <p className="mt-1.5 text-xs leading-5 text-ink-muted">
+              Choose the first programme this entrepreneur should start with.
+            </p>
           </FormField>
         )}
-        <FormRow2>
-          <FormField label="Programme" optional>
-            <FormAutocomplete
-              value={form.watch('programmeId') ?? 'none'}
-              onValueChange={(v) => form.setValue('programmeId', v)}
-              options={[
-                { value: 'none', label: 'Leave unassigned' },
-                ...programs.map((p) => ({ value: p.id, label: p.name })),
-              ]}
-              placeholder="Search programme"
-              searchPlaceholder="Search programmes..."
-            />
-          </FormField>
-          <FormField label="Trainer" optional>
-            <FormAutocomplete
-              value={form.watch('trainerId') ?? 'none'}
-              onValueChange={(v) => form.setValue('trainerId', v)}
-              options={[
-                { value: 'none', label: 'Unassigned' },
-                ...trainers.map((t) => ({
-                  value: t.id,
-                  label: t.fullName,
-                  description: `${t.role} · ${t.metrics.entrepreneursCount} assigned`,
-                })),
-              ]}
-              placeholder="Search trainer"
-              searchPlaceholder="Search trainers..."
-            />
-          </FormField>
-        </FormRow2>
         <Button type="submit" className="mt-1 w-full">
           {mode === 'edit' ? 'Save changes' : 'Add entrepreneur'}
         </Button>

@@ -14,13 +14,16 @@ import { FormField, FormTextarea } from '@/components/shared/FormField';
 import {
   DataTable,
   RowActions,
+  TableFilterAutocomplete,
   TableFilterInput,
   TableFilterSelect,
   TablePagination,
   TableToolbar,
   type Column,
+  type RowAction,
 } from '@/components/shared/DataTable';
 import { routes } from '@/lib/routes';
+import { toolAreaOptions } from '@/lib/tool-areas';
 import {
   toolRequests,
   toolRequestStatusMeta,
@@ -43,6 +46,7 @@ export default function AdminToolRequestsPage() {
   const [requests, setRequests] = useState<ToolRequest[]>(toolRequests);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ToolRequestStatus>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -68,6 +72,66 @@ export default function AdminToolRequestsPage() {
     setActiveId(null);
   };
 
+  const getRowActions = (request: ToolRequest): Array<RowAction | 'separator'> => {
+    const actions: Array<RowAction | 'separator'> = [
+      { label: 'View request', onSelect: () => openRequest(request) },
+    ];
+
+    if (request.status === 'under-review') {
+      actions.push(
+        'separator',
+        {
+          label: 'Approve for development',
+          onSelect: () =>
+            updateRequest(request.id, { status: 'in-development' }, 'Tool request approved for development'),
+        },
+        {
+          label: 'Decline request',
+          destructive: true,
+          onSelect: () =>
+            updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
+        },
+      );
+    }
+
+    if (request.status === 'in-development') {
+      actions.push(
+        'separator',
+        {
+          label: 'Mark as built',
+          onSelect: () =>
+            updateRequest(request.id, { status: 'built' }, 'Tool marked as built and ready for the library'),
+        },
+        {
+          label: 'Decline request',
+          destructive: true,
+          onSelect: () =>
+            updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
+        },
+      );
+    }
+
+    if (request.status === 'built') {
+      actions.push(
+        'separator',
+        { label: 'View in library', onSelect: () => router.push(routes.admin.content) },
+      );
+    }
+
+    if (request.status === 'declined') {
+      actions.push(
+        'separator',
+        {
+          label: 'Reopen review',
+          onSelect: () =>
+            updateRequest(request.id, { status: 'under-review' }, 'Tool request reopened for review'),
+        },
+      );
+    }
+
+    return actions;
+  };
+
   const filteredRequests = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return requests.filter((request) => {
@@ -86,9 +150,10 @@ export default function AdminToolRequestsPage() {
           .toLowerCase()
           .includes(needle);
       const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-      return matchesQuery && matchesStatus;
+      const matchesCategory = categoryFilter === 'all' || request.category === categoryFilter;
+      return matchesQuery && matchesStatus && matchesCategory;
     });
-  }, [query, requests, statusFilter]);
+  }, [categoryFilter, query, requests, statusFilter]);
 
   const pageRows = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -105,14 +170,7 @@ export default function AdminToolRequestsPage() {
       key: 'actions',
       header: 'Action',
       cell: (request) => (
-        <RowActions
-          actions={[
-            { label: 'View request', onSelect: () => openRequest(request) },
-            ...(request.status === 'built'
-              ? [{ label: 'View in library', onSelect: () => router.push(routes.admin.content) }]
-              : []),
-          ]}
-        />
+        <RowActions actions={getRowActions(request)} />
       ),
       className: 'w-[84px]',
     },
@@ -199,7 +257,7 @@ export default function AdminToolRequestsPage() {
               Search by business, requester, programme, tool area, or business need.
             </div>
           </div>
-          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[280px_190px]">
+          <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[280px_190px_190px]">
             <TableFilterInput
               icon
               placeholder="Search requests..."
@@ -221,6 +279,17 @@ export default function AdminToolRequestsPage() {
                 <option key={value} value={value}>{meta.label}</option>
               ))}
             </TableFilterSelect>
+            <TableFilterAutocomplete
+              value={categoryFilter}
+              onValueChange={(value) => {
+                setCategoryFilter(value);
+                setPage(1);
+              }}
+              options={[{ value: 'all', label: 'All tool areas' }, ...toolAreaOptions]}
+              placeholder="All tool areas"
+              searchPlaceholder="Search tool areas..."
+              emptyMessage="No tool area found."
+            />
           </div>
         </TableToolbar>
         <DataTable
@@ -320,13 +389,13 @@ function ToolRequestReviewModal({
             <Button type="button" variant="outline" onClick={onClose}>Close</Button>
             {request.status === 'under-review' && (
               <>
-                <Button type="button" variant="outline" onClick={onDecline}>Decline</Button>
+                <Button type="button" variant="destructive" onClick={onDecline}>Decline</Button>
                 <Button type="button" onClick={onMoveToDevelopment}>Approve for development</Button>
               </>
             )}
             {request.status === 'in-development' && (
               <>
-                <Button type="button" variant="outline" onClick={onDecline}>Decline</Button>
+                <Button type="button" variant="destructive" onClick={onDecline}>Decline</Button>
                 <Button type="button" onClick={onMarkBuilt}>Mark as built</Button>
               </>
             )}

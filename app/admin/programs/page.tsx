@@ -1,8 +1,23 @@
 'use client';
 
 import * as React from 'react';
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
@@ -15,6 +30,7 @@ import {
   CalendarDays,
   CheckCircle2,
   FileText,
+  GripVertical,
   Layers3,
   PlayCircle,
   Users,
@@ -22,10 +38,12 @@ import {
 } from 'lucide-react';
 import { ProgramModal } from '@/components/admin/ProgramModal';
 import { ModuleModal } from '@/components/admin/ModuleModal';
-import { ReuseModuleModal } from '@/components/admin/ReuseModuleModal';
 import { ManageContentModal, AddContentItemModal } from '@/components/admin/ManageContentModal';
+import { ModuleDetailModal } from '@/components/admin/programmes/ModuleDetailModal';
+import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
+import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormInput, FormSelect } from '@/components/shared/FormField';
+import { FormAutocomplete, FormField, FormInput, FormSelect } from '@/components/shared/FormField';
 import { Notice } from '@/components/shared/PageHeader';
 import {
   DataTable,
@@ -34,13 +52,25 @@ import {
   TableFilterSelect,
   TablePagination,
   TableToolbar,
+  useSortableRow,
   type Column,
 } from '@/components/shared/DataTable';
 import { useAdminStore } from '@/lib/stores/admin-store';
+import { routes } from '@/lib/routes';
+import {
+  archiveProgrammePatch,
+  completeProgrammePatch,
+  publishProgrammePatch,
+  reopenProgrammePatch,
+  restoreProgrammePatch,
+  unpublishProgrammePatch,
+} from '@/lib/programme-lifecycle';
+import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
 import { contentItems } from '@/lib/mock-data/programs';
+import { stages } from '@/lib/mock-data/definitions';
 import { requiredDeliverableSchema, type RequiredDeliverableForm } from '@/lib/forms/schemas';
 import { toast } from 'sonner';
-import type { ContentItem, Module, Program } from '@/types';
+import type { ContentItem, Module, Program, ProgramStatus } from '@/types';
 
 interface RequiredDeliverable {
   id: string;
@@ -51,6 +81,14 @@ interface RequiredDeliverable {
 }
 
 function RequiredDeliverablesSection({ programName }: { programName: string }) {
+  const requiredForOptions = [
+    { value: 'All entrepreneurs in this programme', label: 'All entrepreneurs in this programme' },
+    ...stages.map((stage) => ({
+      value: `${stage.label} stage only`,
+      label: `${stage.label} stage only`,
+      description: stage.definition,
+    })),
+  ];
   const [rows, setRows] = React.useState<RequiredDeliverable[]>([
     { id: 'rd1', name: 'Business Model Canvas', due: 'After Module 2', requiredFor: 'All entrepreneurs', submitted: '14 / 18' },
     { id: 'rd2', name: 'Financial Statements (quarterly)', due: 'Recurring', requiredFor: 'All entrepreneurs', submitted: '11 / 18' },
@@ -209,14 +247,13 @@ function RequiredDeliverablesSection({ programName }: { programName: string }) {
             />
           </FormField>
           <FormField label="Required for" error={addForm.formState.errors.requiredFor?.message}>
-            <FormSelect
+            <FormAutocomplete
               value={addForm.watch('requiredFor')}
               onValueChange={(value) => addForm.setValue('requiredFor', value, { shouldValidate: true })}
-              options={[
-                { value: 'All entrepreneurs in this programme', label: 'All entrepreneurs in this programme' },
-                { value: 'Growth & Scale stage only', label: 'Growth & Scale stage only' },
-                { value: 'Idea stage only', label: 'Idea stage only' },
-              ]}
+              options={requiredForOptions}
+              placeholder="Select who must submit"
+              searchPlaceholder="Search stage rules..."
+              emptyMessage="No stage rule found."
             />
           </FormField>
           <Notice>
@@ -255,7 +292,14 @@ function RequiredDeliverablesSection({ programName }: { programName: string }) {
             <FormInput {...editForm.register('due')} />
           </FormField>
           <FormField label="Required for" error={editForm.formState.errors.requiredFor?.message}>
-            <FormInput {...editForm.register('requiredFor')} />
+            <FormAutocomplete
+              value={editForm.watch('requiredFor')}
+              onValueChange={(value) => editForm.setValue('requiredFor', value, { shouldValidate: true })}
+              options={requiredForOptions}
+              placeholder="Select who must submit"
+              searchPlaceholder="Search stage rules..."
+              emptyMessage="No stage rule found."
+            />
           </FormField>
           <Button type="submit" className="w-full">
             Save deliverable
@@ -267,17 +311,23 @@ function RequiredDeliverablesSection({ programName }: { programName: string }) {
 }
 
 export default function AdminProgramsPage() {
-  const { programs, modules } = useAdminStore();
+  const { programs, modules, updateProgram, reorderProgramModule, moveProgramModule, moveProgramModuleToPosition } = useAdminStore();
+  const router = useRouter();
   const [selectedProgram, setSelectedProgram] = React.useState<Program | null>(programs[0] ?? null);
+  const [workspaceOpen, setWorkspaceOpen] = React.useState(false);
   const [workspaceTab, setWorkspaceTab] = React.useState<'curriculum' | 'deliverables' | 'readiness'>('curriculum');
   const [addProgramOpen, setAddProgramOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<Program | null>(null);
   const [moduleOpen, setModuleOpen] = React.useState(false);
-  const [reuseOpen, setReuseOpen] = React.useState(false);
+  const [viewModule, setViewModule] = React.useState<Module | null>(null);
   const [manageContentModule, setManageContentModule] = React.useState<Module | null>(null);
+  const [addContentModule, setAddContentModule] = React.useState<Module | null>(null);
   const [addContentOpen, setAddContentOpen] = React.useState(false);
+  const [archiveTarget, setArchiveTarget] = React.useState<Program | null>(null);
+  const [movePositionModule, setMovePositionModule] = React.useState<Module | null>(null);
   const [programQuery, setProgramQuery] = React.useState('');
-  const [programStatus, setProgramStatus] = React.useState<'all' | Program['status']>('all');
+  const [programStatus, setProgramStatus] = React.useState<'current' | 'all' | ProgramStatus>('current');
+  const [programAccess, setProgramAccess] = React.useState<'all' | Program['accessType']>('all');
   const [programPage, setProgramPage] = React.useState(1);
   const [programPageSize, setProgramPageSize] = React.useState(8);
   const [moduleQuery, setModuleQuery] = React.useState('');
@@ -285,49 +335,66 @@ export default function AdminProgramsPage() {
   const [modulePageSize, setModulePageSize] = React.useState(6);
 
   React.useEffect(() => {
-    if (!selectedProgram && programs.length > 0) {
-      setSelectedProgram(programs[0]);
-    }
-  }, [programs, selectedProgram]);
+    setSelectedProgram((current) => {
+      if (!current) return programs[0] ?? null;
+      return programs.find((program) => program.id === current.id) ?? programs[0] ?? null;
+    });
+  }, [programs]);
+
+  const openAddContent = React.useCallback((module: Module) => {
+    setViewModule(null);
+    setManageContentModule(null);
+    setAddContentModule(module);
+    setAddContentOpen(true);
+  }, []);
+
+  const openManageContent = React.useCallback((module: Module) => {
+    setViewModule(null);
+    setManageContentModule(module);
+  }, []);
 
   const filteredPrograms = React.useMemo(() => {
     const needle = programQuery.trim().toLowerCase();
     return programs.filter((program) => {
-      const matchesStatus = programStatus === 'all' || program.status === programStatus;
+      const derivedStatus = getProgrammeStatus(program);
+      const matchesStatus =
+        programStatus === 'current'
+          ? derivedStatus !== 'archived'
+          : programStatus === 'all' || derivedStatus === programStatus;
+      const matchesAccess = programAccess === 'all' || program.accessType === programAccess;
       const matchesQuery =
         !needle ||
         [
           program.name,
           program.description ?? '',
-          program.status,
+          getProgrammeStatusLabel(derivedStatus),
+          program.accessType,
           String(program.entrepreneursCount),
           String(program.moduleIds.length),
         ]
           .join(' ')
           .toLowerCase()
           .includes(needle);
-      return matchesStatus && matchesQuery;
+      return matchesStatus && matchesAccess && matchesQuery;
     });
-  }, [programQuery, programStatus, programs]);
+  }, [programAccess, programQuery, programStatus, programs]);
 
   React.useEffect(() => {
     setProgramPage(1);
-  }, [programQuery, programStatus, programPageSize]);
+  }, [programAccess, programQuery, programStatus, programPageSize]);
 
   const programPageRows = React.useMemo(() => {
     const start = (programPage - 1) * programPageSize;
     return filteredPrograms.slice(start, start + programPageSize);
   }, [filteredPrograms, programPage, programPageSize]);
 
-  const programModules = React.useMemo(
-    () =>
-      selectedProgram
-        ? modules
-            .filter((module) => selectedProgram.moduleIds.includes(module.id))
-            .sort((a, b) => a.order - b.order)
-        : [],
-    [modules, selectedProgram],
-  );
+  const programModules = React.useMemo(() => {
+    if (!selectedProgram) return [];
+    const moduleById = new Map(modules.map((module) => [module.id, module]));
+    return selectedProgram.moduleIds
+      .map((moduleId) => moduleById.get(moduleId))
+      .filter((module): module is Module => Boolean(module));
+  }, [modules, selectedProgram]);
   const filteredProgramModules = React.useMemo(() => {
     const needle = moduleQuery.trim().toLowerCase();
     if (!needle) return programModules;
@@ -338,7 +405,7 @@ export default function AdminProgramsPage() {
       return [
         module.title,
         module.description ?? '',
-        String(module.order),
+        String(programModules.findIndex((item) => item.id === module.id) + 1),
         ...attachedItems.map((item) => `${item.title} ${item.type} ${item.durationLabel ?? ''}`),
       ]
         .join(' ')
@@ -353,6 +420,11 @@ export default function AdminProgramsPage() {
     const start = (modulePage - 1) * modulePageSize;
     return filteredProgramModules.slice(start, start + modulePageSize);
   }, [filteredProgramModules, modulePage, modulePageSize]);
+  const modulePageRowIds = React.useMemo(() => modulePageRows.map((module) => module.id), [modulePageRows]);
+  const moduleReorderSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const selectedContentItems = programModules.flatMap((module) =>
     module.contentItemIds
       .map((contentId) => contentItems.find((item) => item.id === contentId))
@@ -366,13 +438,113 @@ export default function AdminProgramsPage() {
   const capacityPercentage = selectedProgram
     ? Math.round((selectedProgram.entrepreneursCount / Math.max(selectedProgram.maxEntrepreneurs, 1)) * 100)
     : 0;
-  const activePrograms = programs.filter((program) => program.status === 'active').length;
+  const activePrograms = programs.filter((program) => getProgrammeStatus(program) === 'active').length;
   const totalEntrepreneurs = programs.reduce((sum, program) => sum + program.entrepreneursCount, 0);
   const totalModules = programs.reduce((sum, program) => sum + program.moduleIds.length, 0);
   const avgProgress = Math.round(programs.reduce((sum, program) => sum + program.progress, 0) / Math.max(programs.length, 1));
   const readinessScore = programModules.length
     ? Math.round(((programModules.length - modulesWithoutContent.length) / programModules.length) * 100)
     : 0;
+  const readinessNeedsAttention = modulesWithoutContent.length > 0;
+  const capacityNeedsAttention = selectedProgram ? capacityPercentage >= 90 : false;
+  const canReorderModules = Boolean(
+    selectedProgram && getProgrammeStatus(selectedProgram) !== 'archived' && moduleQuery.trim().length === 0,
+  );
+
+  const handleModuleDragEnd = React.useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!selectedProgram || !canReorderModules || !over || active.id === over.id) return;
+    reorderProgramModule(selectedProgram.id, String(active.id), String(over.id));
+  }, [canReorderModules, reorderProgramModule, selectedProgram]);
+
+  const openProgrammeWorkspace = React.useCallback(
+    (program: Program) => {
+      router.push(routes.admin.program(program.id));
+    },
+    [router],
+  );
+
+  const getProgramRowActions = React.useCallback(
+    (program: Program) => {
+      const status = getProgrammeStatus(program);
+      return [
+        {
+          label: 'Open workspace',
+          onSelect: () => openProgrammeWorkspace(program),
+        },
+        ...(status !== 'archived'
+          ? [
+              {
+                label: 'Edit programme',
+                onSelect: () => setEditTarget(program),
+              },
+            ]
+          : []),
+        'separator' as const,
+        ...(status === 'draft'
+          ? [
+              {
+                label: 'Publish programme',
+                onSelect: () => updateProgram(program.id, publishProgrammePatch()),
+              },
+              {
+                label: 'Archive programme',
+                destructive: true,
+                onSelect: () => setArchiveTarget(program),
+              },
+            ]
+          : []),
+        ...(status === 'scheduled'
+          ? [
+              {
+                label: 'Unpublish programme',
+                onSelect: () => updateProgram(program.id, unpublishProgrammePatch()),
+              },
+              {
+                label: 'Archive programme',
+                destructive: true,
+                onSelect: () => setArchiveTarget(program),
+              },
+            ]
+          : []),
+        ...(status === 'active'
+          ? [
+              {
+                label: 'Complete programme',
+                onSelect: () => updateProgram(program.id, completeProgrammePatch()),
+              },
+              {
+                label: 'End and archive',
+                destructive: true,
+                onSelect: () => setArchiveTarget(program),
+              },
+            ]
+          : []),
+        ...(status === 'completed'
+          ? [
+              {
+                label: 'Reopen programme',
+                onSelect: () => updateProgram(program.id, reopenProgrammePatch(program)),
+              },
+              {
+                label: 'Archive programme',
+                destructive: true,
+                onSelect: () => setArchiveTarget(program),
+              },
+            ]
+          : []),
+        ...(status === 'archived'
+          ? [
+              {
+                label: 'Restore programme',
+                onSelect: () => updateProgram(program.id, restoreProgrammePatch()),
+              },
+            ]
+          : []),
+      ];
+    },
+    [openProgrammeWorkspace, updateProgram],
+  );
 
   const programColumns = React.useMemo<Column<Program>[]>(
     () => [
@@ -380,30 +552,7 @@ export default function AdminProgramsPage() {
         key: 'actions',
         header: 'Action',
         cell: (program) => (
-          <RowActions
-            actions={[
-              {
-                label: 'Open workspace',
-                onSelect: () => {
-                  setSelectedProgram(program);
-                  setWorkspaceTab('curriculum');
-                },
-              },
-              {
-                label: 'Edit programme',
-                onSelect: () => setEditTarget(program),
-              },
-              'separator',
-              {
-                label: 'Add module',
-                onSelect: () => {
-                  setSelectedProgram(program);
-                  setWorkspaceTab('curriculum');
-                  setModuleOpen(true);
-                },
-              },
-            ]}
-          />
+          <RowActions actions={getProgramRowActions(program)} />
         ),
         className: 'w-[84px]',
       },
@@ -413,13 +562,10 @@ export default function AdminProgramsPage() {
         cell: (program) => (
           <button
             type="button"
-            onClick={() => {
-              setSelectedProgram(program);
-              setWorkspaceTab('curriculum');
-            }}
-            className="block max-w-[340px] text-left"
+            onClick={() => openProgrammeWorkspace(program)}
+            className="block max-w-[340px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
           >
-            <span className="block text-sm font-semibold text-ink">{program.name}</span>
+            <span className="block text-sm font-semibold text-ink transition-colors group-hover:text-bid">{program.name}</span>
             <span className="mt-1 block line-clamp-2 text-xs leading-5 text-ink-muted">
               {program.description}
             </span>
@@ -430,12 +576,24 @@ export default function AdminProgramsPage() {
       {
         key: 'status',
         header: 'Status',
-        cell: (program) => <StatusBadge status={program.status} />,
+        cell: (program) => <StatusBadge program={program} />,
+      },
+      {
+        key: 'access',
+        header: 'Access',
+        cell: (program) => (
+          <Badge tone={program.accessType === 'free' ? 'blue' : 'brand'}>
+            {program.accessType === 'free' ? 'Free' : 'Assigned'}
+          </Badge>
+        ),
       },
       {
         key: 'enrollment',
         header: 'Enrollment',
         cell: (program) => {
+          if (program.accessType === 'free') {
+            return <span className="text-sm text-ink-muted">Available to all entrepreneurs</span>;
+          }
           const percentage = Math.round((program.entrepreneursCount / Math.max(program.maxEntrepreneurs, 1)) * 100);
           return (
             <div className="min-w-[150px]">
@@ -483,48 +641,70 @@ export default function AdminProgramsPage() {
         ),
       },
     ],
-    [modules],
+    [getProgramRowActions, modules, openProgrammeWorkspace],
   );
 
   const moduleColumns = React.useMemo<Column<Module>[]>(
     () => [
       {
-        key: 'actions',
-        header: 'Action',
-        cell: (module) => (
-          <RowActions
-            actions={[
-              {
-                label: 'Manage content',
-                onSelect: () => setManageContentModule(module),
-              },
-              {
-                label: 'Add content item',
-                onSelect: () => {
-                  setManageContentModule(module);
-                  setAddContentOpen(true);
-                },
-              },
-            ]}
-          />
-        ),
-        className: 'w-[84px]',
+        key: 'reorder',
+        header: 'Reorder',
+        cell: (module) => {
+          const modulePosition = programModules.findIndex((item) => item.id === module.id) + 1;
+          return <ModuleReorderHandle module={module} position={modulePosition} />;
+        },
+        className: 'min-w-[132px]',
       },
       {
-        key: 'order',
-        header: 'Order',
-        cell: (module) => (
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface-subtle text-xs font-semibold text-ink-muted">
-            {module.order}
-          </span>
-        ),
+        key: 'actions',
+        header: 'Action',
+        cell: (module) => {
+          const moduleIndex = programModules.findIndex((item) => item.id === module.id);
+          return (
+            <RowActions
+              actions={[
+                {
+                  label: 'Manage content',
+                  onSelect: () => openManageContent(module),
+                },
+                {
+                  label: 'Add content item',
+                  onSelect: () => openAddContent(module),
+                },
+                'separator',
+                {
+                  label: 'Move to position',
+                  disabled: !selectedProgram || getProgrammeStatus(selectedProgram) === 'archived',
+                  onSelect: () => setMovePositionModule(module),
+                },
+                {
+                  label: 'Move up',
+                  disabled: !selectedProgram || !canReorderModules || moduleIndex <= 0,
+                  onSelect: () => selectedProgram && moveProgramModule(selectedProgram.id, module.id, 'up'),
+                },
+                {
+                  label: 'Move down',
+                  disabled: !selectedProgram || !canReorderModules || moduleIndex < 0 || moduleIndex >= programModules.length - 1,
+                  onSelect: () => selectedProgram && moveProgramModule(selectedProgram.id, module.id, 'down'),
+                },
+              ]}
+            />
+          );
+        },
+        className: 'w-[84px]',
       },
       {
         key: 'module',
         header: 'Module',
         cell: (module) => (
           <div className="max-w-[420px]">
-            <div className="font-semibold text-ink">{module.title}</div>
+            <button
+              type="button"
+              onClick={() => setViewModule(module)}
+              className="block rounded-md text-left font-semibold text-ink transition-colors hover:text-bid focus:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+            >
+              {module.title}
+            </button>
             {module.description && (
               <div className="mt-1 line-clamp-2 text-xs leading-5 text-ink-muted">{module.description}</div>
             )}
@@ -559,8 +739,9 @@ export default function AdminProgramsPage() {
           ),
       },
     ],
-    [],
+    [canReorderModules, moveProgramModule, openAddContent, openManageContent, programModules, selectedProgram],
   );
+
 
   return (
     <>
@@ -581,7 +762,6 @@ export default function AdminProgramsPage() {
         <CardHeader
           title="Programme directory"
           description="Search, filter, and open the programme workspace from one scalable list."
-          actions={<Button size="sm" onClick={() => setAddProgramOpen(true)}>New programme</Button>}
         />
         <TableToolbar>
           <div>
@@ -590,7 +770,7 @@ export default function AdminProgramsPage() {
               {filteredPrograms.length} of {programs.length} programmes shown
             </div>
           </div>
-          <div className="grid w-full gap-2 sm:w-auto sm:min-w-[460px] sm:grid-cols-[1fr_160px]">
+          <div className="grid w-full gap-2 lg:w-[720px] lg:grid-cols-[minmax(220px,1fr)_160px_170px]">
             <TableFilterInput
               icon
               placeholder="Search by name, status, module count..."
@@ -601,10 +781,21 @@ export default function AdminProgramsPage() {
               value={programStatus}
               onChange={(event) => setProgramStatus(event.target.value as typeof programStatus)}
             >
-              <option value="all">All statuses</option>
+              <option value="current">Current programmes</option>
+              <option value="all">All programmes</option>
               <option value="active">Active</option>
+              <option value="scheduled">Scheduled</option>
               <option value="draft">Draft</option>
               <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
+            </TableFilterSelect>
+            <TableFilterSelect
+              value={programAccess}
+              onChange={(event) => setProgramAccess(event.target.value as typeof programAccess)}
+            >
+              <option value="all">All access</option>
+              <option value="assigned">Assigned</option>
+              <option value="free">Free</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>
@@ -612,7 +803,6 @@ export default function AdminProgramsPage() {
           columns={programColumns}
           rows={programPageRows}
           rowKey={(program) => program.id}
-          rowClassName={(program) => (program.id === selectedProgram?.id ? 'bg-bid-light/40' : undefined)}
           emptyMessage="No programmes match this search."
           tableClassName="min-w-[1060px]"
         />
@@ -630,12 +820,18 @@ export default function AdminProgramsPage() {
       </Card>
 
       {selectedProgram && (
-        <section className="mt-4 space-y-4">
+        <Modal
+          open={workspaceOpen}
+          onOpenChange={setWorkspaceOpen}
+          title="Programme workspace"
+          width="xl"
+        >
+          <section className="space-y-4">
           <Card accent={selectedProgram.accent} padding="lg">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <StatusBadge status={selectedProgram.status} />
+                  <StatusBadge program={selectedProgram} />
                   <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
                     <CalendarDays className="h-4 w-4" />
                     {formatProgramDate(selectedProgram.startDate)} - {formatProgramDate(selectedProgram.endDate)}
@@ -647,9 +843,14 @@ export default function AdminProgramsPage() {
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                <Button variant="outline" onClick={() => setEditTarget(selectedProgram)}>Edit programme</Button>
-                <Button variant="outline" onClick={() => setReuseOpen(true)}>Reuse module</Button>
-                <Button onClick={() => setModuleOpen(true)}>New module</Button>
+                {getProgrammeStatus(selectedProgram) !== 'archived' && (
+                  <>
+                    <Button variant="outline" onClick={() => setEditTarget(selectedProgram)}>Edit programme</Button>
+                    {getProgrammeStatus(selectedProgram) !== 'completed' && (
+                      <Button onClick={() => setModuleOpen(true)}>New module</Button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -700,17 +901,26 @@ export default function AdminProgramsPage() {
                     />
                   </div>
                 </TableToolbar>
-                <DataTable
-                  columns={moduleColumns}
-                  rows={modulePageRows}
-                  rowKey={(module) => module.id}
-                  emptyMessage={
-                    programModules.length === 0
-                      ? 'No modules yet. Add a new module or reuse an existing module to start the curriculum.'
-                      : 'No modules match this search.'
-                  }
-                  tableClassName="min-w-[980px]"
-                />
+                <DndContext
+                  sensors={moduleReorderSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleModuleDragEnd}
+                >
+                  <SortableContext items={modulePageRowIds} strategy={verticalListSortingStrategy}>
+                    <DataTable
+                      columns={moduleColumns}
+                      rows={modulePageRows}
+                      rowKey={(module) => module.id}
+                      sortableRows={canReorderModules}
+                      emptyMessage={
+                        programModules.length === 0
+                          ? 'No modules yet. Add a new module or reuse an existing module to start the curriculum.'
+                          : 'No modules match this search.'
+                      }
+                      tableClassName="min-w-[980px]"
+                    />
+                  </SortableContext>
+                </DndContext>
                 <TablePagination
                   page={modulePage}
                   pageSize={modulePageSize}
@@ -730,63 +940,43 @@ export default function AdminProgramsPage() {
             )}
 
             {workspaceTab === 'readiness' && (
-              <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
-                <DataTable
-                  columns={[
-                    {
-                      key: 'module',
-                      header: 'Module',
-                      cell: (module) => (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-base font-semibold text-ink">Launch readiness</div>
+                        <Badge tone={readinessNeedsAttention ? 'amber' : 'green'}>
+                          {readinessNeedsAttention ? 'Needs attention' : 'Ready to launch'}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
+                        Use this checklist before publishing or enrolling entrepreneurs. It confirms that modules have learning content, capacity is clear, and deliverable rules are easy to find.
+                      </p>
+                    </div>
+                    <div className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 lg:w-[280px]">
+                      <div className="flex items-end justify-between gap-3">
                         <div>
-                          <div className="font-semibold">{module.title}</div>
-                          <div className="mt-1 text-xs text-ink-muted">Order {module.order}</div>
+                          <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">Readiness score</div>
+                          <div className="mt-1 text-3xl font-semibold leading-none text-ink">{readinessScore}%</div>
                         </div>
-                      ),
-                      className: 'min-w-[260px]',
-                    },
-                    {
-                      key: 'coverage',
-                      header: 'Coverage',
-                      cell: (module) => <ContentCoverage module={module} />,
-                    },
-                    {
-                      key: 'status',
-                      header: 'Launch status',
-                      cell: (module) =>
-                        module.contentItemIds.length > 0 ? (
-                          <Badge tone="green">Ready for learners</Badge>
-                        ) : (
-                          <Badge tone="amber">Add learning content</Badge>
-                        ),
-                    },
-                    {
-                      key: 'actions',
-                      header: 'Action',
-                      cell: (module) => (
-                        <RowActions
-                          actions={[
-                            {
-                              label: 'Manage content',
-                              onSelect: () => setManageContentModule(module),
-                            },
-                          ]}
-                        />
-                      ),
-                      className: 'w-[84px]',
-                    },
-                  ]}
-                  rows={programModules}
-                  rowKey={(module) => module.id}
-                  emptyMessage="No modules have been added to this programme yet."
-                  tableClassName="min-w-[820px]"
-                />
-                <div className="space-y-3">
+                        <div className="text-right text-xs leading-5 text-ink-muted">
+                          {programModules.length - modulesWithoutContent.length}/{programModules.length} modules ready
+                        </div>
+                      </div>
+                      <ProgressBar value={readinessScore} width="100%" className="mt-3 h-1.5" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                   <ReadinessPanelItem
                     icon={modulesWithoutContent.length ? AlertTriangle : CheckCircle2}
-                    title={modulesWithoutContent.length ? 'Content gaps' : 'Content coverage complete'}
+                    title="Content coverage"
+                    status={modulesWithoutContent.length ? 'Needs content' : 'Complete'}
                     description={
                       modulesWithoutContent.length
-                        ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} need learning content before launch.`
+                        ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} still need at least one learning asset.`
                         : 'Every module currently has at least one learning asset attached.'
                     }
                     tone={modulesWithoutContent.length ? 'warning' : 'success'}
@@ -794,18 +984,85 @@ export default function AdminProgramsPage() {
                   <ReadinessPanelItem
                     icon={Users}
                     title="Enrollment capacity"
-                    description={`${selectedProgram.entrepreneursCount} of ${selectedProgram.maxEntrepreneurs} entrepreneur seats are currently filled.`}
+                    status={capacityNeedsAttention ? 'Nearly full' : 'Seats available'}
+                    description={`${selectedProgram.entrepreneursCount} of ${selectedProgram.maxEntrepreneurs} seats are currently filled.`}
+                    tone={capacityNeedsAttention ? 'warning' : 'neutral'}
                   />
                   <ReadinessPanelItem
                     icon={FileText}
                     title="Required submissions"
-                    description="Deliverable rules are managed in the Deliverables tab and surfaced on entrepreneur profiles."
+                    status="Managed separately"
+                    description="Deliverable rules live in the Deliverables tab and appear in entrepreneur submission queues."
+                    tone="neutral"
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-3">
+                    <div className="text-sm font-semibold text-ink">Module readiness</div>
+                    <div className="mt-0.5 text-sm text-ink-muted">Review each module before entrepreneurs start learning.</div>
+                  </div>
+                  <DataTable
+                    columns={[
+                      {
+                        key: 'module',
+                        header: 'Module',
+                        cell: (module) => (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setViewModule(module)}
+                              className="block rounded-md text-left font-semibold text-ink transition-colors hover:text-bid focus:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+                            >
+                              {module.title}
+                            </button>
+                            <div className="mt-1 text-xs text-ink-muted">Order {module.order}</div>
+                          </div>
+                        ),
+                        className: 'min-w-[280px]',
+                      },
+                      {
+                        key: 'coverage',
+                        header: 'Coverage',
+                        cell: (module) => <ContentCoverage module={module} />,
+                      },
+                      {
+                        key: 'status',
+                        header: 'Launch status',
+                        cell: (module) =>
+                          module.contentItemIds.length > 0 ? (
+                            <Badge tone="green">Ready</Badge>
+                          ) : (
+                            <Badge tone="amber">Needs content</Badge>
+                          ),
+                      },
+                      {
+                        key: 'actions',
+                        header: 'Action',
+                        cell: (module) => (
+                          <RowActions
+                            actions={[
+                              {
+                                label: 'Manage content',
+                                onSelect: () => openManageContent(module),
+                              },
+                            ]}
+                          />
+                        ),
+                        className: 'w-[84px]',
+                      },
+                    ]}
+                    rows={programModules}
+                    rowKey={(module) => module.id}
+                    emptyMessage="No modules have been added to this programme yet."
+                    tableClassName="min-w-[840px]"
                   />
                 </div>
               </div>
             )}
           </Card>
-        </section>
+          </section>
+        </Modal>
       )}
 
       <ProgramModal open={addProgramOpen} onOpenChange={setAddProgramOpen} mode="add" />
@@ -815,16 +1072,52 @@ export default function AdminProgramsPage() {
       {selectedProgram && (
         <>
           <ModuleModal open={moduleOpen} onOpenChange={setModuleOpen} programId={selectedProgram.id} />
-          <ReuseModuleModal open={reuseOpen} onOpenChange={setReuseOpen} programId={selectedProgram.id} />
         </>
       )}
+      <ModuleDetailModal
+        open={!!viewModule}
+        onOpenChange={(open) => !open && setViewModule(null)}
+        module={viewModule ?? undefined}
+        program={selectedProgram ?? undefined}
+        onManageContent={openManageContent}
+        onAddContent={openAddContent}
+        readOnly={selectedProgram ? getProgrammeStatus(selectedProgram) === 'archived' : false}
+      />
       <ManageContentModal
         open={!!manageContentModule}
         onOpenChange={(o) => !o && setManageContentModule(null)}
         module={manageContentModule ?? undefined}
-        onAddItem={() => setAddContentOpen(true)}
+        onAddItem={openAddContent}
       />
-      <AddContentItemModal open={addContentOpen} onOpenChange={setAddContentOpen} module={manageContentModule ?? undefined} />
+      <AddContentItemModal
+        open={addContentOpen}
+        onOpenChange={(open) => {
+          setAddContentOpen(open);
+          if (!open) setAddContentModule(null);
+        }}
+        module={addContentModule ?? undefined}
+        onAdded={(module) => setManageContentModule(module)}
+      />
+
+      <MoveModulePositionModal
+        open={!!movePositionModule}
+        onOpenChange={(open) => !open && setMovePositionModule(null)}
+        module={movePositionModule}
+        program={selectedProgram}
+        currentPosition={movePositionModule ? programModules.findIndex((module) => module.id === movePositionModule.id) + 1 : 0}
+        totalModules={programModules.length}
+        onMove={(position) => {
+          if (selectedProgram && movePositionModule) {
+            moveProgramModuleToPosition(selectedProgram.id, movePositionModule.id, position);
+          }
+        }}
+      />
+      <ProgrammeArchiveModal
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        program={archiveTarget ?? undefined}
+        onArchive={(target, reason) => updateProgram(target.id, archiveProgrammePatch(target, reason))}
+      />
     </>
   );
 }
@@ -846,10 +1139,12 @@ const getModuleContentItems = (module: Module) =>
     .map((contentId) => contentItems.find((item) => item.id === contentId))
     .filter(Boolean) as ContentItem[];
 
-function StatusBadge({ status }: { status: Program['status'] }) {
+function StatusBadge({ program }: { program: Program }) {
+  const status = getProgrammeStatus(program);
+
   return (
-    <Badge tone={status === 'active' ? 'green' : status === 'draft' ? 'amber' : 'neutral'}>
-      {status === 'active' ? 'Active' : status === 'draft' ? 'Draft' : 'Completed'}
+    <Badge tone={getProgrammeStatusTone(status)}>
+      {getProgrammeStatusLabel(status)}
     </Badge>
   );
 }
@@ -904,6 +1199,32 @@ function ProgrammeHealthCard({
   );
 }
 
+
+function ModuleReorderHandle({ module, position }: { module: Module; position: number }) {
+  const { attributes, listeners, setActivatorNodeRef, disabled, isDragging } = useSortableRow();
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        disabled={disabled}
+        className="inline-flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted shadow-sm transition hover:bg-surface-subtle hover:text-ink active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
+        aria-label={`Reorder ${module.title}`}
+        title={disabled ? 'Clear search to reorder modules' : 'Drag to reorder module'}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-surface-subtle px-2 text-xs font-semibold text-ink-muted">
+        {position}
+      </span>
+      {isDragging ? <span className="sr-only">Moving {module.title}</span> : null}
+    </div>
+  );
+}
+
 function ContentCoverage({ module }: { module: Module }) {
   const attachedItems = getModuleContentItems(module);
   const counts = attachedItems.reduce<Record<ContentItem['type'], number>>(
@@ -947,16 +1268,20 @@ function ContentPill({
 function ReadinessPanelItem({
   icon: Icon,
   title,
+  status,
   description,
   tone = 'neutral',
 }: {
   icon: LucideIcon;
   title: string;
+  status: string;
   description: string;
   tone?: 'neutral' | 'success' | 'warning';
 }) {
+  const badgeTone = tone === 'success' ? 'green' : tone === 'warning' ? 'amber' : 'neutral';
+
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-white p-4">
+    <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-4">
       <div className="flex items-start gap-3">
         <div
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
@@ -964,14 +1289,17 @@ function ReadinessPanelItem({
               ? 'bg-success-light text-success-dark'
               : tone === 'warning'
                 ? 'bg-warning-light text-warning-dark'
-                : 'bg-surface-subtle text-ink-muted'
+                : 'bg-surface-subtle text-bid'
           }`}
         >
           <Icon className="h-4 w-4" />
         </div>
-        <div>
-          <div className="text-sm font-semibold text-ink">{title}</div>
-          <p className="mt-1 text-sm leading-5 text-ink-muted">{description}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-semibold text-ink">{title}</div>
+            <Badge tone={badgeTone}>{status}</Badge>
+          </div>
+          <p className="mt-2 text-sm leading-5 text-ink-muted">{description}</p>
         </div>
       </div>
     </div>

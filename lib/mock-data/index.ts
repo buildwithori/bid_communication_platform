@@ -148,6 +148,9 @@ export const sessions: Session[] = [
     date: '2026-07-08',
     startTime: '10:00',
     endTime: '10:45',
+    location: 'virtual',
+    meetingProvider: 'google-meet',
+    meetingUrl: 'https://meet.google.com/bid-kofi-paybridge',
     status: 'confirmed',
     accent: 'bid',
   },
@@ -159,6 +162,8 @@ export const sessions: Session[] = [
     startTime: '14:00',
     endTime: '15:30',
     location: 'virtual',
+    meetingProvider: 'google-meet',
+    meetingUrl: 'https://meet.google.com/bid-office-hours',
     status: 'confirmed',
     accent: 'info',
   },
@@ -170,6 +175,8 @@ export const sessions: Session[] = [
     startTime: '11:00',
     endTime: '12:00',
     location: 'virtual',
+    meetingProvider: 'google-meet',
+    meetingUrl: 'https://meet.google.com/bid-investor-prep',
     status: 'confirmed',
     accent: 'success',
   },
@@ -184,13 +191,23 @@ export const tools: Tool[] = [
     name: 'Business Model Canvas',
     description: 'Build and iterate on your BMC directly in the browser.',
     type: 'embed',
+    status: 'published',
+    visibility: 'all-entrepreneurs',
+    embedUrl: 'https://example.com',
+    updatedAt: '2026-07-02',
     iconKey: 'canvas',
   },
   {
     id: 'tool-finmodel',
     name: 'Financial Model Template',
-    description: 'Downloadable 3-year financial model template (Excel/PDF).',
+    description: 'Downloadable 3-year financial model resource (Excel/PDF).',
     type: 'pdf',
+    status: 'published',
+    visibility: 'programmes',
+    programmeIds: ['p-accelerator-c6', 'p-readiness-fintech'],
+    pdfFileName: 'Financial model resource.pdf',
+    pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    updatedAt: '2026-07-01',
     iconKey: 'document',
   },
   {
@@ -198,6 +215,10 @@ export const tools: Tool[] = [
     name: 'Pitch Timer',
     description: 'Practice your investor pitch with structured timing cues.',
     type: 'embed',
+    status: 'published',
+    visibility: 'all-entrepreneurs',
+    embedUrl: 'https://example.com',
+    updatedAt: '2026-06-28',
     iconKey: 'timer',
   },
   {
@@ -206,6 +227,12 @@ export const tools: Tool[] = [
     description:
       "Self-assessment checklist against BID's investor-readiness criteria.",
     type: 'pdf',
+    status: 'published',
+    visibility: 'programmes',
+    programmeIds: ['p-readiness-fintech'],
+    pdfFileName: 'Pitch deck scorer checklist.pdf',
+    pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    updatedAt: '2026-06-26',
     iconKey: 'star',
   },
   {
@@ -213,13 +240,23 @@ export const tools: Tool[] = [
     name: 'Market Sizing Calculator',
     description: 'Estimate TAM, SAM and SOM with guided inputs.',
     type: 'embed',
+    status: 'draft',
+    visibility: 'entrepreneurs',
+    entrepreneurIds: ['e-paybridge'],
+    embedUrl: 'https://example.com',
+    updatedAt: '2026-07-05',
     iconKey: 'plus',
   },
   {
     id: 'tool-quarterly',
     name: 'Quarterly Goal Tracker',
-    description: 'Printable template for setting and tracking quarterly goals.',
+    description: 'Printable resource for setting and tracking quarterly goals.',
     type: 'pdf',
+    status: 'archived',
+    visibility: 'all-entrepreneurs',
+    pdfFileName: 'Quarterly goal tracker.pdf',
+    pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    updatedAt: '2026-05-15',
     iconKey: 'calendar',
   },
 ];
@@ -295,27 +332,6 @@ export const fundsByProgram: ProgramBreakdownRow[] = [
   { programName: 'BID Accelerator', value: 150000, label: '$150k', accent: 'bid', percent: 45 },
   { programName: 'Investment Readiness', value: 190000, label: '$190k', accent: 'info', percent: 55 },
   { programName: 'Women Econ. Empowerment', value: 0, label: '$0', accent: 'success', percent: 0 },
-];
-
-/**
- * Admin reporting — entrepreneurs whose periodic updates are overdue.
- */
-export const overdueUpdaters = [
-  {
-    entrepreneurId: 'e-farmlink',
-    lastUpdateLabel: 'Q3 2024',
-    programmeId: 'p-accelerator-c6',
-  },
-  {
-    entrepreneurId: 'e-edify',
-    lastUpdateLabel: 'Never submitted',
-    programmeId: 'p-accelerator-c6',
-  },
-  {
-    entrepreneurId: 'e-healthfirst',
-    lastUpdateLabel: 'Q4 2024',
-    programmeId: 'p-readiness-fintech',
-  },
 ];
 
 /** Per-programme reporting snapshots used when a specific programme is selected. */
