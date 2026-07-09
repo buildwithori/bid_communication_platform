@@ -23,6 +23,8 @@ const buttonVariants = cva(
         info: 'bg-info text-white hover:bg-info-dark',
         // .bg2 — success / green button (reports)
         success: 'bg-success text-white hover:bg-success-dark',
+        // destructive — irreversible or negative action
+        destructive: 'bg-danger text-white hover:bg-danger-dark focus-visible:ring-danger',
         // .btn text-only subtle
         ghost: 'bg-transparent text-ink-muted hover:bg-surface-subtle hover:text-ink',
       },

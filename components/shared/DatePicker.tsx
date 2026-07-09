@@ -61,6 +61,16 @@ export interface DatePickerProps {
   className?: string;
 }
 
+export interface DateRangePickerProps {
+  startValue?: string;
+  endValue?: string;
+  onChange: (value: { start: string; end: string }) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+}
+
 export function DatePicker({
   value,
   onChange,
@@ -166,6 +176,179 @@ export function DatePicker({
               </button>
             );
           })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function DateRangePicker({
+  startValue,
+  endValue,
+  onChange,
+  onBlur,
+  placeholder = 'Select date range',
+  disabled,
+  className,
+}: DateRangePickerProps) {
+  const startDate = parseDate(startValue);
+  const endDate = parseDate(endValue);
+  const [open, setOpen] = React.useState(false);
+  const [hoverDate, setHoverDate] = React.useState<Date | null>(null);
+  const [visibleMonth, setVisibleMonth] = React.useState<Date>(
+    startDate ?? new Date(),
+  );
+
+  React.useEffect(() => {
+    if (startDate) {
+      setVisibleMonth(startDate);
+    }
+  }, [startValue]);
+
+  const moveMonth = (offset: number) => {
+    setVisibleMonth((current) => (
+      new Date(current.getFullYear(), current.getMonth() + offset, 1)
+    ));
+  };
+
+  const displayValue = startValue && endValue
+    ? `${formatDisplayDate(startValue)} - ${formatDisplayDate(endValue)}`
+    : '';
+
+  const selectDate = (date: Date) => {
+    const value = toDateValue(date);
+
+    if (!startValue || (startValue && endValue)) {
+      setHoverDate(null);
+      onChange({ start: value, end: '' });
+      return;
+    }
+
+    if (date < parseDate(startValue)!) {
+      setHoverDate(null);
+      onChange({ start: value, end: startValue });
+      setOpen(false);
+      return;
+    }
+
+    setHoverDate(null);
+    onChange({ start: startValue, end: value });
+    setOpen(false);
+  };
+
+  const renderMonth = (monthDate: Date) => {
+    const visibleDays = getCalendarDays(monthDate);
+    const startTime = startDate?.getTime();
+    const endTime = endDate?.getTime();
+    const hoverTime = hoverDate?.getTime();
+    const previewStartTime = startTime && hoverTime ? Math.min(startTime, hoverTime) : undefined;
+    const previewEndTime = startTime && hoverTime ? Math.max(startTime, hoverTime) : undefined;
+
+    return (
+      <div>
+        <div className="mb-3 text-center text-sm font-semibold text-ink">
+          {monthFormatter.format(monthDate)}
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {weekdays.map((day) => (
+            <div key={day} className="py-1 text-[11px] font-medium text-ink-faint">
+              {day}
+            </div>
+          ))}
+          {visibleDays.map((date) => {
+            const dateValue = toDateValue(date);
+            const time = date.getTime();
+            const isStart = dateValue === startValue;
+            const isEnd = dateValue === endValue;
+            const isInRange = !!startTime && !!endTime && time > startTime && time < endTime;
+            const isPreviewRange =
+              !!startTime &&
+              !endTime &&
+              !!previewStartTime &&
+              !!previewEndTime &&
+              time > previewStartTime &&
+              time < previewEndTime;
+            const isPreviewEnd = !!startTime && !endTime && !!hoverTime && time === hoverTime;
+            const isOutsideMonth = date.getMonth() !== monthDate.getMonth();
+
+            return (
+              <button
+                key={dateValue}
+                type="button"
+                onMouseEnter={() => {
+                  if (startValue && !endValue) {
+                    setHoverDate(date);
+                  }
+                }}
+                onFocus={() => {
+                  if (startValue && !endValue) {
+                    setHoverDate(date);
+                  }
+                }}
+                onClick={() => selectDate(date)}
+                className={cn(
+                  'grid h-8 place-items-center rounded-lg text-sm transition focus:outline-none focus:ring-2 focus:ring-bid/20',
+                  isOutsideMonth
+                    ? 'text-ink-faint hover:bg-surface-subtle'
+                    : 'text-ink hover:bg-bid-light',
+                  isPreviewRange && 'bg-bid-light text-bid',
+                  isInRange && 'bg-bid-light text-bid',
+                  (isStart || isEnd || isPreviewEnd) && 'bg-bid text-white hover:bg-bid',
+                )}
+              >
+                {date.getDate()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          onBlur={onBlur}
+          className={cn(
+            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:pointer-events-none disabled:opacity-55',
+            displayValue ? 'text-ink' : 'text-ink-faint',
+            className,
+          )}
+        >
+          <span className="truncate">{displayValue || placeholder}</span>
+          <CalendarDays className="h-4 w-4 text-ink-muted" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[min(640px,calc(100vw-2rem))] rounded-xl border-black/[0.08] bg-surface-panel p-3 shadow-xl">
+        <div className="mb-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => moveMonth(-1)}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-surface-subtle hover:text-ink"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="text-xs text-ink-muted">
+            Pick a start date, then an end date
+          </div>
+          <button
+            type="button"
+            onClick={() => moveMonth(1)}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-surface-subtle hover:text-ink"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2" onMouseLeave={() => setHoverDate(null)}>
+          {renderMonth(visibleMonth)}
+          {renderMonth(nextMonth)}
         </div>
       </PopoverContent>
     </Popover>

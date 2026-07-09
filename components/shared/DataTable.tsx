@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { ChevronLeft, ChevronRight, MoreHorizontal, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -10,6 +12,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
+import { FormAutocomplete, type FormAutocompleteProps } from '@/components/shared/FormField';
 
 export interface Column<T> {
   key: string;
@@ -24,9 +33,31 @@ export interface DataTableProps<T> {
   rows: T[];
   rowKey: (row: T) => string;
   rowClassName?: (row: T) => string | undefined;
+  rowProps?: (row: T) => React.HTMLAttributes<HTMLTableRowElement> | undefined;
+  sortableRows?: boolean;
   emptyMessage?: string;
   className?: string;
   tableClassName?: string;
+}
+
+interface SortableRowContextValue {
+  attributes: Record<string, unknown>;
+  listeners?: Record<string, unknown>;
+  setActivatorNodeRef: (node: HTMLElement | null) => void;
+  disabled: boolean;
+  isDragging: boolean;
+}
+
+const SortableRowContext = React.createContext<SortableRowContextValue>({
+  attributes: {},
+  listeners: undefined,
+  setActivatorNodeRef: () => undefined,
+  disabled: true,
+  isDragging: false,
+});
+
+export function useSortableRow() {
+  return React.useContext(SortableRowContext);
 }
 
 export type RowAction = {
@@ -41,6 +72,8 @@ export function DataTable<T>({
   rows,
   rowKey,
   rowClassName,
+  rowProps,
+  sortableRows = false,
   emptyMessage = 'No rows yet.',
   className,
   tableClassName,
@@ -87,31 +120,92 @@ export function DataTable<T>({
               </tr>
             ) : (
               rows.map((row) => (
-                <tr
+                <DataTableRow
                   key={rowKey(row)}
-                  className={cn(
-                    'group transition-colors hover:bg-surface-subtle/70',
-                    rowClassName?.(row),
-                  )}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={cn(
-                        'border-b border-line/80 px-4 py-4 align-middle text-ink first:pl-5 last:pr-5 group-last:border-b-0',
-                        column.className,
-                      )}
-                    >
-                      {column.cell(row)}
-                    </td>
-                  ))}
-                </tr>
+                  row={row}
+                  rowId={rowKey(row)}
+                  columns={columns}
+                  rowClassName={rowClassName}
+                  rowProps={rowProps}
+                  sortable={sortableRows}
+                />
               ))
             )}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+
+function DataTableRow<T>({
+  row,
+  rowId,
+  columns,
+  rowClassName,
+  rowProps,
+  sortable,
+}: {
+  row: T;
+  rowId: string;
+  columns: Column<T>[];
+  rowClassName?: (row: T) => string | undefined;
+  rowProps?: (row: T) => React.HTMLAttributes<HTMLTableRowElement> | undefined;
+  sortable: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: rowId, disabled: !sortable });
+  const extraRowProps = rowProps?.(row) ?? {};
+  const { className: extraRowClassName, style: extraRowStyle, ...restRowProps } = extraRowProps;
+  const rowContext = React.useMemo<SortableRowContextValue>(
+    () => ({
+      attributes: attributes as unknown as Record<string, unknown>,
+      listeners: listeners as unknown as Record<string, unknown> | undefined,
+      setActivatorNodeRef,
+      disabled: !sortable,
+      isDragging,
+    }),
+    [attributes, isDragging, listeners, setActivatorNodeRef, sortable],
+  );
+
+  return (
+    <SortableRowContext.Provider value={rowContext}>
+      <tr
+        ref={setNodeRef}
+        {...restRowProps}
+        className={cn(
+          'group transition-colors hover:bg-surface-subtle/70',
+          isDragging && 'relative z-10 bg-white shadow-xl',
+          rowClassName?.(row),
+          extraRowClassName,
+        )}
+        style={{
+          ...extraRowStyle,
+          transform: CSS.Transform.toString(transform),
+          transition,
+        }}
+      >
+        {columns.map((column) => (
+          <td
+            key={column.key}
+            className={cn(
+              'border-b border-line/80 px-4 py-4 align-middle text-ink first:pl-5 last:pr-5 group-last:border-b-0',
+              column.className,
+            )}
+          >
+            {column.cell(row)}
+          </td>
+        ))}
+      </tr>
+    </SortableRowContext.Provider>
   );
 }
 
@@ -122,14 +216,30 @@ export function TableToolbar({
   children: React.ReactNode;
   className?: string;
 }) {
+  const items = React.Children.toArray(children);
+  const [copy, ...actions] = items;
+  const controlCount = actions.reduce<number>((count, action) => {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(action)) {
+      return count + 1;
+    }
+
+    const childCount = React.Children.count(action.props.children);
+    return count + Math.max(childCount, 1);
+  }, 0);
+
   return (
     <div
       className={cn(
-        'mb-4 flex flex-col gap-3 rounded-xl border border-black/[0.08] bg-surface-subtle/70 p-3 sm:flex-row sm:items-center sm:justify-between',
+        'table-toolbar mb-4 flex flex-wrap items-start gap-3 rounded-xl border border-black/[0.08] bg-surface-subtle/70 p-3',
         className,
       )}
     >
-      {children}
+      {copy ? <div className="table-toolbar-copy">{copy}</div> : null}
+      {actions.length > 0 ? (
+        <div className="table-toolbar-actions" data-control-count={controlCount}>
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -155,22 +265,96 @@ export const TableFilterInput = React.forwardRef<
 ));
 TableFilterInput.displayName = 'TableFilterInput';
 
+type TableFilterSelectProps = Omit<
+  React.SelectHTMLAttributes<HTMLSelectElement>,
+  'children' | 'defaultValue' | 'multiple' | 'size'
+> & {
+  children: React.ReactNode;
+  placeholder?: React.ReactNode;
+};
+
+function getOptionData(children: React.ReactNode) {
+  return React.Children.toArray(children).flatMap((child) => {
+    if (!React.isValidElement<React.OptionHTMLAttributes<HTMLOptionElement>>(child)) {
+      return [];
+    }
+
+    const value = child.props.value;
+    if (value === undefined || value === null) return [];
+
+    return [{
+      value: String(value),
+      label: child.props.children,
+      disabled: child.props.disabled,
+    }];
+  });
+}
+
 export const TableFilterSelect = React.forwardRef<
-  HTMLSelectElement,
-  React.SelectHTMLAttributes<HTMLSelectElement>
->(({ className, children, ...props }, ref) => (
-  <select
-    ref={ref}
-    className={cn(
-      'h-9 w-full rounded-lg border border-black/[0.1] bg-white px-3 text-sm font-normal text-ink shadow-sm outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/10',
-      className,
-    )}
-    {...props}
-  >
-    {children}
-  </select>
-));
+  HTMLButtonElement,
+  TableFilterSelectProps
+>(({ className, children, value, onChange, disabled, id, name, placeholder, ...props }, ref) => {
+  const options = getOptionData(children);
+  const currentValue = String(value ?? options[0]?.value ?? '');
+  const currentOption = options.find((option) => option.value === currentValue);
+
+  return (
+    <Select
+      value={currentValue}
+      disabled={disabled}
+      name={name}
+      onValueChange={(nextValue) => {
+        onChange?.({
+          target: { value: nextValue, name },
+          currentTarget: { value: nextValue, name },
+        } as React.ChangeEvent<HTMLSelectElement>);
+      }}
+    >
+      <SelectTrigger
+        ref={ref}
+        id={id}
+        className={cn(
+          'h-9 w-full rounded-lg border border-black/[0.1] bg-white px-3 text-sm font-normal text-ink shadow-sm outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/10 focus:ring-offset-0 [&>span]:truncate',
+          className,
+        )}
+        aria-label={props['aria-label']}
+      >
+        <span className="block min-w-0 truncate">
+          {currentOption?.label ?? placeholder ?? 'Select'}
+        </span>
+      </SelectTrigger>
+      <SelectContent className="rounded-xl border-black/[0.08] bg-white p-1.5 text-sm shadow-xl">
+        {options.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            disabled={option.disabled}
+            className="rounded-lg py-2 pl-8 pr-2 text-sm text-ink focus:bg-bid-light focus:text-bid-dark"
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+});
 TableFilterSelect.displayName = 'TableFilterSelect';
+
+export function TableFilterAutocomplete({
+  className,
+  popoverClassName,
+  listClassName,
+  ...props
+}: FormAutocompleteProps) {
+  return (
+    <FormAutocomplete
+      className={cn('h-9 bg-white', className)}
+      popoverClassName={cn('min-w-[220px]', popoverClassName)}
+      listClassName={cn('max-h-64', listClassName)}
+      {...props}
+    />
+  );
+}
 
 export function TableEmptyState({
   title,

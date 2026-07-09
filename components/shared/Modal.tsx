@@ -10,7 +10,7 @@ export interface ModalProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   /** Controls the max modal width while preserving mobile gutters. */
-  width?: 'sm' | 'md' | 'wide' | 'xl';
+  width?: 'sm' | 'md' | 'wide' | 'xl' | 'media';
   children: React.ReactNode;
 }
 
@@ -19,6 +19,7 @@ const widthClass: Record<NonNullable<ModalProps['width']>, string> = {
   md: 'w-[500px]',
   wide: 'w-[620px]',
   xl: 'w-[min(960px,calc(100vw-32px))]',
+  media: 'w-[min(1180px,calc(100vw-32px))]',
 };
 
 export function Modal({
@@ -28,13 +29,32 @@ export function Modal({
   width = 'sm',
   children,
 }: ModalProps) {
+  React.useEffect(() => {
+    if (!open) return;
+
+    const body = document.body;
+    const currentCount = Number(body.dataset.modalOpenCount ?? '0') + 1;
+    body.dataset.modalOpenCount = String(currentCount);
+    body.dataset.modalOpen = 'true';
+
+    return () => {
+      const nextCount = Math.max(Number(body.dataset.modalOpenCount ?? '1') - 1, 0);
+      if (nextCount === 0) {
+        delete body.dataset.modalOpen;
+        delete body.dataset.modalOpenCount;
+      } else {
+        body.dataset.modalOpenCount = String(nextCount);
+      }
+    };
+  }, [open]);
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="modal-overlay fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
         <DialogPrimitive.Content
           className={cn(
-            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-y-auto rounded-2xl border border-black/[0.08] bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
+            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto rounded-2xl border border-black/[0.08] bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
             widthClass[width],
           )}
         >

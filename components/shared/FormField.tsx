@@ -118,7 +118,7 @@ FormTextarea.displayName = 'FormTextarea';
 export interface FormSelectProps {
   value: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: ReadonlyArray<{ value: string; label: string }>;
   placeholder?: string;
   id?: string;
   className?: string;
@@ -163,6 +163,8 @@ export interface FormAutocompleteProps {
   searchPlaceholder?: string;
   emptyMessage?: string;
   className?: string;
+  popoverClassName?: string;
+  listClassName?: string;
   disabled?: boolean;
 }
 
@@ -174,10 +176,21 @@ export function FormAutocomplete({
   searchPlaceholder = 'Search...',
   emptyMessage = 'No results found.',
   className,
+  popoverClassName,
+  listClassName,
   disabled,
 }: FormAutocompleteProps) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((option) => option.value === value);
+
+  const handleListWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const list = event.currentTarget;
+    if (list.scrollHeight <= list.clientHeight) return;
+
+    event.stopPropagation();
+    event.preventDefault();
+    list.scrollTop += event.deltaY;
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -195,10 +208,10 @@ export function FormAutocomplete({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-ink-faint" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+      <PopoverContent align="start" className={cn('w-[var(--radix-popover-trigger-width)] p-0', popoverClassName)}>
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList className={listClassName} onWheel={handleListWheel}>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (

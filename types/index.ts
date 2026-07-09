@@ -17,9 +17,9 @@ export type SectorId =
   | 'construction'
   | 'renewable-energy';
 
-export type StageId = 'idea' | 'growth' | 'scale';
+export type StageId = string;
 
-export type Country = 'Ghana' | 'Nigeria' | 'Kenya';
+export type Country = 'Ghana' | 'Nigeria' | 'Kenya' | 'Rwanda';
 
 export type EntrepreneurSource = 'invited' | 'self-registered';
 
@@ -33,7 +33,8 @@ export type TrainerRole =
 
 export type TrainerAccessLevel = 'full' | 'guest';
 
-export type ProgramStatus = 'active' | 'completed' | 'draft';
+export type ProgramStatus = 'draft' | 'scheduled' | 'active' | 'completed' | 'archived';
+export type ProgramAccessType = 'assigned' | 'free';
 
 export type ModuleStatus = 'not-started' | 'in-progress' | 'completed';
 
@@ -60,10 +61,13 @@ export type SessionType =
   | 'deadline';
 
 export type SessionStatus = 'confirmed' | 'pending' | 'cancelled';
+export type MeetingProvider = 'google-meet' | 'zoom' | 'teams' | 'custom';
 
 export type ToolType = 'pdf' | 'embed';
+export type ToolVisibility = 'all-entrepreneurs' | 'programmes' | 'entrepreneurs';
+export type ToolStatus = 'draft' | 'published' | 'archived';
 
-export type GoalType = 'fundraising' | 'programme-completion' | 'milestone';
+export type GoalType = string;
 
 export interface Sector {
   id: SectorId;
@@ -99,7 +103,17 @@ export interface Entrepreneur {
   sector: SectorId;
   stage: StageId;
   cohort?: string;
+  /** Learning content the entrepreneur can access. Programme access is inferred from these content items. */
+  contentItemIds?: string[];
+  /** Legacy programme enrolments. New UI should infer programme access from contentItemIds. */
+  programmeIds?: string[];
+  /** Legacy programme pointer; use programmeIds for the full enrolment list. */
   programmeId?: string;
+  /** Individual tool access exceptions. Global and programme rules still remain the default source of access. */
+  toolAccess?: {
+    addedToolIds?: string[];
+    blockedToolIds?: string[];
+  };
   source: EntrepreneurSource;
   goal: {
     type: GoalType;
@@ -118,8 +132,10 @@ export interface Entrepreneur {
     fundsMobilisedUsd: number;
   };
   fundingRounds: FundingRound[];
+  periodicUpdates?: PeriodicUpdate[];
   /** ISO date string for the most recent periodic update, or null. */
   lastUpdateAt?: string;
+  /** Legacy only. Trainer scope is inferred from the trainers attached to accessible content. */
   trainerId?: string;
   joinedAt: string; // ISO date
 }
@@ -130,6 +146,24 @@ export interface FundingRound {
   amountUsd: number;
   date: string; // ISO date
   source?: string;
+  /** Programme this round should count toward in reporting. Empty means company-wide/unattributed. */
+  programmeId?: string;
+  goalId?: string;
+}
+
+export interface PeriodicUpdate {
+  id: string;
+  period: string;
+  periodStart: string;
+  periodEnd: string;
+  submittedAt: string; // ISO date
+  /** Programme this update should count toward in reporting. Empty means company-wide/unattributed. */
+  programmeId?: string;
+  jobsWomen: number;
+  jobsMen: number;
+  jobsCreated: number;
+  fundsMobilisedUsd: number;
+  notes?: string;
 }
 
 export interface Trainer {
@@ -156,9 +190,21 @@ export interface Trainer {
 export interface Program {
   id: string;
   name: string;
+  /** Free programmes are available to every entrepreneur; assigned programmes require enrolment. */
+  accessType: ProgramAccessType;
   startDate: string; // ISO date
   endDate: string; // ISO date
-  status: ProgramStatus;
+  /** Programmes are drafts until published; status is derived from this and the date window. */
+  publishedAt?: string;
+  /** Manual lifecycle fields. Archive wins over every other displayed status. */
+  completedAt?: string;
+  completedBy?: string;
+  completionReason?: string;
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  /** Legacy snapshot/fallback only. Use getProgrammeStatus for display logic. */
+  status?: ProgramStatus;
   maxEntrepreneurs: number;
   description?: string;
   /** Accent color used for the left border on the card. */
@@ -194,6 +240,18 @@ export interface ContentItem {
   type: ContentType;
   durationLabel?: string; // "9 min" for video, "Downloadable" for pdf, "Embedded" for tool
   moduleId: string;
+  /** Trainer/content owner. Ratings for this content are attributed to this trainer. */
+  trainerId?: string;
+  /** Mux public playback ID used by video content. */
+  muxPlaybackId?: string;
+  /** URL for PDF/file content that can be rendered in the browser. */
+  fileUrl?: string;
+  /** Original uploaded PDF file name shown in admin/customer UI before storage is connected. */
+  pdfFileName?: string;
+  /** Linked entrepreneur tool when this content item reuses the tool library. */
+  linkedToolId?: string;
+  /** External URL for embedded browser tools. */
+  toolUrl?: string;
   progress: ContentProgress;
 }
 
@@ -240,6 +298,8 @@ export interface Session {
   startTime?: string; // "10:00"
   endTime?: string; // "10:45"
   location?: 'virtual' | 'in-person';
+  meetingProvider?: MeetingProvider;
+  meetingUrl?: string;
   status: SessionStatus;
   accent: 'bid' | 'info' | 'success' | 'warning' | 'neutral';
   isDeadline?: boolean;
@@ -250,6 +310,22 @@ export interface Tool {
   name: string;
   description: string;
   type: ToolType;
+  /** Published tools appear in entrepreneur workspaces; drafts stay admin-only. */
+  status?: ToolStatus;
+  /** Controls who can see the tool in the entrepreneur workspace. */
+  visibility?: ToolVisibility;
+  /** Programmes that can see this tool when visibility === 'programmes'. */
+  programmeIds?: string[];
+  /** Individual entrepreneurs that can see this tool when visibility === 'entrepreneurs'. */
+  entrepreneurIds?: string[];
+  /** Display name of the uploaded template file. */
+  pdfFileName?: string;
+  /** Browser-renderable PDF URL for downloadable templates. */
+  pdfUrl?: string;
+  /** Browser-renderable URL for embedded online tools. */
+  embedUrl?: string;
+  /** ISO timestamp for the last admin update. */
+  updatedAt?: string;
   /** Icon key used by the rendering layer. */
   iconKey: 'canvas' | 'document' | 'timer' | 'star' | 'plus' | 'calendar';
 }
@@ -286,6 +362,6 @@ export interface ProgramBreakdownRow {
   programName: string;
   value: number;
   label: string; // formatted value e.g. "$150k", "38"
-  accent: 'bid' | 'info' | 'success';
+  accent: 'bid' | 'info' | 'success' | 'neutral';
   percent: number; // 0-100 bar width
 }

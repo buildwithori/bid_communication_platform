@@ -57,4 +57,36 @@ export const stageById: Record<StageId, Stage> = stages.reduce(
   {} as Record<StageId, Stage>,
 );
 
-export const countries = ['Ghana', 'Nigeria', 'Kenya'] as const;
+export const countries = ['Ghana', 'Nigeria', 'Kenya', 'Rwanda'] as const;
+
+export interface ProgrammeGoalType {
+  id: string;
+  label: string;
+  description: string;
+  requiresTargetAmount: boolean;
+  active: boolean;
+}
+
+export const programmeGoalTypes: ProgrammeGoalType[] = [
+  {
+    id: 'fundraising',
+    label: 'Fundraising target',
+    description: 'Track capital the entrepreneur intends to raise for a programme.',
+    requiresTargetAmount: true,
+    active: true,
+  },
+  {
+    id: 'programme-completion',
+    label: 'Programme completion',
+    description: 'Track completion of the assigned programme requirements.',
+    requiresTargetAmount: false,
+    active: true,
+  },
+  {
+    id: 'milestone',
+    label: 'Milestone-based',
+    description: 'Track a business milestone agreed with BID or the programme team.',
+    requiresTargetAmount: false,
+    active: true,
+  },
+];

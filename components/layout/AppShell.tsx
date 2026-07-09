@@ -51,7 +51,7 @@ export function AppShell({
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-surface">
+    <div className="flex h-screen h-[100dvh] w-full overflow-hidden bg-surface">
       {/* Desktop sidebar */}
       <aside className="hidden w-[260px] shrink-0 border-r border-line lg:block">
         {sidebar}
@@ -83,7 +83,7 @@ export function AppShell({
           onMenuClick={() => setDrawerOpen(true)}
           rightSlot={topRightSlot}
         />
-        <main className="flex-1 overflow-y-auto px-5 py-6 lg:px-7 lg:py-7">
+        <main className="app-shell-main flex-1 overflow-y-auto px-5 py-6 lg:px-7 lg:py-7">
           {children}
         </main>
       </div>

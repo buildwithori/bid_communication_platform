@@ -3,10 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BidLogo } from '@/components/shared/BidLogo';
 import { Avatar } from '@/components/shared/Avatar';
 import { Badge } from '@/components/shared/Badge';
+import { routes } from '@/lib/routes';
 
 export interface NavItem {
   href: string;
@@ -77,7 +79,7 @@ export function NavSidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3">
+      <nav className="app-shell-sidebar-nav flex-1 overflow-y-auto px-3 py-3">
         {sections.map((section) => (
           <div key={section.heading}>
             <div className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.08em] text-ink-faint">
@@ -115,11 +117,18 @@ export function NavSidebar({
       <div className="border-t border-line px-4 py-4">
         <div className="flex items-center gap-2.5">
           <Avatar initials={user.initials} size={34} tone={user.tone} />
-          <div className="min-w-0">
-            <div className="text-sm font-medium leading-tight">{user.name}</div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium leading-tight">{user.name}</div>
             <div className="truncate text-xs text-ink-faint">{user.subtitle}</div>
           </div>
         </div>
+        <Link
+          href={routes.auth.login}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </Link>
       </div>
     </div>
   );

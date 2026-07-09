@@ -8,7 +8,7 @@ export interface BarChartRowProps {
   label: string;
   value: string;
   percent: number;
-  accent?: 'bid' | 'info' | 'success';
+  accent?: 'bid' | 'info' | 'success' | 'neutral';
   className?: string;
 }
 
@@ -16,6 +16,7 @@ const barColors: Record<NonNullable<BarChartRowProps['accent']>, string> = {
   bid: 'bg-bid',
   info: 'bg-info',
   success: 'bg-success',
+  neutral: 'bg-ink-faint',
 };
 
 export function BarChartRow({
