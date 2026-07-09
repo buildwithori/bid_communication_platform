@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, ExternalLink, MapPin } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
@@ -23,6 +23,8 @@ type CalendarItem = {
   startTime?: string;
   endTime?: string;
   location?: Session['location'];
+  meetingProvider?: Session['meetingProvider'];
+  meetingUrl?: string;
   status?: Session['status'];
   category: ScheduleCategory;
   description?: string;
@@ -130,6 +132,8 @@ function sessionToCalendarItem(session: Session): CalendarItem {
     startTime: session.startTime,
     endTime: session.endTime,
     location: session.location,
+    meetingProvider: session.meetingProvider,
+    meetingUrl: session.meetingUrl,
     status: session.status,
     category: getSessionCategory(session),
   };
@@ -178,6 +182,7 @@ export default function SchedulePage() {
   const [bookOpen, setBookOpen] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(todayValue);
   const [visibleMonth, setVisibleMonth] = React.useState(todayDate);
+  const [nextPage, setNextPage] = React.useState(1);
 
   const itemsByDate = React.useMemo(() => {
     return calendarItems.reduce<Record<string, CalendarItem[]>>((acc, item) => {
@@ -190,8 +195,11 @@ export default function SchedulePage() {
     () => calendarItems.filter((item) => item.date >= todayValue),
     [calendarItems, todayValue],
   );
-  const nextItems = upcomingItems.slice(0, 3);
-  const remainingUpcomingCount = Math.max(upcomingItems.length - nextItems.length, 0);
+  const nextPageSize = 3;
+  const nextTotalPages = Math.max(1, Math.ceil(upcomingItems.length / nextPageSize));
+  const nextItems = upcomingItems.slice((nextPage - 1) * nextPageSize, nextPage * nextPageSize);
+  const nextStart = upcomingItems.length === 0 ? 0 : (nextPage - 1) * nextPageSize + 1;
+  const nextEnd = Math.min(nextPage * nextPageSize, upcomingItems.length);
   const selectedItems = itemsByDate[selectedDate] ?? [];
   const monthCells = React.useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
   const monthItems = React.useMemo(
@@ -218,6 +226,10 @@ export default function SchedulePage() {
     visibleMonth.getFullYear() === todayDate.getFullYear() &&
     visibleMonth.getMonth() === todayDate.getMonth();
   const isSelectedToday = selectedDate === todayValue;
+
+  React.useEffect(() => {
+    setNextPage((current) => Math.min(current, nextTotalPages));
+  }, [nextTotalPages]);
 
   const moveMonth = (offset: number) => {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
@@ -353,8 +365,30 @@ export default function SchedulePage() {
           title="Next up"
           description="A short queue of what needs attention soon."
           actions={
-            remainingUpcomingCount > 0 ? (
-              <Badge tone="neutral">+{remainingUpcomingCount} later</Badge>
+            upcomingItems.length > nextPageSize ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-ink-muted">
+                  {nextStart}-{nextEnd} of {upcomingItems.length}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Previous upcoming items"
+                  disabled={nextPage === 1}
+                  onClick={() => setNextPage((current) => Math.max(1, current - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Next upcoming items"
+                  disabled={nextPage === nextTotalPages}
+                  onClick={() => setNextPage((current) => Math.min(nextTotalPages, current + 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             ) : undefined
           }
         />
@@ -393,6 +427,11 @@ function ScheduleEventCard({
   onSelect?: () => void;
 }) {
   const meta = categoryMeta[item.category];
+  const canJoinMeeting =
+    item.source === 'session' &&
+    item.status === 'confirmed' &&
+    item.location !== 'in-person' &&
+    Boolean(item.meetingUrl);
   const content = (
     <>
       <div className="flex items-start gap-3">
@@ -432,6 +471,18 @@ function ScheduleEventCard({
               </span>
             )}
           </div>
+          {canJoinMeeting && (
+            <a
+              href={item.meetingUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-bid px-3 py-2 text-sm font-medium text-white transition hover:bg-bid-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+            >
+              Join meeting
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
       </div>
     </>

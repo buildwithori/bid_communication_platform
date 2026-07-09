@@ -5,6 +5,7 @@ import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
 import { toast } from 'sonner';
+import { getContentTrainer } from '@/lib/content-trainer-access';
 
 interface ContentRatingProps {
   contentId: string;
@@ -23,6 +24,7 @@ export function ContentRating({
   const [rating, setRating] = React.useState(initialRating);
   const [note, setNote] = React.useState(initialNote);
   const [saved, setSaved] = React.useState(initialRating > 0);
+  const trainer = getContentTrainer(contentId);
 
   const displayed = hovered || rating;
 
@@ -33,14 +35,19 @@ export function ContentRating({
     }
     setSaved(true);
     onSaved?.(rating, note);
-    toast.success('Rating saved!');
-    // In a real app: persist to Supabase here (keyed by contentId).
+    toast.success(trainer ? `Rating saved for ${trainer.fullName}` : 'Rating saved!');
+    // In a real app: persist to Supabase here (keyed by contentId) and attribute it to the content trainer.
     void contentId;
   }
 
   return (
     <div className="rounded-lg border border-line bg-surface-subtle p-3.5">
       <div className="mb-1 text-[11px] font-medium text-ink">Rate this content</div>
+      {trainer && (
+        <div className="mb-2 text-[11px] leading-5 text-ink-muted">
+          This rating is attributed to {trainer.fullName}.
+        </div>
+      )}
       <div className="mb-3 flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button

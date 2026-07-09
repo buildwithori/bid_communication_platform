@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import type { Entrepreneur, FundingRound, Session, Deliverable } from '@/types';
+import type { Entrepreneur, FundingRound, PeriodicUpdate, Session, Deliverable } from '@/types';
 import {
   currentEntrepreneur as seedEntrepreneur,
 } from '@/lib/mock-data/entrepreneurs';
@@ -26,6 +26,7 @@ interface EntrepreneurStore {
   submitDeliverable: (input: DeliverableForm) => void;
   markDeliverableFeedbackRead: (deliverableId: string, feedbackIds: string[]) => void;
   addFundingRound: (input: FundingRoundForm) => void;
+  updateFundingRound: (id: string, input: FundingRoundForm) => void;
   submitPeriodicUpdate: (input: PeriodicUpdateForm) => void;
   requestTool: (name: string, reason: string) => void;
   updateProfile: (patch: Partial<Entrepreneur>) => void;
@@ -53,11 +54,12 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
   const bookSession: EntrepreneurStore['bookSession'] = React.useCallback((input) => {
     const newSession: Session = {
       id: 's-' + Date.now(),
-      type: 'mentor-checkin',
-      title: input.sessionType,
+      type: input.sessionType as Session['type'],
+      title: input.topic,
       trainerId: input.recipient === 'specific' ? input.trainerId : undefined,
       date: input.date,
       startTime: input.time,
+      location: 'virtual',
       status: 'pending',
       accent: 'bid',
     };
@@ -129,6 +131,8 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
       amountUsd: Number(input.amountUsd) || 0,
       date: input.date,
       source: input.source,
+      programmeId: input.programmeId && input.programmeId !== 'unattributed' ? input.programmeId : undefined,
+      goalId: input.goalId && input.goalId !== 'none' ? input.goalId : undefined,
     };
     setEntrepreneur((curr) => ({
       ...curr,
@@ -137,16 +141,53 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
     toast.success('Funding round added!');
   }, []);
 
-  const submitPeriodicUpdate: EntrepreneurStore['submitPeriodicUpdate'] = React.useCallback((input) => {
+  const updateFundingRound: EntrepreneurStore['updateFundingRound'] = React.useCallback((id, input) => {
     setEntrepreneur((curr) => ({
       ...curr,
-      lastUpdateAt: new Date().toISOString().slice(0, 10),
+      fundingRounds: curr.fundingRounds.map((round) =>
+        round.id === id
+          ? {
+              ...round,
+              name: input.name,
+              amountUsd: Number(input.amountUsd) || 0,
+              date: input.date,
+              source: input.source,
+              programmeId: input.programmeId && input.programmeId !== 'unattributed' ? input.programmeId : undefined,
+              goalId: input.goalId && input.goalId !== 'none' ? input.goalId : undefined,
+            }
+          : round,
+      ),
+    }));
+    toast.success('Funding round updated!');
+  }, []);
+
+  const submitPeriodicUpdate: EntrepreneurStore['submitPeriodicUpdate'] = React.useCallback((input) => {
+    const jobsWomen = Number(input.jobsWomen) || 0;
+    const jobsMen = Number(input.jobsMen) || 0;
+    const submittedAt = new Date().toISOString().slice(0, 10);
+    const update: PeriodicUpdate = {
+      id: 'pu-' + Date.now(),
+      period: formatPeriodRange(input.periodStart, input.periodEnd),
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      submittedAt,
+      programmeId: input.programmeId !== 'company-wide' ? input.programmeId : undefined,
+      jobsWomen,
+      jobsMen,
+      jobsCreated: jobsWomen + jobsMen,
+      fundsMobilisedUsd: 0,
+      notes: input.notes,
+    };
+
+    setEntrepreneur((curr) => ({
+      ...curr,
+      periodicUpdates: [update, ...(curr.periodicUpdates ?? [])],
+      lastUpdateAt: submittedAt,
       metrics: {
         ...curr.metrics,
-        jobsWomen: curr.metrics.jobsWomen + (Number(input.jobsWomen) || 0),
-        jobsMen: curr.metrics.jobsMen + (Number(input.jobsMen) || 0),
-        jobsCreated: curr.metrics.jobsCreated + (Number(input.jobsWomen) || 0) + (Number(input.jobsMen) || 0),
-        fundsMobilisedUsd: curr.metrics.fundsMobilisedUsd + (Number(input.fundsMobilisedUsd) || 0),
+        jobsWomen: curr.metrics.jobsWomen + jobsWomen,
+        jobsMen: curr.metrics.jobsMen + jobsMen,
+        jobsCreated: curr.metrics.jobsCreated + update.jobsCreated,
       },
     }));
     toast.success('Update submitted!');
@@ -169,11 +210,12 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
       submitDeliverable,
       markDeliverableFeedbackRead,
       addFundingRound,
+      updateFundingRound,
       submitPeriodicUpdate,
       requestTool,
       updateProfile,
     }),
-    [entrepreneur, sessions, deliverables, notifications, bookSession, submitDeliverable, markDeliverableFeedbackRead, addFundingRound, submitPeriodicUpdate, requestTool, updateProfile],
+    [entrepreneur, sessions, deliverables, notifications, bookSession, submitDeliverable, markDeliverableFeedbackRead, addFundingRound, updateFundingRound, submitPeriodicUpdate, requestTool, updateProfile],
   );
 
   return (
@@ -181,6 +223,15 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
       {children}
     </EntrepreneurContext.Provider>
   );
+}
+
+function formatPeriodRange(start: string, end: string) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return `${formatter.format(new Date(start))} - ${formatter.format(new Date(end))}`;
 }
 
 export function useEntrepreneurStore() {

@@ -2,14 +2,12 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { EntrepreneurProvider, useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { entrepreneurNav } from '@/lib/nav/entrepreneur-nav';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
-import { Modal } from '@/components/shared/Modal';
-import { NotificationsModal } from '@/components/entrepreneur/NotificationsModal';
+import { NotificationsModal } from '@/components/shared/NotificationsModal';
 import { routes } from '@/lib/routes';
 
 const titles: Record<string, string> = {
@@ -66,7 +64,15 @@ function Shell({ children }: { children: React.ReactNode }) {
       }
     >
       {children}
-      <NotificationsModal open={notifOpen} onOpenChange={setNotifOpen} />
+      <NotificationsModal
+        open={notifOpen}
+        onOpenChange={setNotifOpen}
+        notifications={notifications.map((notification) => ({
+          ...notification,
+          unread: true,
+          tone: 'danger',
+        }))}
+      />
     </AppShell>
   );
 }

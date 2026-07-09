@@ -1,9 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
-import { FormAutocomplete, FormField, FormInput, FormRow2, FormSelect, FormTextarea } from '@/components/shared/FormField';
+import { FormAutocomplete, FormField, FormRow2, FormSelect, FormTextarea } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { bookingSchema, type BookingForm } from '@/lib/forms/schemas';
@@ -16,7 +17,7 @@ const sessionTypes = [
   { value: 'investor-prep', label: 'Investor Prep Session (60 min)' },
 ];
 
-const timeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00'];
+const timeSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 export function BookingModal({
   open,
@@ -30,8 +31,9 @@ export function BookingModal({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
       sessionType: 'mentor-checkin',
-      recipient: 'specific',
-      trainerId: trainers[0]?.id ?? '',
+      recipient: 'general',
+      trainerId: '',
+      topic: '',
       date: '2026-07-08',
       time: '10:00',
       notes: '',
@@ -40,6 +42,12 @@ export function BookingModal({
 
   const recipient = form.watch('recipient');
 
+  React.useEffect(() => {
+    if (recipient === 'general' && form.watch('trainerId')) {
+      form.setValue('trainerId', '', { shouldValidate: true });
+    }
+  }, [form, recipient]);
+
   const onSubmit = (values: BookingForm) => {
     bookSession(values);
     onOpenChange(false);
@@ -47,7 +55,7 @@ export function BookingModal({
   };
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Book a session">
+    <Modal open={open} onOpenChange={onOpenChange} title="Book a session" width="wide">
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Session type">
           <FormSelect
@@ -60,13 +68,24 @@ export function BookingModal({
         <FormField label="Who would you like to meet?">
           <FormSelect
             value={form.watch('recipient')}
-            onValueChange={(v) => form.setValue('recipient', v as 'specific' | 'general')}
+            onValueChange={(v) => {
+              form.setValue('recipient', v as 'specific' | 'general', { shouldValidate: true });
+              if (v === 'specific' && !form.watch('trainerId')) {
+                form.setValue('trainerId', trainers[0]?.id ?? '', { shouldValidate: true });
+              }
+            }}
             options={[
-              { value: 'specific', label: 'A specific trainer' },
               { value: 'general', label: 'Any available BID team member' },
+              { value: 'specific', label: 'A specific trainer' },
             ]}
           />
         </FormField>
+
+        {recipient === 'general' && (
+          <div className="mb-4 rounded-xl border border-line bg-surface-subtle px-4 py-3 text-sm leading-6 text-ink-muted">
+            This request will go to the BID team queue. The first available team member who accepts it will own the session.
+          </div>
+        )}
 
         {recipient === 'specific' && (
           <FormField label="Trainer">
@@ -84,7 +103,15 @@ export function BookingModal({
           </FormField>
         )}
 
-        <FormRow2>
+        <FormField label="Session topic / goal" error={form.formState.errors.topic?.message}>
+          <FormTextarea
+            rows={2}
+            placeholder="e.g. Review our pricing model before investor outreach"
+            {...form.register('topic')}
+          />
+        </FormField>
+
+        <FormRow2 className="sm:grid-cols-[minmax(0,1fr)_132px]">
           <FormField label="Date" error={form.formState.errors.date?.message}>
             <Controller
               control={form.control}
@@ -100,10 +127,16 @@ export function BookingModal({
           </FormField>
 
           <FormField label="Time">
-            <FormSelect
+            <FormAutocomplete
               value={form.watch('time')}
-              onValueChange={(v) => form.setValue('time', v)}
-              options={timeSlots.map((t) => ({ value: t, label: t }))}
+              onValueChange={(value) => form.setValue('time', value, { shouldValidate: true })}
+              options={timeSlots.map((time) => ({ value: time, label: time }))}
+              placeholder="Select time"
+              searchPlaceholder="Search time..."
+              emptyMessage="No time slot found."
+              className="w-[132px]"
+              popoverClassName="w-[160px]"
+              listClassName="max-h-[176px] overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y"
             />
           </FormField>
         </FormRow2>
@@ -111,7 +144,7 @@ export function BookingModal({
         <FormField label="Notes" optional>
           <FormTextarea
             rows={3}
-            placeholder="What would you like to discuss?"
+            placeholder="Add any extra context, links, or preparation notes."
             {...form.register('notes')}
           />
         </FormField>

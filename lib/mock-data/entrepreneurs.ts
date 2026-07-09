@@ -5,18 +5,19 @@ import type { Entrepreneur, FundingRound } from '@/types';
  *
  * Mirrors the rows surfaced in the admin "Entrepreneurs" table and the
  * "Recently joined" dashboard card. The shape is deliberately close to a
- * DB row — `programmeId`, `trainerId`, `sector` / `stage` are ids that
- * resolve against the lookup tables in `./definitions`.
+ * DB row — `contentItemIds`, `programmeIds`, `sector` / `stage` are ids that
+ * resolve against lookup tables. `trainerId` is legacy only; trainer scope is
+ * inferred from content item ownership.
  */
 
 const funding: Record<string, FundingRound[]> = {
   'e-paybridge': [
     { id: 'f-pb-1', name: 'Pre-seed (pre-BID)', amountUsd: 30000, date: '2023-01-15', source: 'Angel investor' },
-    { id: 'f-pb-2', name: 'Grant – BID', amountUsd: 50000, date: '2023-06-10', source: 'BID grant' },
-    { id: 'f-pb-3', name: 'Seed', amountUsd: 40000, date: '2024-10-02', source: 'Angel investor' },
+    { id: 'f-pb-2', name: 'Grant – BID', amountUsd: 50000, date: '2023-06-10', source: 'BID grant', programmeId: 'p-accelerator-c6' },
+    { id: 'f-pb-3', name: 'Seed', amountUsd: 40000, date: '2024-10-02', source: 'Angel investor', programmeId: 'p-readiness-fintech', goalId: 'goal-fundraising-series-a' },
   ],
   'e-healthfirst': [
-    { id: 'f-hf-1', name: 'Series A', amountUsd: 300000, date: '2024-11-15', source: 'Institutional investor' },
+    { id: 'f-hf-1', name: 'Series A', amountUsd: 300000, date: '2024-11-15', source: 'Institutional investor', programmeId: 'p-readiness-fintech' },
   ],
 };
 
@@ -32,6 +33,8 @@ export const entrepreneurs: Entrepreneur[] = [
     sector: 'fintech',
     stage: 'growth',
     cohort: 'Cohort 6',
+    contentItemIds: ['c-intro-vid', 'c-intro-pdf', 'c-bmc-why', 'c-bmc-sheet', 'c-bmc-valueprop', 'c-bmc-tool', 'c-pitch-structure', 'c-pitch-qa', 'c-pitch-checklist', 'c-finmodel-basics', 'c-growth-ops-cadence', 'c-market-expansion-map', 'c-leadership-routines', 'c-export-checklist'],
+    programmeIds: ['p-accelerator-c6', 'p-readiness-fintech', 'p-growth-ops', 'p-market-expansion', 'p-leadership-lab', 'p-export-readiness'],
     programmeId: 'p-accelerator-c6',
     source: 'invited',
     goal: {
@@ -51,6 +54,34 @@ export const entrepreneurs: Entrepreneur[] = [
       fundsMobilisedUsd: 120000,
     },
     fundingRounds: funding['e-paybridge'],
+    periodicUpdates: [
+      {
+        id: 'pu-pb-q4-2024',
+        period: 'Q4 2024',
+        periodStart: '2024-10-01',
+        periodEnd: '2024-12-31',
+        submittedAt: '2024-12-31',
+        programmeId: 'p-accelerator-c6',
+        jobsWomen: 2,
+        jobsMen: 1,
+        jobsCreated: 3,
+        fundsMobilisedUsd: 0,
+        notes: 'Maintained operations while preparing for investor outreach.',
+      },
+      {
+        id: 'pu-pb-q3-2024',
+        period: 'Q3 2024',
+        periodStart: '2024-07-01',
+        periodEnd: '2024-09-30',
+        submittedAt: '2024-09-30',
+        programmeId: 'p-readiness-fintech',
+        jobsWomen: 0,
+        jobsMen: 0,
+        jobsCreated: 0,
+        fundsMobilisedUsd: 0,
+        notes: 'BID grant recorded in fundraising history and allocated to product development.',
+      },
+    ],
     lastUpdateAt: '2024-12-31',
     trainerId: 't-kofi',
     joinedAt: '2024-09-01',
@@ -66,6 +97,8 @@ export const entrepreneurs: Entrepreneur[] = [
     sector: 'agritech',
     stage: 'idea',
     cohort: 'Cohort 6',
+    contentItemIds: ['c-intro-vid', 'c-intro-pdf', 'c-bmc-why', 'c-bmc-sheet', 'c-bmc-valueprop', 'c-growth-ops-cadence', 'c-market-expansion-map'],
+    programmeIds: ['p-accelerator-c6', 'p-growth-ops', 'p-market-expansion'],
     programmeId: 'p-accelerator-c6',
     source: 'invited',
     goal: { type: 'milestone', description: 'Complete first pilot season' },
@@ -94,6 +127,8 @@ export const entrepreneurs: Entrepreneur[] = [
     country: 'Nigeria',
     sector: 'healthtech',
     stage: 'scale',
+    contentItemIds: ['c-pitch-structure', 'c-pitch-qa', 'c-pitch-checklist', 'c-finmodel-basics', 'c-market-expansion-map', 'c-export-checklist'],
+    programmeIds: ['p-readiness-fintech', 'p-market-expansion', 'p-export-readiness'],
     programmeId: 'p-readiness-fintech',
     source: 'invited',
     goal: {
@@ -112,6 +147,22 @@ export const entrepreneurs: Entrepreneur[] = [
       fundsMobilisedUsd: 300000,
     },
     fundingRounds: funding['e-healthfirst'],
+    periodicUpdates: [
+      {
+        id: 'pu-hf-q4-2024',
+        period: 'Q4 2024',
+        periodStart: '2024-10-01',
+        periodEnd: '2024-12-31',
+        submittedAt: '2024-12-31',
+        programmeId: 'p-readiness-fintech',
+        jobsWomen: 8,
+        jobsMen: 4,
+        jobsCreated: 12,
+        fundsMobilisedUsd: 0,
+        notes: 'Expanded operations team after clinical pilot growth.',
+      },
+    ],
+    lastUpdateAt: '2024-12-31',
     trainerId: 't-kofi',
     joinedAt: '2024-03-01',
   },
@@ -176,6 +227,8 @@ export const entrepreneurs: Entrepreneur[] = [
     sector: 'edtech',
     stage: 'growth',
     cohort: 'Cohort 6',
+    contentItemIds: ['c-intro-vid', 'c-intro-pdf', 'c-bmc-why', 'c-bmc-sheet', 'c-pitch-structure'],
+    programmeIds: ['p-accelerator-c6'],
     programmeId: 'p-accelerator-c6',
     source: 'invited',
     goal: { type: 'milestone', description: 'Reach 10k active learners' },
@@ -190,6 +243,22 @@ export const entrepreneurs: Entrepreneur[] = [
       fundsMobilisedUsd: 0,
     },
     fundingRounds: [],
+    periodicUpdates: [
+      {
+        id: 'pu-edify-q4-2024',
+        period: 'Q4 2024',
+        periodStart: '2024-10-01',
+        periodEnd: '2024-12-31',
+        submittedAt: '2024-12-31',
+        programmeId: 'p-accelerator-c6',
+        jobsWomen: 3,
+        jobsMen: 1,
+        jobsCreated: 4,
+        fundsMobilisedUsd: 0,
+        notes: 'Hired learning support team for the pilot cohort.',
+      },
+    ],
+    lastUpdateAt: '2024-12-31',
     joinedAt: '2024-08-12',
   },
 ];

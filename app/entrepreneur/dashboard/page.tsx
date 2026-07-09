@@ -58,10 +58,10 @@ export default function EntrepreneurDashboardPage() {
     .filter((d) => d.status === 'pending' || d.status === 'overdue' || d.status === 'submitted')
     .slice(0, 4);
   const progressTrend = [
-    { week: 'W1', training: 32 },
-    { week: 'W2', training: 44 },
-    { week: 'W3', training: 57 },
-    { week: 'W4', training: entrepreneur.metrics.trainingProgress },
+    { date: 'Jun 16', training: 32 },
+    { date: 'Jun 23', training: 44 },
+    { date: 'Jun 30', training: 57 },
+    { date: 'Jul 7', training: entrepreneur.metrics.trainingProgress },
   ];
 
   return (
@@ -142,7 +142,7 @@ export default function EntrepreneurDashboardPage() {
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-              <XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
               <YAxis
                 domain={[0, 100]}
                 tickFormatter={(value) => `${value}%`}

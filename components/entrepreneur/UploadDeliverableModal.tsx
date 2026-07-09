@@ -194,7 +194,6 @@ export function UploadDeliverableModal({
           onClick={() => {
             if (!selectedDeliverable) return;
             form.setValue('fileName', sampleFileName(selectedDeliverable), { shouldValidate: true });
-            import('sonner').then(({ toast }) => toast.info('File picker will connect when storage is added.'));
           }}
           className="flex w-full flex-col items-center rounded-xl border-[1.5px] border-dashed border-line-strong px-5 py-6 text-center transition-colors hover:border-bid hover:bg-bid-light disabled:pointer-events-none disabled:opacity-60"
           aria-label="Upload file"
@@ -204,7 +203,7 @@ export function UploadDeliverableModal({
             {isResubmission ? 'Attach revised file' : 'Attach file for review'}
           </span>
           <span className="mt-1 text-xs text-ink-muted">
-            PDF, PPTX, DOCX, XLSX up to 25 MB
+            PDF, PPTX, DOCX, XLSX up to 25 MB. Click to select a sample file for this UI flow.
           </span>
         </button>
 

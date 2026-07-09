@@ -20,6 +20,7 @@ import {
 import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { deliverableGroups } from '@/lib/mock-data';
+import { entrepreneurHasProgramme } from '@/lib/programme-access';
 import { routes } from '@/lib/routes';
 import { Modal } from '@/components/shared/Modal';
 import type { BadgeTone, Deliverable, DeliverableFeedback, DeliverableStatus } from '@/types';
@@ -67,7 +68,7 @@ export default function DeliverableListPage({
 }: {
   params: { groupId: string };
 }) {
-  const { deliverables, markDeliverableFeedbackRead } = useEntrepreneurStore();
+  const { entrepreneur, deliverables, markDeliverableFeedbackRead } = useEntrepreneurStore();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [targetDeliverable, setTargetDeliverable] = React.useState<Deliverable | null>(null);
   const [feedbackTarget, setFeedbackTarget] = React.useState<Deliverable | null>(null);
@@ -77,6 +78,7 @@ export default function DeliverableListPage({
   const [pageSize, setPageSize] = React.useState(10);
   const group = deliverableGroups.find((item) => item.id === params.groupId);
   if (!group) return notFound();
+  if (group.programmeId && !entrepreneurHasProgramme(entrepreneur, group.programmeId)) return notFound();
 
   const groupItems = React.useMemo(() => {
     if (group.id === 'g-general') {
