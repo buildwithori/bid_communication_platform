@@ -21,6 +21,16 @@ The project is currently in a UI-first phase. Backend authentication, persistenc
 - Lucide React icons
 - Sonner toasts
 
+Planned backend stack:
+
+- NestJS API
+- PostgreSQL + Prisma
+- BullMQ + Redis for background jobs
+- S3-compatible file storage
+- Mux Video
+- Resend email
+- Google Calendar / Google Meet integration first
+
 ## Getting Started
 
 Install dependencies:
@@ -228,7 +238,7 @@ Not implemented yet:
 
 ## Backend Integration Notes
 
-Future backend work should connect around the current boundaries:
+Future backend work will be implemented as a NestJS API. It should connect around the current boundaries:
 
 - Auth: replace UI-only auth with a real auth provider and role-based routing.
 - Data: replace `lib/stores` in-memory mutations with backend calls.

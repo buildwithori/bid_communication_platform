@@ -81,7 +81,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 
 ## Current Important Decisions
 
-- Backend/API folders were removed for now. The app is UI/in-memory-state first.
+- Backend/API folders were removed for now. The app is UI/in-memory-state first. Backend implementation direction is now NestJS, not Next.js route handlers.
 - TanStack Query is installed and wired through `app/providers.tsx`; current mock stores still own data until backend integration begins.
 - Auth includes separate `/auth/login` and `/auth/signup` pages with shared tabs that navigate between URLs, plus forgot password, reset password, and email verification.
 - Admin dashboard and entrepreneur dashboard include charts via Recharts.

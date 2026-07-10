@@ -1,8 +1,8 @@
 # BID Hub Backend Design Document
 
-Last updated: 2026-07-01
+Last updated: 2026-07-10
 
-Status: Draft for collaboration
+Status: Draft for collaboration before implementation
 
 Owner: BID Hub engineering
 
@@ -13,576 +13,693 @@ Related memory files:
 
 ## 1. Purpose
 
-This document defines the backend architecture for BID Hub. It is intended to be collaborative and durable: we should update it as product decisions become clearer, but it should keep the backend work aligned around clean boundaries, reliable workflows, and scalable data design.
+This document defines the backend architecture for BID Hub now that the backend direction is NestJS. It is intentionally detailed because we are about to move from UI-first mock flows into real data, permissions, files, jobs, calendar integration, and video processing.
 
-The current application is UI-first. The next major phase is to replace mock data and in-memory stores with real authentication, persistence, file storage, jobs, video streaming, and operational APIs.
+The goal is not to build quickly at the cost of future pain. The goal is to build a backend that can support BID operations as entrepreneurs, programmes, trainers, content, deliverables, sessions, tools, and reports grow.
 
 ## 2. Product Context
 
-BID Hub supports entrepreneur development programmes. It has two primary workspaces:
+BID Hub supports entrepreneur development programmes across three workspaces:
 
 - Entrepreneur workspace: learning, deliverables, profile, funding updates, sessions, tools.
-- Admin workspace: programme operations, entrepreneurs, trainers, content, deliverable reviews, reporting, sessions, and tool requests.
+- Admin workspace: operations, programmes, entrepreneurs, trainers, content, deliverable reviews, sessions, reporting, tool requests, settings.
+- Trainer workspace: programme/content portfolio, inferred entrepreneurs, sessions, deliverable reviews, settings.
 
-The backend must support:
+Important product decisions the backend must preserve:
 
-- role-based access
-- growing programme and content libraries
-- file uploads
-- video training content
-- deliverable submission and review
-- session scheduling workflows
-- report generation
-- notifications and reminders
-- auditability of important admin decisions
+- Entrepreneurs can have zero, one, or many programme access grants.
+- Every entrepreneur automatically has free resource access after signup.
+- Free resources are not stored as per-entrepreneur assignments.
+- Trainers are not directly assigned to entrepreneurs.
+- Trainers are assigned to programme content items/modules.
+- An entrepreneur's trainer context is inferred from the content they can access.
+- Ratings on content roll up to the trainer attached to that content.
+- Programme impact reporting must be attributed explicitly. Do not force unattributed jobs/funding into programme charts.
+- Deliverable due dates come from programme deliverable rules and become concrete per entrepreneur/programme context.
+- Session requests can target a specific person or the open BID team queue.
+- The first eligible admin/trainer who accepts an open team request owns the session.
+- Google Calendar/Google Meet is first, but session data should stay provider-agnostic.
 
 ## 3. Chosen Stack
 
-### Application Backend
+### Backend Framework
 
-- Next.js App Router route handlers.
-- TypeScript throughout.
-- Modular server code under `lib/server`.
+- NestJS.
+- TypeScript.
+- REST-first API.
+- OpenAPI/Swagger documentation generated from DTOs.
 
 Rationale:
 
-- The product is not yet an external public API platform.
-- We already use Next.js and TanStack Query.
-- Route handlers are enough for the first production backend if we keep route handlers thin and place business logic in services.
-- Avoiding a separate backend app reduces deployment and maintenance overhead.
+- The product has multiple bounded domains and non-trivial workflows.
+- NestJS gives us modules, guards, interceptors, pipes, providers, dependency injection, and testable services.
+- A dedicated backend keeps business logic out of the Next.js UI.
+- REST maps cleanly to the current TanStack Query integration.
+
+### Frontend
+
+- Existing Next.js app remains the frontend.
+- TanStack Query remains the client data fetching layer.
+- The frontend should call NestJS APIs through typed client helpers/hooks.
 
 ### Database
 
-- Supabase Postgres.
-- Drizzle ORM for schema, migrations, and typed queries.
+- PostgreSQL.
+- Prisma ORM for schema, migrations, and typed database access.
 
 Rationale:
 
-- The domain is relational: users, profiles, programmes, modules, enrolments, submissions, reviews, trainers, sessions, reports, and tool requests.
-- Postgres gives us strong relational integrity, transactions, indexes, views, and future reporting flexibility.
-- Drizzle keeps us close to SQL while preserving TypeScript safety.
+- The domain is relational and needs transactions, constraints, indexes, joins, and reporting queries.
+- Prisma gives strong schema visibility, migrations, generated types, and a clean developer experience with NestJS.
 
-### Auth and Authorization
+### Auth
 
-- Supabase Auth.
-- `profiles` table linked to Supabase Auth users.
-- Application roles: entrepreneur, admin, trainer.
-- Postgres RLS for exposed tables and storage access where appropriate.
-- Service-level authorization checks for business operations.
+- NestJS-owned authentication.
+- Email/password auth for standard login.
+- Google OAuth signup/login for entrepreneurs.
+- Admin/trainer invitation flows.
+- JWT access tokens plus refresh tokens stored server-side or hashed in the database.
+- Argon2 for password hashing.
 
-### Validation
+Rationale:
 
-- Zod for server-side input validation.
-- Existing UI form schemas can inform backend schemas, but server validation is authoritative.
+- We need business-specific role routing, invitations, email verification, password reset, and future permissions.
+- Owning auth in the NestJS backend keeps authorization decisions close to the domain.
 
-### Client Data Fetching
+### Authorization
 
-- TanStack Query.
-- Replace mock stores gradually with query/mutation hooks.
+- Role-based access first: entrepreneur, trainer, admin.
+- Policy-based checks inside services for business rules.
+- Capability/permission table can be added later without rewriting every endpoint.
 
-### Storage
+### Files
 
-- Supabase Storage for PDFs, deliverables, images, and downloadable tool resources.
-- Store metadata and storage keys in Postgres.
-
-### Background Jobs
-
-- Trigger.dev.
-
-Use it for:
-
-- report generation
-- email notifications
-- deliverable review notifications
-- weekly update reminders
-- session reminders
-- report generation
-- calendar sync
-- file post-processing
-- future AI analysis/summarization
-- video webhook processing if needed
+- S3-compatible object storage.
+- Use storage keys in the database, not public URLs.
+- Signed URLs for private reads/downloads.
+- Direct upload URLs where appropriate.
 
 ### Video
 
-- Mux Video for upload, encoding, thumbnails, adaptive streaming, playback analytics, and playback IDs.
-- `@mux/mux-player-react` for frontend playback.
+- Mux Video for video upload, encoding, playback, thumbnails, captions later, and analytics.
+- Frontend uses `@mux/mux-player-react`.
+- Store Mux asset IDs, playback IDs, duration, status, and metadata in Postgres.
 
-Do not use Supabase Storage as the primary training video streaming system. Supabase Storage is for files; Mux is for video streaming infrastructure.
+### Jobs
+
+- Redis + BullMQ.
+- NestJS queue processors for background work.
+- Use repeatable jobs for reminders and sync.
+
+Jobs cover:
+
+- email notifications
+- in-app notification fanout
+- session reminders
+- deliverable reminders
+- periodic update reminders
+- report generation/export
+- file processing
+- Google Calendar sync
+- Mux webhook processing
 
 ### Email
 
-- Resend, unless business requirements later prefer Postmark or another transactional email provider.
+- Resend for transactional email unless the business chooses another provider later.
+
+### Calendar
+
+- Google Calendar first.
+- Store OAuth tokens encrypted.
+- Read free/busy availability.
+- Create/update/cancel Google Calendar events with Google Meet links.
+- Keep session fields provider-agnostic so we can add Zoom/Teams later.
 
 ## 4. Architecture Principles
 
-1. Keep route handlers thin.
-2. Put business rules in services.
-3. Put database access in repositories.
-4. Validate all inputs on the server.
-5. Authorize every read and write.
-6. Use transactions for multi-step writes.
-7. Use background jobs for long-running work.
-8. Make jobs idempotent.
-9. Design every list endpoint for growth.
-10. Keep files and videos outside Postgres.
-11. Use typed DTOs for API responses.
-12. Keep the UI decoupled from database tables.
+1. Controllers are thin.
+2. DTOs validate request input.
+3. Services own business rules and transactions.
+4. Policies own authorization decisions that are more complex than role guards.
+5. Repositories/query helpers own complex database queries.
+6. Jobs are idempotent.
+7. Files and videos stay outside Postgres.
+8. Every list endpoint supports growth: search, filters, sorting, pagination.
+9. Use transactions for multi-step writes.
+10. Use audit logs for important admin decisions.
+11. Never trust client-provided ownership, role, or status transitions.
+12. Return API DTOs, not raw database rows.
 
-## 5. Target Backend Folder Structure
+## 5. Repository Shape
+
+Recommended monorepo shape:
 
 ```text
-lib/server/
-  auth/
-    get-current-user.ts
-    require-role.ts
-    permissions.ts
-  db/
-    client.ts
-    schema/
-    migrations/
-  repositories/
-    entrepreneurs.repository.ts
-    trainers.repository.ts
-    programmes.repository.ts
-    content.repository.ts
-    deliverables.repository.ts
-    sessions.repository.ts
-  services/
-    entrepreneurs.service.ts
-    trainers.service.ts
-    programmes.service.ts
-    content.service.ts
-    deliverables.service.ts
-    sessions.service.ts
-    reporting.service.ts
-  validators/
-    entrepreneurs.validators.ts
-    programmes.validators.ts
-    content.validators.ts
-    deliverables.validators.ts
-  jobs/
-    email-notification.job.ts
-    session-reminder.job.ts
-    weekly-update-reminder.job.ts
-    video-webhook.job.ts
-  storage/
-    storage.service.ts
-    signed-url.service.ts
-  video/
-    mux.service.ts
-    video-assets.service.ts
-  email/
-    email.service.ts
-    templates/
-  audit/
-    audit.service.ts
-  errors/
-    api-error.ts
-    error-response.ts
-
-app/api/
-  auth/
-  entrepreneurs/
-  trainers/
-  programmes/
-  content/
-  deliverables/
-  sessions/
-  reporting/
-  webhooks/
-
-drizzle/
-  schema.ts
+apps/
+  web/              # existing Next.js UI, or current root app can stay until migrated
+  api/              # NestJS backend
+packages/
+  shared/           # optional shared types/constants later
+prisma/
+  schema.prisma
   migrations/
 ```
 
-## 6. Request Flow
+If we keep the current repo root as the web app initially, create the backend under:
+
+```text
+backend/
+  src/
+  test/
+  package.json
+  tsconfig.json
+```
+
+The long-term preferred structure is `apps/api` and `apps/web`, but we do not need to move the frontend on day one if that slows backend setup.
+
+## 6. NestJS Folder Structure
+
+```text
+apps/api/src/
+  main.ts
+  app.module.ts
+  config/
+    app.config.ts
+    database.config.ts
+    auth.config.ts
+    storage.config.ts
+    mux.config.ts
+    calendar.config.ts
+  common/
+    decorators/
+    dto/
+    errors/
+    filters/
+    guards/
+    interceptors/
+    pagination/
+    pipes/
+    policies/
+    types/
+  database/
+    prisma.module.ts
+    prisma.service.ts
+    transaction.ts
+  auth/
+  users/
+  admins/
+  entrepreneurs/
+  trainers/
+  programmes/
+  learning-content/
+  deliverables/
+  sessions/
+  tools/
+  reporting/
+  notifications/
+  files/
+  video/
+  calendar/
+  audit/
+  jobs/
+```
+
+Feature module pattern:
+
+```text
+feature/
+  feature.module.ts
+  feature.controller.ts
+  feature.service.ts
+  dto/
+  policies/
+  repositories/
+  mappers/
+  jobs/
+```
+
+## 7. Request Flow
 
 ### Read Request
 
 ```text
-Client component
+Next.js page/component
   -> TanStack Query hook
-  -> app/api route handler
-  -> auth helper
-  -> validator for query params
+  -> API client
+  -> NestJS controller
+  -> auth guard
+  -> query DTO validation
   -> service
-  -> repository
-  -> Drizzle/Postgres
+  -> policy check
+  -> repository/query helper
+  -> Prisma/Postgres
+  -> mapper
   -> DTO response
 ```
 
 ### Mutation Request
 
 ```text
-Client form
-  -> React Hook Form + client Zod validation
+Form
+  -> client validation for UX
   -> TanStack mutation
-  -> app/api route handler
-  -> auth helper
-  -> server Zod validation
-  -> service authorization and business rules
-  -> repository transaction
-  -> audit event
-  -> optional background job trigger
+  -> NestJS controller
+  -> auth guard
+  -> body DTO validation
+  -> service
+  -> policy check
+  -> transaction
+  -> audit log
+  -> optional job enqueue
   -> DTO response
 ```
 
-### Long-Running Work
+### Long Running Work
 
 ```text
 Client action
-  -> API route validates request
-  -> service creates pending record
-  -> service triggers Trigger.dev job
-  -> API returns job/run reference
-  -> job performs work
-  -> job updates database status
-  -> UI polls or subscribes to status later
+  -> controller validates request
+  -> service creates pending record/job record
+  -> service enqueues BullMQ job
+  -> controller returns status reference
+  -> worker processes job idempotently
+  -> worker updates database
+  -> UI polls, refreshes, or receives future realtime notification
 ```
 
-## 7. Identity and Access Model
-
-### Roles
-
-Initial roles:
-
-- `entrepreneur`
-- `admin`
-- `trainer`
-
-Expected future growth:
-
-- admin permissions
-- reviewer-only roles
-- programme manager role
-- finance/reporting role
-- trainer with restricted access
-
-Do not hard-code assumptions that there will only ever be one admin type.
+## 8. Identity and Auth Model
 
 ### Core Tables
 
-```text
-auth.users
-profiles
-roles or profile_roles
-invitations
-entrepreneur_profiles
-trainer_profiles
-```
+- `users`
+- `user_roles`
+- `admin_profiles`
+- `trainer_profiles`
+- `entrepreneur_profiles`
+- `businesses`
+- `invitations`
+- `refresh_tokens`
+- `email_verification_tokens`
+- `password_reset_tokens`
+- `oauth_accounts`
 
-### Profile Table
+### Role Rules
 
-```text
-profiles
-  id uuid primary key
-  auth_user_id uuid unique references auth.users
-  role text
-  full_name text
-  email text
-  avatar_url text nullable
-  status text
-  created_at timestamptz
-  updated_at timestamptz
-```
+A user can have one or more roles, but initial UI routes assume one active workspace at a time.
 
-For entrepreneurs, keep business-specific fields in `entrepreneur_profiles`, not directly in `profiles`.
+- Entrepreneurs can self-register.
+- Entrepreneurs can sign up with Google.
+- Admins are invited.
+- Trainers are invited.
+- Admins/trainers can connect Google Calendar after account creation.
 
-### Access Rules
+### Auth Flows
 
-Entrepreneur:
+- Signup creates user, entrepreneur profile, business profile, and sends verification email.
+- Login returns access token and refresh token.
+- Refresh token rotation should invalidate reused/stolen tokens.
+- Forgot password creates a short-lived token and sends email.
+- Reset password validates token and updates password hash.
+- Google auth links by verified email where safe, otherwise creates entrepreneur account.
+- Invitations create an invitation token and role intent.
+- Accept invitation creates/links user and role profile.
 
-- Can read their own profile.
-- Can update allowed business profile fields.
-- Can view programmes they are enrolled in.
-- Can view published content assigned to those programmes.
-- Can submit deliverables for themselves.
-- Can manage their funding updates and tool requests.
+## 9. Domain Model Draft
 
-Trainer:
+This is the first schema plan. Exact Prisma names can change, but the relationships should stay stable.
 
-- Can read assigned sessions.
-- Can read assigned entrepreneur summary data.
-- Can update availability and session outcomes if allowed.
+### Lookup and Company Settings
 
-Admin:
+- `company_settings`
+  - periodic update overdue threshold in days
+  - default timezone
+  - default session provider
+  - notification defaults
+- `sectors`
+- `business_stages`
+- `goal_types`
+- `tool_areas`
+- `countries` can be static seed data initially
 
-- Can manage programmes, entrepreneurs, trainers, content, deliverables, sessions, reports, definitions, and tool requests.
-- Sensitive admin operations should create audit logs.
+### Entrepreneurs and Businesses
 
-## 8. Domain Model Draft
-
-This is a working draft. Names may change during implementation, but the relationships should stay explicit.
+- `businesses`
+  - name
+  - country
+  - sector_id
+  - stage_id
+  - status
+  - source: self_registered, admin_invited, imported
+- `entrepreneur_profiles`
+  - user_id
+  - business_id
+  - representative details
+- `business_contacts` can come later if multiple contacts are needed.
 
 ### Programme Operations
 
-```text
-programmes
-  id
-  name
-  description
-  status
-  start_date
-  end_date
-  max_entrepreneurs
-  accent
-  created_at
-  updated_at
+- `programmes`
+  - name
+  - description
+  - access_type: free, assigned
+  - start_date
+  - end_date
+  - published_at
+  - completed_at
+  - archived_at
+  - archived_by_id
+  - archive_reason
+- `programme_modules`
+  - programme_id
+  - module_id
+  - position
+- `programme_access_grants`
+  - programme_id
+  - business_id
+  - granted_by_id
+  - granted_at
+  - revoked_at
+  - revoke_reason
 
-programme_enrolments
-  id
-  programme_id
-  entrepreneur_id
-  status
-  enrolled_at
-  completed_at
+Rules:
 
-programme_modules
-  id
-  programme_id
-  module_id
-  order_index
-  required
-```
+- Free programmes/resources do not need per-business grants.
+- Assigned programmes use `programme_access_grants`.
+- Programme lifecycle is derived, not blindly stored as a manual status.
 
 ### Learning Content
 
-```text
-modules
-  id
-  title
-  description
-  status
-  created_at
-  updated_at
+- `modules`
+  - title
+  - description
+  - reusable flag or implicit reuse by joins
+- `module_content_items`
+  - module_id
+  - content_item_id
+  - position
+- `content_items`
+  - title
+  - description
+  - type: video, pdf, tool
+  - trainer_id nullable but required when ratings should attribute to a trainer
+  - duration_seconds nullable
+  - status: draft, processing, ready, failed, archived
+- `video_assets`
+  - content_item_id
+  - mux_asset_id
+  - mux_upload_id
+  - playback_id
+  - duration
+  - status
+- `file_assets`
+  - content_item_id nullable
+  - storage_key
+  - original_filename
+  - mime_type
+  - size_bytes
+  - status
+- `content_tool_links`
+  - content_item_id
+  - tool_id nullable
+  - external_url nullable
+- `content_ratings`
+  - content_item_id
+  - business_id
+  - entrepreneur_user_id
+  - trainer_id copied from content item at rating time
+  - rating
+  - comment
 
-content_items
-  id
-  title
-  type
-  description
-  duration_label
-  status
-  created_at
-  updated_at
+Rules:
 
-module_content_items
-  id
-  module_id
-  content_item_id
-  order_index
-
-video_assets
-  id
-  content_item_id
-  mux_asset_id
-  mux_playback_id
-  upload_id
-  status
-  duration_seconds
-  thumbnail_url
-  created_at
-  updated_at
-
-file_assets
-  id
-  content_item_id
-  storage_bucket
-  storage_key
-  file_name
-  mime_type
-  file_size_bytes
-  created_at
-```
-
-### Entrepreneur Data
-
-```text
-entrepreneur_profiles
-  id
-  profile_id
-  business_name
-  representative_name
-  phone
-  country
-  sector_id
-  stage_id
-  funding_goal
-  current_need
-  assigned_trainer_id
-  created_at
-  updated_at
-
-funding_rounds
-  id
-  entrepreneur_id
-  amount
-  source
-  stage
-  closed_at
-
-periodic_updates
-  id
-  entrepreneur_id
-  period_start
-  period_end
-  revenue
-  jobs_created
-  key_update
-  blockers
-  submitted_at
-```
+- A module can be reused across programmes.
+- Reordering must update `position` safely inside a transaction.
+- Trainer attribution comes from content item ownership at the time of rating.
 
 ### Deliverables
 
-```text
-required_deliverables
-  id
-  programme_id nullable
-  name
-  due_rule
-  required_for
-  status
-  created_at
-  updated_at
+- `programme_deliverable_rules`
+  - programme_id
+  - name
+  - description
+  - due_type: fixed_date, after_module, recurring, manual
+  - due_date nullable
+  - due_after_module_id nullable
+  - recurring_rule nullable
+  - required_for: all, stage, sector, custom later
+- `deliverable_instances`
+  - rule_id
+  - business_id
+  - programme_id
+  - due_date
+  - status: not_submitted, submitted, changes_required, approved, overdue
+- `deliverable_submissions`
+  - instance_id
+  - submitted_by_id
+  - file_asset_id
+  - note
+  - submitted_at
+- `deliverable_reviews`
+  - submission_id
+  - reviewer_id
+  - reviewer_role
+  - decision: approved, changes_required
+  - feedback
+  - created_at
+  - read_at nullable
 
-deliverable_submissions
-  id
-  required_deliverable_id
-  entrepreneur_id
-  programme_id nullable
-  file_asset_id nullable
-  title
-  notes
-  status
-  submitted_at
-  reviewed_at nullable
-  reviewed_by nullable
+Rules:
 
-deliverable_reviews
-  id
-  submission_id
-  reviewer_id
-  decision
-  feedback
-  created_at
-```
+- Programme deliverable rules define the requirement.
+- Deliverable instances define what one entrepreneur/business owes.
+- Reviews are history. Do not overwrite feedback.
+- `changes_required` is a status, not just a note.
+- Entrepreneurs need unread feedback tracking.
+- Trainers can review deliverables in their trainer scope.
 
-### Trainers and Sessions
+### Sessions
 
-```text
-trainers
-  id
-  profile_id
-  role
-  bio
-  calendar_provider
-  calendar_connected
-  status
+- `session_requests`
+  - business_id
+  - requested_by_id
+  - session_type
+  - topic
+  - notes
+  - requested_date
+  - requested_start_time
+  - target_type: specific_user, open_team
+  - target_user_id nullable
+  - status: awaiting_owner, awaiting_trainer, confirmed, declined, cancelled, completed
+- `sessions`
+  - request_id nullable
+  - business_id
+  - owner_user_id
+  - owner_role
+  - session_type
+  - topic
+  - notes
+  - starts_at
+  - ends_at
+  - provider: google_meet for now
+  - meeting_url
+  - calendar_event_id
+  - status: confirmed, completed, cancelled
+- `session_reschedules`
+  - session_id or request_id
+  - requested_by_id
+  - previous_starts_at
+  - previous_ends_at
+  - new_starts_at
+  - new_ends_at
+  - reason
+  - status
+- `session_notes`
+  - session_id
+  - author_id
+  - note
+- `calendar_connections`
+  - user_id
+  - provider
+  - provider_account_email
+  - encrypted_access_token
+  - encrypted_refresh_token
+  - scopes
+  - status
+  - last_synced_at
 
-trainer_specialisms
-  id
-  trainer_id
-  specialism
+Rules:
 
-trainer_assignments
-  id
-  trainer_id
-  entrepreneur_id
-  programme_id nullable
-  status
+- Time slots are computed from selected person/team, date, duration, and calendar availability.
+- Open team requests are accepted by the first eligible admin/trainer.
+- Only users with Google Calendar connection can accept Google Meet ownership.
+- Meeting links are generated in the background when ownership is confirmed.
 
-sessions
-  id
-  entrepreneur_id
-  trainer_id
-  programme_id nullable
-  title
-  session_type
-  status
-  starts_at
-  ends_at
-  meeting_url
-  notes
-  created_at
-  updated_at
-```
+### Tools
+
+- `tools`
+  - name
+  - description
+  - type: pdf, online_tool
+  - tool_area_id
+  - visibility: global, programme, custom
+  - status: draft, published, archived
+  - file_asset_id nullable
+  - external_url nullable
+- `tool_programme_access`
+- `tool_business_access`
+- `tool_hidden_businesses`
+- `tool_requests`
+  - business_id
+  - requested_by_id
+  - title
+  - business_need
+  - tool_area_id
+  - needed_by nullable
+  - status: under_review, in_development, built, declined
+  - admin_decision_note nullable
+  - decided_by_id nullable
+  - decided_at nullable
+
+Rules:
+
+- Global tools are visible to all entrepreneurs unless explicitly hidden.
+- Programme tools are visible to businesses with access to that programme.
+- Custom tools are visible only to selected businesses.
+- Admin decisions on requests must be visible to the entrepreneur.
 
 ### Reporting
 
+- `periodic_updates`
+  - business_id
+  - reporting_period_start
+  - reporting_period_end
+  - submitted_at
+  - jobs_total
+  - jobs_women
+  - jobs_men
+  - funds_mobilised
+  - programme_id nullable when explicitly programme-scoped
+  - notes
+- `fundraising_rounds`
+  - business_id
+  - round_name
+  - amount
+  - currency
+  - date
+  - source
+  - programme_goal_id nullable
+  - programme_id nullable only if explicitly attributed
+- `programme_goals`
+  - business_id
+  - programme_id nullable depending on goal type scope
+  - goal_type_id
+  - target_amount nullable
+  - target_date nullable
+  - description
+  - status: active, achieved, closed
+- `report_exports`
+  - requested_by_id
+  - status
+  - storage_key nullable
+  - filters json
+
+Rules:
+
+- Jobs by programme require periodic updates to be programme-scoped.
+- Funds by programme require fundraising rounds or goals to be programme-attributed.
+- If attribution is missing, report as company-wide/unattributed, not under a programme.
+
+### Notifications and Audit
+
+- `notifications`
+  - recipient_user_id
+  - type
+  - title
+  - body
+  - entity_type
+  - entity_id
+  - read_at
+- `audit_logs`
+  - actor_id
+  - action
+  - entity_type
+  - entity_id
+  - before json
+  - after json
+  - created_at
+
+## 10. State Machines
+
+### Programme Lifecycle
+
 ```text
-report_snapshots
-  id
-  type
-  period_start
-  period_end
-  payload_json
-  generated_by
-  created_at
+Draft -> Scheduled -> Active -> Completed -> Archived
+Draft -> Archived
+Scheduled -> Archived
+Active -> Completed
+Active -> Archived (sets completed_at if needed)
+Completed -> Active (reopen)
+Archived -> previous derived state (restore)
 ```
 
-### Tools and Requests
+Derived order:
+
+1. `archived_at` means Archived.
+2. no `published_at` means Draft.
+3. `completed_at` or passed `end_date` means Completed.
+4. future `start_date` means Scheduled.
+5. otherwise Active.
+
+### Deliverable Instance
 
 ```text
-tools
-  id
-  title
-  description
-  category
-  storage_bucket
-  storage_key
-  status
-
-tool_requests
-  id
-  entrepreneur_id
-  title
-  description
-  status
-  admin_notes
-  created_at
-  updated_at
+Not submitted -> Submitted -> Approved
+Not submitted -> Submitted -> Changes required -> Submitted -> Approved
+Not submitted -> Overdue -> Submitted
+Submitted -> Changes required
 ```
 
-### Audit
+Rules:
+
+- Review history is append-only.
+- Latest review decision determines review-facing status.
+- Entrepreneur read state is per review or per feedback event.
+
+### Tool Request
 
 ```text
-audit_logs
-  id
-  actor_profile_id
-  action
-  entity_type
-  entity_id
-  metadata_json
-  created_at
+Under review -> In development -> Built
+Under review -> Declined
+In development -> Built
+In development -> Declined
 ```
 
-Audit important actions:
+Rules:
 
-- role changes
-- entrepreneur assignment
-- trainer assignment
-- deliverable approval or rejection
-- programme publish/unpublish
-- content publish/unpublish
-- file deletion
-- admin edits to profile/business data
+- Built should link to the created/published tool when available.
+- Declined requires a decision note.
 
-## 9. API Design
+### Session Request
 
-### Conventions
+```text
+Awaiting owner -> Confirmed -> Completed
+Awaiting owner -> Declined
+Confirmed -> Cancelled
+Confirmed -> Rescheduled -> Confirmed
+```
 
-- API routes live under `app/api`.
-- Response data should be DTOs, not raw database rows.
-- Use Zod for params, query, and body validation.
-- Services return typed results.
-- List endpoints support:
-  - `q`
-  - filters
-  - sort
-  - cursor or page
-  - page size
+Specific trainer request can be represented as awaiting that trainer. Open BID team request remains `awaiting_owner` until accepted.
+
+## 11. API Design
+
+### API Conventions
+
+- Base path: `/api/v1`.
+- REST nouns for resources.
+- Action endpoints only when the operation is not a simple CRUD update.
+- Request DTOs validated by `class-validator` or Zod pipes. Pick one consistently during implementation.
+- Response DTOs should be explicit.
+- Use cursor pagination for growing lists.
 
 ### Response Envelope
 
@@ -599,11 +716,11 @@ For lists:
 ```json
 {
   "data": [],
-  "pagination": {
-    "nextCursor": null,
-    "pageSize": 25,
-    "total": 120
-  }
+  "pageInfo": {
+    "nextCursor": "...",
+    "hasNextPage": true
+  },
+  "totalCount": 124
 }
 ```
 
@@ -613,562 +730,554 @@ For errors:
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Please check the submitted fields.",
-    "fields": {}
+    "message": "Please check the highlighted fields.",
+    "details": []
   }
 }
 ```
 
 ### Initial API Surface
 
-Auth/profile:
+Auth:
 
-```text
-GET    /api/me
-PATCH  /api/me/profile
-```
+- `POST /auth/signup`
+- `POST /auth/login`
+- `POST /auth/google`
+- `POST /auth/logout`
+- `POST /auth/refresh`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
+- `POST /auth/verify-email`
+- `GET /auth/me`
 
-Programmes:
+Admin team:
 
-```text
-GET    /api/programmes
-POST   /api/programmes
-GET    /api/programmes/:id
-PATCH  /api/programmes/:id
-POST   /api/programmes/:id/modules
-POST   /api/programmes/:id/modules/reuse
-GET    /api/programmes/:id/readiness
-```
-
-Content:
-
-```text
-GET    /api/content
-POST   /api/content
-PATCH  /api/content/:id
-POST   /api/content/:id/files
-POST   /api/content/:id/video/upload-url
-```
+- `GET /admins`
+- `POST /admins/invitations`
+- `GET /admins/:id`
+- `PATCH /admins/:id`
 
 Entrepreneurs:
 
-```text
-GET    /api/entrepreneurs
-POST   /api/entrepreneurs
-GET    /api/entrepreneurs/:id
-PATCH  /api/entrepreneurs/:id
-POST   /api/entrepreneurs/:id/assign-programme
-POST   /api/entrepreneurs/:id/assign-trainer
-```
+- `GET /entrepreneurs`
+- `POST /entrepreneurs`
+- `GET /entrepreneurs/:id`
+- `PATCH /entrepreneurs/:id`
+- `GET /entrepreneurs/:id/programme-access`
+- `POST /entrepreneurs/:id/programme-access`
+- `DELETE /entrepreneurs/:id/programme-access/:programmeId`
+- `GET /entrepreneurs/:id/tool-access`
+- `POST /entrepreneurs/:id/tool-access`
+- `DELETE /entrepreneurs/:id/tool-access/:toolId`
+
+Programmes:
+
+- `GET /programmes`
+- `POST /programmes`
+- `GET /programmes/:id`
+- `PATCH /programmes/:id`
+- `POST /programmes/:id/publish`
+- `POST /programmes/:id/complete`
+- `POST /programmes/:id/archive`
+- `POST /programmes/:id/restore`
+- `GET /programmes/:id/modules`
+- `POST /programmes/:id/modules`
+- `PATCH /programmes/:id/modules/reorder`
+
+Learning content:
+
+- `GET /modules/:id`
+- `POST /modules`
+- `PATCH /modules/:id`
+- `POST /modules/:id/content-items`
+- `PATCH /modules/:id/content-items/reorder`
+- `GET /content-items/:id`
+- `POST /content-items/:id/ratings`
 
 Deliverables:
 
-```text
-GET    /api/deliverables
-POST   /api/deliverables/submissions
-GET    /api/deliverables/submissions
-GET    /api/deliverables/submissions/:id
-POST   /api/deliverables/submissions/:id/review
-```
+- `GET /programme-deliverable-rules`
+- `POST /programmes/:id/deliverable-rules`
+- `PATCH /deliverable-rules/:id`
+- `GET /deliverable-instances`
+- `POST /deliverable-instances/:id/submissions`
+- `GET /deliverable-reviews`
+- `POST /deliverable-submissions/:id/reviews`
+- `PATCH /deliverable-instances/:id/due-date`
+- `POST /deliverable-reviews/:id/mark-read`
 
 Sessions:
 
-```text
-GET    /api/sessions
-POST   /api/sessions
-PATCH  /api/sessions/:id
-POST   /api/sessions/:id/cancel
-```
+- `GET /sessions`
+- `POST /session-requests`
+- `GET /session-requests`
+- `POST /session-requests/:id/accept`
+- `POST /session-requests/:id/decline`
+- `POST /sessions`
+- `POST /sessions/:id/reschedule`
+- `POST /sessions/:id/complete`
+- `POST /sessions/:id/notes`
+- `GET /availability`
+
+Tools:
+
+- `GET /tools`
+- `POST /tools`
+- `GET /tools/:id`
+- `PATCH /tools/:id`
+- `POST /tools/:id/publish`
+- `POST /tools/:id/archive`
+- `GET /tool-requests`
+- `POST /tool-requests`
+- `POST /tool-requests/:id/transition`
 
 Reporting:
 
+- `GET /reporting/overview`
+- `GET /reporting/overdue-updates`
+- `POST /periodic-updates`
+- `GET /periodic-updates`
+- `POST /fundraising-rounds`
+- `GET /fundraising-rounds`
+- `POST /report-exports`
+
+Files/video/calendar:
+
+- `POST /files/direct-upload-url`
+- `GET /files/:id/signed-url`
+- `POST /video/direct-upload`
+- `POST /webhooks/mux`
+- `GET /calendar/google/connect-url`
+- `POST /calendar/google/callback`
+- `DELETE /calendar/connections/:id`
+
+Notifications:
+
+- `GET /notifications`
+- `POST /notifications/:id/read`
+- `POST /notifications/read-all`
+
+## 12. Search, Filtering, and Pagination
+
+Every growing list endpoint should accept:
+
+- `search`
+- `cursor`
+- `limit`
+- `sortBy`
+- `sortDirection`
+- domain filters
+
+Use case-insensitive search over normalized fields. Add indexes before production data grows.
+
+Important filters:
+
+- Entrepreneurs: source, status, sector, stage, country, programme access, tool access.
+- Trainers: status, specialism, access level, calendar support.
+- Programmes: lifecycle, access type, archive state.
+- Content: type, readiness, trainer, programme usage.
+- Deliverables: programme, status, due date, reviewer, unread feedback.
+- Sessions: status, owner, target type, date range, session type.
+- Tools: type, area, visibility, status.
+- Reporting: programme attribution, date range, country, sector, stage.
+
+## 13. Storage Design
+
+### File Categories
+
+- deliverable submissions
+- programme PDFs
+- tool PDFs
+- profile images later
+- report exports
+
+### Storage Rules
+
+- Files are private by default.
+- Generate short-lived signed URLs for reads.
+- Validate file type and size before issuing upload permission.
+- Store file metadata in `file_assets`.
+- Keep original file name but never use it as the storage key.
+- Use background scan/post-processing hook if needed later.
+
+### Upload Flow
+
 ```text
-GET    /api/reporting/dashboard
-GET    /api/reporting/programmes
-GET    /api/reporting/exports
-POST   /api/reporting/exports
+Client asks API for upload permission
+API authorizes actor and validates desired file category
+API creates pending file_asset record
+API returns signed upload URL or direct upload credentials
+Client uploads file
+Client confirms upload
+API marks file ready or schedules processing job
 ```
 
-Webhooks:
+## 14. Video Design
 
-```text
-POST   /api/webhooks/mux
-POST   /api/webhooks/trigger
-POST   /api/webhooks/resend
-```
-
-## 10. Query and Mutation Strategy
-
-The frontend already has TanStack Query installed. Backend integration should introduce query hooks gradually.
-
-Target client structure:
-
-```text
-lib/client/api/
-  fetcher.ts
-  query-keys.ts
-  auth.queries.ts
-  programmes.queries.ts
-  entrepreneurs.queries.ts
-  deliverables.queries.ts
-```
-
-Rules:
-
-- Centralize fetch behavior.
-- Centralize query keys.
-- Use optimistic updates only when the rollback path is clear.
-- Invalidate precise query keys after mutations.
-- Keep server response DTOs stable.
-- Avoid one-off fetch calls inside components.
-
-## 11. Storage Design
-
-### Buckets
-
-Proposed Supabase Storage buckets:
-
-```text
-deliverables-private
-tools-private
-content-files-private
-profile-images
-```
-
-### File Metadata
-
-Postgres should store:
-
-- owner or source entity
-- bucket
-- storage key
-- original file name
-- MIME type
-- size
-- upload status
-- checksum if needed
-- created by
-- created at
-
-### Access
-
-- Private files use signed URLs.
-- Public profile images may use public URLs only if approved.
-- Deliverables should not be publicly accessible.
-
-## 12. Video Design
-
-### Why Mux
-
-Training content can grow quickly and video is operationally expensive to do well. Mux handles upload, encoding, adaptive playback, thumbnails, analytics, and playback infrastructure.
-
-### Video Flow
+### Mux Upload Flow
 
 ```text
 Admin creates video content item
-  -> backend creates Mux direct upload
-  -> admin uploads video to Mux
-  -> Mux processes asset
-  -> Mux webhook updates video_assets row
-  -> content becomes playable when status is ready
-  -> entrepreneur views with Mux Player
+API creates Mux direct upload
+API stores pending video_asset
+Client uploads video to Mux
+Mux sends webhook
+API verifies webhook signature
+API updates video_asset status, asset ID, playback ID, duration
+Content item becomes ready when Mux asset is ready
 ```
-
-### Tables
-
-Use `video_assets` linked to `content_items`.
-
-Important fields:
-
-- `mux_asset_id`
-- `mux_playback_id`
-- `mux_upload_id`
-- `status`
-- `duration_seconds`
-- `thumbnail_url`
-- `error_message`
-
-### Player
-
-Use `@mux/mux-player-react/lazy` for training detail pages.
 
 ### Access Control
 
-Start with signed playback if content must be restricted to enrolled entrepreneurs. If public playback IDs are acceptable for early internal pilots, still design the table so signed playback can be added later.
+Start with private/signed playback if training content should be restricted. If we temporarily use public playback IDs for pilots, keep database fields ready for signed playback policy.
 
-## 13. Background Jobs Design
+### Playback Data
 
-### Job Categories
+Store:
 
-Notification jobs:
+- mux upload ID
+- mux asset ID
+- playback ID
+- playback policy
+- duration
+- aspect ratio if needed
+- status
+- error message if processing fails
 
-- welcome email
-- password reset or verification follow-up if needed outside Supabase templates
-- deliverable submitted notification
-- deliverable review decision notification
-- session reminders
-- weekly update reminders
+## 15. Background Jobs
 
-Maintenance jobs:
+### Queues
 
-- overdue deliverable status updates
-- session status updates
-- stale invitation cleanup
-- dashboard/report snapshot generation
-
-Integration jobs:
-
-- calendar sync
-- Mux webhook post-processing
-- future CRM/accounting integrations
+- `emails`
+- `notifications`
+- `sessions`
+- `calendar-sync`
+- `deliverables`
+- `periodic-updates`
+- `reports`
+- `video`
 
 ### Job Rules
 
 - Jobs must be idempotent.
-- Jobs should receive IDs, not full domain objects.
 - Jobs should reload current state from the database.
-- Jobs should write status transitions.
-- Jobs should be retry-safe.
-- Jobs should emit audit logs when they complete important business actions.
+- Jobs should no-op safely if the target entity has changed state.
+- Store `job_runs` for user-visible long-running work.
+- Use exponential backoff for transient provider failures.
+- Do not send emails inside database transactions.
 
-### Job Status Tables
+### Scheduled Jobs
 
-For long-running user-visible jobs, create a table:
+- Daily deliverable overdue check.
+- Daily periodic update overdue check.
+- Session reminders before scheduled start.
+- Calendar sync for connected admins/trainers.
+- Report export cleanup for old signed/generated files.
 
-```text
-background_tasks
-  id
-  type
-  status
-  source_type
-  source_id
-  trigger_run_id
-  requested_by
-  error_message
-  created_at
-  updated_at
-  completed_at
-```
+## 16. Calendar and Meeting Design
 
-## 14. Email Design
+### Google Calendar Connection
 
-Use Resend for transactional email unless changed later.
+- Admin/trainer starts OAuth from settings.
+- Backend stores encrypted tokens and scopes.
+- Backend verifies required scopes are present.
+- Backend marks calendar support available only after successful token exchange.
 
-Email categories:
+### Availability
 
-- account verification and account lifecycle
-- admin invitations
-- trainer invitations
-- deliverable status notifications
-- session reminders
-- weekly update reminders
+Availability endpoint input:
 
-Email rules:
+- date or date range
+- session type/duration
+- target user or open team
+- timezone
 
-- Trigger emails from services or jobs, not UI components.
-- Keep email templates versioned in code.
-- Do not send emails directly inside a database transaction.
-- Use a notification log table to avoid duplicate sends.
+Availability output:
 
-Possible table:
-
-```text
-notification_logs
-  id
-  recipient_profile_id
-  channel
-  template
-  status
-  provider_message_id
-  metadata_json
-  sent_at
-  created_at
-```
-
-## 15. Authorization and RLS Strategy
-
-Use both:
-
-- service-level authorization for business rules
-- RLS for data protection at the database/storage boundary
-
-Do not rely only on frontend route protection.
-
-### Service Authorization
-
-Every service method should receive an actor:
-
-```ts
-type Actor = {
-  profileId: string;
-  authUserId: string;
-  role: 'admin' | 'entrepreneur' | 'trainer';
-};
-```
-
-Services should check:
-
-- Is the actor authenticated?
-- Does the actor have the right role?
-- Is the actor assigned to this entity?
-- Is the entity in the right status for this action?
-
-### RLS
-
-Use RLS for:
-
-- entrepreneur-owned data
-- deliverable submissions
-- private file metadata
-- storage objects
-- trainer assigned views if direct client access is used
-
-If all data access goes through server-side route handlers with service role, still keep RLS policies planned and documented so future direct Supabase client access does not become dangerous.
-
-## 16. Search, Filtering, and Pagination
-
-Backend list endpoints should support the UI patterns already built.
-
-Required list behavior:
-
-- search query
-- filters
-- sort
-- page size
-- pagination metadata
-
-For small admin lookup lists:
-
-- offset pagination is acceptable.
-
-For large tables:
-
-- use cursor pagination.
-- index filter and sort columns.
-
-Large/growing surfaces:
-
-- entrepreneurs
-- trainers
-- programmes
-- content library
-- deliverable submissions
-- sessions
-- reporting exports
-- training library
-
-## 17. Error Handling
-
-Create a shared `ApiError`.
-
-Suggested error codes:
-
-```text
-VALIDATION_ERROR
-UNAUTHENTICATED
-FORBIDDEN
-NOT_FOUND
-CONFLICT
-BUSINESS_RULE_VIOLATION
-RATE_LIMITED
-INTERNAL_ERROR
-```
+- available slots
+- eligible owners for open team requests if needed
 
 Rules:
 
-- Never expose raw database errors to users.
-- Log unexpected errors server-side.
-- Return safe, structured error responses.
-- Preserve field-level validation errors for forms.
+- Do not return static time lists after trainer selection.
+- For open team requests, show slots that at least one eligible connected owner can cover.
+- When a user accepts a request, recheck availability inside the transaction/workflow.
 
-## 18. Audit and Compliance
+### Meeting Link Creation
 
-Audit logs should record important actions without storing sensitive payloads.
+- Confirmed Google Meet sessions should be backed by a Google Calendar event.
+- Store provider, event ID, meeting URL, and owner.
+- Reschedule updates the calendar event.
+- Cancel/decline cancels or marks the event based on state.
 
-Audit examples:
+## 17. Email and Notification Design
 
-- admin created programme
-- admin edited entrepreneur profile
-- admin assigned trainer
-- admin reviewed deliverable
-- admin generated document
-- admin changed content publish status
-- trainer completed session
-- entrepreneur submitted deliverable
+Use in-app notifications for immediate product context and email for important external prompts.
 
-Audit metadata should be useful, but not become a dump of private data.
+Notification triggers:
 
-## 19. Observability
+- admin/trainer invitation
+- email verification
+- password reset
+- deliverable submitted
+- deliverable reviewed
+- feedback unread reminder
+- session requested
+- session accepted/declined/rescheduled/completed
+- trainer nudged
+- tool request decision changed
+- periodic update overdue
+- report export ready
 
-Minimum:
+Templates should live in backend email module and use stable template names.
 
-- structured server logs
-- Trigger.dev job dashboard
-- provider logs for Mux, Resend, and Supabase
-- clear error handling
+## 18. Authorization Details
 
-Later:
+### Guards
 
-- Sentry for frontend/backend exceptions
-- PostHog or similar for product analytics if needed
-- custom admin health dashboard backed by reporting queries
+- `JwtAuthGuard`
+- `RolesGuard`
+- optional `VerifiedEmailGuard`
 
-## 20. Environment Variables
+### Decorators
 
-Draft environment variables:
+- `@CurrentUser()`
+- `@Roles()`
+- `@RequestId()`
 
-```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+### Policies
+
+Examples:
+
+- `ProgrammePolicy.canViewProgramme(actor, programme)`
+- `ProgrammePolicy.canManageProgramme(actor)`
+- `EntrepreneurPolicy.canViewBusiness(actor, businessId)`
+- `TrainerPolicy.canViewBusinessThroughContent(actor, businessId)`
+- `DeliverablePolicy.canReviewSubmission(actor, submissionId)`
+- `SessionPolicy.canAcceptRequest(actor, requestId)`
+- `ToolPolicy.canViewTool(actor, toolId)`
+
+Authorization should be checked in services, close to business logic, even if a controller already requires a role.
+
+## 19. Error Handling
+
+Use a global exception filter to normalize errors.
+
+Error code examples:
+
+- `VALIDATION_ERROR`
+- `UNAUTHENTICATED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `CONFLICT`
+- `BUSINESS_RULE_VIOLATION`
+- `UPLOAD_NOT_ALLOWED`
+- `CALENDAR_NOT_CONNECTED`
+- `SESSION_SLOT_UNAVAILABLE`
+- `VIDEO_PROCESSING_FAILED`
+
+Do not leak raw Prisma/provider errors to the frontend.
+
+## 20. Observability
+
+Minimum production setup:
+
+- structured JSON logging with request IDs
+- Sentry for backend exceptions
+- health endpoint
+- readiness endpoint
+- queue dashboard or admin observability for BullMQ
+- provider webhook logs
+- audit log table for business actions
+
+Track:
+
+- API error rate
+- auth failures
+- upload failures
+- Mux webhook failures
+- calendar sync failures
+- job retry/dead-letter counts
+- email send failures
+
+## 21. Environment Variables
+
+Draft variables:
+
+```bash
 DATABASE_URL=
-
-TRIGGER_SECRET_KEY=
-TRIGGER_PROJECT_ID=
-
+REDIS_URL=
+JWT_ACCESS_SECRET=
+JWT_REFRESH_SECRET=
+ARGON2_MEMORY_COST=
+APP_WEB_URL=
+API_URL=
+RESEND_API_KEY=
+EMAIL_FROM=
+S3_ENDPOINT=
+S3_REGION=
+S3_BUCKET=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_PUBLIC_BASE_URL=
 MUX_TOKEN_ID=
 MUX_TOKEN_SECRET=
 MUX_WEBHOOK_SECRET=
-
-RESEND_API_KEY=
-EMAIL_FROM=
-
-APP_URL=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+ENCRYPTION_KEY=
+SENTRY_DSN=
 ```
 
-Rules:
-
-- Only `NEXT_PUBLIC_*` variables can reach the browser.
-- Service keys must stay server-side.
-- Webhook secrets must be validated.
-
-## 21. Testing Strategy
+## 22. Testing Strategy
 
 ### Unit Tests
 
-Test:
-
-- services
-- validators
-- permission helpers
-- DTO mappers
+- services with business rules
+- policy checks
+- date/due-date calculations
+- programme lifecycle derivation
+- reporting attribution calculations
+- session state transitions
 
 ### Integration Tests
 
-Test:
-
-- route handlers
-- repository filters and joins
-- transactional workflows
-- job handlers
-
-### Security Tests
-
-Test:
-
-- entrepreneur cannot read another entrepreneur's data
-- trainer cannot read unassigned entrepreneurs
-- non-admin cannot perform admin mutations
-- signed file URLs require ownership or admin access
+- auth flows
+- programme access grants/revokes
+- deliverable submit/review
+- session request/accept/reschedule
+- tool access and request decisions
+- file upload permission creation
 
 ### Job Tests
 
-Test:
-
 - idempotency
-- retry safety
-- status transitions
-- duplicate email prevention
+- retry behavior
+- no-op when entity state changes
+- provider webhook handling
 
-## 22. Backend Implementation Phases
+### Contract Tests
 
-### Phase 1: Foundation
+The frontend depends on stable DTOs. Add OpenAPI generation and consider generated frontend API types once core endpoints settle.
 
-- Install Supabase, Drizzle, Trigger.dev, Mux, Resend packages.
-- Add environment variable template.
-- Create Drizzle config and schema folder.
-- Add server error helpers.
-- Add auth/session helpers.
-- Create `profiles` and role model.
+## 23. Backend Implementation Phases
 
-### Phase 2: Read APIs
+### Phase 0: Planning Lock
 
-- Build read endpoints for programmes, content, entrepreneurs, trainers, sessions, deliverables.
-- Replace mock reads with TanStack Query.
-- Keep mock stores only as fallback until migrated.
+- Confirm stack.
+- Confirm repository layout.
+- Confirm auth ownership.
+- Confirm storage provider.
+- Confirm first production hosting target.
 
-### Phase 3: Core Mutations
+### Phase 1: NestJS Foundation
 
-- Entrepreneur signup profile creation.
-- Admin entrepreneur create/edit/assign.
-- Trainer create/edit/assign.
-- Programme create/edit.
-- Module/content create/reuse.
-- Deliverable submission and review.
+- Scaffold NestJS app.
+- Add config validation.
+- Add Prisma/Postgres.
+- Add global validation pipe.
+- Add global exception filter.
+- Add logging/request ID.
+- Add health endpoints.
+- Add OpenAPI setup.
 
-### Phase 4: Storage
+### Phase 2: Identity and Access
 
-- Deliverable upload flow.
-- Tool/resource file storage.
-- Signed URL access.
+- Users, roles, profiles.
+- Entrepreneur signup/login.
+- Google signup/login.
+- Email verification.
+- Password reset.
+- Admin/trainer invitations.
+- Auth guards/decorators.
 
-### Phase 5: Jobs and Email
+### Phase 3: Read APIs
 
-- Trigger.dev setup.
-- Email notification jobs.
-- Session reminders.
-- Weekly update reminders.
+- Lookups/settings.
+- Programmes/content/training library.
+- Entrepreneurs/admin directory.
+- Trainers/trainer dashboard data.
+- Tools catalogue.
 
-### Phase 6: Video
+### Phase 4: Core Mutations
 
-- Mux direct upload.
-- Mux webhook.
-- Video asset status.
-- Mux player integration in training pages.
-- Signed playback decision.
+- Entrepreneur profile updates.
+- Programme access management.
+- Programme CRUD/lifecycle.
+- Module/content CRUD/reorder.
+- Tool CRUD/access/request decisions.
+- Periodic updates/fundraising/goals.
 
-### Phase 7: Reporting and Hardening
+### Phase 5: Deliverables
 
-- Dashboard metrics from real queries.
-- Report snapshots/exports.
+- Programme deliverable rules.
+- Deliverable instances.
+- Upload flow.
+- Review history.
+- Unread feedback.
+- Trainer review queue.
+
+### Phase 6: Sessions and Calendar
+
+- Calendar OAuth.
+- Availability endpoint.
+- Session request flow.
+- Open team acceptance.
+- Google Meet creation.
+- Reschedule/completion/notes.
+- Notifications.
+
+### Phase 7: Files, Video, and Jobs
+
+- S3 file uploads.
+- Mux direct uploads.
+- Mux webhooks.
+- BullMQ processors.
+- Email notifications.
+
+### Phase 8: Reporting and Hardening
+
+- Reporting queries.
+- Overdue periodic updates.
+- Exports.
 - Audit logs.
-- RLS policies.
 - Rate limiting.
-- Production monitoring.
+- Security review.
+- Load/performance checks.
 
-## 23. Key Open Questions
+## 24. Open Questions
 
-These should be answered before or during backend implementation:
+These should be answered before implementation or during Phase 0:
 
-- Will admins and trainers be invited only, or can admins create them directly in the admin UI?
-- Does every entrepreneur belong to exactly one organization/business, or can one user represent multiple businesses?
-- Can an entrepreneur be enrolled in multiple programmes at once?
-- Can a trainer be assigned at programme level, entrepreneur level, or both?
-- Should training videos require signed playback from day one?
-- What email templates need business approval?
-- What reporting outputs are required by funders?
-- Do we need multi-tenant organization separation in the future?
-- What is the expected number of entrepreneurs, programmes, videos, and deliverables over 12 months?
+1. Hosting: where will the NestJS API, Postgres, Redis, and object storage run?
+2. Auth cookies vs bearer tokens: do we want httpOnly cookie sessions for the web app, bearer tokens, or both?
+3. Multi-business users: can one entrepreneur user belong to more than one business in the future?
+4. Admin permissions: do all admins have full access at launch, or do we need permission groups immediately?
+5. Trainer permissions: can trainers edit any content they own, or only view/review until admins publish changes?
+6. File storage provider: AWS S3, Cloudflare R2, DigitalOcean Spaces, or another S3-compatible service?
+7. Video playback: signed playback from day one, or public playback IDs for internal pilot?
+8. Calendar: can admins also accept sessions, or only trainers with connected calendars? Current UI says admins can too.
+9. Reports: do exported reports need branded PDF generation in Phase 1, or can CSV/Excel come first?
+10. Data import: will existing entrepreneur/programme data be migrated from a spreadsheet or another system?
 
-## 24. Decision Log
+## 25. Decision Log
 
-| Date | Decision | Reason |
+| Date | Decision | Rationale |
 | --- | --- | --- |
-| 2026-07-01 | Use Next.js route handlers instead of a separate backend app initially. | Lower operational complexity while keeping modular backend boundaries. |
-| 2026-07-01 | Use Supabase Postgres/Auth/Storage. | Provides relational database, auth, storage, and RLS aligned with product needs. |
-| 2026-07-01 | Use Drizzle ORM. | Type-safe and close to SQL without forcing a heavy data framework. |
-| 2026-07-01 | Use Trigger.dev for background jobs. | Reliable jobs, retries, scheduling, monitoring, and long-running workflows without managing queue infrastructure. |
-| 2026-07-01 | Use Mux for training video. | Avoid custom video encoding/streaming infrastructure; support adaptive playback and analytics. |
-| 2026-07-01 | Use Supabase Storage for non-video files. | Good fit for deliverables, PDFs, tools, and other non-video assets. |
+| 2026-07-10 | Use NestJS for the backend. | The product now needs a dedicated backend with clear modules, services, jobs, auth, files, calendar, and video workflows. |
+| 2026-07-10 | Use PostgreSQL with Prisma. | Relational domain, strong migrations, typed access, and good NestJS fit. |
+| 2026-07-10 | Own auth in NestJS. | Invitations, roles, verification, reset, Google signup, and future permissions should live near backend policies. |
+| 2026-07-10 | Use BullMQ with Redis for jobs. | Reliable local/production queue model with retries, scheduling, and NestJS processors. |
+| 2026-07-10 | Use Mux for video. | Training video needs upload, transcoding, adaptive playback, thumbnails, and analytics. |
+| 2026-07-10 | Use S3-compatible object storage for non-video files. | Keeps PDFs, deliverables, tools, and exports outside Postgres with signed access. |
+| 2026-07-10 | Google Calendar/Meet first, provider-agnostic model. | Current product focuses on Google Meet, but future providers should not require schema redesign. |
 
-## 25. References
+## 26. References
 
-- Supabase Auth: https://supabase.com/docs/guides/auth
-- Supabase Storage: https://supabase.com/docs/guides/storage
-- Supabase Row Level Security: https://supabase.com/docs/guides/database/postgres/row-level-security
-- Drizzle ORM: https://orm.drizzle.team/docs/overview
-- Next.js Route Handlers: https://nextjs.org/docs/app/api-reference/file-conventions/route
-- Trigger.dev: https://trigger.dev/docs
-- Mux Video: https://www.mux.com/docs/guides/video
-- Mux Player React: https://github.com/muxinc/elements/tree/main/packages/mux-player-react
-- Resend: https://resend.com/docs
+- NestJS documentation: https://docs.nestjs.com/
+- Prisma documentation: https://www.prisma.io/docs
+- BullMQ documentation: https://docs.bullmq.io/
+- Mux Video documentation: https://docs.mux.com/guides/video
+- Google Calendar API: https://developers.google.com/calendar/api/guides/overview
+- Resend documentation: https://resend.com/docs

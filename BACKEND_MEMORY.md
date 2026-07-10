@@ -10,31 +10,31 @@ The backend should support the product for years, not just make the current scre
 
 ## Chosen Stack
 
-- App runtime: Next.js App Router route handlers.
-- Database: Supabase Postgres.
-- Auth: Supabase Auth.
-- Authorization: application roles plus Postgres RLS where it protects direct data access.
-- ORM/query layer: Drizzle ORM.
-- Validation: Zod.
+- Backend runtime: NestJS with TypeScript.
+- API style: REST-first, OpenAPI documented. GraphQL is not needed for the first backend.
+- Database: PostgreSQL.
+- ORM/query layer: Prisma, unless we later hit a strong reason to use TypeORM or Drizzle.
+- Auth: JWT/session-backed auth owned by the NestJS backend, with support for Google signup/login for entrepreneurs.
+- Passwords: hash with Argon2.
 - Frontend data fetching: TanStack Query.
-- File storage: Supabase Storage.
-- Background jobs: Trigger.dev.
+- File storage: S3-compatible object storage for PDFs, deliverables, images, and downloadable tool files.
+- Background jobs: BullMQ with Redis.
 - Video platform: Mux Video.
 - Video player: `@mux/mux-player-react`.
 - Email: Resend unless the project later requires a different provider.
+- Calendar provider: Google Calendar first, but keep session fields provider-agnostic.
 
-Do not introduce a separate backend framework, NestJS, Express server, or microservice until there is a clear operational reason. Start modular inside Next.js.
+NestJS is now the backend direction. Do not design new backend work around Next.js route handlers.
 
 ## Standing Backend Rules
 
 - Keep backend concerns out of React components.
 - Every mutation must have server-side validation.
-- Every route handler must call a service; route handlers should not contain business logic.
+- Controllers stay thin: parse request context, call services, return DTOs.
 - Services own business rules and transactions.
-- Repositories own database access.
-- UI schemas and server schemas may share types, but server validation is always authoritative.
-- Never trust client-provided role, user ID, programme ID, or ownership fields.
-- Prefer explicit authorization checks in services, even when RLS also exists.
+- Repositories/data-access classes own database access when queries grow beyond simple Prisma calls.
+- Never trust client-provided role, user ID, programme ID, trainer ID, or ownership fields.
+- Prefer explicit authorization checks in services/policies.
 - Use transactions for multi-step writes.
 - Make write operations idempotent where retries or background jobs can happen.
 - Keep audit trails for important admin actions.
@@ -43,63 +43,76 @@ Do not introduce a separate backend framework, NestJS, Express server, or micros
 - Use cursor pagination for large or growing datasets. Offset pagination is acceptable only for small lookup data.
 - Use stable identifiers. Do not expose sequential assumptions to the UI.
 - Store files in object storage, not the database.
-- Store only file metadata, storage keys, playback IDs, and processing state in Postgres.
-- Never put service role keys in client code.
+- Store only file metadata, storage keys, Mux asset IDs/playback IDs, and processing state in Postgres.
+- Never put secrets in client code.
 - Never expose private storage URLs without signed access rules.
-- Do not put long-running work in route handlers. Trigger a background job and return a status.
+- Do not put long-running work in controllers. Enqueue a job and return a status.
 - All backend code should be testable without rendering UI.
 
-## Folder Rules
+## NestJS Module Rules
 
-Use this target structure when backend work begins:
+Use feature modules that match business boundaries:
 
 ```text
-lib/server/
+apps/api/src/
+  main.ts
+  app.module.ts
+  config/
+  common/
+  database/
   auth/
-  db/
-  repositories/
-  services/
-  validators/
-  jobs/
-  storage/
+  users/
+  entrepreneurs/
+  admins/
+  trainers/
+  programmes/
+  learning-content/
+  deliverables/
+  sessions/
+  tools/
+  reporting/
+  notifications/
+  files/
   video/
-  email/
-  errors/
+  calendar/
   audit/
-
-app/api/
-  ...
-
-drizzle/
-  schema.ts
-  migrations/
+  jobs/
 ```
 
-Route handlers in `app/api` should be thin adapters:
+Each feature should prefer this internal shape:
 
-1. Read request input.
-2. Get authenticated actor.
-3. Validate input.
-4. Call a service.
-5. Return a typed response.
+```text
+feature/
+  feature.module.ts
+  feature.controller.ts
+  feature.service.ts
+  dto/
+  entities-or-types/
+  policies/
+  repositories/
+  jobs/
+```
+
+Controllers should not contain business logic. DTOs validate input. Services coordinate business rules. Policies answer authorization questions. Repositories hold non-trivial query composition.
 
 ## Core Domain Boundaries
 
 Keep these areas separate:
 
 - Identity and access: users, profiles, roles, invitations, route access.
-- Entrepreneur workspace: profile, funding history, updates, deliverables, tool requests, sessions.
-- Programme operations: programmes, enrolments, stages, sectors, assignments.
-- Learning content: modules, content items, programme module order, video assets, resources.
-- Deliverable workflow: required deliverables, submissions, reviews, reviewer decisions.
-- Trainer workflow: trainer profiles, availability, assignments, sessions.
-- Reporting: report snapshots and exports.
+- Entrepreneur workspace: profile, funding history, periodic updates, deliverables, tool requests, sessions.
+- Admin team: admins, invitations, calendar connection, operational notifications.
+- Programme operations: programmes, lifecycle, modules, access grants, archival.
+- Learning content: modules, content items, trainers attached to content, ratings, programme module order.
+- Deliverable workflow: required deliverables, due rules, submissions, reviews, reviewer decisions.
+- Trainer workflow: trainer profiles, content ownership, calendar connection, sessions, deliverable reviews.
+- Sessions: booking requests, ownership, Google Meet links, reschedule history, completion.
+- Tools: tool catalogue, global/programme/entrepreneur access, tool requests, admin decisions.
+- Reporting: impact updates, fundraising attribution, overdue update rules, exports.
 - Notifications and jobs: email, reminders, long-running processing.
 - Audit and compliance: important admin actions and security-sensitive events.
 
 ## Authorization Model
-
-Use a `profiles` table linked to Supabase Auth users.
 
 Roles:
 
@@ -107,26 +120,43 @@ Roles:
 - `admin`
 - `trainer`
 
-Do not assume only one admin level forever. Model role and capability checks in a way that can grow into permissions later.
+Do not assume only one admin level forever. Model roles and capabilities in a way that can grow into permissions later.
 
 Initial access rules:
 
 - Entrepreneurs can read and update only their own business profile and submitted data.
-- Entrepreneurs can read programmes they are enrolled in.
-- Entrepreneurs can read published training content assigned to their programmes.
-- Entrepreneurs can submit deliverables for their own account.
-- Trainers can read assigned entrepreneurs, assigned programmes, and sessions.
+- Entrepreneurs automatically get free resource access after signup.
+- Entrepreneurs can read programmes/content they have access to through programme content access.
+- Entrepreneurs can submit deliverables for their own business.
+- Trainers can read entrepreneurs inferred from the programme content they own.
+- Trainers can review deliverables attached to programmes/content in their trainer scope.
+- Trainers are not directly assigned to entrepreneurs.
 - Admins can manage operational data across the platform.
+
+## Critical Business Rules
+
+- Trainer scope is inferred from content ownership, not direct entrepreneur assignment.
+- Content ratings roll up to the trainer attached to that content item.
+- Programme access is many-to-many. An entrepreneur can have zero, one, or many programme access grants, plus automatic free resources.
+- Free resources are globally available and should not be stored as per-entrepreneur assignments.
+- Programme lifecycle is derived from dates and archive fields: draft, scheduled, active, completed, archived.
+- Archived programmes are hidden from default operational lists and become read-only unless restored.
+- Deliverable due dates come from programme deliverable rules, then become concrete due dates per entrepreneur/programme submission context.
+- Periodic update overdue status comes from company configuration, not a manually maintained list.
+- Impact reporting needs attribution: jobs/funds should only be charted by programme when the source record is programme-scoped or explicitly attributed.
+- Sessions can be specific-person requests or open BID team requests. The first eligible admin/trainer who accepts an open request owns it.
+- Only users with supported calendar connection can accept/own Google Meet session requests.
+- Confirmed virtual sessions must have a provider-agnostic meeting link field.
 
 ## Data Modeling Rules
 
 - Use relational tables for core business entities.
 - Use join tables for many-to-many relationships.
 - Use enum-like status fields deliberately and document transitions.
-- Keep `created_at`, `updated_at`, and relevant actor fields on important tables.
+- Keep `createdAt`, `updatedAt`, and relevant actor fields on important tables.
 - Add indexes for foreign keys, search filters, status filters, and dashboard counts.
 - Avoid storing derived dashboard totals as primary truth unless they are snapshots.
-- For analytics/reporting, start with views or query services before introducing a warehouse.
+- For analytics/reporting, start with query services/materialized views before introducing a warehouse.
 
 ## API Rules
 
@@ -146,26 +176,26 @@ Initial access rules:
 
 ## Background Job Rules
 
-Use Trigger.dev for:
+Use BullMQ/Redis for:
 
 - emails and notifications
 - scheduled reminders
 - report generation
 - file processing
-- calendar sync
-- video webhook processing if needed
+- Google Calendar sync
+- Mux webhook processing
 - long-running exports
 - future AI summarization or analysis
 
 Jobs must be idempotent. Store job records or idempotency keys when a job can be triggered more than once.
 
-Route handlers should enqueue jobs and return a job/run status reference instead of doing long-running work inline.
+Controllers should enqueue jobs and return a job/status reference instead of doing long-running work inline.
 
 ## Video Rules
 
 Use Mux for training video upload, encoding, playback, thumbnails, and analytics.
 
-Supabase Storage remains for:
+Object storage remains for:
 
 - PDFs
 - deliverable uploads
@@ -176,8 +206,8 @@ Do not build custom video transcoding unless the business explicitly chooses to 
 
 ## Security Rules
 
-- Enable RLS on exposed Supabase tables.
-- Keep service-role access server-only.
+- Hash passwords with Argon2.
+- Keep JWT/session secrets, OAuth secrets, storage keys, Mux secrets, and email keys server-only.
 - Validate file type, size, and ownership before accepting uploads.
 - Use signed URLs for private files.
 - Log sensitive admin actions.
@@ -190,36 +220,35 @@ Do not build custom video transcoding unless the business explicitly chooses to 
 Backend work should include tests based on risk:
 
 - Unit test services with business rules.
-- Test repository queries when joins, filters, or permissions are non-trivial.
-- Test route handlers for auth, validation, and response shape.
-- Test job handlers for idempotency and retry safety.
-- Test RLS policies or authorization behavior before shipping real auth.
+- Test repositories when joins, filters, or permissions are non-trivial.
+- Test controllers for auth, validation, and response shape.
+- Test job processors for idempotency and retry safety.
+- Test authorization behavior before shipping real auth.
 
 ## Backend Build Sequence
 
 Build backend in this order:
 
-1. Environment and package setup.
-2. Database schema and migrations.
-3. Auth session helpers and profile/role model.
-4. Shared server error and response helpers.
-5. Repositories and services for read-only data.
+1. NestJS workspace and environment setup.
+2. Database schema, Prisma migrations, and seed strategy.
+3. Auth, users, profiles, roles, invitations.
+4. Shared errors, response DTOs, guards, decorators, and policies.
+5. Read APIs for lookup data, programmes, entrepreneurs, trainers, and content.
 6. Replace mock reads with TanStack Query API reads.
-7. Mutations for core admin and entrepreneur workflows.
+7. Mutations for core admin, entrepreneur, and trainer workflows.
 8. File storage and deliverable uploads.
-9. Trigger.dev jobs and email notifications.
-10. Mux video ingestion and playback metadata.
-11. Reporting jobs.
-12. Auditing, hardening, tests, and production readiness.
+9. BullMQ jobs, email notifications, and notification records.
+10. Google Calendar OAuth, availability, and Google Meet session creation.
+11. Mux video ingestion, webhooks, and playback metadata.
+12. Reporting queries, exports, auditing, hardening, tests, and production readiness.
 
 ## Review Checklist
 
 Before merging backend work, ask:
 
-- Is the route handler thin?
+- Is the controller thin?
 - Is input validated on the server?
 - Is authorization explicit?
-- Is the data access in a repository?
 - Is business logic in a service?
 - Are multi-step writes transactional?
 - Is the operation idempotent if it can be retried?
