@@ -26,9 +26,12 @@ Planned backend stack:
 - NestJS API
 - PostgreSQL + Prisma
 - BullMQ + Redis for background jobs
-- S3-compatible file storage
+- Required monorepo shape: `apps/web`, `apps/api`, `packages/shared`, root `prisma`
+- Local and production Docker Compose runtime with separate frontend and backend services
+- DigitalOcean Spaces for non-video file storage
 - Mux Video
-- Resend email
+- Resend + React Email for branded email templates
+- Mailpit development email catcher
 - Google Calendar / Google Meet integration first
 
 ## Getting Started
@@ -73,11 +76,12 @@ Auth pages live under `/auth`.
 
 - `/auth/login`
 - `/auth/signup`
+- `/auth/onboarding`
 - `/auth/forgot-password`
 - `/auth/reset-password`
 - `/auth/verify-email`
 
-Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Entrepreneur signup is direct. Backend auth is not connected yet.
+Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Regular email signup collects the required details directly and moves to email verification. `/auth/onboarding` is only for Google signup when required details are missing. Backend auth is not connected yet.
 
 ### Entrepreneur Workspace
 

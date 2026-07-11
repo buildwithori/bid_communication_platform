@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Briefcase, Mail, UserPlus } from 'lucide-react';
@@ -34,6 +35,7 @@ export default function AuthSignupPage() {
 }
 
 function SignupForm() {
+  const router = useRouter();
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -49,10 +51,11 @@ function SignupForm() {
     <form
       className="space-y-4"
       onSubmit={form.handleSubmit(() => {
-        toast.success('Account details validated.');
+        toast.success('Account created. Check your email to verify your account.');
+        router.push('/auth/verify-email');
       })}
     >
-      <AuthGoogleButton>
+      <AuthGoogleButton onClick={() => router.push('/auth/onboarding?provider=google')}>
         Sign up with Google
       </AuthGoogleButton>
 

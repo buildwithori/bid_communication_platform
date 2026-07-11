@@ -46,11 +46,8 @@ import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeAr
 import { RequiredDeliverablesSection } from '@/components/admin/programmes/RequiredDeliverablesSection';
 import {
   archiveProgrammePatch,
-  completeProgrammePatch,
   publishProgrammePatch,
-  reopenProgrammePatch,
   restoreProgrammePatch,
-  unpublishProgrammePatch,
 } from '@/lib/programme-lifecycle';
 import { contentItems } from '@/lib/mock-data/programs';
 import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
@@ -284,20 +281,18 @@ export function ProgrammeWorkspaceView({
               {programmeStatus === 'scheduled' && (
                 <>
                   <Button variant="outline" onClick={onEditProgram}>Edit programme</Button>
-                  <Button variant="outline" onClick={() => updateProgram(program.id, unpublishProgrammePatch())}>Unpublish</Button>
                   <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
                 </>
               )}
               {programmeStatus === 'active' && (
                 <>
                   <Button variant="outline" onClick={onEditProgram}>Edit programme</Button>
-                  <Button variant="outline" className="border-success/20 bg-success-light/60 text-success-dark hover:border-success/30 hover:bg-success-light hover:text-success-dark" onClick={() => updateProgram(program.id, completeProgrammePatch())}>Complete programme</Button>
-                  <Button variant="destructive" onClick={() => setArchiveTarget(program)}>End and archive</Button>
+                  <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
                 </>
               )}
               {programmeStatus === 'completed' && (
                 <>
-                  <Button variant="outline" onClick={() => updateProgram(program.id, reopenProgrammePatch(program))}>Reopen</Button>
+                  <Button variant="outline" onClick={onEditProgram}>Edit timeline</Button>
                   <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
                 </>
               )}
@@ -591,7 +586,7 @@ export function ProgrammeWorkspaceView({
         open={!!archiveTarget}
         onOpenChange={(open) => !open && setArchiveTarget(null)}
         program={archiveTarget ?? undefined}
-        onArchive={(target, reason) => updateProgram(target.id, archiveProgrammePatch(target, reason))}
+        onArchive={(target, reason) => updateProgram(target.id, archiveProgrammePatch(reason))}
       />
     </>
   );

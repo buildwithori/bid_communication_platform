@@ -29,11 +29,9 @@ export function ProgrammeArchiveModal({
   if (!program) return null;
 
   const status = getProgrammeStatus(program);
-  const isActive = status === 'active';
-  const title = isActive ? 'End and archive programme' : 'Archive programme';
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={title} width="wide">
+    <Modal open={open} onOpenChange={onOpenChange} title="Archive programme" width="wide">
       <div className="space-y-4">
         <Notice>
           <div className="flex gap-3">
@@ -43,9 +41,7 @@ export function ProgrammeArchiveModal({
                 {program.name} is currently {getProgrammeStatusLabel(status).toLowerCase()}.
               </div>
               <p className="mt-1 text-sm leading-6 text-ink-muted">
-                {isActive
-                  ? 'Archiving an active programme will first mark it completed, then hide it from default programme operations.'
-                  : 'Archived programmes stay available for audit and reporting, but are hidden from default programme operations.'}
+                Archived programmes stay available for audit and reporting, but are hidden from default programme operations.
               </p>
             </div>
           </div>
@@ -71,7 +67,7 @@ export function ProgrammeArchiveModal({
               onOpenChange(false);
             }}
           >
-            {isActive ? 'End and archive' : 'Archive programme'}
+            Archive programme
           </Button>
         </div>
       </div>

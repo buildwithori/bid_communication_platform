@@ -196,10 +196,7 @@ export interface Program {
   endDate: string; // ISO date
   /** Programmes are drafts until published; status is derived from this and the date window. */
   publishedAt?: string;
-  /** Manual lifecycle fields. Archive wins over every other displayed status. */
-  completedAt?: string;
-  completedBy?: string;
-  completionReason?: string;
+  /** Archive wins over every other displayed status. Completion is derived from the programme end date. */
   archivedAt?: string;
   archivedBy?: string;
   archiveReason?: string;

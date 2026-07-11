@@ -23,6 +23,7 @@ export function ProgramModal({
 }) {
   const { addProgram, updateProgram } = useAdminStore();
   const isEdit = mode === 'edit' && program;
+  const isPublishedProgram = Boolean(program?.publishedAt);
 
   const form = useForm<ProgramForm>({
     resolver: zodResolver(programSchema),
@@ -45,9 +46,11 @@ export function ProgramModal({
         startDate: values.startDate,
         endDate: values.endDate,
         maxEntrepreneurs: Number(values.maxEntrepreneurs) || 20,
-        publishedAt: values.publishState === 'published'
-          ? program.publishedAt ?? new Date().toISOString()
-          : undefined,
+        publishedAt: isPublishedProgram
+          ? program.publishedAt
+          : values.publishState === 'published'
+            ? new Date().toISOString()
+            : undefined,
         description: values.description,
       });
     } else {
@@ -110,16 +113,27 @@ export function ProgramModal({
         <FormField label="Max entrepreneurs">
           <FormInput type="number" {...form.register('maxEntrepreneurs')} />
         </FormField>
-        <FormField label="Publishing">
-          <FormSelect
-            value={form.watch('publishState')}
-            onValueChange={(value) => form.setValue('publishState', value as ProgramForm['publishState'], { shouldValidate: true })}
-            options={[
-              { value: 'draft', label: 'Save as draft' },
-              { value: 'published', label: 'Publish programme' },
-            ]}
-          />
-        </FormField>
+        {isPublishedProgram ? (
+          <FormField label="Publishing">
+            <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-3 text-sm text-ink">
+              Published
+              <p className="mt-1 text-xs leading-5 text-ink-muted">
+                Published programmes stay published. Archive the programme when it should no longer appear in active operations.
+              </p>
+            </div>
+          </FormField>
+        ) : (
+          <FormField label="Publishing">
+            <FormSelect
+              value={form.watch('publishState')}
+              onValueChange={(value) => form.setValue('publishState', value as ProgramForm['publishState'], { shouldValidate: true })}
+              options={[
+                { value: 'draft', label: 'Save as draft' },
+                { value: 'published', label: 'Publish programme' },
+              ]}
+            />
+          </FormField>
+        )}
         <FormField label="Description" optional>
           <FormTextarea rows={2} placeholder="Brief program description…" {...form.register('description')} />
         </FormField>

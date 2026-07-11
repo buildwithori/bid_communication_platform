@@ -59,11 +59,8 @@ import { useAdminStore } from '@/lib/stores/admin-store';
 import { routes } from '@/lib/routes';
 import {
   archiveProgrammePatch,
-  completeProgrammePatch,
   publishProgrammePatch,
-  reopenProgrammePatch,
   restoreProgrammePatch,
-  unpublishProgrammePatch,
 } from '@/lib/programme-lifecycle';
 import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
 import { contentItems } from '@/lib/mock-data/programs';
@@ -497,10 +494,6 @@ export default function AdminProgramsPage() {
         ...(status === 'scheduled'
           ? [
               {
-                label: 'Unpublish programme',
-                onSelect: () => updateProgram(program.id, unpublishProgrammePatch()),
-              },
-              {
                 label: 'Archive programme',
                 destructive: true,
                 onSelect: () => setArchiveTarget(program),
@@ -510,11 +503,7 @@ export default function AdminProgramsPage() {
         ...(status === 'active'
           ? [
               {
-                label: 'Complete programme',
-                onSelect: () => updateProgram(program.id, completeProgrammePatch()),
-              },
-              {
-                label: 'End and archive',
+                label: 'Archive programme',
                 destructive: true,
                 onSelect: () => setArchiveTarget(program),
               },
@@ -523,8 +512,8 @@ export default function AdminProgramsPage() {
         ...(status === 'completed'
           ? [
               {
-                label: 'Reopen programme',
-                onSelect: () => updateProgram(program.id, reopenProgrammePatch(program)),
+                label: 'Edit timeline',
+                onSelect: () => setEditTarget(program),
               },
               {
                 label: 'Archive programme',
@@ -1116,7 +1105,7 @@ export default function AdminProgramsPage() {
         open={!!archiveTarget}
         onOpenChange={(open) => !open && setArchiveTarget(null)}
         program={archiveTarget ?? undefined}
-        onArchive={(target, reason) => updateProgram(target.id, archiveProgrammePatch(target, reason))}
+        onArchive={(target, reason) => updateProgram(target.id, archiveProgrammePatch(reason))}
       />
     </>
   );

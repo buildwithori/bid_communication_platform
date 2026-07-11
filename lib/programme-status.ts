@@ -14,7 +14,6 @@ function parseDateOnly(value?: string) {
 export function getProgrammeStatus(program: Program, referenceDate = new Date()): ProgramStatus {
   if (program.archivedAt) return 'archived';
   if (!program.publishedAt) return 'draft';
-  if (program.completedAt) return 'completed';
 
   const today = toDateOnly(referenceDate);
   const startDate = parseDateOnly(program.startDate);
@@ -38,7 +37,7 @@ export function getProgrammeStatusDescription(program: Program, referenceDate = 
   if (status === 'draft') return 'Not published to entrepreneurs yet';
   if (status === 'scheduled') return 'Published and waiting for the start date';
   if (status === 'active') return 'Published and currently inside the programme date window';
-  if (status === 'completed') return program.completedAt ? 'Marked completed by BID' : 'Programme end date has passed';
+  if (status === 'completed') return 'Programme end date has passed';
   return 'Archived and hidden from day-to-day programme operations';
 }
 

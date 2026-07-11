@@ -201,6 +201,15 @@ export const signupSchema = z.object({
 });
 export type SignupForm = z.infer<typeof signupSchema>;
 
+export const entrepreneurOnboardingSchema = z.object({
+  businessName: z.string().min(1, 'Business name is required'),
+  representative: z.string().min(1, 'Representative name is required'),
+  email: z.string().email('Enter a valid email'),
+  country: z.enum(countries),
+  phone: z.string().min(1, 'Phone number is required'),
+});
+export type EntrepreneurOnboardingForm = z.infer<typeof entrepreneurOnboardingSchema>;
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Enter a valid email'),
 });
