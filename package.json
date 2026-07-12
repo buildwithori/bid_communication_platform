@@ -28,7 +28,7 @@
     "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d"
   },
   "devDependencies": {
-    "prisma": "^5.22.0",
+    "prisma": "^6.19.3",
     "typescript": "5.2.2"
   }
 }
