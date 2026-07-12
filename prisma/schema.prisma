@@ -19,6 +19,17 @@ enum UserStatus {
   inactive
 }
 
+enum AuthProvider {
+  google
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
 enum BusinessStatus {
   active
   inactive
@@ -114,6 +125,11 @@ model User {
 
   invitedBy                   User?                      @relation("UserInvitations", fields: [invitedById], references: [id])
   invitedUsers                User[]                     @relation("UserInvitations")
+  sentInvitations             Invitation[]               @relation("InvitationInvitedBy")
+  oauthAccounts               OAuthAccount[]
+  refreshTokens               RefreshToken[]
+  emailVerificationTokens     EmailVerificationToken[]
+  passwordResetTokens         PasswordResetToken[]
   businessMemberships         BusinessMembership[]
   trainerCapability           TrainerCapability?
   trainerSpecialisms          TrainerSpecialism[]
@@ -131,6 +147,94 @@ model User {
   @@index([role, status])
   @@index([invitedById])
   @@map("users")
+}
+
+model OAuthAccount {
+  id                String       @id @default(cuid())
+  userId            String       @map("user_id")
+  provider          AuthProvider
+  providerAccountId String       @map("provider_account_id")
+  email             String
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([email])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  tokenHash     String    @unique @map("token_hash")
+  userAgent     String?   @map("user_agent")
+  ipAddress     String?   @map("ip_address")
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedReason String?   @map("revoked_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  email       String
+  role        UserRole
+  tokenHash   String           @unique @map("token_hash")
+  invitedById String           @map("invited_by_id")
+  status      InvitationStatus @default(pending)
+  expiresAt   DateTime         @map("expires_at")
+  acceptedAt  DateTime?        @map("accepted_at")
+  revokedAt   DateTime?        @map("revoked_at")
+  note        String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  invitedBy User @relation("InvitationInvitedBy", fields: [invitedById], references: [id])
+
+  @@index([email, status])
+  @@index([role, status])
+  @@index([invitedById])
+  @@map("invitations")
 }
 
 model CompanySettings {

@@ -4,7 +4,7 @@ WORKDIR /workspace
 ENV NODE_ENV=development
 
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl \
+  && apt-get install -y --no-install-recommends openssl procps \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json tsconfig.json prisma.config.ts ./
@@ -34,7 +34,7 @@ WORKDIR /workspace
 ENV NODE_ENV=production
 
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl \
+  && apt-get install -y --no-install-recommends openssl procps \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json prisma.config.ts ./
