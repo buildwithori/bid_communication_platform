@@ -10,7 +10,7 @@ import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormInput, FormSelect, FormTextarea } from '@/components/shared/FormField';
+import { FormAutocomplete, FormField, FormInput, FormSelect, FormTextarea } from '@/components/shared/FormField';
 import {
   DataTable,
   RowActions,
@@ -33,6 +33,7 @@ import {
   toolStatusLabels,
   toolVisibilityLabels,
 } from '@/lib/tool-access';
+import { toolAreaOptions } from '@/lib/tool-areas';
 import { cn } from '@/lib/utils';
 import type { BadgeTone, Entrepreneur, Program, Tool, ToolStatus, ToolType, ToolVisibility } from '@/types';
 
@@ -102,6 +103,10 @@ function sourceLabel(tool: Tool) {
   return tool.embedUrl ? 'Embed link added' : 'No tool link added';
 }
 
+function toolAreaLabel(tool: Tool) {
+  return tool.toolArea || 'No tool area';
+}
+
 function normaliseTool(tool: Tool): Tool {
   return {
     ...tool,
@@ -114,6 +119,7 @@ export default function AdminEntrepreneurToolsPage() {
   const [toolRows, setToolRows] = React.useState<Tool[]>(() => seedTools.map(normaliseTool));
   const [query, setQuery] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState<'all' | ToolType>('all');
+  const [toolAreaFilter, setToolAreaFilter] = React.useState('all');
   const [statusFilter, setStatusFilter] = React.useState<'all' | ToolStatus>('all');
   const [visibilityFilter, setVisibilityFilter] = React.useState<'all' | ToolVisibility>('all');
   const [page, setPage] = React.useState(1);
@@ -156,20 +162,21 @@ export default function AdminEntrepreneurToolsPage() {
       const audience = describeToolAudience(tool, programs, entrepreneurs);
       const matchesQuery =
         !needle ||
-        [tool.name, tool.description, tool.type, sourceLabel(tool), audience.label, audience.detail]
+        [tool.name, tool.description, tool.type, toolAreaLabel(tool), sourceLabel(tool), audience.label, audience.detail]
           .join(' ')
           .toLowerCase()
           .includes(needle);
       const matchesType = typeFilter === 'all' || tool.type === typeFilter;
+      const matchesToolArea = toolAreaFilter === 'all' || tool.toolArea === toolAreaFilter;
       const matchesStatus = statusFilter === 'all' || getToolStatus(tool) === statusFilter;
       const matchesVisibility = visibilityFilter === 'all' || getToolVisibility(tool) === visibilityFilter;
-      return matchesQuery && matchesType && matchesStatus && matchesVisibility;
+      return matchesQuery && matchesType && matchesToolArea && matchesStatus && matchesVisibility;
     });
-  }, [query, statusFilter, toolRows, typeFilter, visibilityFilter]);
+  }, [query, statusFilter, toolAreaFilter, toolRows, typeFilter, visibilityFilter]);
 
   React.useEffect(() => {
     setPage(1);
-  }, [query, statusFilter, typeFilter, visibilityFilter, pageSize]);
+  }, [query, statusFilter, toolAreaFilter, typeFilter, visibilityFilter, pageSize]);
 
   const pageRows = React.useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -244,6 +251,11 @@ export default function AdminEntrepreneurToolsPage() {
       cell: (tool) => <Badge tone={typeTone[tool.type]}>{tool.type === 'pdf' ? 'PDF resource' : 'Online tool'}</Badge>,
     },
     {
+      key: 'toolArea',
+      header: 'Tool area',
+      cell: (tool) => <Badge tone="neutral">{toolAreaLabel(tool)}</Badge>,
+    },
+    {
       key: 'audience',
       header: 'Who can see it',
       cell: (tool) => {
@@ -283,13 +295,13 @@ export default function AdminEntrepreneurToolsPage() {
       />
       <Notice>
         Use global visibility for broad self-serve tools, programme visibility for tools tied to a curriculum or cohort,
-        and individual visibility only when a tool is meant for a specific business.
+        and individual visibility only when a tool is meant for specific entrepreneurs.
       </Notice>
 
       <MetricGrid className="mb-4">
         <StatCard label="Published tools" value={published} subline="Visible when access rules match" dotColor="success" accent="success" />
         <StatCard label="Global tools" value={globalTools} subline="Available to every entrepreneur" dotColor="bid" accent="bid" />
-        <StatCard label="Targeted tools" value={targetedTools} subline="Programme or business-specific" dotColor="info" accent="info" />
+        <StatCard label="Targeted tools" value={targetedTools} subline="Programme or entrepreneur-specific" dotColor="info" accent="info" />
         <StatCard label="Drafts" value={drafts} subline="Not visible yet" dotColor="warning" accent="warning" />
       </MetricGrid>
 
@@ -301,9 +313,9 @@ export default function AdminEntrepreneurToolsPage() {
         <TableToolbar>
           <div>
             <div className="text-sm font-medium text-ink">Filter entrepreneur tools</div>
-            <div className="mt-0.5 text-sm text-ink-muted">Search by tool name, audience, source, or description.</div>
+            <div className="mt-0.5 text-sm text-ink-muted">Search by tool name, tool area, audience, source, or description.</div>
           </div>
-          <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[260px_160px_180px_210px]">
+          <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[240px_170px_190px_170px_200px]">
             <TableFilterInput
               icon
               placeholder="Search tools..."
@@ -315,6 +327,14 @@ export default function AdminEntrepreneurToolsPage() {
               <option value="pdf">PDF resources</option>
               <option value="embed">Online tools</option>
             </TableFilterSelect>
+            <TableFilterAutocomplete
+              value={toolAreaFilter}
+              onValueChange={setToolAreaFilter}
+              options={[{ value: 'all', label: 'All tool areas' }, ...toolAreaOptions]}
+              placeholder="All tool areas"
+              searchPlaceholder="Search tool areas..."
+              emptyMessage="No tool area found."
+            />
             <TableFilterSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
               <option value="all">All statuses</option>
               {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -367,6 +387,7 @@ type ToolDraft = {
   name: string;
   description: string;
   type: ToolType;
+  toolArea: string;
   status: ToolStatus;
   visibility: ToolVisibility;
   iconKey: Tool['iconKey'];
@@ -418,6 +439,7 @@ function ToolEditorModal({
     const next: Record<string, string> = {};
     if (!draft.name.trim()) next.name = 'Tool name is required.';
     if (!draft.description.trim()) next.description = 'Description is required.';
+    if (!draft.toolArea.trim()) next.toolArea = 'Select a tool area.';
     if (draft.type === 'pdf' && !draft.pdfFileName.trim() && !tool?.pdfUrl) next.pdfFileName = 'Upload or select a PDF resource.';
     if (draft.type === 'embed') {
       if (!draft.embedUrl.trim()) next.embedUrl = 'Add the online tool link.';
@@ -440,6 +462,7 @@ function ToolEditorModal({
       name: draft.name.trim(),
       description: draft.description.trim(),
       type: draft.type,
+      toolArea: draft.toolArea,
       status: draft.status,
       visibility: draft.visibility,
       programmeIds: draft.visibility === 'programmes' ? selectedProgrammeIds : [],
@@ -473,6 +496,16 @@ function ToolEditorModal({
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Tool type">
                 <FormSelect value={draft.type} onValueChange={(value) => setField('type', value as ToolType)} options={typeOptions} />
+              </FormField>
+              <FormField label="Tool area" error={errors.toolArea}>
+                <FormAutocomplete
+                  value={draft.toolArea}
+                  onValueChange={(value) => setField('toolArea', value)}
+                  options={[...toolAreaOptions]}
+                  placeholder="Select tool area"
+                  searchPlaceholder="Search tool areas..."
+                  emptyMessage="No tool area found."
+                />
               </FormField>
               <FormField label="Publishing">
                 <FormSelect value={draft.status} onValueChange={(value) => setField('status', value as ToolStatus)} options={statusOptions} />
@@ -570,6 +603,7 @@ function emptyDraft(): ToolDraft {
     name: '',
     description: '',
     type: 'pdf',
+    toolArea: '',
     status: 'draft',
     visibility: 'all-entrepreneurs',
     iconKey: 'document',
@@ -584,6 +618,7 @@ function toolToDraft(tool: Tool | null): ToolDraft {
     name: tool.name,
     description: tool.description,
     type: tool.type,
+    toolArea: tool.toolArea ?? '',
     status: getToolStatus(tool),
     visibility: getToolVisibility(tool),
     iconKey: tool.iconKey,
@@ -903,7 +938,8 @@ function ToolDetailsModal({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
+          <InfoBlock label="Tool area" value={toolAreaLabel(tool)} />
           <InfoBlock label="Audience" value={audience.label} detail={audience.detail} />
           <InfoBlock label="Source" value={sourceLabel(tool)} detail={tool.type === 'pdf' ? tool.pdfUrl : tool.embedUrl} />
           <InfoBlock label="Last updated" value={formatDate(tool.updatedAt)} />

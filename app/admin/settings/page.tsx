@@ -7,7 +7,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { MetricGrid } from '@/components/shared/MetricGrid';
 import { StatCard } from '@/components/shared/StatCard';
-import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
 import { CalendarConnectionCard } from '@/components/settings/CalendarConnectionCard';
@@ -42,7 +41,7 @@ export default function AdminSettingsPage() {
         description="Manage the profile and calendar connection used when you own BID sessions."
       />
 
-      <MetricGrid columns={3}>
+      <MetricGrid>
         <StatCard
           label="Admin profile"
           value="Active"
@@ -56,13 +55,6 @@ export default function AdminSettingsPage() {
           subline="Google Meet sessions"
           dotColor={isCalendarConnected ? 'success' : 'warning'}
           accent={isCalendarConnected ? 'success' : 'warning'}
-        />
-        <StatCard
-          label="Access"
-          value="Full"
-          subline="Admin workspace"
-          dotColor="bid"
-          accent="bid"
         />
       </MetricGrid>
 
@@ -91,14 +83,6 @@ export default function AdminSettingsPage() {
                 <FormInput value={phone} onChange={(event) => setPhone(event.target.value)} />
               </FormField>
             </div>
-
-            <FormField label="Access">
-              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-black/[0.1] bg-surface-subtle px-3 py-2">
-                <Badge tone="brand">Admin workspace</Badge>
-                <Badge tone="green">Can manage sessions</Badge>
-                <Badge tone="blue">Can invite admins</Badge>
-              </div>
-            </FormField>
 
             <FormField label="Admin bio" optional>
               <FormTextarea

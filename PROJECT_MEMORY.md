@@ -20,10 +20,12 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Session booking backend rule: available time slots must be filtered by selected trainer/team member, selected date, session type duration, and existing calendar availability. The UI can show mock slots now, but backend implementation must not expose global static times after a trainer is selected.
 - Confirmed virtual sessions need a meeting link. Google Meet is the first provider, but the data/UI must stay provider-agnostic (`meetingProvider`, `meetingUrl`) so Zoom/Teams/custom links can be supported later.
 - Session requests can target a specific trainer or any available BID team member. Any-available requests should appear in admin and trainer queues; the first admin/trainer who accepts becomes the owner and the confirmed meeting gets a provider-agnostic meeting link.
+- Session requests and confirmed sessions are linked to `entrepreneur_user_id`, not `business_id`. Business names in calendars, queues, and reports are derived through the entrepreneur user's business membership.
 - Session queue topic/title should come from the entrepreneur booking form's required “Session topic / goal” field. Notes are supporting context, not the row title.
 - Mock workflow records must connect across roles with the same entrepreneur, programme, deliverable/session/tool IDs, dates, and status meaning. Avoid isolated demo rows that make admin and entrepreneur screens tell different business stories.
 - Fields shown in admin should come from entrepreneur input, admin action, or clear system-generated data. Do not invent admin-only fields without defining the source and the matching entrepreneur/admin workflow.
 - Backend models and DTOs must be reconciled against the real UI forms before implementation. Each UI field must be persisted, derived, request-only, or intentionally removed; do not silently drop fields such as programme capacity, publish state, deliverable due rules, or content upload metadata.
+- While building the backend, keep updating the UI when real backend models reveal missing, misleading, or incomplete screens. Ask focused questions when a business rule is genuinely unclear instead of guessing.
 - Derive labels, statuses, categories, and visual states from business meaning first. Do not let colors, mock accents, or temporary UI styling become the source of product logic.
 - Entrepreneur programme access is not one-to-one. Every entrepreneur automatically has free resource access, and may have zero, one, or many programme content-access paths. UI should say “programme access”, “programmes”, or “content access” when showing access, and should not use “not assigned to a programme” as if the entrepreneur has no learning access.
 - Programme access grants are per entrepreneur user, not per business. Business-level views should derive programme access from the entrepreneurs attached to the business.
@@ -34,6 +36,11 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Content ratings roll up to the trainer/content owner on that content item. Rating UI should make trainer attribution clear when possible.
 - Never use “formal programme” or “formal program” in table labels, input labels, placeholders, filter labels, badges, helper text, or other user-facing UI. The distinction is internal; user-facing UI should simply say “programme”.
 - Admin entrepreneur programme access must be manageable, not add-only. Admins need one flow to view current programme content access, add another programme's content, and remove existing programme content access.
+- Deliverable instances are per entrepreneur user, not per business. Review tables can show the business name by deriving it from the entrepreneur's business membership.
+- Programme goals are per entrepreneur user, not per business. Do not add `target_date` unless a real goal deadline workflow is introduced.
+- Fundraising rounds are per entrepreneur user, not per business. Business-level funding history should be derived through the entrepreneur's business membership.
+- Periodic updates are per entrepreneur user, not per business. They collect jobs and notes; funding belongs in fundraising rounds.
+- Entrepreneur tools need a tool area, icon, visibility, status, and either a PDF upload or embedded URL. Tool visibility is global, programme-based, or entrepreneur-specific, with per-entrepreneur hidden overrides for exceptions.
 - Do not show “primary programme” or “latest programme” in the UI unless the business explicitly adds a real primary-programme field and workflow. The current `programmeId` is a legacy/default pointer; `programmeIds` is the enrolment list.
 - Do not show a “Graduated” KPI unless there is a real graduation workflow/status transition behind it. Until then, use computable programme-access metrics such as “With programmes”.
 - Programme impact reporting needs explicit attribution. Jobs come from periodic job-impact updates with a reporting scope. Funds mobilised come from fundraising history with programme attribution or stay company-wide/unattributed. Do not force unattributed records into a programme chart.
@@ -86,7 +93,13 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Backend/API folders were removed for now. The app is UI/in-memory-state first. Backend implementation direction is now NestJS, not Next.js route handlers.
 - Backend repository direction: use the monorepo shape `apps/web`, `apps/api`, `packages/shared`, and root `prisma`. Do not create a root-level `backend/` app.
 - Backend identity direction: each user has one active role at a time, and role change is not supported for launch. Do not create separate admin/trainer/entrepreneur profile tables; shared profile fields live on `users`, while role-specific business data belongs in real domain tables such as `businesses`, `business_memberships`, `trainer_specialisms`, and `calendar_connections`.
-- Backend runtime/deployment direction: local and production Docker Compose setup with separate services for the Next.js frontend and NestJS API, plus Postgres and Redis services. Local Compose includes Mailpit for email catching; production Compose uses built images, production env, restart policies, health checks, and DigitalOcean Spaces for non-video file storage.
+- Backend runtime/deployment direction: local and production Docker Compose setup with separate services for the Next.js frontend and NestJS API, plus Postgres and Redis services. Local Compose includes Mailpit for email catching; production Compose uses built images, production env, restart policies, health checks, and DigitalOcean Spaces for non-video file storage. First production deployment runs on one DigitalOcean Droplet.
+- Backend auth uses secure httpOnly cookie sessions for the browser app, not client-managed bearer tokens.
+- One entrepreneur user belongs to one business at launch.
+- Admins have full permissions at launch.
+- Trainers are read-only except for sessions and deliverable reviews.
+- Use signed Mux playback from day one.
+- Reporting exports start with CSV/Excel only; no data import is required for launch.
 - Backend email direction: Resend for production delivery, React Email for reusable branded templates, and Mailpit as the Docker Compose development email catcher. Build a consistent BID email brand system even before final email designs exist.
 - Backend audit direction: audit logs should be generated by lifecycle/workflow infrastructure, not manually created in every feature. Business actions emit audit events into an `audit_outbox` inside the same transaction, then a background processor writes immutable `audit_logs`.
 - TanStack Query is installed and wired through `app/providers.tsx`; current mock stores still own data until backend integration begins.
@@ -97,6 +110,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Programmes and Training Library are core content surfaces and must be robust:
   - Admin Programs should support growing programme portfolios with search, status filters, pagination, and module search/pagination.
   - Entrepreneur Training Library should feel learner-facing, with featured programme cards, searchable catalogue, standalone resources, and detailed programme learning paths.
+- Learner progress is tracked only for entrepreneurs. The UI should not send progress updates on every player tick; use a batched/throttled sync model and flush only on meaningful events such as open, pause, milestones, ended, close/pagehide, or explicit completion.
 - Training library content can grow fast, so avoid pure card grids without search/pagination.
 - Programme lifecycle is derived from business fields, not a loose mock status. Archive wins over every other status: `archivedAt` -> Archived, no `publishedAt` -> Draft, future start date -> Scheduled, passed end date -> Completed, otherwise Active.
 - Archived programmes are hidden from default admin/entrepreneur/trainer operational lists, but remain viewable through explicit admin filters or direct URLs for audit/reporting. Archived programme workspaces are read-only until restored.

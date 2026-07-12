@@ -37,6 +37,8 @@ Important product decisions the backend must preserve:
 - Ratings on content roll up to the trainer attached to that content.
 - Programme impact reporting must be attributed explicitly. Do not force unattributed jobs/funding into programme charts.
 - Deliverable due dates come from programme deliverable rules and become concrete per entrepreneur/programme context.
+- Deliverable instances are linked to the entrepreneur user, not the business record. Business names in review queues are derived through membership.
+- Session requests and confirmed sessions are linked to the entrepreneur user, not the business record. Business names in calendars and queues are derived through membership.
 - Session requests can target a specific person or the open BID team queue.
 - The first eligible admin/trainer who accepts an open team request owns the session.
 - Google Calendar/Google Meet is first, but session data should stay provider-agnostic.
@@ -93,7 +95,7 @@ Rationale:
 - Email/password auth for standard login.
 - Google OAuth signup/login for entrepreneurs.
 - Admin/trainer invitation flows.
-- JWT access tokens plus refresh tokens stored server-side or hashed in the database.
+- Secure httpOnly cookie sessions for the web app, backed by server-side hashed session/refresh records.
 - Argon2 for password hashing.
 
 Rationale:
@@ -379,8 +381,8 @@ A user has exactly one active role at a time.
 - Email signup creates a user with role `entrepreneur`, creates/links a business through `business_memberships`, collects the required signup fields, and sends a verification email. It does not require onboarding.
 - Google signup may redirect to `/auth/onboarding` only when required signup baseline details are missing. Provider-supplied name/email should prefill the form; onboarding collects the remaining business name, representative name, email, country, and phone fields as needed.
 - Dashboard access requires email verification for email signup. For Google signup, dashboard access also requires any onboarding step to be complete.
-- Login returns access token and refresh token.
-- Refresh token rotation should invalidate reused/stolen tokens.
+- Login sets secure httpOnly session cookies.
+- Session/refresh rotation should invalidate reused/stolen session records.
 - Forgot password creates a short-lived token and sends email.
 - Reset password validates token and updates password hash.
 - Google auth links by verified email where safe, otherwise creates entrepreneur account.
@@ -459,7 +461,7 @@ Rules:
   - stage_id nullable
   - onboarding_completed_at nullable
   - status
-  - source: self_registered, admin_invited, imported
+  - source: self_registered, admin_invited
 - `business_memberships`
   - user_id
   - business_id
@@ -473,6 +475,7 @@ Rules:
 - Entrepreneur user details come from `users`.
 - Business details come from `businesses`.
 - The relationship between a user and business comes from `business_memberships`.
+- One entrepreneur user belongs to one business at launch. Keep `business_memberships` for a clean relational model, but enforce one active business membership per entrepreneur user until a real multi-business workflow exists.
 - Do not create an `entrepreneur_profiles` table for duplicate representative fields.
 - Entrepreneur dashboard access requires `businesses.onboarding_completed_at`.
 
@@ -494,6 +497,7 @@ Rules:
 - Trainer capability fields come from the admin trainer create/edit UI and trainer settings.
 - Trainers are not assigned directly to entrepreneurs. The trainer's entrepreneur scope is inferred through programme content ownership.
 - Trainer workload and learner reach are derived from content ownership, programme access, learner activity, sessions, and deliverable review queues.
+- Trainers are read-only across programme, content, entrepreneur, and settings data. Trainer mutations are limited to session workflows and deliverable reviews.
 
 ### Programme Operations
 
@@ -546,7 +550,6 @@ Rules:
   - position
 - `content_items`
   - title
-  - description
   - type: video, pdf, tool
   - trainer_id nullable but required when ratings should attribute to a trainer
   - duration_seconds nullable
@@ -572,17 +575,64 @@ Rules:
   - source: library, custom
 - `content_ratings`
   - content_item_id
-  - business_id
   - entrepreneur_user_id
   - trainer_id copied from content item at rating time
   - rating
   - comment
+- `learner_content_progress`
+  - entrepreneur_user_id
+  - programme_id nullable for standalone/free resources outside a programme path
+  - module_id nullable for standalone/free resources outside a module path
+  - content_item_id
+  - status: not_started, in_progress, completed
+  - progress_percent
+  - last_position_seconds nullable for video
+  - duration_seconds nullable snapshot
+  - started_at nullable
+  - completed_at nullable
+  - last_opened_at nullable
+  - last_synced_at
+  - source: player, explicit_action, system
+- `learner_module_progress`
+  - entrepreneur_user_id
+  - programme_id
+  - module_id
+  - status: not_started, in_progress, completed
+  - progress_percent
+  - completed_content_count
+  - total_content_count
+  - started_at nullable
+  - completed_at nullable
+  - last_synced_at
+- `learner_programme_progress`
+  - entrepreneur_user_id
+  - programme_id
+  - status: not_started, in_progress, completed
+  - progress_percent
+  - completed_module_count
+  - total_module_count
+  - completed_content_count
+  - total_content_count
+  - started_at nullable
+  - completed_at nullable
+  - last_synced_at
 
 Rules:
 
 - A module can be reused across programmes.
 - Reordering must update `position` safely inside a transaction.
 - Trainer attribution comes from content item ownership at the time of rating.
+- Business-level rating reports are derived through the entrepreneur user's business membership, not stored directly on `content_ratings`.
+- Learner progress is tracked only for entrepreneur users. Admins and trainers can read scoped progress summaries, but they do not have learner progress rows.
+- Content progress is tracked in the learning context: entrepreneur + programme + module + content item. This matters because modules and content can be reused across programmes.
+- Standalone/free resources that are not opened through a programme/module path can use nullable `programme_id` and `module_id`, but programme progress must only aggregate rows with a programme context.
+- Module and programme progress are materialized summaries maintained by the progress service, not manually edited fields on `modules` or `programmes`.
+- Completing content should update the relevant module/programme summaries in the same transaction or via an idempotent progress aggregation job.
+- Module-completion deliverable rules must listen to `learner_module_progress.completed_at`, not a client-only UI flag.
+- Video progress should not be written every second. The client should batch/throttle progress and sync only on meaningful changes: start, pause, close/pagehide, ended, or coarse milestones such as 25/50/75/90 percent, with a minimum time/percentage delta between writes.
+- PDF and embedded tool progress should not be inferred as completed just because the item was opened. Opening sets `in_progress`; completion requires an explicit learner action or a future tool-specific completion event.
+- Progress sync endpoints must be idempotent and accept batched updates so the UI can queue local progress and flush without spamming the backend.
+- Backend writes should ignore stale progress events when an older client event arrives after a newer one.
 - Content item create UI supports exactly three asset families: video upload, PDF upload, and embedded tool. Video upload creates Mux upload metadata. PDF upload creates a DigitalOcean Spaces `file_asset`. Embedded tool either links to a published entrepreneur tool or stores a custom external URL.
 - Content preview should be powered by the content type: Mux playback for video, signed file URL for PDFs, and embedded/sandboxed URL for tools.
 - If we need chapter labels later, they should be stored as content item metadata or computed from item order. Current UI labels such as "Chapter 1" must not become hardcoded backend truth.
@@ -592,7 +642,6 @@ Rules:
 - `programme_deliverable_rules`
   - programme_id
   - name
-  - description
   - due_type: fixed_date, module_completion, recurring
   - due_date nullable
   - due_after_module_id nullable
@@ -601,7 +650,7 @@ Rules:
   - required_stage_id nullable
 - `deliverable_instances`
   - rule_id
-  - business_id
+  - entrepreneur_user_id
   - programme_id
   - due_date
   - status: not_submitted, submitted, changes_required, approved, overdue
@@ -623,8 +672,9 @@ Rules:
 Rules:
 
 - Programme deliverable rules define the requirement.
-- Deliverable instances define what one entrepreneur/business owes.
+- Deliverable instances define what one entrepreneur owes for a programme.
 - Due dates in review queues come from concrete `deliverable_instances.due_date`, which is calculated from the programme deliverable rule and the entrepreneur/programme context.
+- Business-level display in review queues is derived from the entrepreneur user's business membership, not stored on the deliverable instance.
 - Fixed-date rules copy `due_date` directly into each applicable instance.
 - Module-completion rules create or activate an instance when the learner completes the configured module; the concrete due date should come from company configuration, for example "due N days after module completion".
 - Recurring rules generate instances per reporting cadence and period.
@@ -636,7 +686,7 @@ Rules:
 ### Sessions
 
 - `session_requests`
-  - business_id
+  - entrepreneur_user_id
   - requested_by_id
   - session_type
   - topic
@@ -648,7 +698,7 @@ Rules:
   - status: awaiting_owner, awaiting_trainer, confirmed, declined, cancelled, completed
 - `sessions`
   - request_id nullable
-  - business_id
+  - entrepreneur_user_id
   - owner_user_id
   - owner_role
   - session_type
@@ -685,6 +735,8 @@ Rules:
 
 Rules:
 
+- Session requests and confirmed sessions are linked to the entrepreneur user, not the business record.
+- Business names shown in session calendars, admin queues, and trainer queues are derived through the entrepreneur user's business membership.
 - Time slots are computed from selected person/team, date, duration, and calendar availability.
 - Open team requests are accepted by the first eligible admin/trainer.
 - Only users with Google Calendar connection can accept Google Meet ownership.
@@ -695,49 +747,71 @@ Rules:
 - `tools`
   - name
   - description
-  - type: pdf, online_tool
+  - type: pdf, embedded_tool
   - tool_area_id
-  - visibility: global, programme, custom
+  - icon_key
+  - visibility: all_entrepreneurs, programmes, entrepreneurs
   - status: draft, published, archived
-  - file_asset_id nullable
-  - external_url nullable
+  - pdf_asset_id nullable
+  - embedded_url nullable
+  - created_by_id
+  - updated_by_id nullable
+  - published_at nullable
+  - archived_at nullable
 - `tool_programme_access`
-- `tool_business_access`
-- `tool_hidden_businesses`
+  - tool_id
+  - programme_id
+- `tool_entrepreneur_access`
+  - tool_id
+  - entrepreneur_user_id
+  - granted_by_id
+  - granted_at
+- `tool_hidden_entrepreneurs`
+  - tool_id
+  - entrepreneur_user_id
+  - hidden_by_id
+  - hidden_at
+  - reason nullable
 - `tool_requests`
-  - business_id
-  - requested_by_id
+  - entrepreneur_user_id
   - title
   - business_need
   - tool_area_id
   - needed_by nullable
   - status: under_review, in_development, built, declined
+  - linked_tool_id nullable
   - admin_decision_note nullable
   - decided_by_id nullable
   - decided_at nullable
 
 Rules:
 
-- Global tools are visible to all entrepreneurs unless explicitly hidden.
-- Programme tools are visible to businesses with access to that programme.
-- Custom tools are visible only to selected businesses.
+- Tool area is required when an admin creates a tool. It powers filtering, reporting, and request triage.
+- PDF tools use uploaded file assets stored in DigitalOcean Spaces. Do not store PDF URLs entered by admins as the primary source.
+- Embedded tools store a validated `embedded_url` and should be rendered in a sandboxed iframe where possible.
+- `all_entrepreneurs` tools are visible to every entrepreneur unless that entrepreneur has a hidden override.
+- Programme tools are visible to entrepreneurs with access to one of the selected programmes.
+- Entrepreneur tools are visible only to selected entrepreneur users.
+- Hidden overrides are per entrepreneur user and can remove inherited global or programme tool access for exceptions.
+- Tool request records are linked to the entrepreneur user, not the business record. Business context is derived through membership.
+- Tool requests do not need `requested_by_id`; the requesting actor is the `entrepreneur_user_id`. If admins later create requests on behalf of entrepreneurs, capture that actor through audit logs instead of duplicating ownership fields.
+- When a requested tool is built, link the request to `linked_tool_id` so the entrepreneur can see the admin decision and open the created tool.
 - Admin decisions on requests must be visible to the entrepreneur.
 
 ### Reporting
 
 - `periodic_updates`
-  - business_id
+  - entrepreneur_user_id
   - reporting_period_start
   - reporting_period_end
   - submitted_at
   - jobs_total
   - jobs_women
   - jobs_men
-  - funds_mobilised
   - programme_id nullable when explicitly programme-scoped
   - notes
 - `fundraising_rounds`
-  - business_id
+  - entrepreneur_user_id
   - round_name
   - amount
   - currency
@@ -746,11 +820,10 @@ Rules:
   - programme_goal_id nullable
   - programme_id nullable only if explicitly attributed
 - `programme_goals`
-  - business_id
+  - entrepreneur_user_id
   - programme_id nullable depending on goal type scope
   - goal_type_id
   - target_amount nullable
-  - target_date nullable
   - description
   - status: active, achieved, closed
 - `report_exports`
@@ -763,7 +836,11 @@ Rules:
 
 - Jobs by programme require periodic updates to be programme-scoped.
 - Funds by programme require fundraising rounds or goals to be programme-attributed.
+- Periodic updates are linked to the entrepreneur user, not the business record. Business-level update history is derived through business membership.
+- Periodic updates collect jobs and narrative reporting only. Funding belongs in `fundraising_rounds`, not `periodic_updates`.
+- Fundraising rounds are linked to the entrepreneur user, not the business record. Business-level funding history is derived through business membership.
 - If attribution is missing, report as company-wide/unattributed, not under a programme.
+- Report exports should generate CSV/Excel files in the first backend release. Do not build branded PDF generation yet.
 
 ### Notifications and Audit
 
@@ -923,11 +1000,44 @@ Current UI fields:
 
 Backend mapping:
 
-- Common fields go to `content_items`.
+- `title`, `type`, and `trainerId` go to `content_items`.
 - Video upload state goes to `video_assets` and Mux direct-upload records.
 - PDF upload state goes to `file_assets` backed by DigitalOcean Spaces.
 - Embedded tool state goes to `content_tool_links`.
 - Trainer rating attribution must copy the content item's `trainer_id` into `content_ratings` at rating time.
+
+### Learner Progress
+
+Current UI surfaces:
+
+- training library programme cards: programme progress percentage and next content
+- programme detail: module accordions, module progress, content status badges, continue module/content
+- module detail: module progress, content list, previous/next navigation, content player
+- content player: video playback, PDF preview, embedded tool, next/previous content, content rating
+- admin/trainer dashboards: aggregated learner progress and programme coverage
+
+Backend mapping:
+
+- Programme cards and dashboards read from `learner_programme_progress`.
+- Module accordions and module detail read from `learner_module_progress`.
+- Content badges and resume position read from `learner_content_progress`.
+- Content ratings remain separate in `content_ratings`; rating a content item does not automatically mark it completed.
+
+Progress write strategy:
+
+- The UI should use one batched endpoint: `POST /learning/progress/sync`.
+- Payload should include the programme/module/content context, client event time, status, percent, optional video position, and source.
+- The client should keep a small local queue while the player is open and flush on meaningful moments only:
+  - content opened
+  - video pause
+  - video ended
+  - modal close/pagehide
+  - coarse video milestones such as 25/50/75/90 percent
+  - explicit "mark complete" action for PDF/tool/manual completion
+- The backend should upsert progress rows, ignore stale events, clamp percent to 0-100, and recompute affected module/programme summaries.
+- The UI should not send progress writes on every video `timeupdate` event.
+- Do not write audit log rows for every progress update. Use progress tables and optional aggregate events; only business-significant transitions such as module completion should emit downstream domain events for deliverable rules or notifications.
+- When backend work starts, update the player UI to include a clear content-level completion action for PDF/tool content rather than relying only on "Mark module complete".
 
 ### Programme Deliverable Rule
 
@@ -971,7 +1081,7 @@ Backend mapping:
 - Shared representative identity/contact fields go to `users`.
 - Business fields go to `businesses`.
 - The user-to-business relationship goes to `business_memberships`.
-- Goal fields create `programme_goals`, not columns on `businesses`.
+- Goal fields create `programme_goals` linked to the entrepreneur user, not columns on `businesses`.
 - Initial programme creates `programme_access_grants` for the entrepreneur user only when a programme is selected.
 - Email signup writes the required baseline fields during signup. Google onboarding writes any missing signup baseline fields and sets `businesses.onboarding_completed_at`.
 
@@ -994,13 +1104,14 @@ Backend mapping:
 Current UI fields:
 
 - funding round: name, amount, date, source, optional programme, optional goal
-- periodic update: programme scope, period start/end, jobs by gender, funds mobilised, notes
+- periodic update: programme scope, period start/end, jobs by gender, notes
 - programme goal: optional programme depending on goal type, goal type, optional target amount, description
 
 Backend mapping:
 
 - Funds by programme are only valid when `fundraising_rounds.programme_id` or linked `programme_goal.programme_id` exists.
 - Jobs by programme are only valid when `periodic_updates.programme_id` exists.
+- Periodic updates are linked to `entrepreneur_user_id`; business display/reporting is derived through membership.
 - Company-wide/unattributed records must stay company-wide in analytics.
 
 ### Sessions and Tools
@@ -1009,14 +1120,15 @@ Current UI fields:
 
 - booking/session: session type, target recipient, trainer/team target, topic, date, time, notes
 - admin session create/reschedule: owner, entrepreneur, session type, topic, date/time, reschedule reason, notes
-- tool: name, description, type, tool area, visibility/audience, file upload or external URL
+- tool: name, description, type, tool area, icon, visibility/audience, PDF upload or embedded tool URL
 - tool request: name, category/tool area, optional needed-by date, business need/reason, admin decision state
 
 Backend mapping:
 
 - Session requests and confirmed sessions stay separate until accepted/owned.
+- Session requests and confirmed sessions store `entrepreneur_user_id`; business display/reporting is derived through the entrepreneur user's business membership.
 - Google Meet links are generated after ownership confirmation.
-- Tool visibility uses global, programme, and business-level access tables. Do not store a giant selected-audience array on `tools`.
+- Tool visibility uses global, programme, and entrepreneur-level access/hidden-override tables. Do not store a giant selected-audience array on `tools`.
 - Tool request admin decisions are persisted and visible to the entrepreneur.
 
 ## 11. State Machines
@@ -1190,7 +1302,6 @@ Programmes:
 - `GET /programmes/:id`
 - `PATCH /programmes/:id`
 - `POST /programmes/:id/publish`
-- `POST /programmes/:id/complete`
 - `POST /programmes/:id/archive`
 - `POST /programmes/:id/restore`
 - `GET /programmes/:id/modules`
@@ -1206,6 +1317,9 @@ Learning content:
 - `PATCH /modules/:id/content-items/reorder`
 - `GET /content-items/:id`
 - `POST /content-items/:id/ratings`
+- `GET /learning/progress`
+- `GET /programmes/:id/learning-progress`
+- `POST /learning/progress/sync`
 
 Deliverables:
 
@@ -1345,7 +1459,7 @@ Content item becomes ready when Mux asset is ready
 
 ### Access Control
 
-Start with private/signed playback if training content should be restricted. If we temporarily use public playback IDs for pilots, keep database fields ready for signed playback policy.
+Use private/signed Mux playback from day one. Training content is restricted to authorised entrepreneurs, so public playback IDs should not be the default.
 
 ### Playback Data
 
@@ -1372,6 +1486,7 @@ Store:
 - `periodic-updates`
 - `reports`
 - `video`
+- `learning-progress`
 
 ### Job Rules
 
@@ -1389,6 +1504,7 @@ Store:
 - Session reminders before scheduled start.
 - Calendar sync for connected admins/trainers.
 - Report export cleanup for old signed/generated files.
+- Learner progress aggregation repair job for any stale module/programme summaries.
 
 ## 17. Calendar and Meeting Design
 
@@ -1547,7 +1663,7 @@ Controller
 Preferred sources:
 
 - workflow services: session accept/decline/reschedule/complete
-- lifecycle services: programme publish/complete/archive/restore
+- lifecycle services: programme publish/archive/restore
 - review services: deliverable review/change request/approval
 - access services: programme access grants/revokes, tool access changes
 - settings services: company settings, sectors, stages, goal types
@@ -1573,7 +1689,7 @@ Safety-net sources:
 
 - user invitation accepted/revoked
 - role/profile access changes
-- programme publish/complete/archive/restore
+- programme publish/archive/restore
 - programme access grant/revoke
 - module/content create/update/reorder/archive
 - trainer ownership changes on content
@@ -1800,19 +1916,19 @@ The frontend depends on stable DTOs. Add OpenAPI generation and consider generat
 - Security review.
 - Load/performance checks.
 
-## 26. Open Questions
+## 26. Resolved Planning Decisions
 
-These should be answered before implementation or during Phase 0:
+These decisions remove the remaining backend ambiguity before implementation:
 
-1. Hosting topology: will the first production deploy run all Compose services on one DigitalOcean Droplet, or split Postgres/Redis into managed services?
-2. Auth cookies vs bearer tokens: do we want httpOnly cookie sessions for the web app, bearer tokens, or both?
-3. Multi-business users: can one entrepreneur user belong to more than one business in the future?
-4. Admin permissions: do all admins have full access at launch, or do we need permission groups immediately?
-5. Trainer permissions: can trainers edit any content they own, or only view/review until admins publish changes?
-6. Video playback: signed playback from day one, or public playback IDs for internal pilot?
-7. Calendar: can admins also accept sessions, or only trainers with connected calendars? Current UI says admins can too.
-8. Reports: do exported reports need branded PDF generation in Phase 1, or can CSV/Excel come first?
-9. Data import: will existing entrepreneur/programme data be migrated from a spreadsheet or another system?
+1. Hosting topology: the first production deploy will run the frontend, API, Postgres, Redis, workers, and supporting services through Docker Compose on one DigitalOcean Droplet.
+2. Auth sessions: the web app will use secure httpOnly cookie sessions. Do not use client-managed bearer tokens for normal browser authentication.
+3. Multi-business users: not supported for launch. One entrepreneur user belongs to one business.
+4. Admin permissions: all admins have full access at launch. Keep the model extensible, but do not build permission groups now.
+5. Trainer permissions: trainers are mostly read-only. Trainers can act on sessions and deliverable reviews; content, programme, entrepreneur, and settings management stays admin-owned unless explicitly opened later.
+6. Video playback: use signed Mux playback from day one because training content is restricted to authorised entrepreneurs.
+7. Calendar ownership: admins can accept/own sessions as long as they have the required Google Calendar connection.
+8. Report exports: CSV/Excel exports are enough for the first backend release. Branded PDF reports can come later.
+9. Data import: no spreadsheet or legacy-system import is required for launch.
 
 ## 27. Decision Log
 
@@ -1829,6 +1945,15 @@ These should be answered before implementation or during Phase 0:
 | 2026-07-11 | Use DigitalOcean Spaces for non-video files. | Deployment target is DigitalOcean, and Spaces provides S3-compatible storage for PDFs, deliverables, tools, and exports. |
 | 2026-07-11 | Use Resend with React Email and Mailpit. | Resend handles production delivery, React Email gives reusable branded templates, and Mailpit catches local development email. |
 | 2026-07-10 | Google Calendar/Meet first, provider-agnostic model. | Current product focuses on Google Meet, but future providers should not require schema redesign. |
+| 2026-07-12 | Run the first production deployment on one DigitalOcean Droplet with Docker Compose. | The initial operations model should stay simple: frontend, API, database, Redis, workers, and supporting services run as separate Compose services on one server. |
+| 2026-07-12 | Use httpOnly cookie sessions for browser auth. | Keeps tokens out of client JavaScript and fits the web-first app. |
+| 2026-07-12 | Do not support multi-business entrepreneur users at launch. | The product flow treats one entrepreneur account as belonging to one business; business switching would add complexity without a current requirement. |
+| 2026-07-12 | Give admins full access at launch. | Permission groups can be designed later; current admin workflows need broad operational access. |
+| 2026-07-12 | Keep trainers read-only except sessions and deliverable reviews. | Trainers support learning and feedback, but admins remain the owners of programme, content, entrepreneur, and settings management. |
+| 2026-07-12 | Use signed Mux playback from day one. | Training content is restricted, so private playback is the safer default. |
+| 2026-07-12 | Allow admins to accept and own sessions. | Admins may handle open BID team requests when their Google Calendar connection is available. |
+| 2026-07-12 | Start reporting exports with CSV/Excel only. | This covers operational needs without adding branded PDF generation to the first backend release. |
+| 2026-07-12 | Do not build data import for launch. | There is no current migration/import requirement, so implementation should focus on first-class product workflows. |
 
 ## 28. References
 

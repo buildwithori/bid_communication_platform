@@ -307,6 +307,8 @@ export interface Tool {
   name: string;
   description: string;
   type: ToolType;
+  /** Admin-managed taxonomy used for filtering, requests, and reporting. */
+  toolArea?: string;
   /** Published tools appear in entrepreneur workspaces; drafts stay admin-only. */
   status?: ToolStatus;
   /** Controls who can see the tool in the entrepreneur workspace. */

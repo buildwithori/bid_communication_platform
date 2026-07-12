@@ -25,6 +25,11 @@ The backend should support the product for years, not just make the current scre
 - Video player: `@mux/mux-player-react`.
 - Email: Resend for delivery, React Email for templates/components, and Mailpit as the local development email catcher.
 - Calendar provider: Google Calendar first, but keep session fields provider-agnostic.
+- First production deployment runs all Compose services on one DigitalOcean Droplet.
+- Browser auth uses secure httpOnly cookie sessions backed by server-side hashed session/refresh records; do not use client-managed bearer tokens for normal web auth.
+- Use signed Mux playback from day one.
+- Report exports are CSV/Excel first; branded PDF generation can come later.
+- No spreadsheet/legacy data import for launch.
 
 NestJS is now the backend direction. Do not design new backend work around Next.js route handlers.
 
@@ -38,6 +43,8 @@ Repository shape is a required monorepo:
 Do not create a separate root-level `backend/` app.
 
 Frontend and backend should run as separate Docker Compose services. The frontend should call the API service through environment-configured URLs, not hardcoded localhost assumptions.
+
+As backend work begins, keep the UI and backend in conversation. If the real data model exposes missing, misleading, or incomplete UI, update the UI as part of the implementation. Ask focused questions when a business rule is genuinely unclear instead of guessing.
 
 Maintain both local and production Docker setup:
 
@@ -125,7 +132,7 @@ Keep these areas separate:
 - Entrepreneur workspace: profile, funding history, periodic updates, deliverables, tool requests, sessions.
 - Admin team: admins, invitations, calendar connection, operational notifications.
 - Programme operations: programmes, lifecycle, modules, access grants, archival.
-- Learning content: modules, content items, trainers attached to content, ratings, programme module order.
+- Learning content: modules, content items, trainers attached to content, ratings, programme module order, learner progress.
 - Deliverable workflow: required deliverables, due rules, submissions, reviews, reviewer decisions.
 - Trainer workflow: trainer capabilities, content ownership, calendar connection, sessions, deliverable reviews.
 - Sessions: booking requests, ownership, Google Meet links, reschedule history, completion.
@@ -158,16 +165,19 @@ Do not create separate `admin_profiles`, `trainer_profiles`, and `entrepreneur_p
 
 Role change is not supported for launch. If someone needs a different role, create/invite them through the correct role flow instead of mutating `users.role`.
 
-Do not assume only one admin level forever. Model admin capabilities in a way that can grow into permissions later without turning users into multi-role accounts.
+Admins have full access at launch. Do not build permission groups now, but avoid designing admin code in a way that blocks future permissions.
 
 Initial access rules:
 
 - Entrepreneurs can read and update only their own business profile and submitted data.
+- One entrepreneur user belongs to one business at launch.
 - Entrepreneurs automatically get free resource access after signup.
 - Entrepreneurs can read programmes/content they have access to through programme content access.
 - Entrepreneurs can submit deliverables for their own business.
 - Trainers can read entrepreneurs inferred from the programme content they own.
 - Trainers can review deliverables attached to programmes/content in their trainer scope.
+- Trainers can act on sessions in their scope.
+- Trainers are read-only for programme, content, entrepreneur, and settings management.
 - Trainers are not directly assigned to entrepreneurs.
 - Admins can manage operational data across the platform.
 
@@ -175,18 +185,26 @@ Initial access rules:
 
 - Trainer scope is inferred from content ownership, not direct entrepreneur assignment.
 - Content ratings roll up to the trainer attached to that content item.
+- Learner progress is tracked only for entrepreneur users. Track content progress in programme/module/content context, maintain module/programme progress summaries server-side, and use a batched/throttled progress sync endpoint so video/player interactions do not spam the backend.
 - Programme access is many-to-many. An entrepreneur can have zero, one, or many programme access grants, plus automatic free resources.
 - Programme access grants are per entrepreneur user, not per business. Business-level programme context is derived through the entrepreneur users attached to the business.
 - Free resources are globally available and should not be stored as per-entrepreneur assignments.
 - Regular email entrepreneur signup collects the required signup baseline and does not require onboarding. Google entrepreneur signup uses `/auth/onboarding` only when provider data is missing required baseline details. Google onboarding should collect or confirm business name, representative name, email, country, and phone, with provider name/email prefilled when available.
 - Admin-managed lookup data such as sectors, business stages, programme goal types, and tool areas must be backend models because they power autocomplete filters and form options across roles.
+- Entrepreneur tools require `tool_area_id`, icon key, visibility, status, and either a DigitalOcean Spaces PDF asset or an embedded tool URL. Tool access is global, programme-based, or entrepreneur-specific, with per-entrepreneur hidden overrides for exceptions.
+- Tool requests link to `entrepreneur_user_id` only; do not add a duplicate `requested_by_id` unless a future proxy workflow needs actor tracking, and then use audit logs for that actor.
 - Programme lifecycle is derived from dates and archive fields: draft, scheduled, active, completed, archived. Completed is derived from `end_date`; do not add manual programme completion fields.
 - Programme create/edit must persist the current UI fields, including `max_entrepreneurs`. UI `publishState` maps to the initial publish action, not to publish/unpublish workflow fields or a loose status column.
 - Archived programmes are hidden from default operational lists and become read-only unless restored.
 - Deliverable due dates come from programme deliverable rules, then become concrete `deliverable_instances.due_date` values per entrepreneur/programme submission context. Review queues must read due dates from instances, not invent them.
+- Deliverable instances link to `entrepreneur_user_id`, not `business_id`. Business context for display/reporting is derived through business membership.
+- Programme goals link to `entrepreneur_user_id`, not `business_id`, and should not include `target_date` unless a real deadline workflow is designed.
+- Fundraising rounds link to `entrepreneur_user_id`, not `business_id`. Business funding history/reporting is derived through business membership.
+- Periodic updates link to `entrepreneur_user_id`, not `business_id`, and should not include funds mobilised; funding belongs in fundraising rounds.
 - Periodic update overdue status comes from company configuration, not a manually maintained list.
 - Impact reporting needs attribution: jobs/funds should only be charted by programme when the source record is programme-scoped or explicitly attributed.
 - Sessions can be specific-person requests or open BID team requests. The first eligible admin/trainer who accepts an open request owns it.
+- Session requests and confirmed sessions link to `entrepreneur_user_id`, not `business_id`. Business context for display/reporting is derived through business membership.
 - Only users with supported calendar connection can accept/own Google Meet session requests.
 - Confirmed virtual sessions must have a provider-agnostic meeting link field.
 
