@@ -1,8 +1,8 @@
 # BID Hub
 
-BID Hub is a frontend application for managing entrepreneur support programmes. It gives entrepreneurs a workspace for learning, deliverables, profile updates, sessions, and tools, while giving programme teams an admin workspace for operations, content, reporting, and reviews.
+BID Hub is a full-stack application for managing entrepreneur support programmes. It gives entrepreneurs a workspace for learning, deliverables, profile updates, sessions, and tools, while giving programme teams and trainers an operational workspace for programme delivery, content, reporting, sessions, and reviews.
 
-The project is currently in a UI-first phase. Backend authentication, persistence, and storage are not wired yet. The application uses mock data and in-memory stores so the product flows can be designed, tested, and refined before backend integration.
+The project started UI-first and is now entering backend integration. The frontend still uses mock data in many areas while the NestJS backend, database, jobs, files, email, and calendar integrations are introduced behind the product flows.
 
 > Before making product, UI, routing, or frontend architecture changes, read [PROJECT_MEMORY.md](./PROJECT_MEMORY.md). It captures the standing decisions and long-running context for this application.
 >
@@ -10,24 +10,12 @@ The project is currently in a UI-first phase. Backend authentication, persistenc
 
 ## Tech Stack
 
-- Next.js 13 App Router
-- React 18
-- TypeScript
-- Tailwind CSS
-- Radix UI / shadcn primitives
-- React Hook Form + Zod
-- TanStack Query
-- Recharts
-- Lucide React icons
-- Sonner toasts
-
-Planned backend stack:
-
-- NestJS API
-- PostgreSQL + Prisma
-- BullMQ + Redis for background jobs
-- Required monorepo shape: `apps/web`, `apps/api`, `packages/shared`, root `prisma`
-- Local and production Docker Compose runtime with separate frontend and backend services
+- Monorepo: `apps/web`, `apps/api`, `packages/shared`, root `prisma`
+- Frontend: Next.js 13 App Router, React 18, TypeScript, Tailwind CSS, Radix UI/shadcn primitives
+- Forms/data UI: React Hook Form, Zod, TanStack Query, Recharts, Lucide React icons, Sonner
+- Backend: NestJS, PostgreSQL, Prisma
+- Jobs/cache: BullMQ + Redis
+- Runtime: local and production Docker Compose with separate frontend and backend services
 - DigitalOcean Spaces for non-video file storage
 - Mux Video
 - Resend + React Email for branded email templates
@@ -67,6 +55,30 @@ npm run build
 ```
 
 Known note: the build may show an outdated Browserslist warning. It is not currently blocking.
+
+## Docker
+
+Local Docker runs the application as a small system:
+
+- `web`: Next.js frontend on `http://localhost:3000`
+- `api`: NestJS backend on `http://localhost:4000/api`
+- `postgres`: PostgreSQL on `localhost:5432`
+- `redis`: Redis on `localhost:6379`
+- `mailpit`: local email catcher on `http://localhost:8025`
+
+Start the local stack:
+
+```bash
+npm run docker:dev
+```
+
+Production compose is intentionally separate:
+
+```bash
+npm run docker:prod
+```
+
+Use `.env.docker.example` as the local compose baseline. Production should provide real environment variables for database credentials, app origins, Resend, DigitalOcean Spaces, Mux, and Google OAuth.
 
 ## Main Workspaces
 
@@ -120,33 +132,24 @@ Admins can manage entrepreneurs, trainers, programmes, content, deliverable revi
 ## Project Structure
 
 ```text
-app/
-  auth/                 Auth screens
-  entrepreneur/         Entrepreneur workspace routes
-  admin/                Admin workspace routes
-  globals.css           Global styles, tokens, modal animations
-  layout.tsx            Root layout
-  page.tsx              Redirects to /auth/login
+apps/
+  web/
+    app/                Auth, entrepreneur, admin, and trainer routes
+    components/         UI system, role-specific components, Radix primitives
+    lib/                mock data, stores, routes, helpers
+    types/              frontend domain types
+  api/
+    src/                NestJS backend source
 
-components/
-  admin/                Admin-specific modals and flows
-  auth/                 Shared auth primitives used by auth route views
-  entrepreneur/         Entrepreneur-specific modals and content
-  layout/               App shell, sidebar, top bar
-  shared/               Reusable BID UI system
-  ui/                   Radix/shadcn primitives
+packages/
+  shared/
+    src/                shared constants, types, and contracts once stable
 
-lib/
-  forms/                Zod schemas and form types
-  mock-data/            Seed data shaped like future backend tables
-  nav/                  Sidebar navigation definitions
-  stores/               In-memory admin and entrepreneur stores
-  training/             Training progress helpers
-  routes.ts             Route constants
-  utils.ts              Shared utilities
+prisma/
+  schema.prisma         database schema and migrations
 
-types/
-  index.ts              Core domain types
+docker-compose.yml      local development stack
+docker-compose.prod.yml production stack
 
 PROJECT_MEMORY.md       Long-running product and engineering context
 BACKEND_MEMORY.md       Long-running backend architecture and implementation rules
@@ -155,7 +158,7 @@ docs/backend-design.md  Collaborative backend architecture design document
 
 ## UI System
 
-The app uses shared components in `components/shared` as the primary UI layer. Prefer these before creating page-specific UI.
+The app uses shared components in `apps/web/components/shared` as the primary UI layer. Prefer these before creating page-specific UI.
 
 Important shared components:
 
@@ -179,13 +182,13 @@ The current app uses mock data and in-memory React context stores.
 Mock data lives in:
 
 ```text
-lib/mock-data/
+apps/web/lib/mock-data/
 ```
 
 State and mutation logic live in:
 
 ```text
-lib/stores/
+apps/web/lib/stores/
 ```
 
 The mock data is intentionally shaped close to backend tables, including:

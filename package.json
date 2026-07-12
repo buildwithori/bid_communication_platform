@@ -23,7 +23,9 @@
     "typecheck:shared": "npm --workspace @bid/shared run typecheck",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "docker:dev": "docker compose up --build",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d"
   },
   "devDependencies": {
     "prisma": "^5.22.0",
