@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { PrismaService } from './database/prisma.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,6 +23,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  const prisma = app.get(PrismaService);
+  await prisma.enableShutdownHooks(app);
 
   await app.listen(port);
 }

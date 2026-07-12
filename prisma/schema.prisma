@@ -19,17 +19,535 @@ enum UserStatus {
   inactive
 }
 
-model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  firstName     String?
-  lastName      String?
-  phone         String?
-  role          UserRole
-  status        UserStatus @default(pending)
-  emailVerified DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+enum BusinessStatus {
+  active
+  inactive
+  archived
+}
 
+enum BusinessSource {
+  self_registered
+  admin_invited
+}
+
+enum BusinessRelationship {
+  owner
+  representative
+}
+
+enum TrainerRoleLabel {
+  mentor
+  trainer
+  guest_expert
+  investment_analyst
+}
+
+enum TrainerAccessLevel {
+  full
+  guest
+}
+
+enum TrainerCapabilityStatus {
+  active
+  inactive
+}
+
+enum ProgrammeAccessType {
+  free
+  assigned
+}
+
+enum ContentItemType {
+  video
+  pdf
+  tool
+}
+
+enum ContentItemStatus {
+  draft
+  processing
+  ready
+  failed
+  archived
+}
+
+enum AssetStatus {
+  pending
+  processing
+  ready
+  failed
+  archived
+}
+
+enum ToolLinkSource {
+  library
+  custom
+}
+
+enum LearnerProgressStatus {
+  not_started
+  in_progress
+  completed
+}
+
+enum ProgressSource {
+  player
+  explicit_action
+  system
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String?    @map("password_hash")
+  firstName       String?    @map("first_name")
+  lastName        String?    @map("last_name")
+  phone           String?
+  avatarUrl       String?    @map("avatar_url")
+  role            UserRole
+  status          UserStatus @default(pending)
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  invitedById     String?    @map("invited_by_id")
+  lastLoginAt     DateTime?  @map("last_login_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  invitedBy                   User?                      @relation("UserInvitations", fields: [invitedById], references: [id])
+  invitedUsers                User[]                     @relation("UserInvitations")
+  businessMemberships         BusinessMembership[]
+  trainerCapability           TrainerCapability?
+  trainerSpecialisms          TrainerSpecialism[]
+  publishedProgrammes         Programme[]                @relation("ProgrammePublishedBy")
+  archivedProgrammes          Programme[]                @relation("ProgrammeArchivedBy")
+  grantedProgrammeAccess      ProgrammeAccessGrant[]     @relation("ProgrammeAccessGrantedBy")
+  entrepreneurProgrammeGrants ProgrammeAccessGrant[]     @relation("ProgrammeAccessEntrepreneur")
+  ownedContentItems           ContentItem[]              @relation("ContentTrainer")
+  contentRatings              ContentRating[]            @relation("ContentRatingEntrepreneur")
+  trainerContentRatings       ContentRating[]            @relation("ContentRatingTrainer")
+  contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
+  moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
+  programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
+
+  @@index([role, status])
+  @@index([invitedById])
   @@map("users")
+}
+
+model CompanySettings {
+  id                                    String   @id @default(cuid())
+  singletonKey                          String   @unique @default("default") @map("singleton_key")
+  periodicUpdateOverdueAfterDays        Int      @default(30) @map("periodic_update_overdue_after_days")
+  moduleCompletionDeliverableDueDays    Int?     @map("module_completion_deliverable_due_days")
+  defaultCurrency                       String   @default("USD") @map("default_currency")
+  defaultTimezone                       String   @default("UTC") @map("default_timezone")
+  defaultSessionProvider                String   @default("google_meet") @map("default_session_provider")
+  inAppNotificationsEnabledByDefault    Boolean  @default(true) @map("in_app_notifications_enabled_by_default")
+  emailNotificationsEnabledByDefault    Boolean  @default(true) @map("email_notifications_enabled_by_default")
+  reminderNotificationsEnabledByDefault Boolean  @default(true) @map("reminder_notifications_enabled_by_default")
+  weeklyDigestEnabledByDefault          Boolean  @default(false) @map("weekly_digest_enabled_by_default")
+  createdAt                             DateTime @default(now()) @map("created_at")
+  updatedAt                             DateTime @updatedAt @map("updated_at")
+
+  @@map("company_settings")
+}
+
+model Sector {
+  id        String   @id @default(cuid())
+  name      String
+  key       String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  businesses         Business[]
+  trainerSpecialisms TrainerSpecialism[]
+
+  @@index([active])
+  @@map("sectors")
+}
+
+model BusinessStage {
+  id         String   @id @default(cuid())
+  name       String
+  key        String   @unique
+  definition String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  businesses Business[]
+
+  @@index([active])
+  @@map("business_stages")
+}
+
+model ProgrammeGoalType {
+  id                   String   @id @default(cuid())
+  name                 String
+  key                  String   @unique
+  description          String?
+  requiresTargetAmount Boolean  @default(false) @map("requires_target_amount")
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@map("programme_goal_types")
+}
+
+model ToolArea {
+  id        String   @id @default(cuid())
+  name      String
+  key       String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@map("tool_areas")
+}
+
+model Business {
+  id                    String         @id @default(cuid())
+  name                  String
+  country               String
+  sectorId              String?        @map("sector_id")
+  stageId               String?        @map("stage_id")
+  onboardingCompletedAt DateTime?      @map("onboarding_completed_at")
+  status                BusinessStatus @default(active)
+  source                BusinessSource @default(self_registered)
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  sector      Sector?              @relation(fields: [sectorId], references: [id])
+  stage       BusinessStage?       @relation(fields: [stageId], references: [id])
+  memberships BusinessMembership[]
+
+  @@index([sectorId])
+  @@index([stageId])
+  @@index([status, source])
+  @@map("businesses")
+}
+
+model BusinessMembership {
+  id           String               @id @default(cuid())
+  userId       String               @map("user_id")
+  businessId   String               @map("business_id")
+  relationship BusinessRelationship @default(representative)
+  isPrimary    Boolean              @default(true) @map("is_primary")
+  joinedAt     DateTime             @default(now()) @map("joined_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([userId, businessId])
+  @@index([businessId])
+  @@index([userId, isPrimary])
+  @@map("business_memberships")
+}
+
+model TrainerCapability {
+  id              String                  @id @default(cuid())
+  userId          String                  @unique @map("user_id")
+  roleLabel       TrainerRoleLabel        @default(trainer) @map("role_label")
+  accessLevel     TrainerAccessLevel      @default(full) @map("access_level")
+  accessExpiresOn DateTime?               @map("access_expires_on")
+  status          TrainerCapabilityStatus @default(active)
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([status, accessLevel])
+  @@map("trainer_capabilities")
+}
+
+model TrainerSpecialism {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  sectorId  String   @map("sector_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  sector Sector @relation(fields: [sectorId], references: [id])
+
+  @@unique([userId, sectorId])
+  @@index([sectorId])
+  @@map("trainer_specialisms")
+}
+
+model Programme {
+  id               String              @id @default(cuid())
+  name             String
+  description      String
+  accessType       ProgrammeAccessType @map("access_type")
+  startDate        DateTime            @map("start_date")
+  endDate          DateTime            @map("end_date")
+  maxEntrepreneurs Int                 @map("max_entrepreneurs")
+  publishedAt      DateTime?           @map("published_at")
+  publishedById    String?             @map("published_by_id")
+  archivedAt       DateTime?           @map("archived_at")
+  archivedById     String?             @map("archived_by_id")
+  archiveReason    String?             @map("archive_reason")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  publishedBy     User?                      @relation("ProgrammePublishedBy", fields: [publishedById], references: [id])
+  archivedBy      User?                      @relation("ProgrammeArchivedBy", fields: [archivedById], references: [id])
+  modules         ProgrammeModule[]
+  accessGrants    ProgrammeAccessGrant[]
+  contentProgress LearnerContentProgress[]
+  moduleProgress  LearnerModuleProgress[]
+  progress        LearnerProgrammeProgress[]
+
+  @@index([accessType])
+  @@index([publishedAt, archivedAt])
+  @@index([startDate, endDate])
+  @@map("programmes")
+}
+
+model ProgrammeAccessGrant {
+  id                 String    @id @default(cuid())
+  programmeId        String    @map("programme_id")
+  entrepreneurUserId String    @map("entrepreneur_user_id")
+  grantedById        String    @map("granted_by_id")
+  grantedAt          DateTime  @default(now()) @map("granted_at")
+  revokedAt          DateTime? @map("revoked_at")
+  revokeReason       String?   @map("revoke_reason")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  programme    Programme @relation(fields: [programmeId], references: [id])
+  entrepreneur User      @relation("ProgrammeAccessEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  grantedBy    User      @relation("ProgrammeAccessGrantedBy", fields: [grantedById], references: [id])
+
+  @@unique([programmeId, entrepreneurUserId])
+  @@index([entrepreneurUserId, revokedAt])
+  @@index([grantedById])
+  @@map("programme_access_grants")
+}
+
+model LearningModule {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  isReusable  Boolean  @default(true) @map("is_reusable")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  programmes      ProgrammeModule[]
+  contentItems    ModuleContentItem[]
+  contentProgress LearnerContentProgress[]
+  progress        LearnerModuleProgress[]
+
+  @@map("modules")
+}
+
+model ProgrammeModule {
+  id          String   @id @default(cuid())
+  programmeId String   @map("programme_id")
+  moduleId    String   @map("module_id")
+  position    Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  programme Programme      @relation(fields: [programmeId], references: [id])
+  module    LearningModule @relation(fields: [moduleId], references: [id])
+
+  @@unique([programmeId, moduleId])
+  @@unique([programmeId, position])
+  @@index([moduleId])
+  @@map("programme_modules")
+}
+
+model ContentItem {
+  id              String            @id @default(cuid())
+  title           String
+  type            ContentItemType
+  trainerId       String?           @map("trainer_id")
+  durationSeconds Int?              @map("duration_seconds")
+  status          ContentItemStatus @default(draft)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  trainer    User?                    @relation("ContentTrainer", fields: [trainerId], references: [id])
+  modules    ModuleContentItem[]
+  videoAsset VideoAsset?
+  fileAssets FileAsset[]
+  toolLink   ContentToolLink?
+  ratings    ContentRating[]
+  progress   LearnerContentProgress[]
+
+  @@index([type, status])
+  @@index([trainerId])
+  @@map("content_items")
+}
+
+model ModuleContentItem {
+  id            String   @id @default(cuid())
+  moduleId      String   @map("module_id")
+  contentItemId String   @map("content_item_id")
+  position      Int
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  module      LearningModule @relation(fields: [moduleId], references: [id])
+  contentItem ContentItem    @relation(fields: [contentItemId], references: [id])
+
+  @@unique([moduleId, contentItemId])
+  @@unique([moduleId, position])
+  @@index([contentItemId])
+  @@map("module_content_items")
+}
+
+model VideoAsset {
+  id            String      @id @default(cuid())
+  contentItemId String      @unique @map("content_item_id")
+  muxAssetId    String?     @unique @map("mux_asset_id")
+  muxUploadId   String?     @unique @map("mux_upload_id")
+  playbackId    String?     @map("playback_id")
+  duration      Int?
+  status        AssetStatus @default(pending)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id])
+
+  @@index([status])
+  @@map("video_assets")
+}
+
+model FileAsset {
+  id               String      @id @default(cuid())
+  contentItemId    String?     @map("content_item_id")
+  storageKey       String      @unique @map("storage_key")
+  originalFilename String      @map("original_filename")
+  mimeType         String      @map("mime_type")
+  sizeBytes        BigInt      @map("size_bytes")
+  status           AssetStatus @default(pending)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  contentItem ContentItem? @relation(fields: [contentItemId], references: [id])
+
+  @@index([contentItemId])
+  @@index([status])
+  @@map("file_assets")
+}
+
+model ContentToolLink {
+  id            String         @id @default(cuid())
+  contentItemId String         @unique @map("content_item_id")
+  toolId        String?        @map("tool_id")
+  externalUrl   String?        @map("external_url")
+  source        ToolLinkSource
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id])
+
+  @@index([toolId])
+  @@map("content_tool_links")
+}
+
+model ContentRating {
+  id                 String   @id @default(cuid())
+  contentItemId      String   @map("content_item_id")
+  entrepreneurUserId String   @map("entrepreneur_user_id")
+  trainerId          String?  @map("trainer_id")
+  rating             Int
+  comment            String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  contentItem  ContentItem @relation(fields: [contentItemId], references: [id])
+  entrepreneur User        @relation("ContentRatingEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  trainer      User?       @relation("ContentRatingTrainer", fields: [trainerId], references: [id])
+
+  @@unique([contentItemId, entrepreneurUserId])
+  @@index([entrepreneurUserId])
+  @@index([trainerId])
+  @@map("content_ratings")
+}
+
+model LearnerContentProgress {
+  id                  String                @id @default(cuid())
+  entrepreneurUserId  String                @map("entrepreneur_user_id")
+  programmeId         String?               @map("programme_id")
+  moduleId            String?               @map("module_id")
+  contentItemId       String                @map("content_item_id")
+  status              LearnerProgressStatus @default(not_started)
+  progressPercent     Int                   @default(0) @map("progress_percent")
+  lastPositionSeconds Int?                  @map("last_position_seconds")
+  durationSeconds     Int?                  @map("duration_seconds")
+  startedAt           DateTime?             @map("started_at")
+  completedAt         DateTime?             @map("completed_at")
+  lastOpenedAt        DateTime?             @map("last_opened_at")
+  lastSyncedAt        DateTime              @default(now()) @map("last_synced_at")
+  source              ProgressSource        @default(player)
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  entrepreneur User            @relation("LearnerContentProgressEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme    Programme?      @relation(fields: [programmeId], references: [id])
+  module       LearningModule? @relation(fields: [moduleId], references: [id])
+  contentItem  ContentItem     @relation(fields: [contentItemId], references: [id])
+
+  @@unique([entrepreneurUserId, programmeId, moduleId, contentItemId])
+  @@index([programmeId, moduleId])
+  @@index([contentItemId])
+  @@index([status])
+  @@map("learner_content_progress")
+}
+
+model LearnerModuleProgress {
+  id                    String                @id @default(cuid())
+  entrepreneurUserId    String                @map("entrepreneur_user_id")
+  programmeId           String                @map("programme_id")
+  moduleId              String                @map("module_id")
+  status                LearnerProgressStatus @default(not_started)
+  progressPercent       Int                   @default(0) @map("progress_percent")
+  completedContentCount Int                   @default(0) @map("completed_content_count")
+  totalContentCount     Int                   @default(0) @map("total_content_count")
+  startedAt             DateTime?             @map("started_at")
+  completedAt           DateTime?             @map("completed_at")
+  lastSyncedAt          DateTime              @default(now()) @map("last_synced_at")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  entrepreneur User           @relation("LearnerModuleProgressEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme    Programme      @relation(fields: [programmeId], references: [id])
+  module       LearningModule @relation(fields: [moduleId], references: [id])
+
+  @@unique([entrepreneurUserId, programmeId, moduleId])
+  @@index([programmeId, moduleId])
+  @@index([status])
+  @@map("learner_module_progress")
+}
+
+model LearnerProgrammeProgress {
+  id                    String                @id @default(cuid())
+  entrepreneurUserId    String                @map("entrepreneur_user_id")
+  programmeId           String                @map("programme_id")
+  status                LearnerProgressStatus @default(not_started)
+  progressPercent       Int                   @default(0) @map("progress_percent")
+  completedModuleCount  Int                   @default(0) @map("completed_module_count")
+  totalModuleCount      Int                   @default(0) @map("total_module_count")
+  completedContentCount Int                   @default(0) @map("completed_content_count")
+  totalContentCount     Int                   @default(0) @map("total_content_count")
+  startedAt             DateTime?             @map("started_at")
+  completedAt           DateTime?             @map("completed_at")
+  lastSyncedAt          DateTime              @default(now()) @map("last_synced_at")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  entrepreneur User      @relation("LearnerProgrammeProgressEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme    Programme @relation(fields: [programmeId], references: [id])
+
+  @@unique([entrepreneurUserId, programmeId])
+  @@index([programmeId])
+  @@index([status])
+  @@map("learner_programme_progress")
 }
