@@ -2,8 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Briefcase, Mail, UserPlus } from 'lucide-react';
+import { Briefcase, Lock, Mail, UserPlus } from 'lucide-react';
 import { AuthDivider } from '@/components/auth/AuthDivider';
 import { AuthGoogleButton } from '@/components/auth/AuthGoogleButton';
 import { AuthModeTabs } from '@/components/auth/AuthModeTabs';
@@ -16,6 +17,7 @@ import {
   type SignupForm as SignupFormValues,
 } from '@/lib/forms/schemas';
 import { countries } from '@/lib/mock-data/definitions';
+import { signup } from '@/lib/api/auth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -44,15 +46,36 @@ function SignupForm() {
       email: '',
       country: '',
       phone: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
+  const mutation = useMutation({
+    mutationFn: signup,
+    onSuccess: (response) => {
+      toast.success('Account created. Check your email to verify your account.');
+      const tokenQuery = response.verification.devToken
+        ? `?token=${encodeURIComponent(response.verification.devToken)}`
+        : '';
+      router.push(`/auth/verify-email${tokenQuery}`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Unable to create account.');
     },
   });
 
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit(() => {
-        toast.success('Account created. Check your email to verify your account.');
-        router.push('/auth/verify-email');
+      onSubmit={form.handleSubmit((values) => {
+        mutation.mutate({
+          businessName: values.businessName,
+          representativeName: values.representative,
+          email: values.email,
+          password: values.password,
+          country: values.country,
+          phone: values.phone,
+        });
       })}
     >
       <AuthGoogleButton onClick={() => router.push('/auth/onboarding?provider=google')}>
@@ -114,8 +137,25 @@ function SignupForm() {
         />
       </div>
 
-      <Button type="submit" size="lg" className="h-11 w-full">
-        Create account
+      <AuthTextField
+        icon={<Lock className="h-4 w-4" />}
+        label="Password"
+        type="password"
+        placeholder="Create a password"
+        error={form.formState.errors.password?.message}
+        {...form.register('password')}
+      />
+      <AuthTextField
+        icon={<Lock className="h-4 w-4" />}
+        label="Confirm password"
+        type="password"
+        placeholder="Confirm password"
+        error={form.formState.errors.confirmPassword?.message}
+        {...form.register('confirmPassword')}
+      />
+
+      <Button type="submit" size="lg" className="h-11 w-full" disabled={mutation.isPending}>
+        {mutation.isPending ? 'Creating account...' : 'Create account'}
       </Button>
     </form>
   );
