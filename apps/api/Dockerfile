@@ -3,7 +3,11 @@ FROM node:20-bookworm-slim AS base
 WORKDIR /workspace
 ENV NODE_ENV=development
 
-COPY package.json package-lock.json tsconfig.json ./
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json tsconfig.json prisma.config.ts ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
@@ -29,7 +33,11 @@ FROM node:20-bookworm-slim AS production
 WORKDIR /workspace
 ENV NODE_ENV=production
 
-COPY package.json package-lock.json ./
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json prisma.config.ts ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY prisma/schema.prisma prisma/schema.prisma

@@ -23,6 +23,7 @@
     "typecheck:shared": "npm --workspace @bid/shared run typecheck",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
     "docker:dev": "docker compose up --build",
     "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d"

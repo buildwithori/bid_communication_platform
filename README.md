@@ -62,7 +62,7 @@ Local Docker runs the application as a small system:
 
 - `web`: Next.js frontend on `http://localhost:3000`
 - `api`: NestJS backend on `http://localhost:4000/api`
-- `postgres`: PostgreSQL on `localhost:5432`
+- `postgres`: PostgreSQL on `localhost:5433` by default
 - `redis`: Redis on `localhost:6379`
 - `mailpit`: local email catcher on `http://localhost:8025`
 
