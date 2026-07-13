@@ -2,13 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useMutation } from '@tanstack/react-query';
+import { usePathname, useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BidLogo } from '@/components/shared/BidLogo';
 import { Avatar } from '@/components/shared/Avatar';
 import { Badge } from '@/components/shared/Badge';
 import { routes } from '@/lib/routes';
+import { logout } from '@/lib/api/auth';
 
 export interface NavItem {
   href: string;
@@ -50,6 +52,13 @@ export function NavSidebar({
   user,
 }: NavSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSettled: () => {
+      router.push(routes.auth.login);
+    },
+  });
 
   const isActive = (href: string) => {
     // Exact route match for index pages, prefix match otherwise.
@@ -122,13 +131,15 @@ export function NavSidebar({
             <div className="truncate text-xs text-ink-faint">{user.subtitle}</div>
           </div>
         </div>
-        <Link
-          href={routes.auth.login}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20"
+        <button
+          type="button"
+          onClick={() => logoutMutation.mutate()}
+          disabled={logoutMutation.isPending}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20 disabled:pointer-events-none disabled:opacity-60"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
-        </Link>
+          {logoutMutation.isPending ? 'Signing out...' : 'Sign out'}
+        </button>
       </div>
     </div>
   );
