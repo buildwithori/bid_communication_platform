@@ -38,10 +38,290 @@ const toolAreas = [
   ['Market research', 'market-research'],
 ];
 
+
+const trainerSeeds = [
+  {
+    key: 'kofi',
+    email: 'kofi.mensah@bid.org',
+    firstName: 'Kofi',
+    lastName: 'Mensah',
+    roleLabel: 'mentor',
+    specialisms: ['fintech', 'edtech'],
+  },
+  {
+    key: 'esi',
+    email: 'esi.adu@bid.org',
+    firstName: 'Esi',
+    lastName: 'Adu',
+    roleLabel: 'trainer',
+    specialisms: ['agritech', 'logistics'],
+  },
+];
+
+const programmeSeeds = [
+  {
+    id: 'p-accelerator-c6',
+    name: 'BID Accelerator - Cohort 6',
+    accessType: 'assigned',
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    publishedAt: '2025-12-15',
+    maxEntrepreneurs: 20,
+    description: 'Core accelerator curriculum covering foundations, business model, fundraising and operations.',
+    modules: ['m-intro', 'm-bmc', 'm-pitch', 'm-finmodel', 'm-legal'],
+  },
+  {
+    id: 'p-readiness-fintech',
+    name: 'Investment Readiness for Fintech',
+    accessType: 'assigned',
+    startDate: '2026-03-01',
+    endDate: '2026-09-30',
+    publishedAt: '2026-02-10',
+    maxEntrepreneurs: 15,
+    description: 'Specialised track on investor relations, due diligence prep and term sheets.',
+    modules: ['m-pitch', 'm-finmodel', 'm-ddprep'],
+  },
+  {
+    id: 'p-wee',
+    name: 'Women Economic Empowerment Programme',
+    accessType: 'free',
+    startDate: '2026-09-01',
+    endDate: '2026-11-30',
+    publishedAt: '2026-08-01',
+    maxEntrepreneurs: 25,
+    description: 'Programme supporting women-led ventures with tailored training and mentoring.',
+    modules: ['m-intro'],
+  },
+];
+
+const moduleSeeds = [
+  {
+    id: 'm-intro',
+    title: 'Introduction to Entrepreneurship in Africa',
+    description: 'Foundational orientation to the African startup landscape.',
+    content: ['c-intro-vid', 'c-intro-pdf'],
+  },
+  {
+    id: 'm-bmc',
+    title: 'Business Model Canvas Deep Dive',
+    description: 'Map and iterate on every block of the BMC.',
+    content: ['c-bmc-why', 'c-bmc-sheet', 'c-bmc-valueprop', 'c-bmc-tool'],
+  },
+  {
+    id: 'm-pitch',
+    title: 'Investor Pitch Fundamentals',
+    description: 'Structure, deliver and defend your investor pitch.',
+    content: ['c-pitch-structure', 'c-pitch-qa', 'c-pitch-checklist'],
+  },
+  {
+    id: 'm-finmodel',
+    title: 'Financial Modelling for Early-Stage Startups',
+    description: 'Build a 3-year operating model.',
+    content: ['c-finmodel-basics'],
+  },
+  {
+    id: 'm-legal',
+    title: 'Legal Structures for Startups',
+    description: 'Choose the right entity and equity structure.',
+    content: [],
+  },
+  {
+    id: 'm-ddprep',
+    title: 'Due Diligence Preparation',
+    description: 'Get your data room and disclosures ready for investors.',
+    content: [],
+  },
+];
+
+const contentSeeds = [
+  { id: 'c-intro-vid', title: 'Welcome & overview', type: 'video', trainer: 'kofi', durationSeconds: 1080, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
+  { id: 'c-intro-pdf', title: 'Reading list', type: 'pdf', trainer: 'kofi', filename: 'reading-list.pdf' },
+  { id: 'c-bmc-why', title: 'Why the canvas matters', type: 'video', trainer: 'kofi', durationSeconds: 540, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
+  { id: 'c-bmc-sheet', title: 'BMC worksheet', type: 'pdf', trainer: 'kofi', filename: 'bmc-worksheet.pdf' },
+  { id: 'c-bmc-valueprop', title: 'Mapping your value proposition', type: 'video', trainer: 'esi', durationSeconds: 900, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
+  { id: 'c-bmc-tool', title: 'Interactive BMC builder', type: 'tool', trainer: 'esi', externalUrl: 'https://example.com/bmc-builder' },
+  { id: 'c-pitch-structure', title: 'Pitch structure', type: 'video', trainer: 'kofi', durationSeconds: 960, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
+  { id: 'c-pitch-qa', title: 'Handling investor Q&A', type: 'video', trainer: 'kofi', durationSeconds: 720, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
+  { id: 'c-pitch-checklist', title: 'Pitch checklist', type: 'pdf', trainer: 'kofi', filename: 'pitch-checklist.pdf' },
+  { id: 'c-finmodel-basics', title: 'Financial modelling basics', type: 'video', trainer: 'esi', durationSeconds: 1320, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
+];
+
 async function hashPassword(password) {
   const salt = randomBytes(16).toString('base64url');
   const derived = await scrypt(password, salt, 64);
   return `scrypt:${salt}:${derived.toString('base64url')}`;
+}
+
+
+async function seedTrainersAndProgrammes() {
+  const sectorRows = await prisma.sector.findMany();
+  const sectorIdByKey = new Map(sectorRows.map((sector) => [sector.key, sector.id]));
+  const trainerIdByKey = new Map();
+
+  for (const trainer of trainerSeeds) {
+    const user = await prisma.user.upsert({
+      where: { email: trainer.email },
+      update: {
+        firstName: trainer.firstName,
+        lastName: trainer.lastName,
+        role: 'trainer',
+        status: 'active',
+        emailVerifiedAt: new Date(),
+      },
+      create: {
+        email: trainer.email,
+        firstName: trainer.firstName,
+        lastName: trainer.lastName,
+        role: 'trainer',
+        status: 'active',
+        emailVerifiedAt: new Date(),
+      },
+    });
+
+    trainerIdByKey.set(trainer.key, user.id);
+
+    await prisma.trainerCapability.upsert({
+      where: { userId: user.id },
+      update: { roleLabel: trainer.roleLabel, accessLevel: 'full', status: 'active' },
+      create: { userId: user.id, roleLabel: trainer.roleLabel, accessLevel: 'full', status: 'active' },
+    });
+
+    for (const sectorKey of trainer.specialisms) {
+      const sectorId = sectorIdByKey.get(sectorKey);
+      if (!sectorId) continue;
+      await prisma.trainerSpecialism.upsert({
+        where: { userId_sectorId: { userId: user.id, sectorId } },
+        update: {},
+        create: { userId: user.id, sectorId },
+      });
+    }
+  }
+
+  for (const content of contentSeeds) {
+    const trainerId = trainerIdByKey.get(content.trainer);
+    await prisma.contentItem.upsert({
+      where: { id: content.id },
+      update: {
+        title: content.title,
+        type: content.type,
+        trainerId,
+        durationSeconds: content.durationSeconds ?? null,
+        status: 'ready',
+      },
+      create: {
+        id: content.id,
+        title: content.title,
+        type: content.type,
+        trainerId,
+        durationSeconds: content.durationSeconds ?? null,
+        status: 'ready',
+      },
+    });
+
+    if (content.type === 'video') {
+      await prisma.videoAsset.upsert({
+        where: { contentItemId: content.id },
+        update: {
+          playbackId: content.muxPlaybackId,
+          duration: content.durationSeconds ?? null,
+          status: 'ready',
+        },
+        create: {
+          contentItemId: content.id,
+          playbackId: content.muxPlaybackId,
+          duration: content.durationSeconds ?? null,
+          status: 'ready',
+        },
+      });
+    }
+
+    if (content.type === 'pdf') {
+      await prisma.fileAsset.upsert({
+        where: { storageKey: `seed/content/${content.filename}` },
+        update: {
+          contentItemId: content.id,
+          originalFilename: content.filename,
+          mimeType: 'application/pdf',
+          sizeBytes: BigInt(128000),
+          status: 'ready',
+        },
+        create: {
+          contentItemId: content.id,
+          storageKey: `seed/content/${content.filename}`,
+          originalFilename: content.filename,
+          mimeType: 'application/pdf',
+          sizeBytes: BigInt(128000),
+          status: 'ready',
+        },
+      });
+    }
+
+    if (content.type === 'tool') {
+      await prisma.contentToolLink.upsert({
+        where: { contentItemId: content.id },
+        update: { source: 'custom', externalUrl: content.externalUrl, toolId: null },
+        create: { contentItemId: content.id, source: 'custom', externalUrl: content.externalUrl, toolId: null },
+      });
+    }
+  }
+
+  for (const moduleSeed of moduleSeeds) {
+    await prisma.learningModule.upsert({
+      where: { id: moduleSeed.id },
+      update: {
+        title: moduleSeed.title,
+        description: moduleSeed.description,
+        isReusable: true,
+      },
+      create: {
+        id: moduleSeed.id,
+        title: moduleSeed.title,
+        description: moduleSeed.description,
+        isReusable: true,
+      },
+    });
+
+    for (const [index, contentItemId] of moduleSeed.content.entries()) {
+      await prisma.moduleContentItem.upsert({
+        where: { moduleId_contentItemId: { moduleId: moduleSeed.id, contentItemId } },
+        update: { position: index + 1 },
+        create: { moduleId: moduleSeed.id, contentItemId, position: index + 1 },
+      });
+    }
+  }
+
+  for (const programme of programmeSeeds) {
+    await prisma.programme.upsert({
+      where: { id: programme.id },
+      update: {
+        name: programme.name,
+        description: programme.description,
+        accessType: programme.accessType,
+        startDate: new Date(`${programme.startDate}T00:00:00.000Z`),
+        endDate: new Date(`${programme.endDate}T00:00:00.000Z`),
+        maxEntrepreneurs: programme.maxEntrepreneurs,
+        publishedAt: programme.publishedAt ? new Date(`${programme.publishedAt}T00:00:00.000Z`) : null,
+      },
+      create: {
+        id: programme.id,
+        name: programme.name,
+        description: programme.description,
+        accessType: programme.accessType,
+        startDate: new Date(`${programme.startDate}T00:00:00.000Z`),
+        endDate: new Date(`${programme.endDate}T00:00:00.000Z`),
+        maxEntrepreneurs: programme.maxEntrepreneurs,
+        publishedAt: programme.publishedAt ? new Date(`${programme.publishedAt}T00:00:00.000Z`) : null,
+      },
+    });
+
+    for (const [index, moduleId] of programme.modules.entries()) {
+      await prisma.programmeModule.upsert({
+        where: { programmeId_moduleId: { programmeId: programme.id, moduleId } },
+        update: { position: index + 1 },
+        create: { programmeId: programme.id, moduleId, position: index + 1 },
+      });
+    }
+  }
 }
 
 async function main() {
@@ -111,6 +391,8 @@ async function main() {
       create: { name, key, active: true },
     });
   }
+
+  await seedTrainersAndProgrammes();
 }
 
 main()
