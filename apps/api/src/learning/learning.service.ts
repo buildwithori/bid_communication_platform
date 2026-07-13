@@ -134,8 +134,29 @@ export class LearningService {
     item: LearnerContentProgressInputDto,
     syncedAt: Date,
   ) {
-    const status = this.progressStatus(item.progressPercent, item.completed);
-    const completedAt = status === LearnerProgressStatus.completed ? syncedAt : undefined;
+    const existing = await this.prisma.learnerContentProgress.findUnique({
+      where: {
+        entrepreneurUserId_programmeId_moduleId_contentItemId: {
+          entrepreneurUserId,
+          programmeId: item.programmeId,
+          moduleId: item.moduleId,
+          contentItemId: item.contentItemId,
+        },
+      },
+      select: {
+        completedAt: true,
+        progressPercent: true,
+        status: true,
+      },
+    });
+    const incomingPercent = item.completed ? 100 : item.progressPercent;
+    const progressPercent = Math.max(existing?.progressPercent ?? 0, incomingPercent);
+    const status =
+      existing?.status === LearnerProgressStatus.completed
+        ? LearnerProgressStatus.completed
+        : this.progressStatus(progressPercent, item.completed);
+    const completedAt =
+      existing?.completedAt ?? (status === LearnerProgressStatus.completed ? syncedAt : undefined);
     const source = item.completed ? ProgressSource.explicit_action : ProgressSource.player;
 
     await this.prisma.learnerContentProgress.upsert({
@@ -149,7 +170,7 @@ export class LearningService {
       },
       update: {
         status,
-        progressPercent: item.completed ? 100 : item.progressPercent,
+        progressPercent,
         lastPositionSeconds: item.lastPositionSeconds,
         durationSeconds: item.durationSeconds,
         lastOpenedAt: syncedAt,
@@ -163,7 +184,7 @@ export class LearningService {
         moduleId: item.moduleId,
         contentItemId: item.contentItemId,
         status,
-        progressPercent: item.completed ? 100 : item.progressPercent,
+        progressPercent,
         lastPositionSeconds: item.lastPositionSeconds,
         durationSeconds: item.durationSeconds,
         startedAt: status === LearnerProgressStatus.not_started ? null : syncedAt,

@@ -160,7 +160,7 @@ const entrepreneurSeeds = [
     stageKey: 'growth',
     source: 'admin_invited',
     programmes: [
-      { id: 'p-accelerator-c6', progress: 68, completedModules: 3, completedContent: 7 },
+      { id: 'p-accelerator-c6', progress: 68, completedModules: 3, completedContent: 9 },
       { id: 'p-readiness-fintech', progress: 42, completedModules: 1, completedContent: 3 },
     ],
   },
@@ -176,7 +176,7 @@ const entrepreneurSeeds = [
     stageKey: 'idea',
     source: 'admin_invited',
     programmes: [
-      { id: 'p-accelerator-c6', progress: 28, completedModules: 1, completedContent: 3 },
+      { id: 'p-accelerator-c6', progress: 28, completedModules: 1, completedContent: 2 },
     ],
   },
   {
@@ -191,7 +191,7 @@ const entrepreneurSeeds = [
     stageKey: 'scale',
     source: 'self_registered',
     programmes: [
-      { id: 'p-readiness-fintech', progress: 61, completedModules: 2, completedContent: 4 },
+      { id: 'p-readiness-fintech', progress: 61, completedModules: 1, completedContent: 3 },
     ],
   },
 ];
@@ -219,6 +219,112 @@ function programmeContentCount(programmeId) {
     const moduleSeed = moduleSeedById(moduleId);
     return sum + (moduleSeed?.content.length ?? 0);
   }, 0);
+}
+
+function contentSeedById(contentItemId) {
+  return contentSeeds.find((content) => content.id === contentItemId);
+}
+
+function progressStatus(progressPercent) {
+  if (progressPercent >= 100) return 'completed';
+  if (progressPercent > 0) return 'in_progress';
+  return 'not_started';
+}
+
+async function seedLearnerProgressDetails(entrepreneurUserId, grant) {
+  const programme = programmeSeedById(grant.id);
+  if (!programme) return;
+  const syncedAt = new Date('2026-07-01T00:00:00.000Z');
+
+  const moduleCount = programme.modules.length;
+  const targetProgrammePoints = grant.progress * moduleCount;
+  const completedModulePoints = grant.completedModules * 100;
+  const partialModulePercent = Math.max(0, Math.min(99, Math.round(targetProgrammePoints - completedModulePoints)));
+
+  for (const [moduleIndex, moduleId] of programme.modules.entries()) {
+    const moduleSeed = moduleSeedById(moduleId);
+    if (!moduleSeed) continue;
+
+    const modulePercent =
+      moduleIndex < grant.completedModules
+        ? 100
+        : moduleIndex === grant.completedModules
+          ? partialModulePercent
+          : 0;
+    const completedContentCount = modulePercent >= 100 ? moduleSeed.content.length : 0;
+
+    await prisma.learnerModuleProgress.upsert({
+      where: {
+        entrepreneurUserId_programmeId_moduleId: {
+          entrepreneurUserId,
+          programmeId: grant.id,
+          moduleId,
+        },
+      },
+      update: {
+        status: progressStatus(modulePercent),
+        progressPercent: modulePercent,
+        completedContentCount,
+        totalContentCount: moduleSeed.content.length,
+        startedAt: modulePercent > 0 ? syncedAt : null,
+        completedAt: modulePercent >= 100 ? syncedAt : null,
+        lastSyncedAt: syncedAt,
+      },
+      create: {
+        entrepreneurUserId,
+        programmeId: grant.id,
+        moduleId,
+        status: progressStatus(modulePercent),
+        progressPercent: modulePercent,
+        completedContentCount,
+        totalContentCount: moduleSeed.content.length,
+        startedAt: modulePercent > 0 ? syncedAt : null,
+        completedAt: modulePercent >= 100 ? syncedAt : null,
+        lastSyncedAt: syncedAt,
+      },
+    });
+
+    for (const [contentIndex, contentItemId] of moduleSeed.content.entries()) {
+      const contentSeed = contentSeedById(contentItemId);
+      const contentPercent = modulePercent >= 100 ? 100 : contentIndex === 0 ? modulePercent : 0;
+      if (contentPercent === 0) continue;
+
+      await prisma.learnerContentProgress.upsert({
+        where: {
+          entrepreneurUserId_programmeId_moduleId_contentItemId: {
+            entrepreneurUserId,
+            programmeId: grant.id,
+            moduleId,
+            contentItemId,
+          },
+        },
+        update: {
+          status: progressStatus(contentPercent),
+          progressPercent: contentPercent,
+          durationSeconds: contentSeed?.durationSeconds ?? null,
+          startedAt: contentPercent > 0 ? syncedAt : null,
+          completedAt: contentPercent >= 100 ? syncedAt : null,
+          lastOpenedAt: syncedAt,
+          lastSyncedAt: syncedAt,
+          source: 'system',
+        },
+        create: {
+          entrepreneurUserId,
+          programmeId: grant.id,
+          moduleId,
+          contentItemId,
+          status: progressStatus(contentPercent),
+          progressPercent: contentPercent,
+          durationSeconds: contentSeed?.durationSeconds ?? null,
+          startedAt: contentPercent > 0 ? syncedAt : null,
+          completedAt: contentPercent >= 100 ? syncedAt : null,
+          lastOpenedAt: syncedAt,
+          lastSyncedAt: syncedAt,
+          source: 'system',
+        },
+      });
+    }
+  }
 }
 
 async function seedEntrepreneurs(adminUserId, sectorIdByKey, stageIdByKey) {
@@ -313,6 +419,8 @@ async function seedEntrepreneurs(adminUserId, sectorIdByKey, stageIdByKey) {
           totalContentCount: totalContent,
         },
       });
+
+      await seedLearnerProgressDetails(user.id, grant);
     }
   }
 }
