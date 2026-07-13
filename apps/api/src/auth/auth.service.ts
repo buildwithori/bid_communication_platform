@@ -8,6 +8,8 @@ import { SignupDto } from './dto/signup.dto';
 import { TokenDto } from './dto/token.dto';
 import { addMinutes, createPlainToken, hashPassword, hashToken, verifyPassword } from './auth.tokens';
 
+const SESSION_DURATION_MINUTES = 60 * 24 * 30;
+
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
@@ -84,21 +86,78 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    const sessionToken = await this.createSession(user.id);
+
     return {
       user: this.serializeUser(user),
+      sessionToken,
       session: {
-        mode: 'pending-cookie-session',
+        mode: 'cookie',
+        expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES),
       },
     };
   }
 
-  async me(userId?: string) {
-    if (!userId) {
+  async me(sessionToken?: string) {
+    if (!sessionToken) {
       return { user: null };
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.findUserBySession(sessionToken);
     return { user: user ? this.serializeUser(user) : null };
+  }
+
+  async refresh(sessionToken?: string) {
+    if (!sessionToken) {
+      throw new UnauthorizedException('Session is required.');
+    }
+
+    const activeSession = await this.findActiveSession(sessionToken);
+    if (!activeSession) {
+      throw new UnauthorizedException('Session is invalid or expired.');
+    }
+
+    const nextSessionToken = await this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.update({
+        where: { id: activeSession.id },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: 'rotated',
+        },
+      });
+
+      return this.createSession(activeSession.userId, tx);
+    });
+
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: activeSession.userId } });
+
+    return {
+      user: this.serializeUser(user),
+      sessionToken: nextSessionToken,
+      session: {
+        mode: 'cookie',
+        expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES),
+      },
+    };
+  }
+
+  async logout(sessionToken?: string) {
+    if (!sessionToken) {
+      return { ok: true };
+    }
+
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash: await hashToken(sessionToken),
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: 'logout',
+      },
+    });
+
+    return { ok: true };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
@@ -191,6 +250,43 @@ export class AuthService {
       status: user.status,
       emailVerifiedAt: user.emailVerifiedAt,
     };
+  }
+
+  private async createSession(
+    userId: string,
+    tx: Pick<PrismaService, 'refreshToken'> = this.prisma,
+  ) {
+    const sessionToken = createPlainToken(48);
+    await tx.refreshToken.create({
+      data: {
+        userId,
+        tokenHash: await hashToken(sessionToken),
+        expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES),
+      },
+    });
+
+    return sessionToken;
+  }
+
+  private async findUserBySession(sessionToken: string) {
+    const activeSession = await this.findActiveSession(sessionToken);
+    if (!activeSession) {
+      return null;
+    }
+
+    return this.prisma.user.findUnique({ where: { id: activeSession.userId } });
+  }
+
+  private async findActiveSession(sessionToken: string) {
+    return this.prisma.refreshToken.findFirst({
+      where: {
+        tokenHash: await hashToken(sessionToken),
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
   }
 
   private normalizeEmail(email: string) {

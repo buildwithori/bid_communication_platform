@@ -59,3 +59,19 @@ export function verifyEmail(payload: { token: string }) {
     body: JSON.stringify(payload),
   });
 }
+
+export function getCurrentUser() {
+  return apiRequest<{ user: AuthUser | null }>('/auth/me');
+}
+
+export function refreshSession() {
+  return apiRequest<{ user: AuthUser; session: { mode: string; expiresAt: string } }>('/auth/refresh', {
+    method: 'POST',
+  });
+}
+
+export function logout() {
+  return apiRequest<{ ok: boolean }>('/auth/logout', {
+    method: 'POST',
+  });
+}
