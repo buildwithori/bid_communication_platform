@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, CalendarClock, FileCheck2, Globe2 } from 'lucide-react';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
@@ -10,6 +11,7 @@ import { FormField, FormInput, FormSelect } from '@/components/shared/FormField'
 import { StatCard } from '@/components/shared/StatCard';
 import { MetricGrid } from '@/components/shared/MetricGrid';
 import { cn } from '@/lib/utils';
+import { updateCompanySettings } from '@/lib/api/settings';
 import { useCompanyConfigStore } from '@/lib/stores/company-config-store';
 
 const currencyOptions = [
@@ -43,13 +45,8 @@ function isValidDays(value: number | null) {
 }
 
 export default function AdminCompanySettingsPage() {
-  const {
-    companyConfig,
-    updateReportingConfig,
-    updateDeliverableConfig,
-    updateDefaultConfig,
-    updateNotificationConfig,
-  } = useCompanyConfigStore();
+  const queryClient = useQueryClient();
+  const { companyConfig, replaceCompanyConfig } = useCompanyConfigStore();
   const [overdueAfterDays, setOverdueAfterDays] = React.useState(
     String(companyConfig.reporting.periodicUpdateOverdueAfterDays),
   );
@@ -76,6 +73,18 @@ export default function AdminCompanySettingsPage() {
     setNotifications(companyConfig.notifications);
   }, [companyConfig]);
 
+  const saveSettingsMutation = useMutation({
+    mutationFn: updateCompanySettings,
+    onSuccess: (settings) => {
+      replaceCompanyConfig(settings);
+      queryClient.setQueryData(['company-settings'], settings);
+      toast.success('Company settings updated');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Unable to update company settings.');
+    },
+  });
+
   const overdueValue = Number(overdueAfterDays);
   const moduleDueValue = parseOptionalDays(moduleDueDays);
   const overdueError =
@@ -91,11 +100,12 @@ export default function AdminCompanySettingsPage() {
     event.preventDefault();
     if (hasError) return;
 
-    updateReportingConfig({ periodicUpdateOverdueAfterDays: overdueValue });
-    updateDeliverableConfig({ moduleCompletionDeliverableDueDays: moduleDueValue });
-    updateDefaultConfig({ currency, timezone, sessionProvider });
-    updateNotificationConfig(notifications);
-    toast.success('Company settings updated');
+    saveSettingsMutation.mutate({
+      reporting: { periodicUpdateOverdueAfterDays: overdueValue },
+      deliverables: { moduleCompletionDeliverableDueDays: moduleDueValue },
+      defaults: { currency, timezone, sessionProvider },
+      notifications,
+    });
   };
 
   return (
@@ -271,8 +281,8 @@ export default function AdminCompanySettingsPage() {
         </Card>
 
         <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-line bg-[color:var(--background)]/95 py-4 backdrop-blur sm:flex-row">
-          <Button type="submit" disabled={hasError}>
-            Save company settings
+          <Button type="submit" disabled={hasError || saveSettingsMutation.isPending}>
+            {saveSettingsMutation.isPending ? 'Saving settings...' : 'Save company settings'}
           </Button>
           <Button
             type="button"

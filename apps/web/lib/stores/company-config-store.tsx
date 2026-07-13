@@ -28,6 +28,7 @@ export interface CompanyConfig {
 
 interface CompanyConfigStore {
   companyConfig: CompanyConfig;
+  replaceCompanyConfig: (config: CompanyConfig) => void;
   updateReportingConfig: (patch: Partial<CompanyConfig['reporting']>) => void;
   updateDeliverableConfig: (patch: Partial<CompanyConfig['deliverables']>) => void;
   updateDefaultConfig: (patch: Partial<CompanyConfig['defaults']>) => void;
@@ -55,6 +56,10 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
       setCompanyConfig(settingsQuery.data);
     }
   }, [settingsQuery.data]);
+
+  const replaceCompanyConfig: CompanyConfigStore['replaceCompanyConfig'] = React.useCallback((config) => {
+    setCompanyConfig(config);
+  }, []);
 
   const updateReportingConfig: CompanyConfigStore['updateReportingConfig'] = React.useCallback((patch) => {
     setCompanyConfig((current) => ({
@@ -103,6 +108,7 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
   const value = React.useMemo<CompanyConfigStore>(
     () => ({
       companyConfig,
+      replaceCompanyConfig,
       updateReportingConfig,
       updateDeliverableConfig,
       updateDefaultConfig,
@@ -110,6 +116,7 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
     }),
     [
       companyConfig,
+      replaceCompanyConfig,
       updateReportingConfig,
       updateDeliverableConfig,
       updateDefaultConfig,
