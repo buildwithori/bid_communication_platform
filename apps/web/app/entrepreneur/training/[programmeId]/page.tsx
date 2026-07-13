@@ -361,6 +361,7 @@ export default function ProgrammeModulesPage({
 
       <LearningContentPlayer
         item={activeContent}
+        programmeId={program.id}
         playlist={contentPlaylist}
         onChangeItem={setActiveContent}
         onClose={() => setActiveContent(null)}
