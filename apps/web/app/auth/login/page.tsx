@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock, Mail } from 'lucide-react';
 import { AuthDivider } from '@/components/auth/AuthDivider';
@@ -32,6 +33,8 @@ export default function AuthLoginPage() {
 }
 
 function LoginForm() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -40,6 +43,8 @@ function LoginForm() {
     mutationFn: login,
     onSuccess: (response) => {
       toast.success(`Signed in as ${response.user.email}.`);
+      void queryClient.invalidateQueries({ queryKey: ['company-settings'] });
+      router.replace(workspaceRouteForRole(response.user.role));
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Unable to sign in.');
@@ -91,4 +96,10 @@ function LoginForm() {
       </p>
     </form>
   );
+}
+
+function workspaceRouteForRole(role: 'entrepreneur' | 'admin' | 'trainer') {
+  if (role === 'admin') return routes.admin.dashboard;
+  if (role === 'trainer') return routes.trainer.dashboard;
+  return routes.entrepreneur.dashboard;
 }
