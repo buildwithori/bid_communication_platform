@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getCompanySettings, updateCompanySettings } from '@/lib/api/settings';
 import { companyConfig as seedCompanyConfig } from '@/lib/mock-data/company-config';
@@ -37,9 +38,12 @@ const CompanyConfigContext = React.createContext<CompanyConfigStore | null>(null
 
 export function CompanyConfigProvider({ children }: { children: React.ReactNode }) {
   const [companyConfig, setCompanyConfig] = React.useState<CompanyConfig>(seedCompanyConfig);
+  const pathname = usePathname();
+  const shouldLoadSettings = pathname !== '/' && !pathname.startsWith('/auth');
   const settingsQuery = useQuery({
     queryKey: ['company-settings'],
     queryFn: getCompanySettings,
+    enabled: shouldLoadSettings,
   });
   const updateSettingsMutation = useMutation({
     mutationFn: updateCompanySettings,
