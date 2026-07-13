@@ -57,6 +57,7 @@ Email templates should be built as a reusable BID email brand system with React 
 
 - Keep backend concerns out of React components.
 - Every mutation must have server-side validation.
+- Product API endpoints are authenticated by default. Only explicit auth/bootstrap/health endpoints may be public, and any public exception must be intentional and documented. Role guards are added on top only where a role-specific permission is required.
 - Before creating Prisma models or NestJS DTOs for a feature, reconcile them against the current UI form schemas and modals. Every UI field must be persisted, derived, request-only, or intentionally removed from the UI.
 - Controllers stay thin: parse request context, call services, return DTOs.
 - Services own business rules and transactions.

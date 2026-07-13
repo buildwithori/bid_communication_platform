@@ -20,74 +20,65 @@ import { SettingsService } from './settings.service';
 
 @ApiTags('settings')
 @Controller()
+@UseGuards(SessionAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get('company-settings')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   getCompanySettings() {
     return this.settingsService.getCompanySettings();
   }
 
   @Patch('company-settings')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   updateCompanySettings(@Body() dto: UpdateCompanySettingsDto) {
     return this.settingsService.updateCompanySettings(dto);
   }
 
   @Post('settings/sectors')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   createSector(@Body() dto: CreateSectorDto) {
     return this.settingsService.createSector(dto);
   }
 
   @Patch('settings/sectors/:id')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   updateSector(@Param('id') id: string, @Body() dto: UpdateSectorDto) {
     return this.settingsService.updateSector(id, dto);
   }
 
   @Post('settings/business-stages')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   createBusinessStage(@Body() dto: CreateBusinessStageDto) {
     return this.settingsService.createBusinessStage(dto);
   }
 
   @Patch('settings/business-stages/:id')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   updateBusinessStage(@Param('id') id: string, @Body() dto: UpdateBusinessStageDto) {
     return this.settingsService.updateBusinessStage(id, dto);
   }
 
   @Post('settings/programme-goal-types')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   createProgrammeGoalType(@Body() dto: CreateProgrammeGoalTypeDto) {
     return this.settingsService.createProgrammeGoalType(dto);
   }
 
   @Patch('settings/programme-goal-types/:id')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   updateProgrammeGoalType(@Param('id') id: string, @Body() dto: UpdateProgrammeGoalTypeDto) {
     return this.settingsService.updateProgrammeGoalType(id, dto);
   }
 
   @Post('settings/tool-areas')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   createToolArea(@Body() dto: CreateToolAreaDto) {
     return this.settingsService.createToolArea(dto);
   }
 
   @Patch('settings/tool-areas/:id')
-  @UseGuards(SessionAuthGuard, RolesGuard)
   @Roles(UserRole.admin)
   updateToolArea(@Param('id') id: string, @Body() dto: UpdateToolAreaDto) {
     return this.settingsService.updateToolArea(id, dto);

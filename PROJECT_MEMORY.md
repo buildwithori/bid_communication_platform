@@ -95,6 +95,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Backend identity direction: each user has one active role at a time, and role change is not supported for launch. Do not create separate admin/trainer/entrepreneur profile tables; shared profile fields live on `users`, while role-specific business data belongs in real domain tables such as `businesses`, `business_memberships`, `trainer_specialisms`, and `calendar_connections`.
 - Backend runtime/deployment direction: local and production Docker Compose setup with separate services for the Next.js frontend and NestJS API, plus Postgres and Redis services. Local Compose includes Mailpit for email catching; production Compose uses built images, production env, restart policies, health checks, and DigitalOcean Spaces for non-video file storage. First production deployment runs on one DigitalOcean Droplet.
 - Backend auth uses secure httpOnly cookie sessions for the browser app, not client-managed bearer tokens.
+- Backend product endpoints should require authentication by default. Public endpoints must be explicit exceptions, such as auth entry points or health checks; role checks are layered on only when needed.
 - One entrepreneur user belongs to one business at launch.
 - Admins have full permissions at launch.
 - Trainers are read-only except for sessions and deliverable reviews.
