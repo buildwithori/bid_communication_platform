@@ -1,6 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
+const { randomBytes, scrypt: scryptCallback } = require('crypto');
+const { promisify } = require('util');
 
 const prisma = new PrismaClient();
+const scrypt = promisify(scryptCallback);
+const DEV_ADMIN_EMAIL = 'admin@bid.org';
+const DEV_ADMIN_PASSWORD = 'Password123!';
 
 const sectors = [
   ['Fintech', 'fintech'],
@@ -33,7 +38,31 @@ const toolAreas = [
   ['Market research', 'market-research'],
 ];
 
+async function hashPassword(password) {
+  const salt = randomBytes(16).toString('base64url');
+  const derived = await scrypt(password, salt, 64);
+  return `scrypt:${salt}:${derived.toString('base64url')}`;
+}
+
 async function main() {
+  await prisma.user.upsert({
+    where: { email: DEV_ADMIN_EMAIL },
+    update: {
+      role: 'admin',
+      status: 'active',
+      emailVerifiedAt: new Date(),
+    },
+    create: {
+      email: DEV_ADMIN_EMAIL,
+      firstName: 'Ama',
+      lastName: 'Darko',
+      passwordHash: await hashPassword(DEV_ADMIN_PASSWORD),
+      role: 'admin',
+      status: 'active',
+      emailVerifiedAt: new Date(),
+    },
+  });
+
   await prisma.companySettings.upsert({
     where: { singletonKey: 'default' },
     update: {},

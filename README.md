@@ -80,6 +80,19 @@ npm run docker:prod
 
 Use `.env.docker.example` as the local compose baseline. Production should provide real environment variables for database credentials, app origins, Resend, DigitalOcean Spaces, Mux, and Google OAuth.
 
+Seed local data after the database is running:
+
+```bash
+npm run prisma:seed
+```
+
+Local seeded admin account:
+
+```text
+Email: admin@bid.org
+Password: Password123!
+```
+
 ## Main Workspaces
 
 ### Auth
@@ -93,7 +106,7 @@ Auth pages live under `/auth`.
 - `/auth/reset-password`
 - `/auth/verify-email`
 
-Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Regular email signup collects the required details directly and moves to email verification. `/auth/onboarding` is only for Google signup when required details are missing. Backend auth is not connected yet.
+Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Regular email signup collects the required details directly and moves to email verification. `/auth/onboarding` is only for Google signup when required details are missing. Email/password auth is connected to the NestJS API with httpOnly cookie sessions. Google OAuth is still pending backend implementation.
 
 ### Entrepreneur Workspace
 
@@ -223,8 +236,8 @@ Implemented:
 
 Not implemented yet:
 
-- Real authentication
-- API routes
+- Google OAuth backend flow
+- Most domain API routes
 - Persistent database writes
 - File storage
 - Real notifications
