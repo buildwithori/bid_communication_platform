@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
@@ -18,29 +20,82 @@ import {
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
 import {
+  createProgrammeGoalType,
+  listProgrammeGoalTypes,
+  updateProgrammeGoalType,
+  type ProgrammeGoalTypeRecord,
+} from '@/lib/api/settings';
+import {
   programmeGoalTypeSchema,
   type ProgrammeGoalTypeForm,
 } from '@/lib/forms/schemas';
-import {
-  programmeGoalTypes as seedGoalTypes,
-  type ProgrammeGoalType,
-} from '@/lib/mock-data/definitions';
 
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+const GOAL_TYPES_QUERY_KEY = ['settings', 'programme-goal-types'];
+
+type GoalTypeRow = ProgrammeGoalTypeRecord & {
+  label: string;
+};
+
+function toGoalTypeRow(goalType: ProgrammeGoalTypeRecord): GoalTypeRow {
+  return {
+    ...goalType,
+    label: goalType.name,
+  };
 }
 
 export default function AdminGoalTypesPage() {
-  const [goalTypes, setGoalTypes] = React.useState<ProgrammeGoalType[]>(seedGoalTypes);
+  const queryClient = useQueryClient();
+  const goalTypesQuery = useQuery<ProgrammeGoalTypeRecord[]>({
+    queryKey: GOAL_TYPES_QUERY_KEY,
+    queryFn: () => listProgrammeGoalTypes(),
+  });
+  const goalTypes = React.useMemo<GoalTypeRow[]>(
+    () => (goalTypesQuery.data ?? []).map(toGoalTypeRow),
+    [goalTypesQuery.data],
+  );
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [activeGoalType, setActiveGoalType] = React.useState<ProgrammeGoalType | null>(null);
+  const [activeGoalType, setActiveGoalType] = React.useState<GoalTypeRow | null>(null);
+
+  const createMutation = useMutation({
+    mutationFn: (values: ProgrammeGoalTypeForm) =>
+      createProgrammeGoalType({
+        name: values.label.trim(),
+        description: values.description?.trim(),
+        requiresTargetAmount: !!values.requiresTargetAmount,
+      }),
+    onSuccess: () => {
+      toast.success('Goal type added');
+      setCreateOpen(false);
+      void queryClient.invalidateQueries({ queryKey: GOAL_TYPES_QUERY_KEY });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : 'Unable to add goal type.'),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: ProgrammeGoalTypeForm }) =>
+      updateProgrammeGoalType(id, {
+        name: values.label.trim(),
+        description: values.description?.trim(),
+        requiresTargetAmount: !!values.requiresTargetAmount,
+      }),
+    onSuccess: () => {
+      toast.success('Goal type updated');
+      setActiveGoalType(null);
+      void queryClient.invalidateQueries({ queryKey: GOAL_TYPES_QUERY_KEY });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : 'Unable to update goal type.'),
+  });
+  const statusMutation = useMutation({
+    mutationFn: (goalType: GoalTypeRow) =>
+      updateProgrammeGoalType(goalType.id, { active: !goalType.active }),
+    onSuccess: () => {
+      toast.success('Goal type status updated');
+      void queryClient.invalidateQueries({ queryKey: GOAL_TYPES_QUERY_KEY });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : 'Unable to update goal type status.'),
+  });
 
   const filteredGoalTypes = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -48,8 +103,8 @@ export default function AdminGoalTypesPage() {
     return goalTypes.filter((goalType) =>
       [
         goalType.label,
-        goalType.id,
-        goalType.description,
+        goalType.key,
+        goalType.description ?? '',
         goalType.requiresTargetAmount ? 'monetary target amount' : 'non monetary',
         goalType.active ? 'active' : 'inactive',
       ]
@@ -68,33 +123,7 @@ export default function AdminGoalTypesPage() {
     return filteredGoalTypes.slice(start, start + pageSize);
   }, [filteredGoalTypes, page, pageSize]);
 
-  const upsertGoalType = (values: ProgrammeGoalTypeForm, current?: ProgrammeGoalType | null) => {
-    const nextGoalType: ProgrammeGoalType = {
-      id: current?.id ?? slugify(values.label),
-      label: values.label.trim(),
-      description: values.description?.trim() || 'No description added yet.',
-      requiresTargetAmount: !!values.requiresTargetAmount,
-      active: current?.active ?? true,
-    };
-
-    setGoalTypes((items) =>
-      current
-        ? items.map((item) => (item.id === current.id ? nextGoalType : item))
-        : [nextGoalType, ...items],
-    );
-    setCreateOpen(false);
-    setActiveGoalType(null);
-  };
-
-  const toggleActive = (goalType: ProgrammeGoalType) => {
-    setGoalTypes((items) =>
-      items.map((item) =>
-        item.id === goalType.id ? { ...item, active: !item.active } : item,
-      ),
-    );
-  };
-
-  const columns: Column<ProgrammeGoalType>[] = [
+  const columns: Column<GoalTypeRow>[] = [
     {
       key: 'action',
       header: 'Action',
@@ -104,7 +133,7 @@ export default function AdminGoalTypesPage() {
             { label: 'Edit goal type', onSelect: () => setActiveGoalType(goalType) },
             {
               label: goalType.active ? 'Deactivate' : 'Activate',
-              onSelect: () => toggleActive(goalType),
+              onSelect: () => statusMutation.mutate(goalType),
             },
           ]}
         />
@@ -127,13 +156,15 @@ export default function AdminGoalTypesPage() {
     {
       key: 'key',
       header: 'Key',
-      cell: (goalType) => <span className="font-mono text-xs text-ink-muted">{goalType.id}</span>,
+      cell: (goalType) => <span className="font-mono text-xs text-ink-muted">{goalType.key}</span>,
     },
     {
       key: 'description',
       header: 'Description',
       cell: (goalType) => (
-        <p className="max-w-2xl text-sm leading-6 text-ink-muted">{goalType.description}</p>
+        <p className="max-w-2xl text-sm leading-6 text-ink-muted">
+          {goalType.description || 'No description added yet.'}
+        </p>
       ),
     },
     {
@@ -188,7 +219,7 @@ export default function AdminGoalTypesPage() {
           columns={columns}
           rows={pageRows}
           rowKey={(goalType) => goalType.id}
-          emptyMessage="No goal types match this search."
+          emptyMessage={goalTypesQuery.isLoading ? 'Loading goal types...' : 'No goal types match this search.'}
           tableClassName="min-w-[980px]"
         />
         <TablePagination
@@ -206,15 +237,20 @@ export default function AdminGoalTypesPage() {
       <GoalTypeModal
         title="Add goal type"
         open={createOpen}
+        isSaving={createMutation.isPending}
         onOpenChange={setCreateOpen}
-        onSubmit={(values) => upsertGoalType(values)}
+        onSubmit={(values) => createMutation.mutate(values)}
       />
       <GoalTypeModal
         title={activeGoalType ? `Edit ${activeGoalType.label}` : 'Edit goal type'}
         open={!!activeGoalType}
         initialValue={activeGoalType}
+        isSaving={updateMutation.isPending}
         onOpenChange={(open) => !open && setActiveGoalType(null)}
-        onSubmit={(values) => upsertGoalType(values, activeGoalType)}
+        onSubmit={(values) => {
+          if (!activeGoalType) return;
+          updateMutation.mutate({ id: activeGoalType.id, values });
+        }}
       />
     </>
   );
@@ -224,12 +260,14 @@ function GoalTypeModal({
   title,
   open,
   initialValue,
+  isSaving = false,
   onOpenChange,
   onSubmit,
 }: {
   title: string;
   open: boolean;
-  initialValue?: ProgrammeGoalType | null;
+  initialValue?: GoalTypeRow | null;
+  isSaving?: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: ProgrammeGoalTypeForm) => void;
 }) {
@@ -278,10 +316,12 @@ function GoalTypeModal({
           </span>
         </label>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
-          <Button type="submit">Save goal type</Button>
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save goal type'}
+          </Button>
         </div>
       </form>
     </Modal>
