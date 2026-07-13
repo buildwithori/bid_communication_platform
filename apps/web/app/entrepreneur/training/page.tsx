@@ -652,7 +652,7 @@ function FreeResourceModal({
               <Star className="h-4 w-4 text-warning-dark" />
               Rate this resource
             </div>
-            <ContentRating contentId={resource.id} onSaved={() => {}} />
+            <ContentRating contentId={resource.id} persist={false} onSaved={() => {}} />
           </div>
         </div>
       </div>
