@@ -1,5 +1,9 @@
-import { Body, Controller, Get, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { LookupQueryDto } from '../common/dto/lookup-query.dto';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
 import { SettingsService } from './settings.service';
@@ -10,11 +14,15 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get('company-settings')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   getCompanySettings() {
     return this.settingsService.getCompanySettings();
   }
 
   @Patch('company-settings')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   updateCompanySettings(@Body() dto: UpdateCompanySettingsDto) {
     return this.settingsService.updateCompanySettings(dto);
   }

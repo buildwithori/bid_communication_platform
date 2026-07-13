@@ -1,0 +1,54 @@
+const SESSION_COOKIE_NAME = 'bid_session';
+const SESSION_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+
+type CookieRequest = {
+  headers: {
+    cookie?: string;
+  };
+};
+
+type CookieResponse = {
+  cookie: (name: string, value: string, options: CookieOptions) => void;
+  clearCookie: (name: string, options: CookieOptions) => void;
+};
+
+type CookieOptions = {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'lax';
+  path: string;
+  maxAge?: number;
+};
+
+export function setSessionCookie(response: CookieResponse, token: string) {
+  response.cookie(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_COOKIE_MAX_AGE_MS,
+  });
+}
+
+export function clearSessionCookie(response: CookieResponse) {
+  response.clearCookie(SESSION_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  });
+}
+
+export function readSessionCookie(request: CookieRequest) {
+  const cookieHeader = request.headers.cookie;
+  if (!cookieHeader) {
+    return undefined;
+  }
+
+  return cookieHeader
+    .split(';')
+    .map((part) => part.trim().split('='))
+    .find(([name]) => name === SESSION_COOKIE_NAME)
+    ?.slice(1)
+    .join('=');
+}

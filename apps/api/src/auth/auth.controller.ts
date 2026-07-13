@@ -6,9 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
 import { TokenDto } from './dto/token.dto';
-
-const SESSION_COOKIE_NAME = 'bid_session';
-const SESSION_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+import { clearSessionCookie, readSessionCookie, setSessionCookie } from './auth.cookies';
 
 type CookieRequest = {
   headers: {
@@ -86,35 +84,3 @@ export class AuthController {
   }
 }
 
-function setSessionCookie(response: CookieResponse, token: string) {
-  response.cookie(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_COOKIE_MAX_AGE_MS,
-  });
-}
-
-function clearSessionCookie(response: CookieResponse) {
-  response.clearCookie(SESSION_COOKIE_NAME, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-  });
-}
-
-function readSessionCookie(request: CookieRequest) {
-  const cookieHeader = request.headers.cookie;
-  if (!cookieHeader) {
-    return undefined;
-  }
-
-  return cookieHeader
-    .split(';')
-    .map((part) => part.trim().split('='))
-    .find(([name]) => name === SESSION_COOKIE_NAME)
-    ?.slice(1)
-    .join('=');
-}

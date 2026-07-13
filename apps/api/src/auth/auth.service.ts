@@ -103,8 +103,16 @@ export class AuthService {
       return { user: null };
     }
 
-    const user = await this.findUserBySession(sessionToken);
+    const user = await this.validateSession(sessionToken);
     return { user: user ? this.serializeUser(user) : null };
+  }
+
+  async validateSession(sessionToken?: string) {
+    if (!sessionToken) {
+      return null;
+    }
+
+    return this.findUserBySession(sessionToken);
   }
 
   async refresh(sessionToken?: string) {
