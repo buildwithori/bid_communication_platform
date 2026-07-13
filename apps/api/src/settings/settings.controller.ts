@@ -1,10 +1,20 @@
-import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { LookupQueryDto } from '../common/dto/lookup-query.dto';
+import {
+  CreateBusinessStageDto,
+  CreateProgrammeGoalTypeDto,
+  CreateSectorDto,
+  CreateToolAreaDto,
+  UpdateBusinessStageDto,
+  UpdateProgrammeGoalTypeDto,
+  UpdateSectorDto,
+  UpdateToolAreaDto,
+} from './dto/lookup-entry.dto';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
 import { SettingsService } from './settings.service';
 
@@ -25,6 +35,62 @@ export class SettingsController {
   @Roles(UserRole.admin)
   updateCompanySettings(@Body() dto: UpdateCompanySettingsDto) {
     return this.settingsService.updateCompanySettings(dto);
+  }
+
+  @Post('settings/sectors')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  createSector(@Body() dto: CreateSectorDto) {
+    return this.settingsService.createSector(dto);
+  }
+
+  @Patch('settings/sectors/:id')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  updateSector(@Param('id') id: string, @Body() dto: UpdateSectorDto) {
+    return this.settingsService.updateSector(id, dto);
+  }
+
+  @Post('settings/business-stages')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  createBusinessStage(@Body() dto: CreateBusinessStageDto) {
+    return this.settingsService.createBusinessStage(dto);
+  }
+
+  @Patch('settings/business-stages/:id')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  updateBusinessStage(@Param('id') id: string, @Body() dto: UpdateBusinessStageDto) {
+    return this.settingsService.updateBusinessStage(id, dto);
+  }
+
+  @Post('settings/programme-goal-types')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  createProgrammeGoalType(@Body() dto: CreateProgrammeGoalTypeDto) {
+    return this.settingsService.createProgrammeGoalType(dto);
+  }
+
+  @Patch('settings/programme-goal-types/:id')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  updateProgrammeGoalType(@Param('id') id: string, @Body() dto: UpdateProgrammeGoalTypeDto) {
+    return this.settingsService.updateProgrammeGoalType(id, dto);
+  }
+
+  @Post('settings/tool-areas')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  createToolArea(@Body() dto: CreateToolAreaDto) {
+    return this.settingsService.createToolArea(dto);
+  }
+
+  @Patch('settings/tool-areas/:id')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
+  updateToolArea(@Param('id') id: string, @Body() dto: UpdateToolAreaDto) {
+    return this.settingsService.updateToolArea(id, dto);
   }
 
   @Get('lookups/sectors')
