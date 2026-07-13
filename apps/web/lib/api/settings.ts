@@ -22,6 +22,14 @@ type CompanySettingsResponse = {
 
 type CompanySettingsPatch = Partial<CompanySettingsResponse>;
 
+function toClientSessionProvider(provider: string) {
+  return provider === 'google_meet' ? 'google-meet' : provider;
+}
+
+function toApiSessionProvider(provider: string | undefined) {
+  return provider === 'google-meet' ? 'google_meet' : provider;
+}
+
 export async function getCompanySettings() {
   const response = await apiRequest<CompanySettingsResponse>('/company-settings');
   return mapCompanySettings(response);
@@ -47,7 +55,7 @@ function mapCompanySettings(settings: CompanySettingsResponse): CompanyConfig {
     defaults: {
       currency: settings.defaultCurrency,
       timezone: settings.defaultTimezone,
-      sessionProvider: settings.defaultSessionProvider,
+      sessionProvider: toClientSessionProvider(settings.defaultSessionProvider),
     },
     notifications: {
       inAppNotifications: settings.inAppNotificationsEnabledByDefault,
@@ -64,7 +72,7 @@ function toCompanySettingsPatch(patch: CompanyConfigPatch): CompanySettingsPatch
     moduleCompletionDeliverableDueDays: patch.deliverables?.moduleCompletionDeliverableDueDays,
     defaultCurrency: patch.defaults?.currency,
     defaultTimezone: patch.defaults?.timezone,
-    defaultSessionProvider: patch.defaults?.sessionProvider,
+    defaultSessionProvider: toApiSessionProvider(patch.defaults?.sessionProvider),
     inAppNotificationsEnabledByDefault: patch.notifications?.inAppNotifications,
     emailNotificationsEnabledByDefault: patch.notifications?.emailNotifications,
     reminderNotificationsEnabledByDefault: patch.notifications?.reminderNotifications,
