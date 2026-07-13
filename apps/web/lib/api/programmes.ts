@@ -26,6 +26,10 @@ type ProgrammeBase = {
     tools: number;
   };
   readiness: number;
+  learnerProgress: {
+    average: number;
+    trackedLearners: number;
+  };
 };
 
 export type ProgrammeListItem = ProgrammeBase & {

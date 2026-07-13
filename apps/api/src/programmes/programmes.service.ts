@@ -25,6 +25,9 @@ export class ProgrammesService {
             accessGrants: { where: { revokedAt: null } },
           },
         },
+        progress: {
+          select: { progressPercent: true },
+        },
         modules: {
           include: {
             module: {
@@ -55,6 +58,9 @@ export class ProgrammesService {
           select: {
             accessGrants: { where: { revokedAt: null } },
           },
+        },
+        progress: {
+          select: { progressPercent: true },
         },
         modules: {
           orderBy: { position: 'asc' },
@@ -196,6 +202,7 @@ export class ProgrammesService {
   private mapProgrammeListItem(
     programme: Programme & {
       _count: { modules: number; accessGrants: number };
+      progress: Array<{ progressPercent: number }>;
       modules: Array<{
         module: {
           contentItems: Array<{ contentItem: { type: string; status: string } }>;
@@ -229,12 +236,14 @@ export class ProgrammesService {
       },
       content: contentCounts,
       readiness: moduleCount === 0 ? 0 : Math.round((readyModuleCount / moduleCount) * 100),
+      learnerProgress: this.learnerProgress(programme.progress),
     };
   }
 
   private mapProgrammeDetail(
     programme: Programme & {
       _count: { accessGrants: number };
+      progress: Array<{ progressPercent: number }>;
       modules: Array<{
         position: number;
         module: {
@@ -329,9 +338,22 @@ export class ProgrammesService {
         capacity: programme.maxEntrepreneurs,
       },
       readiness: modules.length === 0 ? 0 : Math.round((readyModuleCount / modules.length) * 100),
+      learnerProgress: this.learnerProgress(programme.progress),
       content: contentCounts,
       modules,
     };
+  }
+
+  private learnerProgress(progressRows: Array<{ progressPercent: number }>) {
+    if (progressRows.length === 0) {
+      return { average: 0, trackedLearners: 0 };
+    }
+
+    const average = Math.round(
+      progressRows.reduce((sum, row) => sum + row.progressPercent, 0) / progressRows.length,
+    );
+
+    return { average, trackedLearners: progressRows.length };
   }
 
   private lifecycle(programme: Pick<Programme, 'publishedAt' | 'archivedAt' | 'startDate' | 'endDate'>) {

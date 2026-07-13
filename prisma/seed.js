@@ -146,6 +146,56 @@ const contentSeeds = [
   { id: 'c-finmodel-basics', title: 'Financial modelling basics', type: 'video', trainer: 'esi', durationSeconds: 1320, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
 ];
 
+
+const entrepreneurSeeds = [
+  {
+    email: 'amara@paybridge.africa',
+    firstName: 'Amara',
+    lastName: 'Osei',
+    phone: '+233 24 555 0172',
+    businessId: 'b-paybridge',
+    businessName: 'PayBridge Africa Ltd',
+    country: 'Ghana',
+    sectorKey: 'fintech',
+    stageKey: 'growth',
+    source: 'admin_invited',
+    programmes: [
+      { id: 'p-accelerator-c6', progress: 68, completedModules: 3, completedContent: 7 },
+      { id: 'p-readiness-fintech', progress: 42, completedModules: 1, completedContent: 3 },
+    ],
+  },
+  {
+    email: 'kwame@farmlink.gh',
+    firstName: 'Kwame',
+    lastName: 'Mensah',
+    phone: '+233 27 333 0190',
+    businessId: 'b-farmlink',
+    businessName: 'FarmLink GH',
+    country: 'Ghana',
+    sectorKey: 'agritech',
+    stageKey: 'idea',
+    source: 'admin_invited',
+    programmes: [
+      { id: 'p-accelerator-c6', progress: 28, completedModules: 1, completedContent: 3 },
+    ],
+  },
+  {
+    email: 'nadia@healthfirst.ng',
+    firstName: 'Nadia',
+    lastName: 'Asante',
+    phone: '+234 80 555 0102',
+    businessId: 'b-healthfirst',
+    businessName: 'HealthFirst',
+    country: 'Nigeria',
+    sectorKey: 'healthtech',
+    stageKey: 'scale',
+    source: 'self_registered',
+    programmes: [
+      { id: 'p-readiness-fintech', progress: 61, completedModules: 2, completedContent: 4 },
+    ],
+  },
+];
+
 async function hashPassword(password) {
   const salt = randomBytes(16).toString('base64url');
   const derived = await scrypt(password, salt, 64);
@@ -153,9 +203,123 @@ async function hashPassword(password) {
 }
 
 
+
+function programmeSeedById(programmeId) {
+  return programmeSeeds.find((programme) => programme.id === programmeId);
+}
+
+function moduleSeedById(moduleId) {
+  return moduleSeeds.find((moduleSeed) => moduleSeed.id === moduleId);
+}
+
+function programmeContentCount(programmeId) {
+  const programme = programmeSeedById(programmeId);
+  if (!programme) return 0;
+  return programme.modules.reduce((sum, moduleId) => {
+    const moduleSeed = moduleSeedById(moduleId);
+    return sum + (moduleSeed?.content.length ?? 0);
+  }, 0);
+}
+
+async function seedEntrepreneurs(adminUserId, sectorIdByKey, stageIdByKey) {
+  for (const entrepreneur of entrepreneurSeeds) {
+    const user = await prisma.user.upsert({
+      where: { email: entrepreneur.email },
+      update: {
+        firstName: entrepreneur.firstName,
+        lastName: entrepreneur.lastName,
+        phone: entrepreneur.phone,
+        role: 'entrepreneur',
+        status: 'active',
+        emailVerifiedAt: new Date(),
+      },
+      create: {
+        email: entrepreneur.email,
+        firstName: entrepreneur.firstName,
+        lastName: entrepreneur.lastName,
+        phone: entrepreneur.phone,
+        role: 'entrepreneur',
+        status: 'active',
+        emailVerifiedAt: new Date(),
+      },
+    });
+
+    await prisma.business.upsert({
+      where: { id: entrepreneur.businessId },
+      update: {
+        name: entrepreneur.businessName,
+        country: entrepreneur.country,
+        sectorId: sectorIdByKey.get(entrepreneur.sectorKey) ?? null,
+        stageId: stageIdByKey.get(entrepreneur.stageKey) ?? null,
+        source: entrepreneur.source,
+        status: 'active',
+        onboardingCompletedAt: new Date(),
+      },
+      create: {
+        id: entrepreneur.businessId,
+        name: entrepreneur.businessName,
+        country: entrepreneur.country,
+        sectorId: sectorIdByKey.get(entrepreneur.sectorKey) ?? null,
+        stageId: stageIdByKey.get(entrepreneur.stageKey) ?? null,
+        source: entrepreneur.source,
+        status: 'active',
+        onboardingCompletedAt: new Date(),
+      },
+    });
+
+    await prisma.businessMembership.upsert({
+      where: { userId_businessId: { userId: user.id, businessId: entrepreneur.businessId } },
+      update: { relationship: 'representative', isPrimary: true },
+      create: {
+        userId: user.id,
+        businessId: entrepreneur.businessId,
+        relationship: 'representative',
+        isPrimary: true,
+      },
+    });
+
+    for (const grant of entrepreneur.programmes) {
+      await prisma.programmeAccessGrant.upsert({
+        where: { programmeId_entrepreneurUserId: { programmeId: grant.id, entrepreneurUserId: user.id } },
+        update: { revokedAt: null, revokeReason: null, grantedById: adminUserId },
+        create: { programmeId: grant.id, entrepreneurUserId: user.id, grantedById: adminUserId },
+      });
+
+      const programme = programmeSeedById(grant.id);
+      const totalModules = programme?.modules.length ?? 0;
+      const totalContent = programmeContentCount(grant.id);
+
+      await prisma.learnerProgrammeProgress.upsert({
+        where: { entrepreneurUserId_programmeId: { entrepreneurUserId: user.id, programmeId: grant.id } },
+        update: {
+          status: grant.progress >= 100 ? 'completed' : grant.progress > 0 ? 'in_progress' : 'not_started',
+          progressPercent: grant.progress,
+          completedModuleCount: grant.completedModules,
+          totalModuleCount: totalModules,
+          completedContentCount: grant.completedContent,
+          totalContentCount: totalContent,
+        },
+        create: {
+          entrepreneurUserId: user.id,
+          programmeId: grant.id,
+          status: grant.progress >= 100 ? 'completed' : grant.progress > 0 ? 'in_progress' : 'not_started',
+          progressPercent: grant.progress,
+          completedModuleCount: grant.completedModules,
+          totalModuleCount: totalModules,
+          completedContentCount: grant.completedContent,
+          totalContentCount: totalContent,
+        },
+      });
+    }
+  }
+}
+
 async function seedTrainersAndProgrammes() {
   const sectorRows = await prisma.sector.findMany();
+  const stageRows = await prisma.businessStage.findMany();
+  const adminUser = await prisma.user.findUniqueOrThrow({ where: { email: DEV_ADMIN_EMAIL } });
   const sectorIdByKey = new Map(sectorRows.map((sector) => [sector.key, sector.id]));
+  const stageIdByKey = new Map(stageRows.map((stage) => [stage.key, stage.id]));
   const trainerIdByKey = new Map();
 
   for (const trainer of trainerSeeds) {
@@ -322,6 +486,8 @@ async function seedTrainersAndProgrammes() {
       });
     }
   }
+
+  await seedEntrepreneurs(adminUser.id, sectorIdByKey, stageIdByKey);
 }
 
 async function main() {
