@@ -96,6 +96,23 @@ enum ToolLinkSource {
   custom
 }
 
+enum EntrepreneurToolType {
+  pdf
+  embedded_tool
+}
+
+enum EntrepreneurToolVisibility {
+  all_entrepreneurs
+  programmes
+  entrepreneurs
+}
+
+enum EntrepreneurToolStatus {
+  draft
+  published
+  archived
+}
+
 enum LearnerProgressStatus {
   not_started
   in_progress
@@ -141,6 +158,12 @@ model User {
   ownedContentItems           ContentItem[]              @relation("ContentTrainer")
   contentRatings              ContentRating[]            @relation("ContentRatingEntrepreneur")
   trainerContentRatings       ContentRating[]            @relation("ContentRatingTrainer")
+  createdTools                Tool[]                     @relation("ToolCreatedBy")
+  updatedTools                Tool[]                     @relation("ToolUpdatedBy")
+  toolAccess                  ToolEntrepreneurAccess[]   @relation("ToolAccessEntrepreneur")
+  grantedToolAccess           ToolEntrepreneurAccess[]   @relation("ToolAccessGrantedBy")
+  hiddenTools                 ToolHiddenEntrepreneur[]   @relation("ToolHiddenEntrepreneur")
+  hiddenToolOverrides         ToolHiddenEntrepreneur[]   @relation("ToolHiddenBy")
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
@@ -309,6 +332,8 @@ model ToolArea {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([active])
+  tools     Tool[]
+
   @@map("tool_areas")
 }
 
@@ -406,6 +431,7 @@ model Programme {
   contentProgress LearnerContentProgress[]
   moduleProgress  LearnerModuleProgress[]
   progress        LearnerProgrammeProgress[]
+  toolAccess      ToolProgrammeAccess[]
 
   @@index([accessType])
   @@index([publishedAt, archivedAt])
@@ -536,6 +562,7 @@ model FileAsset {
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
   contentItem ContentItem? @relation(fields: [contentItemId], references: [id])
+  toolPdfAsset Tool?       @relation("ToolPdfAsset")
 
   @@index([contentItemId])
   @@index([status])
@@ -552,9 +579,94 @@ model ContentToolLink {
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   contentItem ContentItem @relation(fields: [contentItemId], references: [id])
+  tool        Tool?       @relation(fields: [toolId], references: [id])
 
   @@index([toolId])
   @@map("content_tool_links")
+}
+
+
+model Tool {
+  id            String                     @id @default(cuid())
+  name          String
+  description   String
+  type          EntrepreneurToolType
+  toolAreaId    String                     @map("tool_area_id")
+  iconKey       String                     @map("icon_key")
+  visibility    EntrepreneurToolVisibility @default(all_entrepreneurs)
+  status        EntrepreneurToolStatus     @default(draft)
+  pdfAssetId    String?                    @unique @map("pdf_asset_id")
+  embeddedUrl   String?                    @map("embedded_url")
+  createdById   String                     @map("created_by_id")
+  updatedById   String?                    @map("updated_by_id")
+  publishedAt   DateTime?                  @map("published_at")
+  archivedAt    DateTime?                  @map("archived_at")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
+
+  toolArea       ToolArea                   @relation(fields: [toolAreaId], references: [id])
+  pdfAsset       FileAsset?                 @relation("ToolPdfAsset", fields: [pdfAssetId], references: [id])
+  createdBy      User                       @relation("ToolCreatedBy", fields: [createdById], references: [id])
+  updatedBy      User?                      @relation("ToolUpdatedBy", fields: [updatedById], references: [id])
+  programmeAccess ToolProgrammeAccess[]
+  entrepreneurAccess ToolEntrepreneurAccess[]
+  hiddenEntrepreneurs ToolHiddenEntrepreneur[]
+  contentLinks    ContentToolLink[]
+
+  @@index([toolAreaId])
+  @@index([visibility, status])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("tools")
+}
+
+model ToolProgrammeAccess {
+  id          String   @id @default(cuid())
+  toolId      String   @map("tool_id")
+  programmeId String   @map("programme_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tool      Tool      @relation(fields: [toolId], references: [id])
+  programme Programme @relation(fields: [programmeId], references: [id])
+
+  @@unique([toolId, programmeId])
+  @@index([programmeId])
+  @@map("tool_programme_access")
+}
+
+model ToolEntrepreneurAccess {
+  id                 String   @id @default(cuid())
+  toolId             String   @map("tool_id")
+  entrepreneurUserId String   @map("entrepreneur_user_id")
+  grantedById        String   @map("granted_by_id")
+  grantedAt          DateTime @default(now()) @map("granted_at")
+
+  tool         Tool @relation(fields: [toolId], references: [id])
+  entrepreneur User @relation("ToolAccessEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  grantedBy    User @relation("ToolAccessGrantedBy", fields: [grantedById], references: [id])
+
+  @@unique([toolId, entrepreneurUserId])
+  @@index([entrepreneurUserId])
+  @@index([grantedById])
+  @@map("tool_entrepreneur_access")
+}
+
+model ToolHiddenEntrepreneur {
+  id                 String   @id @default(cuid())
+  toolId             String   @map("tool_id")
+  entrepreneurUserId String   @map("entrepreneur_user_id")
+  hiddenById         String   @map("hidden_by_id")
+  hiddenAt           DateTime @default(now()) @map("hidden_at")
+  reason             String?
+
+  tool         Tool @relation(fields: [toolId], references: [id])
+  entrepreneur User @relation("ToolHiddenEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  hiddenBy     User @relation("ToolHiddenBy", fields: [hiddenById], references: [id])
+
+  @@unique([toolId, entrepreneurUserId])
+  @@index([entrepreneurUserId])
+  @@index([hiddenById])
+  @@map("tool_hidden_entrepreneurs")
 }
 
 model ContentRating {

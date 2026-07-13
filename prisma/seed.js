@@ -146,6 +146,78 @@ const contentSeeds = [
   { id: 'c-finmodel-basics', title: 'Financial modelling basics', type: 'video', trainer: 'esi', durationSeconds: 1320, muxPlaybackId: 'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe' },
 ];
 
+const entrepreneurToolSeeds = [
+  {
+    id: 'tool-bmc',
+    name: 'Business Model Canvas',
+    description: 'Build and iterate on your BMC directly in the browser.',
+    type: 'embedded_tool',
+    toolAreaKey: 'fundraising',
+    status: 'published',
+    visibility: 'all_entrepreneurs',
+    embeddedUrl: 'https://example.com/bmc-builder',
+    iconKey: 'canvas',
+  },
+  {
+    id: 'tool-finmodel',
+    name: 'Financial Model Template',
+    description: 'Downloadable 3-year financial model resource.',
+    type: 'pdf',
+    toolAreaKey: 'finance',
+    status: 'published',
+    visibility: 'programmes',
+    programmeIds: ['p-accelerator-c6', 'p-readiness-fintech'],
+    pdfFileName: 'financial-model-template.pdf',
+    iconKey: 'document',
+  },
+  {
+    id: 'tool-pitch-timer',
+    name: 'Pitch Timer',
+    description: 'Practice your investor pitch with structured timing cues.',
+    type: 'embedded_tool',
+    toolAreaKey: 'pitching',
+    status: 'published',
+    visibility: 'all_entrepreneurs',
+    embeddedUrl: 'https://example.com/pitch-timer',
+    iconKey: 'timer',
+  },
+  {
+    id: 'tool-pitch-scorer',
+    name: 'Pitch Deck Scorer Checklist',
+    description: "Self-assessment checklist against BID's investor-readiness criteria.",
+    type: 'pdf',
+    toolAreaKey: 'fundraising',
+    status: 'published',
+    visibility: 'programmes',
+    programmeIds: ['p-readiness-fintech'],
+    pdfFileName: 'pitch-deck-scorer-checklist.pdf',
+    iconKey: 'star',
+  },
+  {
+    id: 'tool-market-sizing',
+    name: 'Market Sizing Calculator',
+    description: 'Estimate TAM, SAM and SOM with guided inputs.',
+    type: 'embedded_tool',
+    toolAreaKey: 'market-research',
+    status: 'draft',
+    visibility: 'entrepreneurs',
+    entrepreneurEmails: ['amara@paybridge.africa'],
+    embeddedUrl: 'https://example.com/market-sizing',
+    iconKey: 'plus',
+  },
+  {
+    id: 'tool-quarterly',
+    name: 'Quarterly Goal Tracker',
+    description: 'Printable resource for setting and tracking quarterly goals.',
+    type: 'pdf',
+    toolAreaKey: 'operations',
+    status: 'archived',
+    visibility: 'all_entrepreneurs',
+    pdfFileName: 'quarterly-goal-tracker.pdf',
+    iconKey: 'calendar',
+  },
+];
+
 
 const entrepreneurSeeds = [
   {
@@ -425,12 +497,96 @@ async function seedEntrepreneurs(adminUserId, sectorIdByKey, stageIdByKey) {
   }
 }
 
+async function seedEntrepreneurTools(adminUserId, toolAreaIdByKey) {
+  const entrepreneurByEmail = new Map(
+    (await prisma.user.findMany({ where: { role: 'entrepreneur' }, select: { id: true, email: true } })).map((user) => [user.email, user.id]),
+  );
+
+  for (const toolSeed of entrepreneurToolSeeds) {
+    let pdfAssetId = null;
+    if (toolSeed.type === 'pdf') {
+      const asset = await prisma.fileAsset.upsert({
+        where: { storageKey: `seed/tools/${toolSeed.pdfFileName}` },
+        update: {
+          contentItemId: null,
+          originalFilename: toolSeed.pdfFileName,
+          mimeType: 'application/pdf',
+          sizeBytes: BigInt(256000),
+          status: 'ready',
+        },
+        create: {
+          storageKey: `seed/tools/${toolSeed.pdfFileName}`,
+          originalFilename: toolSeed.pdfFileName,
+          mimeType: 'application/pdf',
+          sizeBytes: BigInt(256000),
+          status: 'ready',
+        },
+      });
+      pdfAssetId = asset.id;
+    }
+
+    await prisma.tool.upsert({
+      where: { id: toolSeed.id },
+      update: {
+        name: toolSeed.name,
+        description: toolSeed.description,
+        type: toolSeed.type,
+        toolAreaId: toolAreaIdByKey.get(toolSeed.toolAreaKey),
+        iconKey: toolSeed.iconKey,
+        visibility: toolSeed.visibility,
+        status: toolSeed.status,
+        pdfAssetId,
+        embeddedUrl: toolSeed.type === 'embedded_tool' ? toolSeed.embeddedUrl : null,
+        updatedById: adminUserId,
+        publishedAt: toolSeed.status === 'published' ? new Date('2026-07-01T00:00:00.000Z') : null,
+        archivedAt: toolSeed.status === 'archived' ? new Date('2026-07-01T00:00:00.000Z') : null,
+      },
+      create: {
+        id: toolSeed.id,
+        name: toolSeed.name,
+        description: toolSeed.description,
+        type: toolSeed.type,
+        toolAreaId: toolAreaIdByKey.get(toolSeed.toolAreaKey),
+        iconKey: toolSeed.iconKey,
+        visibility: toolSeed.visibility,
+        status: toolSeed.status,
+        pdfAssetId,
+        embeddedUrl: toolSeed.type === 'embedded_tool' ? toolSeed.embeddedUrl : null,
+        createdById: adminUserId,
+        publishedAt: toolSeed.status === 'published' ? new Date('2026-07-01T00:00:00.000Z') : null,
+        archivedAt: toolSeed.status === 'archived' ? new Date('2026-07-01T00:00:00.000Z') : null,
+      },
+    });
+
+    await prisma.toolProgrammeAccess.deleteMany({ where: { toolId: toolSeed.id } });
+    if (toolSeed.visibility === 'programmes') {
+      await prisma.toolProgrammeAccess.createMany({
+        data: (toolSeed.programmeIds ?? []).map((programmeId) => ({ toolId: toolSeed.id, programmeId })),
+        skipDuplicates: true,
+      });
+    }
+
+    await prisma.toolEntrepreneurAccess.deleteMany({ where: { toolId: toolSeed.id } });
+    if (toolSeed.visibility === 'entrepreneurs') {
+      const accessRows = (toolSeed.entrepreneurEmails ?? [])
+        .map((email) => entrepreneurByEmail.get(email))
+        .filter(Boolean)
+        .map((entrepreneurUserId) => ({ toolId: toolSeed.id, entrepreneurUserId, grantedById: adminUserId }));
+      if (accessRows.length > 0) {
+        await prisma.toolEntrepreneurAccess.createMany({ data: accessRows, skipDuplicates: true });
+      }
+    }
+  }
+}
+
 async function seedTrainersAndProgrammes() {
   const sectorRows = await prisma.sector.findMany();
   const stageRows = await prisma.businessStage.findMany();
   const adminUser = await prisma.user.findUniqueOrThrow({ where: { email: DEV_ADMIN_EMAIL } });
   const sectorIdByKey = new Map(sectorRows.map((sector) => [sector.key, sector.id]));
   const stageIdByKey = new Map(stageRows.map((stage) => [stage.key, stage.id]));
+  const toolAreaRows = await prisma.toolArea.findMany();
+  const toolAreaIdByKey = new Map(toolAreaRows.map((toolArea) => [toolArea.key, toolArea.id]));
   const trainerIdByKey = new Map();
 
   for (const trainer of trainerSeeds) {
@@ -602,6 +758,7 @@ async function seedTrainersAndProgrammes() {
   }
 
   await seedEntrepreneurs(adminUser.id, sectorIdByKey, stageIdByKey);
+  await seedEntrepreneurTools(adminUser.id, toolAreaIdByKey);
 }
 
 async function main() {
