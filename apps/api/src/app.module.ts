@@ -8,6 +8,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ProgrammesModule } from './programmes/programmes.module';
 import { EntrepreneursModule } from './entrepreneurs/entrepreneurs.module';
 import { TrainersModule } from './trainers/trainers.module';
+import { LearningModule } from './learning/learning.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { TrainersModule } from './trainers/trainers.module';
     ProgrammesModule,
     EntrepreneursModule,
     TrainersModule,
+    LearningModule,
   ],
 })
 export class AppModule {}
