@@ -33,15 +33,15 @@ import {
 } from '@/components/shared/DataTable';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { toolRequestSchema, type ToolRequestForm } from '@/lib/forms/schemas';
 import { toast } from 'sonner';
-import { tools } from '@/lib/mock-data';
 import { toolRequests, toolRequestStatusMeta, type ToolRequest } from '@/lib/mock-data/admin-workflows';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { toolAreaOptions } from '@/lib/tool-areas';
 import { cn } from '@/lib/utils';
 import { formatProgrammeAccess } from '@/lib/programme-access';
-import { isToolVisibleToEntrepreneur } from '@/lib/tool-access';
+import { listTools, type ApiToolVisibility, type ToolRecord } from '@/lib/api/tools';
 import type { LucideIcon } from 'lucide-react';
 import type { Tool } from '@/types';
 
@@ -55,6 +55,32 @@ const iconMap: Record<Tool['iconKey'], LucideIcon> = {
   plus: Plus,
   calendar: CalendarDays,
 };
+
+const toolVisibilityMap: Record<ApiToolVisibility, Tool['visibility']> = {
+  all_entrepreneurs: 'all-entrepreneurs',
+  programmes: 'programmes',
+  entrepreneurs: 'entrepreneurs',
+};
+
+function mapToolRecord(record: ToolRecord): Tool {
+  const iconKey = record.iconKey in iconMap ? (record.iconKey as Tool['iconKey']) : 'plus';
+
+  return {
+    id: record.id,
+    name: record.name,
+    description: record.description,
+    type: record.type === 'embedded_tool' ? 'embed' : 'pdf',
+    toolArea: record.toolArea.name,
+    status: record.status,
+    visibility: toolVisibilityMap[record.visibility],
+    programmeIds: record.audience.programmeIds,
+    entrepreneurIds: record.audience.entrepreneurUserIds,
+    pdfFileName: record.pdfAsset?.originalFilename,
+    embedUrl: record.embeddedUrl ?? undefined,
+    updatedAt: record.updatedAt,
+    iconKey,
+  };
+}
 
 function ToolCard({ tool, onClick }: { tool: Tool; onClick?: () => void }) {
   const Icon = iconMap[tool.iconKey] ?? Wrench;
@@ -358,6 +384,10 @@ function RequestInfoPanel({ title, text }: { title: string; text: string }) {
 
 export default function ToolsPage() {
   const { entrepreneur } = useEntrepreneurStore();
+  const toolsQuery = useQuery({
+    queryKey: ['tools', 'entrepreneur'],
+    queryFn: () => listTools({ take: 100 }),
+  });
   const [tab, setTab] = React.useState<ToolTab>('all');
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -374,12 +404,12 @@ export default function ToolsPage() {
     toolRequests.filter((request) => request.businessName === entrepreneur.businessName),
   );
 
-  const accessibleTools = React.useMemo(
-    () => tools.filter((tool) => isToolVisibleToEntrepreneur(tool, entrepreneur)),
-    [entrepreneur],
+  const accessibleTools = React.useMemo<Tool[]>(
+    () => (toolsQuery.data?.items ?? []).map(mapToolRecord),
+    [toolsQuery.data?.items],
   );
 
-  const filtered = React.useMemo(() => {
+  const filtered = React.useMemo<Tool[]>(() => {
     const needle = query.trim().toLowerCase();
     return accessibleTools.filter((tool) => {
       const matchesTab = tab === 'requests' ? false : tab === 'all' || tool.type === tab;
@@ -401,7 +431,7 @@ export default function ToolsPage() {
     setRequestPage(1);
   }, [requestQuery, requestStatus, requestCategory, requestPageSize]);
 
-  const pageRows = React.useMemo(() => {
+  const pageRows = React.useMemo<Tool[]>(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
@@ -590,26 +620,50 @@ export default function ToolsPage() {
               />
             </div>
           </TableToolbar>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {pageRows.map((t) => (
-              <ToolCard
-                key={t.id}
-                tool={t}
-                onClick={() => setActiveTool(t)}
+          {toolsQuery.isLoading ? (
+            <div className="grid min-h-[220px] place-items-center rounded-xl border border-line bg-surface-subtle text-sm text-ink-muted">
+              Loading tools...
+            </div>
+          ) : toolsQuery.isError ? (
+            <div className="grid min-h-[220px] place-items-center rounded-xl border border-line bg-surface-subtle p-6 text-center">
+              <div>
+                <div className="text-base font-semibold text-ink">Tools could not be loaded</div>
+                <p className="mt-2 text-sm text-ink-muted">Please refresh the page or try again later.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {pageRows.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {pageRows.map((t) => (
+                    <ToolCard
+                      key={t.id}
+                      tool={t}
+                      onClick={() => setActiveTool(t)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid min-h-[220px] place-items-center rounded-xl border border-line bg-surface-subtle p-6 text-center">
+                  <div>
+                    <div className="text-base font-semibold text-ink">No tools found</div>
+                    <p className="mt-2 text-sm text-ink-muted">Try a different search or filter.</p>
+                  </div>
+                </div>
+              )}
+              <TablePagination
+                page={page}
+                pageSize={pageSize}
+                totalItems={filtered.length}
+                pageSizeOptions={[6, 12, 24]}
+                onPageChange={setPage}
+                onPageSizeChange={(next) => {
+                  setPageSize(next);
+                  setPage(1);
+                }}
               />
-            ))}
-          </div>
-          <TablePagination
-            page={page}
-            pageSize={pageSize}
-            totalItems={filtered.length}
-            pageSizeOptions={[6, 12, 24]}
-            onPageChange={setPage}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              setPage(1);
-            }}
-          />
+            </>
+          )}
         </Card>
       )}
 
