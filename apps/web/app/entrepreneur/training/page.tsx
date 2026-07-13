@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import { getEntrepreneurProgrammes, isProgrammeOperational } from '@/lib/programme-access';
 import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
+import { useLearnerProgressOverlay } from '@/lib/training/progress';
 import type { BadgeTone, Program } from '@/types';
 
 type CatalogueKind = 'programme' | 'free-resource';
@@ -207,9 +208,12 @@ function buildResourceRow(resource: FreeResource): CatalogueRow {
 export default function TrainingLibraryPage() {
   const router = useRouter();
   const { entrepreneur } = useEntrepreneurStore();
+  const progressOverlay = useLearnerProgressOverlay();
   const accessibleProgrammes = React.useMemo(
-    () => getEntrepreneurProgrammes(entrepreneur, programs).filter(isProgrammeOperational),
-    [entrepreneur],
+    () => getEntrepreneurProgrammes(entrepreneur, programs)
+      .filter(isProgrammeOperational)
+      .map(progressOverlay.overlayProgramme),
+    [entrepreneur, progressOverlay.overlayProgramme],
   );
   const currentProgramme = accessibleProgrammes.find((programme) => programme.accessType !== 'free') ?? accessibleProgrammes[0];
   const currentProgrammeContent = currentProgramme ? getProgrammeContent(currentProgramme) : null;

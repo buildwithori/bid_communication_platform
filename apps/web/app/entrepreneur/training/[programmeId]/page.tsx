@@ -29,7 +29,7 @@ import { LearningContentPlayer } from '@/components/entrepreneur/LearningContent
 import { contentForModule, modulesForProgram, programById } from '@/lib/mock-data/programs';
 import { deliverableGroups } from '@/lib/mock-data';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { moduleWithProgress } from '@/lib/training/progress';
+import { useLearnerProgressOverlay } from '@/lib/training/progress';
 import { routes } from '@/lib/routes';
 import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
 import { getContentTrainer } from '@/lib/content-trainer-access';
@@ -64,14 +64,18 @@ export default function ProgrammeModulesPage({
 }) {
   const router = useRouter();
   const { deliverables } = useEntrepreneurStore();
-  const program = programById(params.programmeId);
-  if (!program) return notFound();
+  const baseProgram = programById(params.programmeId);
+  if (!baseProgram) return notFound();
+
+  const progressOverlay = useLearnerProgressOverlay(baseProgram.id);
+  const program = progressOverlay.overlayProgramme(baseProgram);
 
   const moduleSummaries = React.useMemo<ModuleSummary[]>(() => {
     return modulesForProgram(program.id).map((module) => {
-      const moduleItems = contentForModule(module.id);
+      const moduleItems = contentForModule(module.id).map(progressOverlay.overlayContentItem);
+      const moduleProgress = progressOverlay.overlayModule(module);
       return {
-        ...moduleWithProgress(module),
+        ...moduleProgress,
         items: moduleItems,
         videos: moduleItems.filter((item) => item.type === 'video').length,
         files: moduleItems.filter((item) => item.type === 'pdf').length,
@@ -83,7 +87,7 @@ export default function ProgrammeModulesPage({
         ].join(' '),
       };
     });
-  }, [program.id]);
+  }, [program.id, progressOverlay.overlayContentItem, progressOverlay.overlayModule]);
 
   const programmeDeliverables = React.useMemo(
     () => deliverables.filter((deliverable) => deliverable.programmeId === program.id),

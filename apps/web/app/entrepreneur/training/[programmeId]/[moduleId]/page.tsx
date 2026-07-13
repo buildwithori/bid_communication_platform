@@ -27,7 +27,7 @@ import {
   contentForModule,
   modulesForProgram,
 } from '@/lib/mock-data/programs';
-import { moduleWithProgress } from '@/lib/training/progress';
+import { useLearnerProgressOverlay } from '@/lib/training/progress';
 import { getContentTrainer } from '@/lib/content-trainer-access';
 import { cn } from '@/lib/utils';
 import type { BadgeTone, ContentItem, ContentProgress, ContentType } from '@/types';
@@ -50,18 +50,20 @@ export default function ModuleContentPage({
   const router = useRouter();
   const [activeContent, setActiveContent] = React.useState<ContentItem | null>(null);
 
-  const program = programById(params.programmeId);
+  const baseProgram = programById(params.programmeId);
   const trainingModule = moduleById(params.moduleId);
-  if (!program || !trainingModule || !program.moduleIds.includes(trainingModule.id)) return notFound();
+  if (!baseProgram || !trainingModule || !baseProgram.moduleIds.includes(trainingModule.id)) return notFound();
 
-  const programmeModules = modulesForProgram(program.id).map(moduleWithProgress);
+  const progressOverlay = useLearnerProgressOverlay(baseProgram.id);
+  const program = progressOverlay.overlayProgramme(baseProgram);
+  const programmeModules = modulesForProgram(program.id).map(progressOverlay.overlayModule);
   const moduleIndex = programmeModules.findIndex((module) => module.id === trainingModule.id);
   const previousModule = moduleIndex > 0 ? programmeModules[moduleIndex - 1] : undefined;
   const nextModule = moduleIndex >= 0 && moduleIndex < programmeModules.length - 1
     ? programmeModules[moduleIndex + 1]
     : undefined;
-  const moduleProgress = moduleWithProgress(trainingModule);
-  const items = contentForModule(trainingModule.id);
+  const moduleProgress = progressOverlay.overlayModule(trainingModule);
+  const items = contentForModule(trainingModule.id).map(progressOverlay.overlayContentItem);
   const firstOpenItem = items.find((item) => item.progress !== 'completed') ?? items[0] ?? null;
   const completedItems = items.filter((item) => item.progress === 'completed').length;
   const videos = items.filter((item) => item.type === 'video').length;
