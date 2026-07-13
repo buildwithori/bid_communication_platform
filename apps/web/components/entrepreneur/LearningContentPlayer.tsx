@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import MuxPlayer from '@mux/mux-player-react/lazy';
 import {
   CheckCircle2,
@@ -62,7 +62,13 @@ export function LearningContentPlayer({
   onClose: () => void;
 }) {
   const [playerKey, setPlayerKey] = React.useState(0);
-  const syncMutation = useMutation({ mutationFn: syncLearnerProgress });
+  const queryClient = useQueryClient();
+  const syncMutation = useMutation({
+    mutationFn: syncLearnerProgress,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['learning', 'progress'] });
+    },
+  });
   const lastSyncedAtRef = React.useRef<Record<string, number>>({});
   const currentIndex = item
     ? Math.max(playlist.findIndex((candidate) => candidate.id === item.id), 0)
