@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell } from 'lucide-react';
+import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/shared/Button';
 import { NotificationsModal, type AppNotification } from '@/components/shared/NotificationsModal';
@@ -51,37 +52,39 @@ export default function TrainerLayout({ children }: { children: React.ReactNode 
   const unreadCount = trainerNotifications.filter((notification) => notification.unread).length;
 
   return (
-    <AppShell
-      brandTitle="BID Hub"
-      brandSubtitle="Trainer Workspace"
-      role="trainer"
-      sections={trainerNav}
-      user={{
-        initials: trainer?.initials ?? 'TR',
-        name: trainer?.fullName ?? 'Trainer',
-        subtitle: trainer ? `${trainer.role} · ${trainer.metrics.entrepreneursCount} entrepreneurs` : 'Trainer',
-        tone: 'blue',
-      }}
-      title={title}
-      topRightSlot={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setNotifOpen(true)}
-          className="flex items-center gap-1.5"
-          aria-label={`Notifications (${unreadCount} unread)`}
-        >
-          <Bell className="h-3 w-3" />
-          {unreadCount}
-        </Button>
-      }
-    >
-      {children}
-      <NotificationsModal
-        open={notifOpen}
-        onOpenChange={setNotifOpen}
-        notifications={trainerNotifications}
-      />
-    </AppShell>
+    <WorkspaceGuard allowedRoles={['trainer']}>
+      <AppShell
+        brandTitle="BID Hub"
+        brandSubtitle="Trainer Workspace"
+        role="trainer"
+        sections={trainerNav}
+        user={{
+          initials: trainer?.initials ?? 'TR',
+          name: trainer?.fullName ?? 'Trainer',
+          subtitle: trainer ? `${trainer.role} · ${trainer.metrics.entrepreneursCount} entrepreneurs` : 'Trainer',
+          tone: 'blue',
+        }}
+        title={title}
+        topRightSlot={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setNotifOpen(true)}
+            className="flex items-center gap-1.5"
+            aria-label={`Notifications (${unreadCount} unread)`}
+          >
+            <Bell className="h-3 w-3" />
+            {unreadCount}
+          </Button>
+        }
+      >
+        {children}
+        <NotificationsModal
+          open={notifOpen}
+          onOpenChange={setNotifOpen}
+          notifications={trainerNotifications}
+        />
+      </AppShell>
+    </WorkspaceGuard>
   );
 }

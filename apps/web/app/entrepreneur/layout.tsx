@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
+import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { EntrepreneurProvider, useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { entrepreneurNav } from '@/lib/nav/entrepreneur-nav';
@@ -83,8 +84,10 @@ export default function EntrepreneurLayout({
   children: React.ReactNode;
 }) {
   return (
-    <EntrepreneurProvider>
-      <Shell>{children}</Shell>
-    </EntrepreneurProvider>
+    <WorkspaceGuard allowedRoles={['entrepreneur']}>
+      <EntrepreneurProvider>
+        <Shell>{children}</Shell>
+      </EntrepreneurProvider>
+    </WorkspaceGuard>
   );
 }

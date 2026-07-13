@@ -43,6 +43,7 @@ function LoginForm() {
     mutationFn: login,
     onSuccess: (response) => {
       toast.success(`Signed in as ${response.user.email}.`);
+      void queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
       void queryClient.invalidateQueries({ queryKey: ['company-settings'] });
       router.replace(workspaceRouteForRole(response.user.role));
     },
