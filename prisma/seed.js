@@ -223,6 +223,7 @@ function programmeContentCount(programmeId) {
 
 async function seedEntrepreneurs(adminUserId, sectorIdByKey, stageIdByKey) {
   for (const entrepreneur of entrepreneurSeeds) {
+    const passwordHash = await hashPassword(DEV_ADMIN_PASSWORD);
     const user = await prisma.user.upsert({
       where: { email: entrepreneur.email },
       update: {
@@ -232,9 +233,11 @@ async function seedEntrepreneurs(adminUserId, sectorIdByKey, stageIdByKey) {
         role: 'entrepreneur',
         status: 'active',
         emailVerifiedAt: new Date(),
+        passwordHash,
       },
       create: {
         email: entrepreneur.email,
+        passwordHash,
         firstName: entrepreneur.firstName,
         lastName: entrepreneur.lastName,
         phone: entrepreneur.phone,
@@ -323,6 +326,7 @@ async function seedTrainersAndProgrammes() {
   const trainerIdByKey = new Map();
 
   for (const trainer of trainerSeeds) {
+    const passwordHash = await hashPassword(DEV_ADMIN_PASSWORD);
     const user = await prisma.user.upsert({
       where: { email: trainer.email },
       update: {
@@ -331,9 +335,11 @@ async function seedTrainersAndProgrammes() {
         role: 'trainer',
         status: 'active',
         emailVerifiedAt: new Date(),
+        passwordHash,
       },
       create: {
         email: trainer.email,
+        passwordHash,
         firstName: trainer.firstName,
         lastName: trainer.lastName,
         role: 'trainer',
