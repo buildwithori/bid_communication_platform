@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AssetStatus, DeliverableInstanceStatus, DeliverableReviewDecision, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { FilesService } from '../files/files.service';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { ReviewDeliverableDto } from './dto/review-deliverable.dto';
@@ -66,7 +67,10 @@ type DeliverableInstanceWithInclude = Prisma.DeliverableInstanceGetPayload<{ inc
 
 @Injectable()
 export class DeliverablesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly filesService: FilesService,
+  ) {}
 
   async listInstances(user: User, query: DeliverableInstanceQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
@@ -114,13 +118,17 @@ export class DeliverablesService {
       throw new BadRequestException('Approved deliverables cannot be resubmitted.');
     }
 
-    const filename = dto.originalFilename.trim();
+    const file = dto.fileAssetId
+      ? await this.attachUploadedFile(user, dto.fileAssetId)
+      : null;
+    const filename = dto.originalFilename?.trim();
+
     const submitted = await this.prisma.$transaction(async (tx) => {
-      const file = await tx.fileAsset.create({
+      const submissionFile = file ?? await tx.fileAsset.create({
         data: {
-          storageKey: this.deliverableStorageKey(instanceId, filename),
-          originalFilename: filename,
-          mimeType: dto.mimeType?.trim() || this.inferMimeType(filename),
+          storageKey: this.deliverableStorageKey(instanceId, filename ?? 'deliverable-file'),
+          originalFilename: filename ?? 'deliverable-file',
+          mimeType: dto.mimeType?.trim() || this.inferMimeType(filename ?? ''),
           sizeBytes: BigInt(dto.sizeBytes ?? 1),
           status: AssetStatus.ready,
         },
@@ -130,7 +138,7 @@ export class DeliverablesService {
         data: {
           instanceId,
           submittedById: user.id,
-          fileAssetId: file.id,
+          fileAssetId: submissionFile.id,
           note: dto.note?.trim() || null,
         },
       });
@@ -227,6 +235,19 @@ export class DeliverablesService {
     });
 
     return this.mapInstance(updated);
+  }
+
+
+  private async attachUploadedFile(user: User, fileAssetId: string) {
+    const existingSubmission = await this.prisma.deliverableSubmission.findFirst({
+      where: { fileAssetId },
+      select: { id: true },
+    });
+    if (existingSubmission) {
+      throw new BadRequestException('This uploaded file has already been submitted.');
+    }
+
+    return this.filesService.markReadyForUser(user, fileAssetId);
   }
 
   private async ensureCanActOnInstance(user: User, instanceId: string) {

@@ -1,11 +1,16 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 
 export class SubmitDeliverableDto {
+  @IsOptional()
+  @IsString()
+  fileAssetId?: string;
+
+  @ValidateIf((dto: SubmitDeliverableDto) => !dto.fileAssetId)
   @IsString()
   @MinLength(3)
   @MaxLength(240)
-  originalFilename!: string;
+  originalFilename?: string;
 
   @IsOptional()
   @IsString()

@@ -125,7 +125,7 @@ export function listDeliverableReviews(query?: DeliverableQuery) {
 
 export function submitDeliverableInstance(
   instanceId: string,
-  payload: { originalFilename: string; mimeType?: string; sizeBytes?: number; note?: string },
+  payload: { fileAssetId?: string; originalFilename?: string; mimeType?: string; sizeBytes?: number; note?: string },
 ) {
   return apiRequest<DeliverableInstance>(`/deliverable-instances/${instanceId}/submissions`, {
     method: 'POST',

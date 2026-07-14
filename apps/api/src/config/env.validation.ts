@@ -8,6 +8,11 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
   DATABASE_URL: z.string().min(1).optional(),
   REDIS_URL: z.string().min(1).optional(),
+  DO_SPACES_BUCKET: z.string().min(1).optional(),
+  DO_SPACES_ENDPOINT: z.string().url().optional(),
+  DO_SPACES_REGION: z.string().min(1).optional(),
+  DO_SPACES_ACCESS_KEY_ID: z.string().min(1).optional(),
+  DO_SPACES_SECRET_ACCESS_KEY: z.string().min(1).optional(),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;

@@ -12,6 +12,7 @@ import { LearningModule } from './learning/learning.module';
 import { ContentModule } from './content/content.module';
 import { DeliverablesModule } from './deliverables/deliverables.module';
 import { ToolsModule } from './tools/tools.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ToolsModule } from './tools/tools.module';
     ContentModule,
     DeliverablesModule,
     ToolsModule,
+    FilesModule,
   ],
 })
 export class AppModule {}
