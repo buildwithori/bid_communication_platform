@@ -22,7 +22,7 @@ COPY prisma prisma
 
 FROM base AS development
 
-EXPOSE 4000
+EXPOSE 3001 4000
 CMD ["npm", "run", "dev:api"]
 
 FROM base AS builder

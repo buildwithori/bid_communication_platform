@@ -45,7 +45,7 @@ Scope:
 - Audit context and audit outbox foundation.
 
 Done when:
-- `docker compose up` starts web, api, postgres, redis, Mailpit, and pgAdmin locally.
+- `docker compose up` starts web, api, the React Email preview service, postgres, redis, Mailpit, and pgAdmin locally.
 - Web and API health routes are reachable.
 - Protected endpoints reject unauthenticated requests.
 - pgAdmin can connect to the local Postgres database.

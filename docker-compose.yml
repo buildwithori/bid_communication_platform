@@ -22,6 +22,26 @@ services:
       api:
         condition: service_healthy
 
+  email-preview:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: development
+    command: sh scripts/docker-dev-entrypoint.sh npm run email:dev
+    environment:
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3001', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    volumes:
+      - .:/workspace
+      - root_node_modules:/workspace/node_modules
+      - email_preview_next:/workspace/apps/api/.react-email
+
   api:
     build:
       context: .
@@ -112,6 +132,7 @@ services:
 volumes:
   root_node_modules:
   web_next:
+  email_preview_next:
   postgres_data:
   redis_data:
   pgadmin_data:
