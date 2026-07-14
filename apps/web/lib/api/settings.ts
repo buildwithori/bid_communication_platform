@@ -1,3 +1,4 @@
+import type { CursorPage } from '@bid/shared';
 import { type CompanyConfig } from '@/lib/stores/company-config-store';
 import { apiRequest } from './client';
 
@@ -101,18 +102,22 @@ export type ProgrammeGoalTypeRecord = LookupRecord & {
 export type LookupQuery = {
   search?: string;
   active?: boolean;
+  take?: number;
+  cursor?: string;
 };
 
 function toQueryString(query?: LookupQuery) {
   const params = new URLSearchParams();
   if (query?.search) params.set('search', query.search);
   if (typeof query?.active === 'boolean') params.set('active', String(query.active));
+  if (query?.take) params.set('take', String(query.take));
+  if (query?.cursor) params.set('cursor', query.cursor);
   const value = params.toString();
   return value ? `?${value}` : '';
 }
 
 export function listSectors(query?: LookupQuery) {
-  return apiRequest<LookupRecord[]>(`/lookups/sectors${toQueryString(query)}`);
+  return apiRequest<CursorPage<LookupRecord>>(`/lookups/sectors${toQueryString(query)}`);
 }
 
 export function createSector(payload: { name: string; key?: string; active?: boolean }) {
@@ -130,7 +135,7 @@ export function updateSector(id: string, payload: { name?: string; key?: string;
 }
 
 export function listBusinessStages(query?: LookupQuery) {
-  return apiRequest<BusinessStageRecord[]>(`/lookups/business-stages${toQueryString(query)}`);
+  return apiRequest<CursorPage<BusinessStageRecord>>(`/lookups/business-stages${toQueryString(query)}`);
 }
 
 export function createBusinessStage(payload: { name: string; key?: string; definition: string; active?: boolean }) {
@@ -151,7 +156,7 @@ export function updateBusinessStage(
 }
 
 export function listProgrammeGoalTypes(query?: LookupQuery) {
-  return apiRequest<ProgrammeGoalTypeRecord[]>(`/lookups/programme-goal-types${toQueryString(query)}`);
+  return apiRequest<CursorPage<ProgrammeGoalTypeRecord>>(`/lookups/programme-goal-types${toQueryString(query)}`);
 }
 
 export function createProgrammeGoalType(payload: {
@@ -184,7 +189,7 @@ export function updateProgrammeGoalType(
 }
 
 export function listToolAreas(query?: LookupQuery) {
-  return apiRequest<LookupRecord[]>(`/lookups/tool-areas${toQueryString(query)}`);
+  return apiRequest<CursorPage<LookupRecord>>(`/lookups/tool-areas${toQueryString(query)}`);
 }
 
 export function createToolArea(payload: { name: string; key?: string; active?: boolean }) {

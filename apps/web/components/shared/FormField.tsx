@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InlineSpinner } from '@/components/shared/Button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -166,6 +167,12 @@ export interface FormAutocompleteProps {
   popoverClassName?: string;
   listClassName?: string;
   disabled?: boolean;
+  isLoading?: boolean;
+  loadingMessage?: string;
+  onOpenChange?: (open: boolean) => void;
+  onSearchChange?: (search: string) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function FormAutocomplete({
@@ -179,6 +186,12 @@ export function FormAutocomplete({
   popoverClassName,
   listClassName,
   disabled,
+  isLoading = false,
+  loadingMessage = 'Loading options...',
+  onOpenChange,
+  onSearchChange,
+  hasMore = false,
+  onLoadMore,
 }: FormAutocompleteProps) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((option) => option.value === value);
@@ -193,7 +206,7 @@ export function FormAutocomplete({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); onOpenChange?.(nextOpen); }}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -209,11 +222,12 @@ export function FormAutocomplete({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={cn('w-[var(--radix-popover-trigger-width)] p-0', popoverClassName)}>
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} />
+        <Command shouldFilter={!onSearchChange}>
+          <CommandInput placeholder={searchPlaceholder} onValueChange={onSearchChange} />
           <CommandList className={listClassName} onWheel={handleListWheel}>
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            {!isLoading ? <CommandEmpty>{emptyMessage}</CommandEmpty> : null}
             <CommandGroup>
+              {isLoading ? <AutocompleteLoadingRow message={loadingMessage} /> : null}
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
@@ -240,6 +254,11 @@ export function FormAutocomplete({
                   </span>
                 </CommandItem>
               ))}
+              {hasMore && !isLoading ? (
+                <CommandItem value="__load_more__" onSelect={() => onLoadMore?.()} className="justify-center text-bid">
+                  Load more
+                </CommandItem>
+              ) : null}
             </CommandGroup>
           </CommandList>
         </Command>
@@ -264,6 +283,15 @@ export function FormRow2({
       )}
     >
       {children}
+    </div>
+  );
+}
+
+export function AutocompleteLoadingRow({ message = 'Loading options...' }: { message?: string }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-3 text-sm text-ink-muted" role="status">
+      <InlineSpinner className="text-bid" />
+      <span>{message}</span>
     </div>
   );
 }

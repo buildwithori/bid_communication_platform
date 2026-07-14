@@ -71,3 +71,92 @@ export function CardHeader({
     </div>
   );
 }
+
+export function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn('animate-pulse rounded-lg bg-black/[0.07]', className)}
+      {...props}
+    />
+  );
+}
+
+export function PageSkeleton({
+  cards = 4,
+  className,
+}: {
+  cards?: number;
+  className?: string;
+}) {
+  return (
+    <div aria-label="Loading page" aria-busy="true" className={cn('space-y-6', className)}>
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-4 w-full max-w-xl" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: cards }, (_, index) => (
+          <Card key={index} className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-3 w-32" />
+          </Card>
+        ))}
+      </div>
+      <TableSkeleton />
+    </div>
+  );
+}
+
+export function TableSkeleton({
+  rows = 6,
+  columns = 4,
+  className,
+}: {
+  rows?: number;
+  columns?: number;
+  className?: string;
+}) {
+  return (
+    <div aria-label="Loading table" aria-busy="true" className={cn('overflow-hidden rounded-xl border border-black/[0.08] bg-white', className)}>
+      <div className="grid gap-4 border-b border-line bg-surface-subtle/80 p-4" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        {Array.from({ length: columns }, (_, index) => <Skeleton key={index} className="h-3 w-20" />)}
+      </div>
+      {Array.from({ length: rows }, (_, row) => (
+        <div key={row} className="grid gap-4 border-b border-line/80 p-4 last:border-0" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+          {Array.from({ length: columns }, (_, column) => <Skeleton key={column} className="h-4 w-full max-w-32" />)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ChartSkeleton({ className }: { className?: string }) {
+  return (
+    <Card aria-label="Loading chart" aria-busy="true" className={cn('space-y-5', className)}>
+      <Skeleton className="h-5 w-40" />
+      <div className="flex h-52 items-end gap-3">
+        {[45, 72, 58, 88, 64, 76].map((height, index) => (
+          <Skeleton key={index} className="flex-1 rounded-t-md" style={{ height: `${height}%` }} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+export function ModalSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div aria-label="Loading dialog content" aria-busy="true" className="space-y-4 py-1">
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="space-y-2">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
