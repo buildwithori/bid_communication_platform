@@ -186,6 +186,13 @@ enum NotificationDeliveryStatus {
   skipped
 }
 
+enum AuditOutboxStatus {
+  pending
+  processing
+  processed
+  failed
+}
+
 enum LearnerProgressStatus {
   not_started
   in_progress
@@ -280,6 +287,8 @@ model User {
   receivedNotifications       Notification[]             @relation("NotificationRecipient")
   actedNotifications          Notification[]             @relation("NotificationActor")
   notificationPreferences     NotificationPreference[]
+  auditLogs                   AuditLog[]                 @relation("AuditLogActor")
+  auditOutboxEvents           AuditOutbox[]              @relation("AuditOutboxActor")
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
@@ -1122,4 +1131,52 @@ model NotificationPreference {
   @@unique([userId, type])
   @@index([userId])
   @@map("notification_preferences")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  outboxId    String?  @unique @map("outbox_id")
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  summary     String?
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actor  User?        @relation("AuditLogActor", fields: [actorUserId], references: [id])
+  outbox AuditOutbox? @relation(fields: [outboxId], references: [id])
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model AuditOutbox {
+  id          String            @id @default(cuid())
+  eventKey    String            @unique @map("event_key")
+  actorUserId String?           @map("actor_user_id")
+  action      String
+  entityType  String            @map("entity_type")
+  entityId    String?           @map("entity_id")
+  summary     String?
+  payload     Json?
+  status      AuditOutboxStatus @default(pending)
+  attempts    Int               @default(0)
+  lockedAt    DateTime?         @map("locked_at")
+  processedAt DateTime?         @map("processed_at")
+  error       String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  actor    User?     @relation("AuditOutboxActor", fields: [actorUserId], references: [id])
+  auditLog AuditLog?
+
+  @@index([status, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_outbox")
 }
