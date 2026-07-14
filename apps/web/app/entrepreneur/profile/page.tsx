@@ -1,10 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
@@ -29,27 +27,10 @@ import {
 import { FundingRoundModal } from '@/components/entrepreneur/FundingRoundModal';
 import { PeriodicUpdateModal } from '@/components/entrepreneur/PeriodicUpdateModal';
 import { DateRangePicker } from '@/components/shared/DatePicker';
-import { getCurrentUser } from '@/lib/api/auth';
-import {
-  createFundraisingRound,
-  createPeriodicUpdate,
-  createProgrammeGoal,
-  getEntrepreneurProfileRecords,
-  updateFundraisingRound,
-  updateProgrammeGoal,
-  type EntrepreneurFundraisingRoundRecord,
-  type EntrepreneurPeriodicUpdateRecord,
-  type EntrepreneurProgrammeGoalRecord,
-  type FundraisingRoundPayload,
-  type PeriodicUpdatePayload,
-  type ProgrammeGoalPayload,
-} from '@/lib/api/entrepreneurs';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { programById, programs } from '@/lib/mock-data/programs';
 import {
   businessProfileSchema,
-  type FundingRoundForm,
-  type PeriodicUpdateForm,
   programmeGoalSchema,
   type BusinessProfileForm,
   type ProgrammeGoalForm,
@@ -74,18 +55,6 @@ function goalTypeLabel(value: string) {
   return programmeGoalTypes.find((goalType) => goalType.id === value)?.label ?? value;
 }
 
-function isFundraisingGoalType(value: string) {
-  return value === 'fundraising' || value === 'fundraising-target';
-}
-
-function uiGoalTypeToApiGoalTypeId(value: string) {
-  return value === 'fundraising' ? 'fundraising-target' : value;
-}
-
-function apiGoalTypeToUiGoalType(value: string) {
-  return value === 'fundraising-target' ? 'fundraising' : value;
-}
-
 function goalTypeRequiresTarget(value: string) {
   return programmeGoalTypes.find((goalType) => goalType.id === value)?.requiresTargetAmount ?? false;
 }
@@ -106,7 +75,7 @@ function getProgrammeGoalStatus(
     trainingProgress: number;
   },
 ): ProgrammeGoalStatus {
-  if (isFundraisingGoalType(goal.goalType)) {
+  if (goal.goalType === 'fundraising') {
     const targetAmount = getGoalTargetAmount(goal);
     if (targetAmount > 0 && context.linkedFundingTotal >= targetAmount) return 'achieved';
     return context.linkedFundingTotal > 0 ? 'active' : 'not-started';
@@ -132,7 +101,7 @@ function getGoalStatusMeta(status: ProgrammeGoalStatus) {
 }
 
 function getGoalStatusSource(goal: ProgrammeGoalRow, linkedFundingTotal: number) {
-  if (isFundraisingGoalType(goal.goalType)) {
+  if (goal.goalType === 'fundraising') {
     return `${formatCurrency(linkedFundingTotal)} linked from fundraising history`;
   }
 
@@ -177,55 +146,6 @@ function formatDateRange(start: string, end: string) {
   return `${formatDate(start)} - ${formatDate(end)}`;
 }
 
-function dollarsToCents(value?: string | null) {
-  const numeric = Number((value ?? '').replace(/[^0-9.]/g, ''));
-  return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric * 100) : null;
-}
-
-function centsToDollars(value?: number | null) {
-  return value ? String(Math.round(value / 100)) : '';
-}
-
-function mapProgrammeGoalRecord(goal: EntrepreneurProgrammeGoalRecord): ProgrammeGoalRow {
-  return {
-    id: goal.id,
-    programmeId: goal.programme?.id ?? '',
-    goalType: apiGoalTypeToUiGoalType(goal.goalType.key),
-    targetAmountUsd: centsToDollars(goal.targetAmountCents),
-    description: goal.description ?? '',
-    evidence: goal.evidence ?? undefined,
-    milestoneAchieved: goal.milestoneAchieved,
-  };
-}
-
-function mapFundraisingRoundRecord(round: EntrepreneurFundraisingRoundRecord): FundingRound {
-  return {
-    id: round.id,
-    name: round.name,
-    amountUsd: Math.round(round.amountCents / 100),
-    date: round.date.slice(0, 10),
-    source: round.source ?? undefined,
-    programmeId: round.programme?.id,
-    goalId: round.programmeGoal?.id,
-  };
-}
-
-function mapPeriodicUpdateRecord(update: EntrepreneurPeriodicUpdateRecord): PeriodicUpdate {
-  return {
-    id: update.id,
-    period: formatDateRange(update.periodStart, update.periodEnd),
-    periodStart: update.periodStart.slice(0, 10),
-    periodEnd: update.periodEnd.slice(0, 10),
-    submittedAt: update.submittedAt.slice(0, 10),
-    programmeId: update.programme?.id,
-    jobsCreated: update.jobsCreated,
-    jobsWomen: update.jobsWomen,
-    jobsMen: update.jobsMen,
-    fundsMobilisedUsd: 0,
-    notes: update.notes ?? undefined,
-  };
-}
-
 export default function ProfilePage() {
   const { entrepreneur, updateProfile } = useEntrepreneurStore();
   const [tab, setTab] = React.useState<ProfileTab>('biz');
@@ -268,27 +188,7 @@ export default function ProfilePage() {
     },
   });
 
-  const queryClient = useQueryClient();
-  const currentUserQuery = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: getCurrentUser,
-    retry: false,
-  });
-  const entrepreneurUserId = currentUserQuery.data?.user?.id ?? entrepreneur.id;
-  const profileRecordsQueryKey = React.useMemo(
-    () => ['entrepreneur-profile-records', entrepreneurUserId] as const,
-    [entrepreneurUserId],
-  );
-  const profileRecordsQuery = useQuery({
-    queryKey: profileRecordsQueryKey,
-    queryFn: () => getEntrepreneurProfileRecords(entrepreneurUserId),
-    enabled: Boolean(entrepreneurUserId),
-  });
-  const refreshProfileRecords = React.useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: profileRecordsQueryKey });
-  }, [profileRecordsQueryKey, queryClient]);
-
-  const seedProgrammeGoals = React.useMemo<ProgrammeGoalRow[]>(() => [
+  const [programmeGoals, setProgrammeGoals] = React.useState<ProgrammeGoalRow[]>(() => [
     {
       id: 'goal-fundraising-series-a',
       programmeId: '',
@@ -323,25 +223,7 @@ export default function ProfilePage() {
       milestoneAchieved: false,
       evidence: 'Two LOIs received; one partner negotiation still in progress.',
     },
-  ], [entrepreneur.programmeId, entrepreneur.programmeIds]);
-  const programmeGoals = React.useMemo<ProgrammeGoalRow[]>(() => {
-    if (profileRecordsQuery.data) {
-      return profileRecordsQuery.data.programmeGoals.map(mapProgrammeGoalRecord);
-    }
-    return seedProgrammeGoals;
-  }, [profileRecordsQuery.data, seedProgrammeGoals]);
-  const fundingRounds = React.useMemo<FundingRound[]>(() => {
-    if (profileRecordsQuery.data) {
-      return profileRecordsQuery.data.fundraisingRounds.map(mapFundraisingRoundRecord);
-    }
-    return entrepreneur.fundingRounds;
-  }, [entrepreneur.fundingRounds, profileRecordsQuery.data]);
-  const periodicUpdates = React.useMemo<PeriodicUpdate[]>(() => {
-    if (profileRecordsQuery.data) {
-      return profileRecordsQuery.data.periodicUpdates.map(mapPeriodicUpdateRecord);
-    }
-    return entrepreneur.periodicUpdates ?? [];
-  }, [entrepreneur.periodicUpdates, profileRecordsQuery.data]);
+  ]);
   const formalProgrammeOptions = programs
     .filter((program) => entrepreneur.programmeIds?.includes(program.id))
     .map((program) => ({
@@ -352,7 +234,7 @@ export default function ProfilePage() {
   const defaultPeriodicUpdateScope =
     formalProgrammeOptions.length === 1 ? formalProgrammeOptions[0].value : 'company-wide';
   const fundraisingGoalOptions = programmeGoals
-    .filter((goal) => isFundraisingGoalType(goal.goalType))
+    .filter((goal) => goal.goalType === 'fundraising')
     .map((goal) => ({
       value: goal.id,
       label: goal.description || goalTypeLabel(goal.goalType),
@@ -362,10 +244,10 @@ export default function ProfilePage() {
     }));
   const linkedFundingTotalForGoal = React.useCallback(
     (goalId: string) =>
-      fundingRounds
+      entrepreneur.fundingRounds
         .filter((round) => round.goalId === goalId)
         .reduce((sum, round) => sum + round.amountUsd, 0),
-    [fundingRounds],
+    [entrepreneur.fundingRounds],
   );
 
   const onProfileSubmit = (values: BusinessProfileForm) => {
@@ -380,99 +262,34 @@ export default function ProfilePage() {
     });
   };
 
-  const toProgrammeGoalPayload = React.useCallback((values: ProgrammeGoalForm): ProgrammeGoalPayload => ({
-    programmeId: goalTypeRequiresProgramme(values.goalType) ? values.programmeId || null : null,
-    goalTypeId: uiGoalTypeToApiGoalTypeId(values.goalType),
-    targetAmountCents: goalTypeRequiresTarget(values.goalType) ? dollarsToCents(values.targetAmountUsd) : null,
-    description: values.description?.trim() || null,
-    evidence: activeGoal?.evidence ?? null,
-    milestoneAchieved: activeGoal?.milestoneAchieved ?? false,
-  }), [activeGoal?.evidence, activeGoal?.milestoneAchieved]);
-
-  const createProgrammeGoalMutation = useMutation({
-    mutationFn: (values: ProgrammeGoalForm) =>
-      createProgrammeGoal(entrepreneurUserId, toProgrammeGoalPayload(values)),
-    onSuccess: () => {
-      refreshProfileRecords();
-      toast.success('Programme goal added');
-      setGoalModalOpen(false);
-      setActiveGoal(null);
-    },
-  });
-  const updateProgrammeGoalMutation = useMutation({
-    mutationFn: ({ goalId, values }: { goalId: string; values: ProgrammeGoalForm }) =>
-      updateProgrammeGoal(entrepreneurUserId, goalId, toProgrammeGoalPayload(values)),
-    onSuccess: () => {
-      refreshProfileRecords();
-      toast.success('Programme goal updated');
-      setGoalModalOpen(false);
-      setActiveGoal(null);
-    },
-  });
-  const createFundingRoundMutation = useMutation({
-    mutationFn: (payload: FundraisingRoundPayload) => createFundraisingRound(entrepreneurUserId, payload),
-    onSuccess: () => {
-      refreshProfileRecords();
-      toast.success('Funding round added');
-    },
-  });
-  const updateFundingRoundMutation = useMutation({
-    mutationFn: ({ roundId, payload }: { roundId: string; payload: FundraisingRoundPayload }) =>
-      updateFundraisingRound(entrepreneurUserId, roundId, payload),
-    onSuccess: () => {
-      refreshProfileRecords();
-      toast.success('Funding round updated');
-    },
-  });
-  const createPeriodicUpdateMutation = useMutation({
-    mutationFn: (payload: PeriodicUpdatePayload) => createPeriodicUpdate(entrepreneurUserId, payload),
-    onSuccess: () => {
-      refreshProfileRecords();
-      toast.success('Periodic update submitted');
-    },
-  });
-
-  const saveProgrammeGoal = async (values: ProgrammeGoalForm) => {
-    if (activeGoal && profileRecordsQuery.data?.programmeGoals.some((goal: EntrepreneurProgrammeGoalRecord) => goal.id === activeGoal.id)) {
-      await updateProgrammeGoalMutation.mutateAsync({ goalId: activeGoal.id, values });
-      return;
-    }
-    await createProgrammeGoalMutation.mutateAsync(values);
-  };
-
-  const saveFundingRound = async (values: FundingRoundForm, round?: FundingRound | null) => {
-    const payload: FundraisingRoundPayload = {
-      name: values.name.trim(),
-      amountCents: dollarsToCents(values.amountUsd) ?? 0,
-      currency: 'USD',
-      date: values.date,
-      source: values.source?.trim() || null,
-      programmeId: values.programmeId && values.programmeId !== 'unattributed' ? values.programmeId : null,
-      programmeGoalId: values.goalId && values.goalId !== 'none' ? values.goalId : null,
+  const saveProgrammeGoal = (values: ProgrammeGoalForm) => {
+    const nextGoal: ProgrammeGoalRow = {
+      id: activeGoal?.id ?? `goal-${Date.now()}`,
+      ...values,
+      milestoneAchieved: activeGoal?.milestoneAchieved,
+      evidence: activeGoal?.evidence,
     };
 
-    if (round && profileRecordsQuery.data?.fundraisingRounds.some((item: EntrepreneurFundraisingRoundRecord) => item.id === round.id)) {
-      await updateFundingRoundMutation.mutateAsync({ roundId: round.id, payload });
-      return;
-    }
-    await createFundingRoundMutation.mutateAsync(payload);
-  };
+    setProgrammeGoals((current) =>
+      activeGoal
+        ? current.map((goal) => (goal.id === activeGoal.id ? nextGoal : goal))
+        : [nextGoal, ...current],
+    );
 
-  const savePeriodicUpdate = async (values: PeriodicUpdateForm) => {
-    const jobsWomen = Number(values.jobsWomen) || 0;
-    const jobsMen = Number(values.jobsMen) || 0;
-    await createPeriodicUpdateMutation.mutateAsync({
-      periodStart: values.periodStart,
-      periodEnd: values.periodEnd,
-      programmeId: values.programmeId && values.programmeId !== 'company-wide' ? values.programmeId : null,
-      jobsWomen,
-      jobsMen,
-      jobsCreated: jobsWomen + jobsMen,
-      notes: values.notes?.trim() || null,
+    updateProfile({
+      goal: {
+        type: values.goalType,
+        amountUsd: values.targetAmountUsd
+          ? Number(values.targetAmountUsd.replace(/[^0-9]/g, '')) || undefined
+          : undefined,
+        description: values.description ?? '',
+      },
     });
+    setGoalModalOpen(false);
+    setActiveGoal(null);
   };
 
-  const filteredFundingRounds = fundingRounds.filter((round) => {
+  const filteredFundingRounds = entrepreneur.fundingRounds.filter((round) => {
     const needle = fundingQuery.trim().toLowerCase();
     const linkedGoal = programmeGoals.find((goal) => goal.id === round.goalId);
     const roundTime = new Date(round.date).getTime();
@@ -701,6 +518,7 @@ export default function ProfilePage() {
       },
     },
   ];
+  const periodicUpdates = entrepreneur.periodicUpdates ?? [];
   const updatePeriodOptions = periodicUpdates.map((update) => ({
     value: update.id,
     label: formatDateRange(update.periodStart, update.periodEnd),
@@ -1195,8 +1013,6 @@ export default function ProfilePage() {
         round={activeFundingRound}
         goalOptions={fundraisingGoalOptions}
         programmeOptions={formalProgrammeOptions}
-        onSubmitRound={saveFundingRound}
-        isSubmitting={createFundingRoundMutation.isPending || updateFundingRoundMutation.isPending}
         onOpenChange={(open) => {
           setFundingOpen(open);
           if (!open) setActiveFundingRound(null);
@@ -1210,15 +1026,12 @@ export default function ProfilePage() {
           if (!open) setActiveGoal(null);
         }}
         onSave={saveProgrammeGoal}
-        isSubmitting={createProgrammeGoalMutation.isPending || updateProgrammeGoalMutation.isPending}
       />
       <PeriodicUpdateModal
         open={updateOpen}
         onOpenChange={setUpdateOpen}
         defaultProgrammeId={defaultPeriodicUpdateScope}
         programmeOptions={formalProgrammeOptions}
-        onSubmitUpdate={savePeriodicUpdate}
-        isSubmitting={createPeriodicUpdateMutation.isPending}
       />
       <PeriodicUpdateDetailsModal update={activeUpdate} onClose={() => setActiveUpdate(null)} />
     </>
@@ -1274,13 +1087,11 @@ function ProgrammeGoalModal({
   goal,
   onOpenChange,
   onSave,
-  isSubmitting = false,
 }: {
   open: boolean;
   goal: ProgrammeGoalRow | null;
   onOpenChange: (open: boolean) => void;
-  onSave: (values: ProgrammeGoalForm) => Promise<void> | void;
-  isSubmitting?: boolean;
+  onSave: (values: ProgrammeGoalForm) => void;
 }) {
   const form = useForm<ProgrammeGoalForm>({
     resolver: zodResolver(programmeGoalSchema),
@@ -1369,8 +1180,8 @@ function ProgrammeGoalModal({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save goal'}
+          <Button type="submit">
+            Save goal
           </Button>
         </div>
       </form>

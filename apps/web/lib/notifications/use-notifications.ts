@@ -56,7 +56,7 @@ export function useNotifications() {
   const unreadCount = records.filter((notification) => !notification.readAt).length;
 
   const openNotification = React.useCallback(
-    (notification: AppNotification) => {
+    (notification: MappedNotification) => {
       if (notification.unread) {
         markReadMutation.mutate(notification.id);
       }

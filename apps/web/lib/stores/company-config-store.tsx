@@ -1,9 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { getCompanySettings, updateCompanySettings } from '@/lib/api/settings';
 import { companyConfig as seedCompanyConfig } from '@/lib/mock-data/company-config';
 
 export interface CompanyConfig {
@@ -28,7 +25,6 @@ export interface CompanyConfig {
 
 interface CompanyConfigStore {
   companyConfig: CompanyConfig;
-  replaceCompanyConfig: (config: CompanyConfig) => void;
   updateReportingConfig: (patch: Partial<CompanyConfig['reporting']>) => void;
   updateDeliverableConfig: (patch: Partial<CompanyConfig['deliverables']>) => void;
   updateDefaultConfig: (patch: Partial<CompanyConfig['defaults']>) => void;
@@ -39,27 +35,6 @@ const CompanyConfigContext = React.createContext<CompanyConfigStore | null>(null
 
 export function CompanyConfigProvider({ children }: { children: React.ReactNode }) {
   const [companyConfig, setCompanyConfig] = React.useState<CompanyConfig>(seedCompanyConfig);
-  const pathname = usePathname();
-  const shouldLoadSettings = pathname !== '/' && !pathname.startsWith('/auth');
-  const settingsQuery = useQuery({
-    queryKey: ['company-settings'],
-    queryFn: getCompanySettings,
-    enabled: shouldLoadSettings,
-  });
-  const updateSettingsMutation = useMutation({
-    mutationFn: updateCompanySettings,
-    onSuccess: setCompanyConfig,
-  });
-
-  React.useEffect(() => {
-    if (settingsQuery.data) {
-      setCompanyConfig(settingsQuery.data);
-    }
-  }, [settingsQuery.data]);
-
-  const replaceCompanyConfig: CompanyConfigStore['replaceCompanyConfig'] = React.useCallback((config) => {
-    setCompanyConfig(config);
-  }, []);
 
   const updateReportingConfig: CompanyConfigStore['updateReportingConfig'] = React.useCallback((patch) => {
     setCompanyConfig((current) => ({
@@ -69,8 +44,7 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
         ...patch,
       },
     }));
-    updateSettingsMutation.mutate({ reporting: patch });
-  }, [updateSettingsMutation]);
+  }, []);
 
   const updateDeliverableConfig: CompanyConfigStore['updateDeliverableConfig'] = React.useCallback((patch) => {
     setCompanyConfig((current) => ({
@@ -80,8 +54,7 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
         ...patch,
       },
     }));
-    updateSettingsMutation.mutate({ deliverables: patch });
-  }, [updateSettingsMutation]);
+  }, []);
 
   const updateDefaultConfig: CompanyConfigStore['updateDefaultConfig'] = React.useCallback((patch) => {
     setCompanyConfig((current) => ({
@@ -91,8 +64,7 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
         ...patch,
       },
     }));
-    updateSettingsMutation.mutate({ defaults: patch });
-  }, [updateSettingsMutation]);
+  }, []);
 
   const updateNotificationConfig: CompanyConfigStore['updateNotificationConfig'] = React.useCallback((patch) => {
     setCompanyConfig((current) => ({
@@ -102,13 +74,11 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
         ...patch,
       },
     }));
-    updateSettingsMutation.mutate({ notifications: patch });
-  }, [updateSettingsMutation]);
+  }, []);
 
   const value = React.useMemo<CompanyConfigStore>(
     () => ({
       companyConfig,
-      replaceCompanyConfig,
       updateReportingConfig,
       updateDeliverableConfig,
       updateDefaultConfig,
@@ -116,7 +86,6 @@ export function CompanyConfigProvider({ children }: { children: React.ReactNode 
     }),
     [
       companyConfig,
-      replaceCompanyConfig,
       updateReportingConfig,
       updateDeliverableConfig,
       updateDefaultConfig,

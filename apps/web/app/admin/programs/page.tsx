@@ -42,7 +42,6 @@ import { ManageContentModal, AddContentItemModal } from '@/components/admin/Mana
 import { ModuleDetailModal } from '@/components/admin/programmes/ModuleDetailModal';
 import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
 import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
-import { RequiredDeliverablesSection as ProgrammeRequiredDeliverablesSection } from '@/components/admin/programmes/RequiredDeliverablesSection';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField, FormInput, FormSelect } from '@/components/shared/FormField';
 import { Notice } from '@/components/shared/PageHeader';
@@ -926,7 +925,7 @@ export default function AdminProgramsPage() {
             )}
 
             {workspaceTab === 'deliverables' && (
-              <ProgrammeRequiredDeliverablesSection programmeId={selectedProgram.id} programName={selectedProgram.name} modules={programModules} />
+              <RequiredDeliverablesSection programName={selectedProgram.name} />
             )}
 
             {workspaceTab === 'readiness' && (

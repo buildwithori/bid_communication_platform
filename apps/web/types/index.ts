@@ -309,8 +309,6 @@ export interface Tool {
   type: ToolType;
   /** Admin-managed taxonomy used for filtering, requests, and reporting. */
   toolArea?: string;
-  /** Backend lookup id for the selected tool area. */
-  toolAreaId?: string;
   /** Published tools appear in entrepreneur workspaces; drafts stay admin-only. */
   status?: ToolStatus;
   /** Controls who can see the tool in the entrepreneur workspace. */
@@ -319,10 +317,6 @@ export interface Tool {
   programmeIds?: string[];
   /** Individual entrepreneurs that can see this tool when visibility === 'entrepreneurs'. */
   entrepreneurIds?: string[];
-  /** Entrepreneurs hidden from this tool even when global or programme visibility would grant access. */
-  hiddenEntrepreneurIds?: string[];
-  /** Backend file asset id for uploaded PDF resources. */
-  pdfAssetId?: string;
   /** Display name of the uploaded template file. */
   pdfFileName?: string;
   /** Browser-renderable PDF URL for downloadable templates. */

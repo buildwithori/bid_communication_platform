@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
@@ -11,7 +10,7 @@ import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
-import { FormField, FormSelect, FormTextarea } from '@/components/shared/FormField';
+import { FormField, FormTextarea } from '@/components/shared/FormField';
 import {
   DataTable,
   RowActions,
@@ -24,16 +23,13 @@ import {
   type RowAction,
 } from '@/components/shared/DataTable';
 import { routes } from '@/lib/routes';
-import { listToolAreas } from '@/lib/api/settings';
-import { listTools } from '@/lib/api/tools';
-import { listToolRequests, updateToolRequest } from '@/lib/api/tool-requests';
+import { toolAreaOptions } from '@/lib/tool-areas';
 import {
-  mapToolRequestRecordToUi,
+  toolRequests,
   toolRequestStatusMeta,
-  uiToApiToolRequestStatus,
   type ToolRequest,
   type ToolRequestStatus,
-} from '@/lib/tool-requests';
+} from '@/lib/mock-data/admin-workflows';
 
 function formatDate(value?: string) {
   if (!value) return 'Not specified';
@@ -47,41 +43,7 @@ function formatDate(value?: string) {
 
 export default function AdminToolRequestsPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const requestsQuery = useQuery({
-    queryKey: ['tool-requests', 'admin'],
-    queryFn: () => listToolRequests({ take: 100 }),
-  });
-  const toolAreasQuery = useQuery({
-    queryKey: ['lookups', 'tool-areas', 'active'],
-    queryFn: () => listToolAreas({ active: true }),
-  });
-  const toolsQuery = useQuery({
-    queryKey: ['tools', 'admin', 'published'],
-    queryFn: () => listTools({ take: 100, status: 'published' }),
-  });
-  const updateRequestMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof updateToolRequest>[1] }) =>
-      updateToolRequest(id, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tool-requests'] }),
-  });
-
-  const requests = useMemo<ToolRequest[]>(
-    () => (requestsQuery.data?.items ?? []).map(mapToolRequestRecordToUi),
-    [requestsQuery.data?.items],
-  );
-  const toolAreaOptions = useMemo<Array<{ value: string; label: string }>>(
-    () => ((toolAreasQuery.data ?? []) as Array<{ id: string; name: string }>).map((area) => ({ value: area.id, label: area.name })),
-    [toolAreasQuery.data],
-  );
-  const linkedToolOptions = useMemo<Array<{ value: string; label: string }>>(
-    () => [
-      { value: 'none', label: 'No linked tool yet' },
-      ...((toolsQuery.data?.items ?? []) as Array<{ id: string; name: string }>).map((tool) => ({ value: tool.id, label: tool.name })),
-    ],
-    [toolsQuery.data?.items],
-  );
-
+  const [requests, setRequests] = useState<ToolRequest[]>(toolRequests);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ToolRequestStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -89,51 +51,24 @@ export default function AdminToolRequestsPage() {
   const [pageSize, setPageSize] = useState(10);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState('');
-  const [linkedToolId, setLinkedToolId] = useState('none');
 
   const activeRequest = requests.find((request) => request.id === activeId) ?? null;
 
   const openRequest = (request: ToolRequest) => {
     setActiveId(request.id);
     setDecisionNote(request.adminNote ?? '');
-    setLinkedToolId(request.linkedToolId ?? 'none');
   };
 
-  const updateRequest = async (
-    id: string,
-    patch: { status?: ToolRequestStatus; adminNote?: string; linkedToolId?: string },
-    msg: string,
-  ) => {
-    await updateRequestMutation.mutateAsync({
-      id,
-      payload: {
-        status: patch.status ? uiToApiToolRequestStatus[patch.status] : undefined,
-        adminDecisionNote: patch.adminNote,
-        linkedToolId:
-          patch.linkedToolId === undefined
-            ? undefined
-            : patch.linkedToolId === 'none'
-              ? null
-              : patch.linkedToolId,
-      },
-    });
+  const updateRequest = (id: string, patch: Partial<ToolRequest>, msg: string) => {
+    setRequests((current) =>
+      current.map((request) => (request.id === id ? { ...request, ...patch } : request)),
+    );
     toast.success(msg);
   };
 
-  const canTransition = (request: ToolRequest, status: ToolRequestStatus) =>
-    request.availableTransitions.includes(status);
-
-  const decideRequest = async (status: ToolRequestStatus, msg: string) => {
+  const decideRequest = (status: ToolRequestStatus, msg: string) => {
     if (!activeRequest) return;
-    await updateRequest(
-      activeRequest.id,
-      {
-        status,
-        adminNote: decisionNote.trim() || undefined,
-        linkedToolId: status === 'built' ? linkedToolId : activeRequest.linkedToolId ?? 'none',
-      },
-      msg,
-    );
+    updateRequest(activeRequest.id, { status, adminNote: decisionNote.trim() || undefined }, msg);
     setActiveId(null);
   };
 
@@ -142,37 +77,62 @@ export default function AdminToolRequestsPage() {
       { label: 'View request', onSelect: () => openRequest(request) },
     ];
 
-    const statusActions: RowAction[] = [];
-    if (canTransition(request, 'in-development')) {
-      statusActions.push({
-        label: 'Approve for development',
-        onSelect: () =>
-          void updateRequest(request.id, { status: 'in-development' }, 'Tool request approved for development'),
-      });
+    if (request.status === 'under-review') {
+      actions.push(
+        'separator',
+        {
+          label: 'Approve for development',
+          onSelect: () =>
+            updateRequest(request.id, { status: 'in-development' }, 'Tool request approved for development'),
+        },
+        {
+          label: 'Decline request',
+          destructive: true,
+          onSelect: () =>
+            updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
+        },
+      );
     }
-    if (canTransition(request, 'built')) {
-      statusActions.push({ label: 'Review build decision', onSelect: () => openRequest(request) });
-    }
-    if (canTransition(request, 'declined')) {
-      statusActions.push({ label: 'Decline request', destructive: true, onSelect: () => openRequest(request) });
-    }
-    if (canTransition(request, 'under-review')) {
-      statusActions.push({
-        label: 'Reopen review',
-        onSelect: () =>
-          void updateRequest(request.id, { status: 'under-review', linkedToolId: 'none' }, 'Tool request reopened for review'),
-      });
+
+    if (request.status === 'in-development') {
+      actions.push(
+        'separator',
+        {
+          label: 'Mark as built',
+          onSelect: () =>
+            updateRequest(request.id, { status: 'built' }, 'Tool marked as built and ready for the library'),
+        },
+        {
+          label: 'Decline request',
+          destructive: true,
+          onSelect: () =>
+            updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
+        },
+      );
     }
 
     if (request.status === 'built') {
-      statusActions.push({ label: 'View in library', onSelect: () => router.push(routes.admin.entrepreneurTools) });
+      actions.push(
+        'separator',
+        { label: 'View in library', onSelect: () => router.push(routes.admin.content) },
+      );
     }
 
-    if (statusActions.length > 0) actions.push('separator', ...statusActions);
+    if (request.status === 'declined') {
+      actions.push(
+        'separator',
+        {
+          label: 'Reopen review',
+          onSelect: () =>
+            updateRequest(request.id, { status: 'under-review' }, 'Tool request reopened for review'),
+        },
+      );
+    }
+
     return actions;
   };
 
-  const filteredRequests = useMemo<ToolRequest[]>(() => {
+  const filteredRequests = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return requests.filter((request) => {
       const matchesQuery =
@@ -190,7 +150,7 @@ export default function AdminToolRequestsPage() {
           .toLowerCase()
           .includes(needle);
       const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-      const matchesCategory = categoryFilter === 'all' || request.categoryId === categoryFilter;
+      const matchesCategory = categoryFilter === 'all' || request.category === categoryFilter;
       return matchesQuery && matchesStatus && matchesCategory;
     });
   }, [categoryFilter, query, requests, statusFilter]);
@@ -332,25 +292,12 @@ export default function AdminToolRequestsPage() {
             />
           </div>
         </TableToolbar>
-        {requestsQuery.isLoading ? (
-          <div className="grid min-h-[180px] place-items-center rounded-xl border border-line bg-surface-subtle text-sm text-ink-muted">
-            Loading requests...
-          </div>
-        ) : requestsQuery.isError ? (
-          <div className="grid min-h-[180px] place-items-center rounded-xl border border-line bg-surface-subtle p-6 text-center">
-            <div>
-              <div className="text-base font-semibold text-ink">Requests could not be loaded</div>
-              <p className="mt-2 text-sm text-ink-muted">Please refresh the page or try again later.</p>
-            </div>
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={pageRows}
-            rowKey={(request) => request.id}
-            emptyMessage="No tool requests match this view."
-          />
-        )}
+        <DataTable
+          columns={columns}
+          rows={pageRows}
+          rowKey={(request) => request.id}
+          emptyMessage="No tool requests match this view."
+        />
         <TablePagination
           page={page}
           pageSize={pageSize}
@@ -367,18 +314,11 @@ export default function AdminToolRequestsPage() {
         request={activeRequest}
         decisionNote={decisionNote}
         onDecisionNoteChange={setDecisionNote}
-        linkedToolId={linkedToolId}
-        onLinkedToolIdChange={setLinkedToolId}
-        linkedToolOptions={linkedToolOptions}
-        isSaving={updateRequestMutation.isPending}
         onClose={() => setActiveId(null)}
-        canMoveToDevelopment={activeRequest ? canTransition(activeRequest, 'in-development') : false}
-        canMarkBuilt={activeRequest ? canTransition(activeRequest, 'built') : false}
-        canDecline={activeRequest ? canTransition(activeRequest, 'declined') : false}
-        onMoveToDevelopment={() => void decideRequest('in-development', 'Tool request approved for development')}
-        onMarkBuilt={() => void decideRequest('built', 'Tool marked as built and ready for the library')}
-        onDecline={() => void decideRequest('declined', 'Tool request declined')}
-        onViewLibrary={() => router.push(routes.admin.entrepreneurTools)}
+        onMoveToDevelopment={() => decideRequest('in-development', 'Tool request approved for development')}
+        onMarkBuilt={() => decideRequest('built', 'Tool marked as built and ready for the library')}
+        onDecline={() => decideRequest('declined', 'Tool request declined')}
+        onViewLibrary={() => router.push(routes.admin.content)}
       />
     </>
   );
@@ -388,13 +328,6 @@ function ToolRequestReviewModal({
   request,
   decisionNote,
   onDecisionNoteChange,
-  linkedToolId,
-  onLinkedToolIdChange,
-  linkedToolOptions,
-  isSaving,
-  canMoveToDevelopment,
-  canMarkBuilt,
-  canDecline,
   onClose,
   onMoveToDevelopment,
   onMarkBuilt,
@@ -404,22 +337,12 @@ function ToolRequestReviewModal({
   request: ToolRequest | null;
   decisionNote: string;
   onDecisionNoteChange: (value: string) => void;
-  linkedToolId: string;
-  onLinkedToolIdChange: (value: string) => void;
-  linkedToolOptions: Array<{ value: string; label: string }>;
-  isSaving: boolean;
-  canMoveToDevelopment: boolean;
-  canMarkBuilt: boolean;
-  canDecline: boolean;
   onClose: () => void;
   onMoveToDevelopment: () => void;
   onMarkBuilt: () => void;
   onDecline: () => void;
   onViewLibrary: () => void;
 }) {
-  const hasDecisionNote = decisionNote.trim().length > 0;
-  const hasLinkedTool = linkedToolId !== 'none';
-
   return (
     <Modal
       open={!!request}
@@ -453,18 +376,7 @@ function ToolRequestReviewModal({
             <InfoPanel title="Why the entrepreneur wants this" text={request.reason} />
           </div>
 
-          {(canMarkBuilt || request.status === 'built') && (
-            <FormField label="Linked tool" optional className="mt-4">
-              <FormSelect
-                value={linkedToolId}
-                onValueChange={onLinkedToolIdChange}
-                options={linkedToolOptions}
-                placeholder="Select the tool that satisfies this request"
-              />
-            </FormField>
-          )}
-
-          <FormField label="Admin decision note" optional={!canDecline} className="mt-4">
+          <FormField label="Admin decision note" optional className="mt-4">
             <FormTextarea
               rows={4}
               placeholder="Capture why BID is approving, building, or declining this request..."
@@ -474,18 +386,21 @@ function ToolRequestReviewModal({
           </FormField>
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Close</Button>
-            {canDecline && (
-              <Button type="button" variant="destructive" onClick={onDecline} disabled={isSaving || !hasDecisionNote}>Decline</Button>
+            <Button type="button" variant="outline" onClick={onClose}>Close</Button>
+            {request.status === 'under-review' && (
+              <>
+                <Button type="button" variant="destructive" onClick={onDecline}>Decline</Button>
+                <Button type="button" onClick={onMoveToDevelopment}>Approve for development</Button>
+              </>
             )}
-            {canMoveToDevelopment && (
-              <Button type="button" onClick={onMoveToDevelopment} disabled={isSaving}>Approve for development</Button>
-            )}
-            {canMarkBuilt && (
-              <Button type="button" onClick={onMarkBuilt} disabled={isSaving || !hasLinkedTool}>Mark as built</Button>
+            {request.status === 'in-development' && (
+              <>
+                <Button type="button" variant="destructive" onClick={onDecline}>Decline</Button>
+                <Button type="button" onClick={onMarkBuilt}>Mark as built</Button>
+              </>
             )}
             {request.status === 'built' && (
-              <Button type="button" onClick={onViewLibrary}>View tool library</Button>
+              <Button type="button" onClick={onViewLibrary}>View content library</Button>
             )}
           </div>
         </div>

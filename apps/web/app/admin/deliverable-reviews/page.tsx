@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
@@ -24,22 +23,15 @@ import {
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
-import { DeliverableFilePreviewModal } from '@/components/deliverables/DeliverableFilePreviewModal';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
 import {
-  listDeliverableReviews,
-  reviewDeliverableSubmission,
-  updateDeliverableDueDate as saveDeliverableDueDate,
-  type DeliverableReviewQueueItem,
-} from '@/lib/api/deliverables';
-import {
+  deliverableReviews,
   deliverableReviewStatusMeta,
-  mapDeliverableReviewRow,
-  type DeliverableReviewRow as DeliverableReview,
+  type DeliverableReview,
   type DeliverableReviewStatus,
-} from '@/lib/deliverables/review-queue';
+} from '@/lib/mock-data/admin-workflows';
 
-const today = new Date();
+const today = new Date('2026-07-07');
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -54,35 +46,8 @@ function daysBetween(start: string, end: Date) {
   return Math.max(Math.floor((end.getTime() - startDate.getTime()) / 86_400_000), 0);
 }
 
-
-
 export default function DeliverableReviewsPage() {
-  const queryClient = useQueryClient();
-  const reviewsQuery = useQuery({
-    queryKey: ['deliverable-reviews', 'admin'],
-    queryFn: () => listDeliverableReviews({ take: 50 }),
-  });
-  const reviewMutation = useMutation({
-    mutationFn: (payload: { submissionId: string; decision: 'approved' | 'changes_required'; feedback?: string }) =>
-      reviewDeliverableSubmission(payload.submissionId, { decision: payload.decision, feedback: payload.feedback }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['deliverable-reviews', 'admin'] });
-    },
-  });
-  const dueDateMutation = useMutation({
-    mutationFn: (payload: { instanceId: string; dueDate: string; reason?: string }) =>
-      saveDeliverableDueDate(payload.instanceId, { dueDate: payload.dueDate, reason: payload.reason }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['deliverable-reviews', 'admin'] });
-    },
-  });
-  const [reviewOverrides, setReviewOverrides] = React.useState<Record<string, Partial<DeliverableReview>>>({});
-  const reviews = React.useMemo<DeliverableReview[]>(() => {
-    return ((reviewsQuery.data?.items ?? []) as DeliverableReviewQueueItem[]).map((row) => {
-      const mapped = mapDeliverableReviewRow(row);
-      return { ...mapped, ...reviewOverrides[mapped.id] };
-    });
-  }, [reviewOverrides, reviewsQuery.data?.items]);
+  const [reviews, setReviews] = React.useState(deliverableReviews);
   const [active, setActive] = React.useState<DeliverableReview | null>(null);
   const [previewTarget, setPreviewTarget] = React.useState<DeliverableReview | null>(null);
   const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReview | null>(null);
@@ -93,56 +58,38 @@ export default function DeliverableReviewsPage() {
   const [pageSize, setPageSize] = React.useState(10);
 
   const updateStatus = (id: string, status: DeliverableReviewStatus, feedback?: string) => {
-    const currentRow = reviews.find((row) => row.id === id);
-    if (!currentRow?.submissionId) {
-      toast.error('No submitted file is available to review.');
-      return;
-    }
-
-    reviewMutation.mutate(
-      {
-        submissionId: currentRow.submissionId,
-        decision: status === 'approved' ? 'approved' : 'changes_required',
-        feedback,
-      },
-      {
-        onSuccess: () => {
-          setReviewOverrides((current) => ({
-            ...current,
-            [id]: {
-              ...current[id],
+    setReviews((rows) =>
+      rows.map((row) =>
+        row.id === id
+          ? {
+              ...row,
               status,
               reviewer: 'Ama Darko',
-              latestFeedback: feedback?.trim() || current[id]?.latestFeedback || currentRow.latestFeedback,
-              feedbackReadAt: status === 'changes-requested' ? undefined : current[id]?.feedbackReadAt || currentRow.feedbackReadAt,
-            },
-          }));
-          toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
-        },
-      },
+              latestFeedback: feedback?.trim() || row.latestFeedback,
+              feedbackReadAt: status === 'changes-requested' ? undefined : row.feedbackReadAt,
+            }
+          : row,
+      ),
     );
+    toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
   };
 
-  const updateDueDate = (id: string, dueAt: string, reason?: string) => {
-    dueDateMutation.mutate(
-      { instanceId: id, dueDate: dueAt, reason },
-      {
-        onSuccess: () => {
-          setReviewOverrides((current) => ({
-            ...current,
-            [id]: {
-              ...current[id],
+  const updateDueDate = (id: string, dueAt: string) => {
+    setReviews((rows) =>
+      rows.map((row) =>
+        row.id === id
+          ? {
+              ...row,
               dueAt,
               dueSource: 'manual-override',
               dueUpdatedAt: new Date().toISOString(),
               dueUpdatedBy: 'Ama Darko',
-            },
-          }));
-          setDueDateTarget(null);
-          toast.success('Due date override saved');
-        },
-      },
+            }
+          : row,
+      ),
     );
+    setDueDateTarget(null);
+    toast.success('Due date override saved');
   };
 
   const pending = reviews.filter((row) => row.status === 'pending-review').length;
@@ -283,7 +230,7 @@ export default function DeliverableReviewsPage() {
       <Card className="mt-4">
         <CardHeader
           title="Review queue"
-          description={reviewsQuery.isLoading ? 'Loading submitted files...' : `${filteredReviews.length} submitted file${filteredReviews.length === 1 ? '' : 's'} in this view`}
+          description={`${filteredReviews.length} submitted file${filteredReviews.length === 1 ? '' : 's'} in this view`}
         />
         <TableToolbar>
           <div>
@@ -346,7 +293,7 @@ export default function DeliverableReviewsPage() {
           setActive(null);
         }}
       />
-      <DeliverableFilePreviewModal
+      <FilePreviewModal
         review={previewTarget}
         onClose={() => setPreviewTarget(null)}
       />
@@ -356,6 +303,48 @@ export default function DeliverableReviewsPage() {
         onSave={updateDueDate}
       />
     </>
+  );
+}
+
+function FilePreviewModal({
+  review,
+  onClose,
+}: {
+  review: DeliverableReview | null;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      open={!!review}
+      onOpenChange={(open) => !open && onClose()}
+      title={review ? `Preview ${review.fileName}` : 'Preview file'}
+      width="wide"
+    >
+      {review && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-line bg-surface px-4 py-4">
+            <div className="font-semibold text-ink">{review.fileName}</div>
+            <div className="mt-1 text-sm text-ink-muted">
+              {review.businessName} · {review.deliverable}
+            </div>
+            <div className="mt-1 text-sm text-ink-muted">
+              Submitted {formatDate(review.submittedAt)}
+            </div>
+          </div>
+          <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-line bg-surface-subtle p-6 text-center">
+            <div>
+              <div className="text-sm font-semibold text-ink">File preview area</div>
+              <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
+                When storage is connected, this panel will render the submitted file preview or secure download.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" onClick={onClose}>Close preview</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

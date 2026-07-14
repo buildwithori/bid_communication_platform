@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ExternalLink, MapPin } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarDays, Clock3, ExternalLink, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetricGrid } from '@/components/shared/MetricGrid';
@@ -23,27 +22,13 @@ import {
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { getCurrentUser } from '@/lib/api/auth';
-import { listEntrepreneurs, type EntrepreneurRecord } from '@/lib/api/entrepreneurs';
-import {
-  acceptSession as acceptSessionRecord,
-  addSessionNote,
-  completeSession as completeSessionRecord,
-  createSession as createSessionRecord,
-  declineSession as declineSessionRecord,
-  listSessions,
-  rescheduleSession as rescheduleSessionRecord,
-  type CreateSessionPayload,
-  type SessionRecord,
-  type SessionStatus,
-  type SessionType,
-} from '@/lib/api/sessions';
-import type { AdminSession } from '@/lib/mock-data/admin-workflows';
+import { adminSessions, type AdminSession } from '@/lib/mock-data/admin-workflows';
+import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
+import { trainerById } from '@/lib/mock-data/trainers';
+import { calendarSupportMessage, supportsMeetingProvider } from '@/lib/sessions/calendar-support';
 
+const currentTrainerId = 't-kofi';
 const ALL = 'all';
-
-type TrainerSessionStatusFilter = typeof ALL | AdminSession['status'];
-type TrainerSessionTypeFilter = typeof ALL | SessionType;
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -54,83 +39,12 @@ function formatDate(value: string) {
   });
 }
 
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
-
-function toDateInput(value: string) {
-  return new Date(value).toISOString().slice(0, 10);
-}
-
-function toDateTime(date: string, time: string) {
-  return new Date(`${date}T${time}:00`).toISOString();
-}
-
 function timeRange(session: AdminSession) {
   return `${session.startTime}${session.endTime ? `-${session.endTime}` : ''}`;
 }
 
-function sessionTypeLabel(type: SessionType): AdminSession['sessionType'] {
-  const labels: Record<SessionType, AdminSession['sessionType']> = {
-    mentor_checkin: 'Mentoring',
-    office_hours: 'Group session',
-    investor_prep: 'Investor prep',
-  };
-  return labels[type];
-}
-
-function uiSessionTypeToApi(value: AdminSession['sessionType']): SessionType {
-  if (value === 'Group session') return 'office_hours';
-  if (value === 'Investor prep') return 'investor_prep';
-  return 'mentor_checkin';
-}
-
-function mapStatus(status: SessionStatus): AdminSession['status'] {
-  if (status === 'requested') return 'awaiting-trainer';
-  if (status === 'cancelled') return 'declined';
-  return status;
-}
-
-function mapSource(session: SessionRecord): AdminSession['source'] {
-  if (session.source === 'entrepreneur_request') return 'entrepreneur-request';
-  return session.createdBy.role === 'trainer' ? 'trainer-scheduled' : 'admin-scheduled';
-}
-
-function mapSessionRecord(session: SessionRecord): AdminSession {
-  const lastInternalNote = session.notesHistory.find((note) => note.visibility === 'internal');
-
-  return {
-    id: session.id,
-    entrepreneurId: session.entrepreneurUserId,
-    trainerId: session.ownerUserId ?? undefined,
-    entrepreneurName: session.entrepreneur.businessName || session.entrepreneur.name,
-    trainerName: session.owner?.name ?? 'Any available BID team member',
-    date: toDateInput(session.startAt),
-    startTime: formatTime(session.startAt),
-    endTime: formatTime(session.endAt),
-    meetingProvider: 'google-meet',
-    meetingUrl: session.meetingUrl ?? undefined,
-    sessionType: sessionTypeLabel(session.type),
-    topic: session.topic,
-    status: mapStatus(session.status),
-    source: mapSource(session),
-    declineReason: session.declinedReason ?? session.cancelledReason ?? undefined,
-    trainerNote: lastInternalNote?.note,
-    rescheduleHistory: session.notesHistory
-      .filter((note) => note.note.startsWith('Rescheduled:'))
-      .map((note) => ({
-        requestedBy: note.author.role === 'trainer' ? 'trainer' : 'admin',
-        requestedAt: toDateInput(note.createdAt),
-        previousDate: toDateInput(session.startAt),
-        previousStartTime: formatTime(session.startAt),
-        previousEndTime: formatTime(session.endAt),
-        reason: note.note.replace(/^Rescheduled:\s*/, ''),
-      })),
-  };
+function createMeetingUrl(session: AdminSession) {
+  return `https://meet.google.com/bid-${session.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
 }
 
 function sessionStatusMeta(status: AdminSession['status']) {
@@ -140,24 +54,20 @@ function sessionStatusMeta(status: AdminSession['status']) {
   return { label: 'Awaiting trainer', tone: 'amber' as const };
 }
 
-function sessionSourceLabel(session: AdminSession) {
-  if (!session.trainerId && session.status === 'awaiting-trainer') return 'Open BID team request';
-  if (session.source === 'entrepreneur-request') return 'Requested by entrepreneur';
-  if (session.source === 'trainer-scheduled') return 'Created by trainer';
-  return 'Scheduled by BID';
-}
-
-function mutationError(error: unknown) {
-  toast.error(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
-}
-
 export default function TrainerSessionsPage() {
-  const queryClient = useQueryClient();
+  const trainer = trainerById(currentTrainerId);
   const [query, setQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<TrainerSessionStatusFilter>(ALL);
-  const [typeFilter, setTypeFilter] = React.useState<TrainerSessionTypeFilter>(ALL);
+  const [statusFilter, setStatusFilter] = React.useState<typeof ALL | AdminSession['status']>(ALL);
+  const [typeFilter, setTypeFilter] = React.useState<typeof ALL | AdminSession['sessionType']>(ALL);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
+  const [sessions, setSessions] = React.useState<AdminSession[]>(() =>
+    adminSessions.filter((session) =>
+      session.trainerId === currentTrainerId ||
+      session.trainerName === trainer?.fullName ||
+      (!session.trainerId && session.status === 'awaiting-trainer'),
+    ),
+  );
   const [messageTarget, setMessageTarget] = React.useState<AdminSession | null>(null);
   const [noteTarget, setNoteTarget] = React.useState<AdminSession | null>(null);
   const [noteText, setNoteText] = React.useState('');
@@ -166,111 +76,112 @@ export default function TrainerSessionsPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rescheduleTarget, setRescheduleTarget] = React.useState<AdminSession | null>(null);
 
-  const userQuery = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: getCurrentUser,
-  });
-  const sessionsQuery = useQuery({
-    queryKey: ['sessions', 'trainer-list'],
-    queryFn: () => listSessions({ take: 100 }),
-  });
-  const entrepreneursQuery = useQuery({
-    queryKey: ['entrepreneurs', 'trainer-session-options'],
-    queryFn: () => listEntrepreneurs({ take: 100 }),
-  });
-
-  const currentUser = userQuery.data?.user ?? null;
-  const currentTrainerName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || currentUser?.email || 'Trainer';
-
-  const invalidateSessions = () => {
-    void queryClient.invalidateQueries({ queryKey: ['sessions'] });
-    void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  const updateSession = (id: string, patch: Partial<AdminSession>, message: string) => {
+    setSessions((current) =>
+      current.map((session) => (session.id === id ? { ...session, ...patch } : session)),
+    );
+    toast.success(message);
   };
 
-  const acceptMutation = useMutation({
-    mutationFn: acceptSessionRecord,
-    onSuccess: () => {
-      invalidateSessions();
-      toast.success('Session accepted and meeting link created');
-    },
-    onError: mutationError,
-  });
-  const declineMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => declineSessionRecord(id, { reason }),
-    onSuccess: () => {
-      invalidateSessions();
-      toast.success('Session request declined');
-      setDeclineTarget(null);
-      setDeclineReason('');
-    },
-    onError: mutationError,
-  });
-  const completeMutation = useMutation({
-    mutationFn: (id: string) => completeSessionRecord(id, {}),
-    onSuccess: () => {
-      invalidateSessions();
-      toast.success('Session marked completed');
-    },
-    onError: mutationError,
-  });
-  const noteMutation = useMutation({
-    mutationFn: ({ id, note }: { id: string; note: string }) => addSessionNote(id, { note, visibility: 'internal' }),
-    onSuccess: () => {
-      invalidateSessions();
-      toast.success('Session note saved');
-      setNoteTarget(null);
-      setNoteText('');
-    },
-    onError: mutationError,
-  });
-  const createMutation = useMutation({
-    mutationFn: createSessionRecord,
-    onSuccess: () => {
-      invalidateSessions();
-      toast.success('Session created and meeting link added');
-      setCreateOpen(false);
-    },
-    onError: mutationError,
-  });
-  const rescheduleMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { startAt: string; endAt: string; reason?: string } }) =>
-      rescheduleSessionRecord(id, payload),
-    onSuccess: () => {
-      invalidateSessions();
-      toast.success('Session rescheduled and attendees notified');
-      setRescheduleTarget(null);
-    },
-    onError: mutationError,
-  });
+  const acceptSession = (session: AdminSession) => {
+    if (!supportsMeetingProvider(trainer?.calendarProvider, session.meetingProvider)) {
+      toast.error(calendarSupportMessage(session.meetingProvider));
+      return;
+    }
 
-  const sessions = React.useMemo<AdminSession[]>(
-    () => (sessionsQuery.data?.items ?? []).map(mapSessionRecord),
-    [sessionsQuery.data],
-  );
-  const entrepreneurOptions = React.useMemo<Array<{ value: string; label: string; description?: string }>>(
-    () => (entrepreneursQuery.data?.items ?? []).map((entrepreneur: EntrepreneurRecord) => ({
-      value: entrepreneur.entrepreneurUserId,
-      label: entrepreneur.businessName,
-      description: entrepreneur.representativeName,
-    })),
-    [entrepreneursQuery.data],
-  );
-  const trainerOptions = React.useMemo<Array<{ value: string; label: string; description?: string }>>(
-    () => currentUser ? [{ value: currentUser.id, label: currentTrainerName, description: currentUser.email }] : [],
-    [currentTrainerName, currentUser],
-  );
+    updateSession(
+      session.id,
+      {
+        status: 'confirmed',
+        trainerId: currentTrainerId,
+        trainerName: trainer?.fullName ?? session.trainerName,
+        meetingProvider: session.meetingProvider ?? 'google-meet',
+        meetingUrl: session.meetingUrl ?? createMeetingUrl(session),
+      },
+      session.trainerId ? 'Session accepted and meeting link created' : 'Team request accepted and assigned to you',
+    );
+  };
+
+  const declineSession = () => {
+    if (!declineTarget) return;
+    updateSession(
+      declineTarget.id,
+      {
+        status: 'declined',
+        declineReason: declineReason.trim() || 'Trainer declined this request.',
+      },
+      'Session request declined',
+    );
+    setDeclineTarget(null);
+    setDeclineReason('');
+  };
+
+  const createSession = (values: SessionEditorValues) => {
+    const entrepreneur = entrepreneurs.find((item) => item.id === values.entrepreneurId);
+    const newSession: AdminSession = {
+      id: `s-trainer-${Date.now()}`,
+      entrepreneurId: values.entrepreneurId,
+      trainerId: currentTrainerId,
+      entrepreneurName: entrepreneur?.representative ?? entrepreneur?.businessName ?? 'Entrepreneur',
+      trainerName: trainer?.fullName ?? values.trainerName,
+      date: values.date,
+      startTime: values.startTime,
+      endTime: values.endTime,
+      meetingProvider: values.meetingProvider,
+      meetingUrl: values.meetingUrl,
+      sessionType: values.sessionType,
+      topic: values.topic,
+      status: 'confirmed',
+      source: 'trainer-scheduled',
+    };
+    setSessions((current) => [newSession, ...current]);
+    setCreateOpen(false);
+    toast.success('Session created and meeting link added');
+  };
+
+  const rescheduleSession = (values: SessionEditorValues) => {
+    if (!rescheduleTarget) return;
+    updateSession(
+      rescheduleTarget.id,
+      {
+        entrepreneurId: values.entrepreneurId,
+        trainerId: currentTrainerId,
+        trainerName: trainer?.fullName ?? values.trainerName,
+        date: values.date,
+        startTime: values.startTime,
+        endTime: values.endTime,
+        meetingProvider: values.meetingProvider,
+        meetingUrl: values.meetingUrl,
+        sessionType: values.sessionType,
+        topic: values.topic,
+        status: rescheduleTarget.status === 'awaiting-trainer' ? 'awaiting-trainer' : 'confirmed',
+        rescheduleHistory: [
+          ...(rescheduleTarget.rescheduleHistory ?? []),
+          {
+            requestedBy: 'trainer',
+            requestedAt: new Date().toISOString().slice(0, 10),
+            previousDate: rescheduleTarget.date,
+            previousStartTime: rescheduleTarget.startTime,
+            previousEndTime: rescheduleTarget.endTime,
+            reason: values.reason,
+          },
+        ],
+      },
+      'Session rescheduled and entrepreneur notified',
+    );
+    setRescheduleTarget(null);
+  };
+
+  const upcoming = sessions.filter((session) => session.date >= '2026-07-07' && !['declined', 'completed'].includes(session.status)).length;
+  const awaiting = sessions.filter((session) => session.status === 'awaiting-trainer').length;
+  const confirmed = sessions.filter((session) => session.status === 'confirmed').length;
 
   const filtered = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return sessions.filter((session) => {
-      const matchesQuery =
-        !needle ||
-        [session.entrepreneurName, session.trainerName, session.topic, session.sessionType, session.date]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
+      const matchesQuery = !needle || [session.entrepreneurName, session.trainerName, session.topic, session.sessionType, session.date].join(' ').toLowerCase().includes(needle);
       const matchesStatus = statusFilter === ALL || session.status === statusFilter;
-      const matchesType = typeFilter === ALL || uiSessionTypeToApi(session.sessionType) === typeFilter;
+      const matchesType = typeFilter === ALL || session.sessionType === typeFilter;
       return matchesQuery && matchesStatus && matchesType;
     });
   }, [query, sessions, statusFilter, typeFilter]);
@@ -280,43 +191,9 @@ export default function TrainerSessionsPage() {
   }, [query, statusFilter, typeFilter, pageSize]);
 
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const now = Date.now();
-  const upcomingSessions = sessions.filter((session) => {
-    const startTime = new Date(`${session.date}T${session.startTime}:00`).getTime();
-    return startTime >= now && !['declined', 'completed'].includes(session.status);
-  });
-  const upcoming = upcomingSessions.length;
-  const awaiting = sessions.filter((session) => session.status === 'awaiting-trainer').length;
-  const confirmed = sessions.filter((session) => session.status === 'confirmed').length;
-  const nextSession = [...upcomingSessions].sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`))[0];
-
-  const createSession = async (values: SessionEditorValues) => {
-    const endTime = values.endTime ?? values.startTime;
-    const payload: CreateSessionPayload = {
-      entrepreneurUserId: values.entrepreneurId,
-      ownerUserId: currentUser?.id,
-      type: uiSessionTypeToApi(values.sessionType),
-      topic: values.topic,
-      startAt: toDateTime(values.date, values.startTime),
-      endAt: toDateTime(values.date, endTime),
-      timezone: 'UTC',
-      meetingProvider: 'google_meet',
-    };
-    await createMutation.mutateAsync(payload);
-  };
-
-  const rescheduleSession = async (values: SessionEditorValues) => {
-    if (!rescheduleTarget) return;
-    const endTime = values.endTime ?? values.startTime;
-    await rescheduleMutation.mutateAsync({
-      id: rescheduleTarget.id,
-      payload: {
-        startAt: toDateTime(values.date, values.startTime),
-        endAt: toDateTime(values.date, endTime),
-        reason: values.reason,
-      },
-    });
-  };
+  const nextSession = [...sessions]
+    .filter((session) => session.date >= '2026-07-07' && !['declined', 'completed'].includes(session.status))
+    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`))[0];
 
   const columns: Column<AdminSession>[] = [
     {
@@ -331,7 +208,8 @@ export default function TrainerSessionsPage() {
                   'separator' as const,
                   {
                     label: 'Accept session',
-                    onSelect: () => acceptMutation.mutate(session.id),
+                    onSelect: () => acceptSession(session),
+                    disabled: !supportsMeetingProvider(trainer?.calendarProvider, session.meetingProvider),
                   },
                   {
                     label: 'Decline request',
@@ -351,7 +229,7 @@ export default function TrainerSessionsPage() {
                     : []),
                   {
                     label: 'Mark completed',
-                    onSelect: () => completeMutation.mutate(session.id),
+                    onSelect: () => updateSession(session.id, { status: 'completed' }, 'Session marked completed'),
                   },
                 ]
               : []),
@@ -385,16 +263,26 @@ export default function TrainerSessionsPage() {
       key: 'session',
       header: 'Session',
       cell: (session) => (
-        <div className="min-w-[260px]">
+        <div className="min-w-[250px]">
           <div className="font-medium text-ink">{session.topic}</div>
           <div className="mt-1 text-sm text-ink-muted">
-            {session.sessionType} · {sessionSourceLabel(session)}
+            {session.sessionType} · {!session.trainerId && session.status === 'awaiting-trainer'
+              ? 'Open BID team request'
+              : session.source === 'entrepreneur-request'
+                ? 'Requested by entrepreneur'
+                : session.source === 'trainer-scheduled'
+                  ? 'Created by trainer'
+                  : 'Scheduled by BID'}
           </div>
           {session.rescheduleHistory?.length ? (
             <div className="mt-2 text-xs font-medium text-warning">
               Rescheduled {session.rescheduleHistory.length} time{session.rescheduleHistory.length === 1 ? '' : 's'}
             </div>
           ) : null}
+          {session.status === 'awaiting-trainer' &&
+            !supportsMeetingProvider(trainer?.calendarProvider, session.meetingProvider) && (
+              <div className="mt-2 text-xs font-medium text-warning">Connect a supported calendar to accept</div>
+            )}
         </div>
       ),
     },
@@ -413,7 +301,7 @@ export default function TrainerSessionsPage() {
       key: 'location',
       header: 'Location',
       cell: (session) => (
-        <div className="flex min-w-[190px] flex-col items-start gap-2">
+        <div className="flex min-w-[180px] flex-col items-start gap-2">
           <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
             <MapPin className="h-4 w-4" />
             Virtual
@@ -432,7 +320,7 @@ export default function TrainerSessionsPage() {
             <span className="text-xs text-ink-muted">Meeting link pending</span>
           )}
           {session.rescheduleHistory?.at(-1)?.reason && (
-            <span className="max-w-[190px] text-xs text-ink-muted">
+            <span className="max-w-[180px] text-xs text-ink-muted">
               Latest reschedule: {session.rescheduleHistory.at(-1)?.reason}
             </span>
           )}
@@ -474,19 +362,19 @@ export default function TrainerSessionsPage() {
             <div>
               <div className="text-sm text-ink-muted">Next session</div>
               <div className="mt-1 text-lg font-semibold text-ink">{nextSession.topic}</div>
-              <div className="mt-1 text-sm text-ink-muted">
-                {nextSession.entrepreneurName} · {formatDate(nextSession.date)} · {timeRange(nextSession)}
-              </div>
+              <div className="mt-1 text-sm text-ink-muted">{nextSession.entrepreneurName} · {formatDate(nextSession.date)} · {timeRange(nextSession)}</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {nextSession.status === 'awaiting-trainer' && (
                 <>
-                  <Button size="sm" onClick={() => acceptMutation.mutate(nextSession.id)}>
+                  <Button
+                    size="sm"
+                    disabled={!supportsMeetingProvider(trainer?.calendarProvider, nextSession.meetingProvider)}
+                    onClick={() => acceptSession(nextSession)}
+                  >
                     Accept
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={() => setDeclineTarget(nextSession)}>
-                    Decline
-                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setDeclineTarget(nextSession)}>Decline</Button>
                 </>
               )}
               {nextSession.status === 'confirmed' && nextSession.meetingUrl && (
@@ -509,38 +397,23 @@ export default function TrainerSessionsPage() {
           </div>
           <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[280px_180px_180px]">
             <TableFilterInput icon placeholder="Search sessions..." value={query} onChange={(event) => setQuery(event.target.value)} />
-            <TableFilterSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TrainerSessionStatusFilter)}>
+            <TableFilterSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
               <option value={ALL}>All statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="awaiting-trainer">Awaiting trainer</option>
               <option value="completed">Completed</option>
               <option value="declined">Declined</option>
             </TableFilterSelect>
-            <TableFilterSelect value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as TrainerSessionTypeFilter)}>
+            <TableFilterSelect value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}>
               <option value={ALL}>All types</option>
-              <option value="mentor_checkin">Mentoring</option>
-              <option value="office_hours">Group session</option>
-              <option value="investor_prep">Investor prep</option>
+              <option value="Mentoring">Mentoring</option>
+              <option value="Group session">Group session</option>
+              <option value="Investor prep">Investor prep</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={pageRows}
-          rowKey={(session) => session.id}
-          emptyMessage={sessionsQuery.isLoading ? 'Loading sessions...' : 'No sessions match this view.'}
-          tableClassName="min-w-[980px]"
-        />
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filtered.length}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
-        />
+        <DataTable columns={columns} rows={pageRows} rowKey={(session) => session.id} emptyMessage="No sessions match this view." tableClassName="min-w-[980px]" />
+        <TablePagination page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
       </Card>
 
       <MessageModal
@@ -562,8 +435,10 @@ export default function TrainerSessionsPage() {
           onSubmit={(event) => {
             event.preventDefault();
             if (noteTarget) {
-              noteMutation.mutate({ id: noteTarget.id, note: noteText.trim() });
+              updateSession(noteTarget.id, { trainerNote: noteText.trim() }, 'Session note saved');
             }
+            setNoteTarget(null);
+            setNoteText('');
           }}
         >
           <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
@@ -580,9 +455,7 @@ export default function TrainerSessionsPage() {
           </FormField>
           <div className="flex justify-end gap-2 border-t border-line pt-4">
             <Button type="button" variant="outline" onClick={() => setNoteTarget(null)}>Cancel</Button>
-            <Button type="submit" disabled={noteText.trim().length < 5 || noteMutation.isPending}>
-              {noteMutation.isPending ? 'Saving...' : 'Save note'}
-            </Button>
+            <Button type="submit" disabled={noteText.trim().length < 5}>Save note</Button>
           </div>
         </form>
       </Modal>
@@ -597,9 +470,7 @@ export default function TrainerSessionsPage() {
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            if (declineTarget) {
-              declineMutation.mutate({ id: declineTarget.id, reason: declineReason.trim() });
-            }
+            declineSession();
           }}
         >
           <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
@@ -618,9 +489,7 @@ export default function TrainerSessionsPage() {
           </FormField>
           <div className="flex justify-end gap-2 border-t border-line pt-4">
             <Button type="button" variant="outline" onClick={() => setDeclineTarget(null)}>Cancel</Button>
-            <Button type="submit" variant="destructive" disabled={declineReason.trim().length < 5 || declineMutation.isPending}>
-              {declineMutation.isPending ? 'Declining...' : 'Decline request'}
-            </Button>
+            <Button type="submit" variant="destructive" disabled={declineReason.trim().length < 5}>Decline request</Button>
           </div>
         </form>
       </Modal>
@@ -630,11 +499,8 @@ export default function TrainerSessionsPage() {
         onOpenChange={setCreateOpen}
         mode="create"
         actor="trainer"
-        defaultTrainerId={currentUser?.id}
-        defaultTrainerName={currentTrainerName}
-        entrepreneurOptions={entrepreneurOptions}
-        trainerOptions={trainerOptions}
-        isSubmitting={createMutation.isPending}
+        defaultTrainerId={currentTrainerId}
+        defaultTrainerName={trainer?.fullName}
         onSubmit={createSession}
       />
       <SessionEditorModal
@@ -643,11 +509,8 @@ export default function TrainerSessionsPage() {
         mode="reschedule"
         actor="trainer"
         initialSession={rescheduleTarget}
-        defaultTrainerId={currentUser?.id}
-        defaultTrainerName={currentTrainerName}
-        entrepreneurOptions={entrepreneurOptions}
-        trainerOptions={trainerOptions}
-        isSubmitting={rescheduleMutation.isPending}
+        defaultTrainerId={currentTrainerId}
+        defaultTrainerName={trainer?.fullName}
         onSubmit={rescheduleSession}
       />
     </>

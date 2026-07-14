@@ -4,31 +4,14 @@ import { AlertTriangle, CheckCircle2, Clock3, FileText, UploadCloud } from 'luci
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { Modal } from '@/components/shared/Modal';
-import { FormAutocomplete, FormField, FormTextarea } from '@/components/shared/FormField';
+import { FormAutocomplete, FormField, FormTextarea, FormInput } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import { Badge } from '@/components/shared/Badge';
 import { deliverableSchema, type DeliverableForm } from '@/lib/forms/schemas';
-import { submitDeliverableInstance } from '@/lib/api/deliverables';
-import { createDirectUpload } from '@/lib/api/files';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { deliverableGroups } from '@/lib/mock-data';
 import type { BadgeTone, Deliverable, DeliverableStatus } from '@/types';
-
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
-const SUPPORTED_EXTENSIONS = ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
-const mimeByExtension: Record<string, string> = {
-  pdf: 'application/pdf',
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  csv: 'text/csv',
-};
 
 const statusMeta: Record<DeliverableStatus, { label: string; tone: BadgeTone; helper: string }> = {
   pending: { label: 'Not submitted', tone: 'amber', helper: 'Upload the required file for BID review.' },
@@ -54,51 +37,10 @@ function latestFeedback(deliverable?: Deliverable | null) {
   )[0]?.message;
 }
 
-function fileExtension(fileName: string) {
-  return fileName.split('.').pop()?.toLowerCase() ?? '';
-}
-
-function mimeTypeForFile(file: File) {
-  return file.type || mimeByExtension[fileExtension(file.name)] || 'application/octet-stream';
-}
-
-function formatFileSize(size: number) {
-  if (size < 1024 * 1024) return `${Math.max(Math.round(size / 1024), 1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function validateSelectedFile(file: File) {
-  const extension = fileExtension(file.name);
-  if (!SUPPORTED_EXTENSIONS.includes(extension)) {
-    return 'Upload a PDF, PowerPoint, Word, Excel, or CSV file.';
-  }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return 'File must be 25 MB or smaller.';
-  }
-  return null;
-}
-
-async function uploadFileForDeliverable(file: File) {
-  const directUpload = await createDirectUpload({
-    originalFilename: file.name,
-    mimeType: mimeTypeForFile(file),
-    sizeBytes: file.size,
-    usage: 'deliverable_submission',
-  });
-
-  if (directUpload.upload.provider === 'digitalocean_spaces') {
-    const response = await fetch(directUpload.upload.url, {
-      method: directUpload.upload.method,
-      headers: directUpload.upload.headers,
-      body: file,
-    });
-
-    if (!response.ok) {
-      throw new Error('The file could not be uploaded. Please try again.');
-    }
-  }
-
-  return directUpload.file;
+function sampleFileName(deliverable?: Deliverable | null) {
+  if (!deliverable) return 'Business_Model_Canvas.pdf';
+  const extension = deliverable.fileType ?? 'pdf';
+  return `${deliverable.name.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}_updated.${extension}`;
 }
 
 export function UploadDeliverableModal({
@@ -106,38 +48,29 @@ export function UploadDeliverableModal({
   onOpenChange,
   deliverable,
   groupId,
-  deliverableOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deliverable?: Deliverable | null;
   groupId?: string;
-  deliverableOptions?: Deliverable[];
 }) {
-  const queryClient = useQueryClient();
   const { deliverables, submitDeliverable } = useEntrepreneurStore();
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const sourceDeliverables = deliverableOptions ?? deliverables;
-  const usesApiDeliverables = Boolean(deliverableOptions);
   const activeGroup = React.useMemo(
     () => (groupId ? deliverableGroups.find((group) => group.id === groupId) : undefined),
     [groupId],
   );
   const eligibleDeliverables = React.useMemo(
     () =>
-      sourceDeliverables.filter((item) => {
+      deliverables.filter((item) => {
         const matchesGroup =
           !groupId ||
-          (deliverableOptions
-            ? item.programmeId === groupId || item.group === 'general'
-            : activeGroup?.id === 'g-general'
-              ? item.group === 'general'
-              : item.programmeId === activeGroup?.programmeId);
+          (activeGroup?.id === 'g-general'
+            ? item.group === 'general'
+            : item.programmeId === activeGroup?.programmeId);
         const needsSubmission = item.status === 'pending' || item.status === 'overdue' || item.status === 'changes-requested';
         return matchesGroup && needsSubmission;
       }),
-    [activeGroup, deliverableOptions, groupId, sourceDeliverables],
+    [activeGroup, deliverables, groupId],
   );
 
   const form = useForm<DeliverableForm>({
@@ -149,73 +82,22 @@ export function UploadDeliverableModal({
     deliverable ?? eligibleDeliverables.find((item) => item.id === selectedDeliverableId) ?? null;
   const isResubmission = selectedDeliverable?.status === 'changes-requested';
   const currentFeedback = latestFeedback(selectedDeliverable);
-  const canSubmit = !!selectedDeliverable && !!selectedFile;
+  const canSubmit = !!selectedDeliverable;
 
   React.useEffect(() => {
     if (!open) return;
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
     form.reset({
       deliverableId: deliverable?.id ?? '',
       name: deliverable?.name ?? '',
-      fileName: '',
+      fileName: deliverable?.fileName ?? '',
       notes: '',
     });
   }, [deliverable, form, open]);
 
-  const submitMutation = useMutation({
-    mutationFn: async (values: DeliverableForm) => {
-      if (!selectedFile) throw new Error('Choose the file you want to submit.');
-      const uploadedFile = await uploadFileForDeliverable(selectedFile);
-      return submitDeliverableInstance(values.deliverableId, {
-        fileAssetId: uploadedFile.id,
-        note: values.notes,
-      });
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['deliverable-instances', 'entrepreneur'] });
-      toast.success('Deliverable submitted for review');
-      onOpenChange(false);
-      form.reset();
-      setSelectedFile(null);
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Could not submit deliverable.');
-    },
-  });
-
   const onSubmit = (values: DeliverableForm) => {
-    if (!selectedFile) {
-      toast.error('Choose the file you want to submit.');
-      return;
-    }
-
-    if (usesApiDeliverables) {
-      submitMutation.mutate(values);
-      return;
-    }
-
     submitDeliverable(values);
     onOpenChange(false);
     form.reset();
-    setSelectedFile(null);
-  };
-
-  const onFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-
-    const error = validateSelectedFile(file);
-    if (error) {
-      toast.error(error);
-      event.target.value = '';
-      setSelectedFile(null);
-      form.setValue('fileName', '', { shouldValidate: true });
-      return;
-    }
-
-    setSelectedFile(file);
-    form.setValue('fileName', file.name, { shouldValidate: true });
   };
 
   return (
@@ -239,9 +121,7 @@ export function UploadDeliverableModal({
                 form.setValue('deliverableId', value, { shouldValidate: true });
                 if (selected) {
                   form.setValue('name', selected.name);
-                  form.setValue('fileName', '', { shouldValidate: true });
-                  setSelectedFile(null);
-                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  form.setValue('fileName', '');
                 }
               }}
               placeholder={eligibleDeliverables.length ? 'Select a deliverable requirement' : 'No open requirements'}
@@ -251,7 +131,7 @@ export function UploadDeliverableModal({
               options={eligibleDeliverables.map((item) => ({
                 value: item.id,
                 label: item.name,
-                description: `${item.groupLabel} - ${statusMeta[item.status].label} - Due ${formatDate(item.dueDate)}`,
+                description: `${item.groupLabel} · ${statusMeta[item.status].label} · Due ${formatDate(item.dueDate)}`,
               }))}
             />
           </FormField>
@@ -308,32 +188,31 @@ export function UploadDeliverableModal({
         )}
 
         <input type="hidden" {...form.register('name')} />
-        <input type="hidden" {...form.register('fileName')} />
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="sr-only"
-          accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.csv"
-          onChange={onFileChange}
-        />
         <button
           type="button"
-          disabled={!selectedDeliverable || submitMutation.isPending}
-          onClick={() => fileInputRef.current?.click()}
+          disabled={!selectedDeliverable}
+          onClick={() => {
+            if (!selectedDeliverable) return;
+            form.setValue('fileName', sampleFileName(selectedDeliverable), { shouldValidate: true });
+          }}
           className="flex w-full flex-col items-center rounded-xl border-[1.5px] border-dashed border-line-strong px-5 py-6 text-center transition-colors hover:border-bid hover:bg-bid-light disabled:pointer-events-none disabled:opacity-60"
-          aria-label="Choose deliverable file"
+          aria-label="Upload file"
         >
-          <UploadCloud className="mx-auto mb-2 h-6 w-6 text-bid" />
-          <span className="text-sm font-semibold text-ink">
-            {selectedFile ? selectedFile.name : isResubmission ? 'Choose revised file' : 'Choose file'}
+          <UploadCloud className="mx-auto mb-1 h-6 w-6 text-bid" />
+          <span className="text-sm font-medium text-ink">
+            {isResubmission ? 'Attach revised file' : 'Attach file for review'}
           </span>
           <span className="mt-1 text-xs text-ink-muted">
-            {selectedFile ? `${formatFileSize(selectedFile.size)} - Ready to submit` : 'PDF, PowerPoint, Word, Excel, or CSV up to 25 MB'}
+            PDF, PPTX, DOCX, XLSX up to 25 MB. Click to select a sample file for this UI flow.
           </span>
         </button>
-        {form.formState.errors.fileName?.message && (
-          <p className="text-sm text-danger">{form.formState.errors.fileName.message}</p>
-        )}
+
+        <FormField label="Selected file" error={form.formState.errors.fileName?.message} className="mb-0">
+          <FormInput
+            placeholder="Click the upload area to simulate selecting a file"
+            {...form.register('fileName')}
+          />
+        </FormField>
 
         <FormField label="Message to BID reviewer" optional className="mb-0">
           <FormTextarea
@@ -343,8 +222,8 @@ export function UploadDeliverableModal({
           />
         </FormField>
 
-        <Button type="submit" className="w-full" disabled={!canSubmit || submitMutation.isPending}>
-          {submitMutation.isPending ? 'Submitting...' : isResubmission ? 'Resubmit for review' : 'Submit for review'}
+        <Button type="submit" className="w-full" disabled={!canSubmit}>
+          {isResubmission ? 'Resubmit for review' : 'Submit for review'}
         </Button>
       </form>
     </Modal>

@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -14,21 +13,12 @@ import { DatePicker } from '@/components/shared/DatePicker';
 import {
   DataTable,
   RowActions,
-  TableEmptyState,
   TableFilterInput,
   TablePagination,
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { listBusinessStages, type BusinessStageRecord } from '@/lib/api/settings';
-import {
-  createProgrammeDeliverableRule,
-  listProgrammeDeliverableRules,
-  updateProgrammeDeliverableRule,
-  type ProgrammeDeliverableRecurringCadence,
-  type ProgrammeDeliverableRule,
-  type UpsertProgrammeDeliverableRulePayload,
-} from '@/lib/api/programmes';
+import { stages } from '@/lib/mock-data/definitions';
 import { requiredDeliverableSchema, type RequiredDeliverableForm } from '@/lib/forms/schemas';
 import type { Module } from '@/types';
 
@@ -43,10 +33,7 @@ interface RequiredDeliverable {
   recurringCadence?: string;
   requiredFor: string;
   submitted: string;
-  source: ProgrammeDeliverableRule;
 }
-
-const ALL_ENTREPRENEURS = 'all';
 
 const dueTypeOptions = [
   { value: 'fixed-date', label: 'Fixed date' },
@@ -60,91 +47,23 @@ const recurringOptions = [
   { value: 'Every 6 months', label: 'Every 6 months' },
 ];
 
-const recurringToApi: Record<string, ProgrammeDeliverableRecurringCadence> = {
-  Monthly: 'monthly',
-  Quarterly: 'quarterly',
-  'Every 6 months': 'six_monthly',
-};
-
-const recurringToUi: Record<ProgrammeDeliverableRecurringCadence, string> = {
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  six_monthly: 'Every 6 months',
-};
-
-function formatDueDate(value?: string | null) {
+function formatDueDate(value?: string) {
   if (!value) return 'No date selected';
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function dueLabel(values: RequiredDeliverableForm, moduleOptions: Array<{ value: string; label: string }>) {
+function dueLabel(values: RequiredDeliverableForm) {
   if (values.dueType === 'fixed-date') return formatDueDate(values.dueDate);
-  if (values.dueType === 'module-completion') {
-    const module = moduleOptions.find((option) => option.value === values.moduleRule);
-    return `After ${module?.label.replace(/^\d+\.\s*/, '') ?? 'selected module'}`;
-  }
+  if (values.dueType === 'module-completion') return `After ${values.moduleRule}`;
   return values.recurringCadence ?? 'Recurring';
 }
 
 function dueHelper(values: RequiredDeliverableForm) {
   if (values.dueType === 'fixed-date') return 'One deadline for everyone in the selected audience.';
-  if (values.dueType === 'module-completion') return 'Due when each learner completes the selected module.';
-  return 'A new submission is expected for each configured reporting period.';
+  if (values.dueType === 'module-completion') return 'Due when the learner reaches this curriculum point.';
+  return 'A new submission is expected for every reporting period.';
 }
 
-function mapRuleToRow(rule: ProgrammeDeliverableRule): RequiredDeliverable {
-  const dueType =
-    rule.dueType === 'fixed_date'
-      ? 'fixed-date'
-      : rule.dueType === 'module_completion'
-        ? 'module-completion'
-        : 'recurring';
-  const recurringCadence = rule.recurringCadence ? recurringToUi[rule.recurringCadence] : undefined;
-  const values: RequiredDeliverableForm = {
-    name: rule.name,
-    due: dueType,
-    dueType,
-    dueDate: rule.dueDate?.slice(0, 10) ?? '',
-    moduleRule: rule.dueAfterModule?.id ?? '',
-    recurringCadence,
-    requiredFor: rule.requiredForScope === 'stage' ? rule.requiredStage?.id ?? '' : ALL_ENTREPRENEURS,
-  };
-
-  return {
-    id: rule.id,
-    name: rule.name,
-    due: dueLabel(values, rule.dueAfterModule ? [{ value: rule.dueAfterModule.id, label: rule.dueAfterModule.title }] : []),
-    dueHelper: dueHelper(values),
-    dueType,
-    dueDate: values.dueDate,
-    moduleRule: values.moduleRule,
-    recurringCadence,
-    requiredFor: rule.requiredForScope === 'stage' ? `${rule.requiredStage?.name ?? 'Selected stage'} stage` : 'All entrepreneurs',
-    submitted: `${rule.submittedCount} / ${rule.assignedCount}`,
-    source: rule,
-  };
-}
-
-function toPayload(values: RequiredDeliverableForm): UpsertProgrammeDeliverableRulePayload & { name: string } {
-  const isStageSpecific = values.requiredFor !== ALL_ENTREPRENEURS;
-  const dueType =
-    values.dueType === 'fixed-date'
-      ? 'fixed_date'
-      : values.dueType === 'module-completion'
-        ? 'module_completion'
-        : 'recurring';
-
-  return {
-    name: values.name,
-    dueType,
-    dueDate: values.dueType === 'fixed-date' ? values.dueDate : undefined,
-    dueAfterModuleId: values.dueType === 'module-completion' ? values.moduleRule : undefined,
-    recurringCadence: values.dueType === 'recurring' ? recurringToApi[values.recurringCadence ?? 'Quarterly'] : undefined,
-    requiredForScope: isStageSpecific ? 'stage' : 'all',
-    requiredStageId: isStageSpecific ? values.requiredFor : undefined,
-    active: true,
-  };
-}
 
 function DueRuleFields({
   form,
@@ -203,56 +122,30 @@ function DueRuleFields({
   );
 }
 
-export function RequiredDeliverablesSection({
-  programmeId,
-  programName,
-  modules = [],
-}: {
-  programmeId: string;
-  programName: string;
-  modules?: Module[];
-}) {
-  const queryClient = useQueryClient();
+export function RequiredDeliverablesSection({ programName, modules = [] }: { programName: string; modules?: Module[] }) {
+  const requiredForOptions = [
+    { value: 'All entrepreneurs in this programme', label: 'All entrepreneurs in this programme' },
+    ...stages.map((stage) => ({
+      value: `${stage.label} stage only`,
+      label: `${stage.label} stage only`,
+      description: stage.definition,
+    })),
+  ];
+  const moduleOptions = modules.map((module, index) => ({
+    value: module.title,
+    label: `${index + 1}. ${module.title}`,
+    description: module.description,
+  }));
+  const [rows, setRows] = React.useState<RequiredDeliverable[]>([
+    { id: 'rd1', name: 'Business Model Canvas', due: 'After Business Model Canvas Deep Dive', dueHelper: 'Due when the learner completes the module.', dueType: 'module-completion', moduleRule: 'Business Model Canvas Deep Dive', requiredFor: 'All entrepreneurs', submitted: '14 / 18' },
+    { id: 'rd2', name: 'Financial Statements', due: 'Quarterly', dueHelper: 'A new file is expected each quarter.', dueType: 'recurring', recurringCadence: 'Quarterly', requiredFor: 'All entrepreneurs', submitted: '11 / 18' },
+    { id: 'rd3', name: 'Pitch Deck v2', due: 'Apr 28, 2025', dueHelper: 'One deadline for growth and scale entrepreneurs.', dueType: 'fixed-date', dueDate: '2025-04-28', requiredFor: 'Growth & Scale stage', submitted: '6 / 14' },
+  ]);
   const [addOpen, setAddOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<RequiredDeliverable | null>(null);
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(5);
-
-  const rulesQuery = useQuery({
-    queryKey: ['programme-deliverable-rules', programmeId],
-    queryFn: () => listProgrammeDeliverableRules(programmeId),
-  });
-  const stagesQuery = useQuery({
-    queryKey: ['business-stages', 'active'],
-    queryFn: () => listBusinessStages({ active: true }),
-  });
-
-  const moduleOptions = React.useMemo(
-    () => modules.map((module, index) => ({
-      value: module.id,
-      label: `${index + 1}. ${module.title}`,
-      description: module.description,
-    })),
-    [modules],
-  );
-  const requiredForOptions = React.useMemo(
-    () => [
-      { value: ALL_ENTREPRENEURS, label: 'All entrepreneurs in this programme' },
-      ...(stagesQuery.data ?? []).map((stage: BusinessStageRecord) => ({
-        value: stage.id,
-        label: `${stage.name} stage only`,
-        description: stage.definition,
-      })),
-    ],
-    [stagesQuery.data],
-  );
-
-  const rows = React.useMemo<RequiredDeliverable[]>(
-    () => (rulesQuery.data?.items ?? []).map(mapRuleToRow),
-    [rulesQuery.data],
-  );
-
   const addForm = useForm<RequiredDeliverableForm>({
     resolver: zodResolver(requiredDeliverableSchema),
     defaultValues: {
@@ -262,34 +155,15 @@ export function RequiredDeliverablesSection({
       dueDate: '',
       moduleRule: '',
       recurringCadence: 'Quarterly',
-      requiredFor: ALL_ENTREPRENEURS,
+      requiredFor: 'All entrepreneurs in this programme',
     },
   });
   const editForm = useForm<RequiredDeliverableForm>({
     resolver: zodResolver(requiredDeliverableSchema),
-    defaultValues: { name: '', due: '', dueType: 'fixed-date', dueDate: '', moduleRule: '', recurringCadence: 'Quarterly', requiredFor: ALL_ENTREPRENEURS },
+    defaultValues: { name: '', due: '', dueType: 'fixed-date', dueDate: '', moduleRule: '', recurringCadence: 'Quarterly', requiredFor: '' },
   });
 
-  const invalidateRules = () => queryClient.invalidateQueries({ queryKey: ['programme-deliverable-rules', programmeId] });
-  const createMutation = useMutation({
-    mutationFn: (values: RequiredDeliverableForm) => createProgrammeDeliverableRule(programmeId, toPayload(values) as ReturnType<typeof toPayload> & { dueType: NonNullable<UpsertProgrammeDeliverableRulePayload['dueType']> }),
-    onSuccess: () => {
-      void invalidateRules();
-      toast.success('Deliverable rule added');
-      addForm.reset({ name: '', due: '', dueType: 'fixed-date', dueDate: '', moduleRule: '', recurringCadence: 'Quarterly', requiredFor: ALL_ENTREPRENEURS });
-      setAddOpen(false);
-    },
-  });
-  const updateMutation = useMutation({
-    mutationFn: ({ ruleId, values }: { ruleId: string; values: RequiredDeliverableForm }) => updateProgrammeDeliverableRule(programmeId, ruleId, toPayload(values)),
-    onSuccess: () => {
-      void invalidateRules();
-      toast.success('Deliverable rule updated');
-      setEditTarget(null);
-    },
-  });
-
-  const filteredRows = React.useMemo<RequiredDeliverable[]>(() => {
+  const filteredRows = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((row) =>
@@ -322,12 +196,12 @@ export function RequiredDeliverablesSection({
                 setEditTarget(deliverable);
                 editForm.reset({
                   name: deliverable.name,
-                  due: deliverable.dueType,
+                  due: deliverable.due,
                   dueType: deliverable.dueType,
                   dueDate: deliverable.dueDate ?? '',
                   moduleRule: deliverable.moduleRule ?? '',
                   recurringCadence: deliverable.recurringCadence ?? 'Quarterly',
-                  requiredFor: deliverable.source.requiredForScope === 'stage' ? deliverable.source.requiredStage?.id ?? '' : ALL_ENTREPRENEURS,
+                  requiredFor: deliverable.requiredFor,
                 });
               },
             },
@@ -382,11 +256,7 @@ export function RequiredDeliverablesSection({
             />
           </div>
         </TableToolbar>
-        {rulesQuery.isLoading ? (
-          <TableEmptyState title="Loading deliverable rules" description="Fetching required submissions for this programme." />
-        ) : (
-          <DataTable columns={columns} rows={pageRows} rowKey={(d) => d.id} emptyMessage={rulesQuery.isError ? 'Deliverable rules could not be loaded.' : 'No required deliverables defined yet.'} />
-        )}
+        <DataTable columns={columns} rows={pageRows} rowKey={(d) => d.id} emptyMessage="No required deliverables defined yet." />
         <TablePagination
           page={page}
           pageSize={pageSize}
@@ -401,11 +271,47 @@ export function RequiredDeliverablesSection({
       </div>
 
       <Modal open={addOpen} onOpenChange={setAddOpen} title="Add deliverable type">
-        <form onSubmit={addForm.handleSubmit((values) => createMutation.mutate(values))}>
+        <form
+          onSubmit={addForm.handleSubmit((values) => {
+            setRows((current) => [
+              ...current,
+              {
+                id: `rd-${Date.now()}`,
+                name: values.name,
+                due: dueLabel(values),
+                dueHelper: dueHelper(values),
+                dueType: values.dueType,
+                dueDate: values.dueDate,
+                moduleRule: values.moduleRule,
+                recurringCadence: values.recurringCadence,
+                requiredFor: values.requiredFor.replace('in this programme', '').trim(),
+                submitted: '0 / 0',
+              },
+            ]);
+            toast.success('Deliverable type added');
+            addForm.reset({
+              name: '',
+              due: '',
+              dueType: 'fixed-date',
+              dueDate: '',
+              moduleRule: '',
+              recurringCadence: 'Quarterly',
+              requiredFor: 'All entrepreneurs in this programme',
+            });
+            setAddOpen(false);
+          })}
+        >
           <FormField label="Deliverable name" error={addForm.formState.errors.name?.message}>
-            <FormInput placeholder="e.g. Business Model Canvas, Pitch Deck" {...addForm.register('name')} />
+            <FormInput
+              placeholder="e.g. Business Model Canvas, Pitch Deck"
+              {...addForm.register('name')}
+            />
           </FormField>
-          <DueRuleFields form={addForm} moduleOptions={moduleOptions} errors={addForm.formState.errors} />
+          <DueRuleFields
+            form={addForm}
+            moduleOptions={moduleOptions}
+            errors={addForm.formState.errors}
+          />
           <FormField label="Required for" error={addForm.formState.errors.requiredFor?.message}>
             <FormAutocomplete
               value={addForm.watch('requiredFor')}
@@ -417,25 +323,52 @@ export function RequiredDeliverablesSection({
             />
           </FormField>
           <Notice>
-            Fixed-date rules create due items for existing eligible entrepreneurs. Module-completion rules create due items when each learner completes that module.
+            Once added, entrepreneurs in this programme will see this deliverable in their
+            profile with an upload prompt.
           </Notice>
-          <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+          <Button type="submit" className="w-full">
             Add deliverable
           </Button>
         </form>
       </Modal>
 
-      <Modal open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)} title="Edit deliverable type">
+      <Modal
+        open={!!editTarget}
+        onOpenChange={(open) => !open && setEditTarget(null)}
+        title="Edit deliverable type"
+      >
         <form
           onSubmit={editForm.handleSubmit((values) => {
             if (!editTarget) return;
-            updateMutation.mutate({ ruleId: editTarget.id, values });
+            setRows((current) =>
+              current.map((row) =>
+                row.id === editTarget.id
+                  ? {
+                      ...row,
+                      name: values.name,
+                      due: dueLabel(values),
+                      dueHelper: dueHelper(values),
+                      dueType: values.dueType,
+                      dueDate: values.dueDate,
+                      moduleRule: values.moduleRule,
+                      recurringCadence: values.recurringCadence,
+                      requiredFor: values.requiredFor,
+                    }
+                  : row,
+              ),
+            );
+            setEditTarget(null);
+            toast.success('Deliverable type updated');
           })}
         >
           <FormField label="Deliverable name" error={editForm.formState.errors.name?.message}>
             <FormInput {...editForm.register('name')} />
           </FormField>
-          <DueRuleFields form={editForm} moduleOptions={moduleOptions} errors={editForm.formState.errors} />
+          <DueRuleFields
+            form={editForm}
+            moduleOptions={moduleOptions}
+            errors={editForm.formState.errors}
+          />
           <FormField label="Required for" error={editForm.formState.errors.requiredFor?.message}>
             <FormAutocomplete
               value={editForm.watch('requiredFor')}
@@ -446,7 +379,7 @@ export function RequiredDeliverablesSection({
               emptyMessage="No stage rule found."
             />
           </FormField>
-          <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
+          <Button type="submit" className="w-full">
             Save deliverable
           </Button>
         </form>

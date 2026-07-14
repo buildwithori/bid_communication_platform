@@ -405,7 +405,7 @@ export function ProgrammeWorkspaceView({
           )}
 
           {workspaceTab === 'deliverables' && (
-            <RequiredDeliverablesSection programmeId={program.id} programName={program.name} modules={programModules} />
+            <RequiredDeliverablesSection programName={program.name} modules={programModules} />
           )}
 
           {workspaceTab === 'readiness' && (

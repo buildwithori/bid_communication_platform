@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { notFound, useRouter } from 'next/navigation';
 import {
   CalendarDays,
   ChevronDown,
@@ -27,37 +26,20 @@ import {
   TableToolbar,
 } from '@/components/shared/DataTable';
 import { LearningContentPlayer } from '@/components/entrepreneur/LearningContentPlayer';
-import { listDeliverableInstances, type DeliverableInstance } from '@/lib/api/deliverables';
-import { mapDeliverableInstanceToEntrepreneurDeliverable } from '@/lib/deliverables/entrepreneur';
-import { getLearnerProgress } from '@/lib/api/learning';
-import { getProgramme, type ProgrammeContentItem, type ProgrammeDetail, type ProgrammeLifecycle } from '@/lib/api/programmes';
+import { contentForModule, modulesForProgram, programById } from '@/lib/mock-data/programs';
+import { deliverableGroups } from '@/lib/mock-data';
+import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
+import { moduleWithProgress } from '@/lib/training/progress';
 import { routes } from '@/lib/routes';
-
+import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
+import { getContentTrainer } from '@/lib/content-trainer-access';
 import { cn } from '@/lib/utils';
-import type { BadgeTone, ContentItem, ContentProgress, ContentType, Deliverable, ModuleWithProgress, ProgramAccessType } from '@/types';
+import type { BadgeTone, ContentItem, ContentProgress, ContentType, Deliverable, ModuleWithProgress } from '@/types';
 
 type ModuleFilter = 'all' | ContentType | ContentProgress;
 
-type ProgrammeDisplay = ProgrammeDetail & {
-  accent: 'bid' | 'info' | 'success';
-  progress: number;
-};
-
-type LearningContentItem = ContentItem & {
-  trainerName?: string;
-};
-
-const lifecycleMeta: Record<ProgrammeLifecycle, { label: string; tone: BadgeTone }> = {
-  draft: { label: 'Draft', tone: 'neutral' },
-  scheduled: { label: 'Scheduled', tone: 'blue' },
-  active: { label: 'Active', tone: 'green' },
-  completed: { label: 'Completed', tone: 'neutral' },
-  archived: { label: 'Archived', tone: 'neutral' },
-};
-
-
 interface ModuleSummary extends ModuleWithProgress {
-  items: LearningContentItem[];
+  items: ContentItem[];
   videos: number;
   files: number;
   tools: number;
@@ -75,164 +57,39 @@ const contentMeta: Record<
   tool: { label: 'Tool', icon: Wrench, tone: 'green', iconClass: 'bg-success-light text-success-dark' },
 };
 
-function programmeAccent(id: string, accessType: ProgramAccessType): ProgrammeDisplay['accent'] {
-  if (accessType === 'free') return 'success';
-  const accents: Array<ProgrammeDisplay['accent']> = ['bid', 'info', 'success'];
-  const score = Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return accents[score % accents.length];
-}
-
-function progressStatus(progress: number): ContentProgress {
-  if (progress >= 100) return 'completed';
-  if (progress > 0) return 'in-progress';
-  return 'not-started';
-}
-
-function formatDuration(seconds: number | null) {
-  if (!seconds) return undefined;
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  return `${minutes} min`;
-}
-
-function mapContentItem(
-  item: ProgrammeContentItem,
-  moduleId: string,
-  contentProgressById: Map<string, number>,
-): LearningContentItem {
-  const progressPercent = contentProgressById.get(item.id) ?? 0;
-  return {
-    id: item.id,
-    title: item.title,
-    chapter: `Item ${item.position}`,
-    type: item.type,
-    durationLabel:
-      item.type === 'video'
-        ? formatDuration(item.durationSeconds)
-        : item.type === 'pdf'
-          ? 'Downloadable'
-          : 'Embedded tool',
-    moduleId,
-    trainerId: item.trainer?.id,
-    trainerName: item.trainer?.name,
-    muxPlaybackId: item.video?.playbackId ?? undefined,
-    pdfFileName: item.files[0]?.originalFilename,
-    fileUrl: item.files[0]?.downloadUrl ?? undefined,
-    linkedToolId: item.tool?.toolId ?? undefined,
-    toolUrl: item.tool?.url ?? undefined,
-    progress: progressStatus(progressPercent),
-  };
-}
-
-function buildModuleSummaries(
-  programme: ProgrammeDetail,
-  moduleProgressById: Map<string, number>,
-  contentProgressById: Map<string, number>,
-): ModuleSummary[] {
-  return programme.modules.map((module) => {
-    const moduleItems = module.contentItems.map((item) => mapContentItem(item, module.id, contentProgressById));
-    const fallbackProgress = moduleItems.length === 0
-      ? 0
-      : Math.round((moduleItems.filter((item) => item.progress === 'completed').length / moduleItems.length) * 100);
-    const progress = moduleProgressById.get(module.id) ?? fallbackProgress;
-
-    return {
-      id: module.id,
-      order: module.position,
-      title: module.title,
-      description: module.description,
-      contentItemIds: moduleItems.map((item) => item.id),
-      reuseCount: module.isReusable ? 1 : undefined,
-      status: progressStatus(progress) === 'completed' ? 'completed' : progress > 0 ? 'in-progress' : 'not-started',
-      progress,
-      items: moduleItems,
-      videos: moduleItems.filter((item) => item.type === 'video').length,
-      files: moduleItems.filter((item) => item.type === 'pdf').length,
-      tools: moduleItems.filter((item) => item.type === 'tool').length,
-      searchText: [
-        module.title,
-        module.description ?? '',
-        ...moduleItems.map((item) => `${item.title} ${item.type} ${item.chapter} ${item.durationLabel ?? ''}`),
-      ].join(' '),
-    };
-  });
-}
-
-async function fetchProgrammeDeliverableInstances(programmeId: string) {
-  const firstPage = await listDeliverableInstances({ programmeId, take: 50 });
-  const items: DeliverableInstance[] = [...firstPage.items];
-  let cursor = firstPage.nextCursor;
-
-  while (cursor) {
-    const nextPage = await listDeliverableInstances({ programmeId, take: 50, cursor });
-    items.push(...nextPage.items);
-    cursor = nextPage.nextCursor;
-  }
-
-  return items;
-}
-
 export default function ProgrammeModulesPage({
   params,
 }: {
   params: { programmeId: string };
 }) {
   const router = useRouter();
-  const programmeQuery = useQuery({
-    queryKey: ['programmes', 'entrepreneur-detail', params.programmeId],
-    queryFn: () => getProgramme(params.programmeId),
-  });
-  const progressQuery = useQuery({
-    queryKey: ['learning-progress', 'programme', params.programmeId],
-    queryFn: () => getLearnerProgress({ programmeId: params.programmeId }),
-  });
-  const deliverablesQuery = useQuery({
-    queryKey: ['deliverable-instances', 'entrepreneur', params.programmeId, 'training-detail'],
-    queryFn: () => fetchProgrammeDeliverableInstances(params.programmeId),
-  });
-
-  const moduleProgressById = React.useMemo<Map<string, number>>(() => {
-    return new Map(
-      ((progressQuery.data?.modules ?? []) as Array<{ moduleId: string; progressPercent: number }>).map((progress) => [
-        progress.moduleId,
-        progress.progressPercent,
-      ]),
-    );
-  }, [progressQuery.data?.modules]);
-
-  const contentProgressById = React.useMemo<Map<string, number>>(() => {
-    return new Map(
-      ((progressQuery.data?.content ?? []) as Array<{ contentItemId: string; progressPercent: number }>).map((progress) => [
-        progress.contentItemId,
-        progress.progressPercent,
-      ]),
-    );
-  }, [progressQuery.data?.content]);
-
-  const programmeProgress = React.useMemo(() => {
-    return ((progressQuery.data?.programmes ?? []) as Array<{ programmeId: string; progressPercent: number }>)
-      .find((progress) => progress.programmeId === params.programmeId)?.progressPercent ?? 0;
-  }, [params.programmeId, progressQuery.data?.programmes]);
-
-  const program = React.useMemo<ProgrammeDisplay | null>(() => {
-    const programme = programmeQuery.data;
-    if (!programme) return null;
-    return {
-      ...programme,
-      accent: programmeAccent(programme.id, programme.accessType),
-      progress: programmeProgress,
-    };
-  }, [programmeProgress, programmeQuery.data]);
+  const { deliverables } = useEntrepreneurStore();
+  const program = programById(params.programmeId);
+  if (!program) return notFound();
 
   const moduleSummaries = React.useMemo<ModuleSummary[]>(() => {
-    if (!program) return [];
-    return buildModuleSummaries(program, moduleProgressById, contentProgressById);
-  }, [contentProgressById, moduleProgressById, program]);
+    return modulesForProgram(program.id).map((module) => {
+      const moduleItems = contentForModule(module.id);
+      return {
+        ...moduleWithProgress(module),
+        items: moduleItems,
+        videos: moduleItems.filter((item) => item.type === 'video').length,
+        files: moduleItems.filter((item) => item.type === 'pdf').length,
+        tools: moduleItems.filter((item) => item.type === 'tool').length,
+        searchText: [
+          module.title,
+          module.description ?? '',
+          ...moduleItems.map((item) => `${item.title} ${item.type} ${item.chapter} ${item.durationLabel ?? ''}`),
+        ].join(' '),
+      };
+    });
+  }, [program.id]);
 
-  const programmeDeliverables = React.useMemo<Deliverable[]>(
-    () => (deliverablesQuery.data ?? []).map(mapDeliverableInstanceToEntrepreneurDeliverable),
-    [deliverablesQuery.data],
+  const programmeDeliverables = React.useMemo(
+    () => deliverables.filter((deliverable) => deliverable.programmeId === program.id),
+    [deliverables, program.id],
   );
-  const contentPlaylist = React.useMemo<LearningContentItem[]>(
+  const contentPlaylist = React.useMemo(
     () => moduleSummaries.flatMap((module) => module.items),
     [moduleSummaries],
   );
@@ -243,17 +100,16 @@ export default function ProgrammeModulesPage({
     moduleSummaries.find((module) => module.status !== 'completed') ?? moduleSummaries[0];
   const nextContent =
     contentPlaylist.find((item) => item.progress !== 'completed') ?? contentPlaylist[0] ?? null;
+  const deliverableGroup = deliverableGroups.find((group) => group.programmeId === program.id);
+
   const [query, setQuery] = React.useState('');
   const [filter, setFilter] = React.useState<ModuleFilter>(ALL);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(5);
-  const [expandedModuleIds, setExpandedModuleIds] = React.useState<string[]>([]);
-  const [activeContent, setActiveContent] = React.useState<LearningContentItem | null>(null);
-
-  React.useEffect(() => {
-    if (!nextModule) return;
-    setExpandedModuleIds((current) => current.length > 0 ? current : [nextModule.id]);
-  }, [nextModule]);
+  const [expandedModuleIds, setExpandedModuleIds] = React.useState<string[]>(() =>
+    nextModule ? [nextModule.id] : [],
+  );
+  const [activeContent, setActiveContent] = React.useState<ContentItem | null>(null);
 
   const filteredModules = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -293,33 +149,7 @@ export default function ProgrammeModulesPage({
     toggleModule(module.id);
   }
 
-  if (programmeQuery.isLoading) {
-    return (
-      <Card padding="lg">
-        <div className="grid min-h-[320px] place-items-center text-sm text-ink-muted">
-          Loading programme...
-        </div>
-      </Card>
-    );
-  }
-
-  if (programmeQuery.isError || !program) {
-    return (
-      <Card padding="lg">
-        <div className="grid min-h-[320px] place-items-center p-6 text-center">
-          <div>
-            <div className="text-lg font-semibold text-ink">Programme could not be loaded</div>
-            <p className="mt-2 text-sm text-ink-muted">You may not have access to this programme, or it may no longer be available.</p>
-            <Button type="button" variant="outline" className="mt-4" onClick={() => router.push(routes.entrepreneur.training)}>
-              Back to training library
-            </Button>
-          </div>
-        </div>
-      </Card>
-    );
-  }
-
-  const lifecycle = lifecycleMeta[program.lifecycle];
+  const status = getProgrammeStatus(program);
   const progress = program.progress;
 
   return (
@@ -347,7 +177,7 @@ export default function ProgrammeModulesPage({
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={lifecycle.tone}>{lifecycle.label}</Badge>
+              <Badge tone={getProgrammeStatusTone(status)}>{getProgrammeStatusLabel(status)}</Badge>
               <Badge tone={program.accessType === 'free' ? 'blue' : 'brand'}>
                 {program.accessType === 'free' ? 'Free programme' : 'Programme access'}
               </Badge>
@@ -478,7 +308,7 @@ export default function ProgrammeModulesPage({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => router.push(routes.entrepreneur.deliverableGroup(params.programmeId))}
+                  onClick={() => router.push(deliverableGroup ? routes.entrepreneur.deliverableGroup(deliverableGroup.id) : routes.entrepreneur.deliverables)}
                 >
                   View all
                 </Button>
@@ -490,7 +320,7 @@ export default function ProgrammeModulesPage({
                   <button
                     key={deliverable.id}
                     type="button"
-                    onClick={() => router.push(routes.entrepreneur.deliverableGroup(params.programmeId))}
+                    onClick={() => router.push(deliverableGroup ? routes.entrepreneur.deliverableGroup(deliverableGroup.id) : routes.entrepreneur.deliverables)}
                     className="w-full rounded-xl border border-line bg-white p-3 text-left transition hover:bg-surface-subtle"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -507,11 +337,7 @@ export default function ProgrammeModulesPage({
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-line-strong bg-surface-subtle px-4 py-8 text-center text-sm text-ink-muted">
-                {deliverablesQuery.isLoading
-                  ? 'Loading programme deliverables...'
-                  : deliverablesQuery.isError
-                    ? 'Programme deliverables could not be loaded.'
-                    : 'No deliverables are required for this programme yet.'}
+                No deliverables are required for this programme yet.
               </div>
             )}
           </Card>
@@ -535,7 +361,6 @@ export default function ProgrammeModulesPage({
 
       <LearningContentPlayer
         item={activeContent}
-        programmeId={program.id}
         playlist={contentPlaylist}
         onChangeItem={setActiveContent}
         onClose={() => setActiveContent(null)}
@@ -629,13 +454,13 @@ function ContentRow({
   index,
   onOpen,
 }: {
-  item: LearningContentItem;
+  item: ContentItem;
   index: number;
   onOpen: () => void;
 }) {
   const meta = contentMeta[item.type];
   const Icon = meta.icon;
-  const trainerName = item.trainerName;
+  const trainer = getContentTrainer(item.id);
 
   return (
     <button
@@ -658,7 +483,7 @@ function ContentRow({
         <span className="mt-1 block text-sm text-ink-muted">
           {item.chapter}
           {item.durationLabel ? ` · ${item.durationLabel}` : ''}
-          {trainerName ? ` · ${trainerName}` : ''}
+          {trainer ? ` · ${trainer.fullName}` : ''}
         </span>
       </span>
       <span className="hidden shrink-0 text-sm font-medium text-bid sm:block">Open</span>

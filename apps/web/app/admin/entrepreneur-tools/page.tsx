@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { CalendarDays, ExternalLink, FileText, Globe2, LayoutGrid, Plus, Star, Timer, Upload, Wrench } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
 import { MetricGrid } from '@/components/shared/MetricGrid';
@@ -23,6 +22,9 @@ import {
   type Column,
   type RowAction,
 } from '@/components/shared/DataTable';
+import { tools as seedTools } from '@/lib/mock-data';
+import { programs } from '@/lib/mock-data/programs';
+import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
 import { sectorById, stageById } from '@/lib/mock-data/definitions';
 import {
   describeToolAudience,
@@ -31,14 +33,9 @@ import {
   toolStatusLabels,
   toolVisibilityLabels,
 } from '@/lib/tool-access';
-import { listEntrepreneurs, type EntrepreneurRecord } from '@/lib/api/entrepreneurs';
-import { createTool as createToolRecord, listTools, updateTool as updateToolRecord } from '@/lib/api/tools';
-import { createDirectUpload } from '@/lib/api/files';
-import { listProgrammes, type ProgrammeListItem } from '@/lib/api/programmes';
-import { listToolAreas, type LookupRecord } from '@/lib/api/settings';
-import { buildToolPayloadFromUi, mapToolRecordToUi } from '@/lib/tools/tool-records';
+import { toolAreaOptions } from '@/lib/tool-areas';
 import { cn } from '@/lib/utils';
-import type { BadgeTone, Country, Entrepreneur, Program, Tool, ToolStatus, ToolType, ToolVisibility } from '@/types';
+import type { BadgeTone, Entrepreneur, Program, Tool, ToolStatus, ToolType, ToolVisibility } from '@/types';
 
 const iconOptions: Array<{ value: Tool['iconKey']; label: string }> = [
   { value: 'canvas', label: 'Canvas' },
@@ -83,14 +80,6 @@ const typeTone: Record<ToolType, BadgeTone> = {
   embed: 'green',
 };
 
-const TOOLS_QUERY_KEY = ['admin', 'entrepreneur-tools'];
-const TOOL_AREAS_QUERY_KEY = ['settings', 'tool-areas'];
-const PROGRAMMES_QUERY_KEY = ['programmes', 'admin-tool-audience'];
-const ENTREPRENEURS_QUERY_KEY = ['entrepreneurs', 'admin-tool-audience'];
-
-type AudienceProgramme = Pick<Program, 'id' | 'name' | 'description' | 'accessType'>;
-type AudienceEntrepreneur = Pick<Entrepreneur, 'id' | 'businessName' | 'representative' | 'email' | 'country' | 'sector' | 'stage'>;
-
 const iconMap = {
   canvas: LayoutGrid,
   document: FileText,
@@ -118,50 +107,16 @@ function toolAreaLabel(tool: Tool) {
   return tool.toolArea || 'No tool area';
 }
 
-function toAudienceProgramme(programme: ProgrammeListItem | Program): AudienceProgramme {
+function normaliseTool(tool: Tool): Tool {
   return {
-    id: programme.id,
-    name: programme.name,
-    description: programme.description,
-    accessType: programme.accessType,
+    ...tool,
+    status: getToolStatus(tool),
+    visibility: getToolVisibility(tool),
   };
 }
 
-function toAudienceEntrepreneur(entrepreneur: EntrepreneurRecord | Entrepreneur): AudienceEntrepreneur {
-  if ('entrepreneurUserId' in entrepreneur) {
-    return {
-      id: entrepreneur.entrepreneurUserId,
-      businessName: entrepreneur.businessName,
-      representative: entrepreneur.representativeName,
-      email: entrepreneur.email,
-      country: entrepreneur.country as Country,
-      sector: (entrepreneur.sector?.key ?? 'fintech') as Entrepreneur['sector'],
-      stage: entrepreneur.stage?.key ?? 'idea',
-    };
-  }
-
-  return entrepreneur;
-}
-
 export default function AdminEntrepreneurToolsPage() {
-  const queryClient = useQueryClient();
-  const toolsQuery = useQuery({
-    queryKey: TOOLS_QUERY_KEY,
-    queryFn: () => listTools({ take: 50 }),
-  });
-  const toolAreasQuery = useQuery({
-    queryKey: TOOL_AREAS_QUERY_KEY,
-    queryFn: () => listToolAreas({ active: true }),
-  });
-  const programmesQuery = useQuery({
-    queryKey: PROGRAMMES_QUERY_KEY,
-    queryFn: () => listProgrammes({ take: 50 }),
-  });
-  const entrepreneursQuery = useQuery({
-    queryKey: ENTREPRENEURS_QUERY_KEY,
-    queryFn: () => listEntrepreneurs({ take: 50 }),
-  });
-
+  const [toolRows, setToolRows] = React.useState<Tool[]>(() => seedTools.map(normaliseTool));
   const [query, setQuery] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState<'all' | ToolType>('all');
   const [toolAreaFilter, setToolAreaFilter] = React.useState('all');
@@ -173,72 +128,22 @@ export default function AdminEntrepreneurToolsPage() {
   const [editingTool, setEditingTool] = React.useState<Tool | null>(null);
   const [editorOpen, setEditorOpen] = React.useState(false);
 
-  const toolRows = React.useMemo<Tool[]>(
-    () => toolsQuery.data?.items.map(mapToolRecordToUi) ?? [],
-    [toolsQuery.data?.items],
-  );
-
-  const toolAreaOptions = React.useMemo<Array<{ value: string; label: string }>>(
-    () => (toolAreasQuery.data ?? []).map((area: LookupRecord) => ({ value: area.id, label: area.name })),
-    [toolAreasQuery.data],
-  );
-
-  const toolAreaLabelById = React.useMemo<Map<string, string>>(
-    () => new Map((toolAreasQuery.data ?? []).map((area: LookupRecord) => [area.id, area.name] as const)),
-    [toolAreasQuery.data],
-  );
-
-  const audienceProgrammes = React.useMemo<AudienceProgramme[]>(
-    () => (programmesQuery.data?.items ?? []).map(toAudienceProgramme),
-    [programmesQuery.data?.items],
-  );
-
-  const audienceEntrepreneurs = React.useMemo<AudienceEntrepreneur[]>(
-    () => (entrepreneursQuery.data?.items ?? []).map(toAudienceEntrepreneur),
-    [entrepreneursQuery.data?.items],
-  );
-
-  const saveMutation = useMutation({
-    mutationFn: async (tool: Tool) => {
-      const payload = buildToolPayloadFromUi(tool, tool.toolAreaId ?? '', {
-        pdfAssetId: tool.pdfAssetId ?? null,
-        hiddenEntrepreneurUserIds: tool.hiddenEntrepreneurIds ?? [],
-      });
-      const exists = toolRows.some((item) => item.id === tool.id);
-      return exists ? updateToolRecord(tool.id, payload) : createToolRecord(payload as Parameters<typeof createToolRecord>[0]);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: TOOLS_QUERY_KEY });
-    },
-  });
-
-  const patchMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<Tool> }) => updateToolRecord(id, {
-      status: patch.status,
-    }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: TOOLS_QUERY_KEY });
-    },
-  });
-
-  const saveTool = async (tool: Tool) => {
-    try {
-      await saveMutation.mutateAsync(tool);
-      toast.success(getToolStatus(tool) === 'published' ? 'Tool saved and published' : 'Tool saved');
-      return true;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Tool could not be saved.');
-      return false;
-    }
+  const saveTool = (tool: Tool) => {
+    setToolRows((current) => {
+      const exists = current.some((item) => item.id === tool.id);
+      if (exists) return current.map((item) => (item.id === tool.id ? tool : item));
+      return [tool, ...current];
+    });
+    toast.success(getToolStatus(tool) === 'published' ? 'Tool saved and published' : 'Tool saved');
   };
 
-  const updateTool = async (id: string, patch: Partial<Tool>, message: string) => {
-    try {
-      await patchMutation.mutateAsync({ id, patch });
-      toast.success(message);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Tool could not be updated.');
-    }
+  const updateTool = (id: string, patch: Partial<Tool>, message: string) => {
+    setToolRows((current) =>
+      current.map((tool) =>
+        tool.id === id ? { ...tool, ...patch, updatedAt: new Date().toISOString() } : tool,
+      ),
+    );
+    toast.success(message);
   };
 
   const openCreate = () => {
@@ -254,7 +159,7 @@ export default function AdminEntrepreneurToolsPage() {
   const filteredTools = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return toolRows.filter((tool) => {
-      const audience = describeToolAudience(tool, audienceProgrammes, audienceEntrepreneurs);
+      const audience = describeToolAudience(tool, programs, entrepreneurs);
       const matchesQuery =
         !needle ||
         [tool.name, tool.description, tool.type, toolAreaLabel(tool), sourceLabel(tool), audience.label, audience.detail]
@@ -262,12 +167,12 @@ export default function AdminEntrepreneurToolsPage() {
           .toLowerCase()
           .includes(needle);
       const matchesType = typeFilter === 'all' || tool.type === typeFilter;
-      const matchesToolArea = toolAreaFilter === 'all' || tool.toolAreaId === toolAreaFilter;
+      const matchesToolArea = toolAreaFilter === 'all' || tool.toolArea === toolAreaFilter;
       const matchesStatus = statusFilter === 'all' || getToolStatus(tool) === statusFilter;
       const matchesVisibility = visibilityFilter === 'all' || getToolVisibility(tool) === visibilityFilter;
       return matchesQuery && matchesType && matchesToolArea && matchesStatus && matchesVisibility;
     });
-  }, [audienceEntrepreneurs, audienceProgrammes, query, statusFilter, toolAreaFilter, toolRows, typeFilter, visibilityFilter]);
+  }, [query, statusFilter, toolAreaFilter, toolRows, typeFilter, visibilityFilter]);
 
   React.useEffect(() => {
     setPage(1);
@@ -292,7 +197,7 @@ export default function AdminEntrepreneurToolsPage() {
       {
         label: status === 'published' ? 'Move to draft' : 'Publish tool',
         onSelect: () =>
-          void updateTool(
+          updateTool(
             tool.id,
             { status: status === 'published' ? 'draft' : 'published' },
             status === 'published' ? 'Tool moved to draft' : 'Tool published',
@@ -302,7 +207,7 @@ export default function AdminEntrepreneurToolsPage() {
         label: status === 'archived' ? 'Restore as draft' : 'Archive tool',
         destructive: status !== 'archived',
         onSelect: () =>
-          void updateTool(
+          updateTool(
             tool.id,
             { status: status === 'archived' ? 'draft' : 'archived' },
             status === 'archived' ? 'Tool restored as draft' : 'Tool archived',
@@ -354,7 +259,7 @@ export default function AdminEntrepreneurToolsPage() {
       key: 'audience',
       header: 'Who can see it',
       cell: (tool) => {
-        const audience = describeToolAudience(tool, audienceProgrammes, audienceEntrepreneurs);
+        const audience = describeToolAudience(tool, programs, entrepreneurs);
         const visibility = getToolVisibility(tool);
         return (
           <div className="min-w-[240px] max-w-[360px]">
@@ -440,24 +345,13 @@ export default function AdminEntrepreneurToolsPage() {
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        {toolsQuery.isError && (
-          <div className="mb-3 rounded-xl border border-danger/15 bg-danger/10 px-4 py-3 text-sm text-danger">
-            Tools could not be loaded. Please refresh the page and try again.
-          </div>
-        )}
-        {toolsQuery.isLoading ? (
-          <div className="grid min-h-[220px] place-items-center rounded-xl border border-line bg-surface-subtle text-sm text-ink-muted">
-            Loading tools...
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={pageRows}
-            rowKey={(tool) => tool.id}
-            emptyMessage={toolsQuery.isError ? 'Tools could not be loaded.' : 'No tools match this view.'}
-            tableClassName="min-w-[1080px]"
-          />
-        )}
+        <DataTable
+          columns={columns}
+          rows={pageRows}
+          rowKey={(tool) => tool.id}
+          emptyMessage="No tools match this view."
+          tableClassName="min-w-[1080px]"
+        />
         <TablePagination
           page={page}
           pageSize={pageSize}
@@ -476,16 +370,10 @@ export default function AdminEntrepreneurToolsPage() {
         tool={editingTool}
         onOpenChange={setEditorOpen}
         onSave={saveTool}
-        toolAreaOptions={toolAreaOptions}
-        toolAreaLabelById={toolAreaLabelById}
-        programmes={audienceProgrammes}
-        entrepreneurs={audienceEntrepreneurs}
       />
       <ToolDetailsModal
         tool={activeTool}
         onClose={() => setActiveTool(null)}
-        programmes={audienceProgrammes}
-        entrepreneurs={audienceEntrepreneurs}
         onEdit={(tool) => {
           setActiveTool(null);
           openEdit(tool);
@@ -503,7 +391,6 @@ type ToolDraft = {
   status: ToolStatus;
   visibility: ToolVisibility;
   iconKey: Tool['iconKey'];
-  pdfAssetId: string;
   pdfFileName: string;
   embedUrl: string;
 };
@@ -513,23 +400,14 @@ function ToolEditorModal({
   tool,
   onOpenChange,
   onSave,
-  toolAreaOptions,
-  toolAreaLabelById,
-  programmes,
-  entrepreneurs,
 }: {
   open: boolean;
   tool: Tool | null;
   onOpenChange: (open: boolean) => void;
-  onSave: (tool: Tool) => Promise<boolean> | boolean;
-  toolAreaOptions: Array<{ value: string; label: string }>;
-  toolAreaLabelById: Map<string, string>;
-  programmes: AudienceProgramme[];
-  entrepreneurs: AudienceEntrepreneur[];
+  onSave: (tool: Tool) => void;
 }) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [draft, setDraft] = React.useState<ToolDraft>(() => emptyDraft());
-  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [selectedProgrammeIds, setSelectedProgrammeIds] = React.useState<string[]>([]);
   const [selectedEntrepreneurIds, setSelectedEntrepreneurIds] = React.useState<string[]>([]);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -537,7 +415,6 @@ function ToolEditorModal({
   React.useEffect(() => {
     if (!open) return;
     setDraft(toolToDraft(tool));
-    setPdfFile(null);
     setSelectedProgrammeIds(tool?.programmeIds ?? []);
     setSelectedEntrepreneurIds(tool?.entrepreneurIds ?? []);
     setErrors({});
@@ -563,7 +440,7 @@ function ToolEditorModal({
     if (!draft.name.trim()) next.name = 'Tool name is required.';
     if (!draft.description.trim()) next.description = 'Description is required.';
     if (!draft.toolArea.trim()) next.toolArea = 'Select a tool area.';
-    if (draft.type === 'pdf' && draft.status === 'published' && !draft.pdfAssetId && !pdfFile) next.pdfFileName = 'Attach a PDF before publishing.';
+    if (draft.type === 'pdf' && !draft.pdfFileName.trim() && !tool?.pdfUrl) next.pdfFileName = 'Upload or select a PDF resource.';
     if (draft.type === 'embed') {
       if (!draft.embedUrl.trim()) next.embedUrl = 'Add the online tool link.';
       else {
@@ -576,63 +453,28 @@ function ToolEditorModal({
     return Object.keys(next).length === 0;
   };
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validate()) return;
     const isPdf = draft.type === 'pdf';
-    let nextPdfAssetId = isPdf ? draft.pdfAssetId : '';
-    let nextPdfFileName = isPdf ? draft.pdfFileName.trim() : '';
-
-    if (isPdf && pdfFile) {
-      if (pdfFile.type !== 'application/pdf') {
-        setErrors((current) => ({ ...current, pdfFileName: 'Choose a PDF file.' }));
-        return;
-      }
-      if (pdfFile.size > 250 * 1024 * 1024) {
-        setErrors((current) => ({ ...current, pdfFileName: 'PDF must be 250 MB or smaller.' }));
-        return;
-      }
-
-      const directUpload = await createDirectUpload({
-        originalFilename: pdfFile.name,
-        mimeType: pdfFile.type,
-        sizeBytes: pdfFile.size,
-        usage: 'tool_pdf',
-      });
-
-      if (directUpload.upload.provider === 'digitalocean_spaces') {
-        const uploadResponse = await fetch(directUpload.upload.url, {
-          method: directUpload.upload.method,
-          headers: directUpload.upload.headers,
-          body: pdfFile,
-        });
-        if (!uploadResponse.ok) throw new Error('PDF upload failed. Please try again.');
-      }
-
-      nextPdfAssetId = directUpload.file.id;
-      nextPdfFileName = directUpload.file.originalFilename;
-    }
-
     const saved: Tool = {
       id: tool?.id ?? `tool-${Date.now()}`,
       name: draft.name.trim(),
       description: draft.description.trim(),
       type: draft.type,
-      toolArea: toolAreaLabelById.get(draft.toolArea) ?? tool?.toolArea ?? '',
-      toolAreaId: draft.toolArea,
+      toolArea: draft.toolArea,
       status: draft.status,
       visibility: draft.visibility,
       programmeIds: draft.visibility === 'programmes' ? selectedProgrammeIds : [],
       entrepreneurIds: draft.visibility === 'entrepreneurs' ? selectedEntrepreneurIds : [],
-      pdfAssetId: isPdf ? nextPdfAssetId : undefined,
-      pdfFileName: isPdf ? nextPdfFileName : undefined,
-      pdfUrl: isPdf ? tool?.pdfUrl : undefined,
+      pdfFileName: isPdf ? draft.pdfFileName.trim() || tool?.pdfFileName : undefined,
+      pdfUrl: isPdf ? tool?.pdfUrl ?? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' : undefined,
       embedUrl: isPdf ? undefined : draft.embedUrl.trim(),
       updatedAt: new Date().toISOString(),
       iconKey: draft.iconKey,
     };
-    const savedOk = await onSave(saved);
-    if (savedOk) onOpenChange(false);
+    onSave(saved);
+    onOpenChange(false);
   };
 
   return (
@@ -685,11 +527,7 @@ function ToolEditorModal({
                   className="hidden"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) {
-                      setPdfFile(file);
-                      setField('pdfFileName', file.name);
-                      setField('pdfAssetId', '');
-                    }
+                    if (file) setField('pdfFileName', file.name);
                   }}
                 />
                 <button
@@ -741,8 +579,6 @@ function ToolEditorModal({
               }
               setErrors((current) => ({ ...current, audience: '' }));
             }}
-            programmes={programmes}
-            entrepreneurs={entrepreneurs}
             onClear={() => {
               if (draft.visibility === 'programmes') {
                 setSelectedProgrammeIds([]);
@@ -771,7 +607,6 @@ function emptyDraft(): ToolDraft {
     status: 'draft',
     visibility: 'all-entrepreneurs',
     iconKey: 'document',
-    pdfAssetId: '',
     pdfFileName: '',
     embedUrl: '',
   };
@@ -783,11 +618,10 @@ function toolToDraft(tool: Tool | null): ToolDraft {
     name: tool.name,
     description: tool.description,
     type: tool.type,
-    toolArea: tool.toolAreaId ?? '',
+    toolArea: tool.toolArea ?? '',
     status: getToolStatus(tool),
     visibility: getToolVisibility(tool),
     iconKey: tool.iconKey,
-    pdfAssetId: tool.pdfAssetId ?? '',
     pdfFileName: tool.pdfFileName ?? '',
     embedUrl: tool.embedUrl ?? '',
   };
@@ -797,8 +631,6 @@ function AudienceSelector({
   mode,
   selectedIds,
   error,
-  programmes,
-  entrepreneurs,
   onToggle,
   onSelectMany,
   onClear,
@@ -806,8 +638,6 @@ function AudienceSelector({
   mode: 'programmes' | 'entrepreneurs';
   selectedIds: string[];
   error?: string;
-  programmes: AudienceProgramme[];
-  entrepreneurs: AudienceEntrepreneur[];
   onToggle: (id: string) => void;
   onSelectMany: (ids: string[]) => void;
   onClear: () => void;
@@ -823,7 +653,7 @@ function AudienceSelector({
   const filteredRows = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (isProgrammes) {
-      return programmes.filter((program) => {
+      return programs.filter((program) => {
         const matchesQuery = !needle || [program.name, program.description ?? '', program.accessType]
           .join(' ')
           .toLowerCase()
@@ -851,7 +681,7 @@ function AudienceSelector({
       const matchesStage = stageFilter === 'all' || entrepreneur.stage === stageFilter;
       return matchesQuery && matchesCountry && matchesStage;
     });
-  }, [countryFilter, entrepreneurs, isProgrammes, programmeAccessFilter, programmes, query, stageFilter]);
+  }, [countryFilter, isProgrammes, programmeAccessFilter, query, stageFilter]);
 
   React.useEffect(() => {
     setPage(1);
@@ -867,16 +697,16 @@ function AudienceSelector({
   const allPageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
 
   const selectedRows = React.useMemo(() => {
-    const source = isProgrammes ? programmes : entrepreneurs;
+    const source = isProgrammes ? programs : entrepreneurs;
     return selectedIds
       .map((id) => source.find((row) => row.id === id))
-      .filter(Boolean) as Array<AudienceProgramme | AudienceEntrepreneur>;
-  }, [entrepreneurs, isProgrammes, programmes, selectedIds]);
+      .filter(Boolean) as Array<Program | Entrepreneur>;
+  }, [isProgrammes, selectedIds]);
 
   const countryOptions = React.useMemo(() => {
     const values = Array.from(new Set(entrepreneurs.map((entrepreneur) => entrepreneur.country))).sort();
     return [{ value: 'all', label: 'All countries' }, ...values.map((value) => ({ value, label: value }))];
-  }, [entrepreneurs]);
+  }, []);
 
   const stageOptions = React.useMemo(() => {
     const values = Array.from(new Set(entrepreneurs.map((entrepreneur) => entrepreneur.stage))).sort();
@@ -884,7 +714,7 @@ function AudienceSelector({
       { value: 'all', label: 'All stages' },
       ...values.map((value) => ({ value, label: stageById[value]?.label ?? value })),
     ];
-  }, [entrepreneurs]);
+  }, []);
 
   const handleSelectPage = () => {
     if (allPageSelected) {
@@ -990,8 +820,8 @@ function AudienceSelector({
             <tbody>
               {pageRows.map((row) => {
                 const selected = selectedIds.includes(row.id);
-                const program = isProgrammes ? row as AudienceProgramme : null;
-                const entrepreneur = !isProgrammes ? row as AudienceEntrepreneur : null;
+                const program = isProgrammes ? row as Program : null;
+                const entrepreneur = !isProgrammes ? row as Entrepreneur : null;
                 return (
                   <tr key={row.id} className="transition-colors hover:bg-surface-subtle/60">
                     <td className="border-b border-line/80 px-4 py-3">
@@ -1059,8 +889,8 @@ function AudienceSelector({
           <div className="mb-2 text-sm font-medium text-ink">Selected {isProgrammes ? 'programmes' : 'businesses'}</div>
           <div className="flex max-h-[92px] flex-wrap gap-1.5 overflow-y-auto pr-1">
             {selectedRows.map((row) => (
-              <Badge key={row.id} tone="brand" className="max-w-[220px] truncate" title={isProgrammes ? (row as AudienceProgramme).name : (row as AudienceEntrepreneur).businessName}>
-                {isProgrammes ? (row as AudienceProgramme).name : (row as AudienceEntrepreneur).businessName}
+              <Badge key={row.id} tone="brand" className="max-w-[220px] truncate" title={isProgrammes ? (row as Program).name : (row as Entrepreneur).businessName}>
+                {isProgrammes ? (row as Program).name : (row as Entrepreneur).businessName}
               </Badge>
             ))}
           </div>
@@ -1074,17 +904,13 @@ function ToolDetailsModal({
   tool,
   onClose,
   onEdit,
-  programmes,
-  entrepreneurs,
 }: {
   tool: Tool | null;
   onClose: () => void;
   onEdit: (tool: Tool) => void;
-  programmes: AudienceProgramme[];
-  entrepreneurs: AudienceEntrepreneur[];
 }) {
   if (!tool) return null;
-  const audience = describeToolAudience(tool, programmes, entrepreneurs);
+  const audience = describeToolAudience(tool, programs, entrepreneurs);
   const previewUrl = tool.type === 'pdf' ? tool.pdfUrl : tool.embedUrl;
 
   return (

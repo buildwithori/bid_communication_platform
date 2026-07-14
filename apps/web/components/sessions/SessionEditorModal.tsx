@@ -58,8 +58,6 @@ export type SessionEditorValues = {
   reason?: string;
 };
 
-type SessionOption = { value: string; label: string; description?: string };
-
 type SessionEditorModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -68,10 +66,7 @@ type SessionEditorModalProps = {
   initialSession?: AdminSession | null;
   defaultTrainerId?: string;
   defaultTrainerName?: string;
-  entrepreneurOptions?: SessionOption[];
-  trainerOptions?: SessionOption[];
-  isSubmitting?: boolean;
-  onSubmit: (values: SessionEditorValues) => Promise<void> | void;
+  onSubmit: (values: SessionEditorValues) => void;
 };
 
 function addMinutes(time: string, minutes: number) {
@@ -103,25 +98,11 @@ export function SessionEditorModal({
   initialSession,
   defaultTrainerId,
   defaultTrainerName,
-  entrepreneurOptions,
-  trainerOptions,
-  isSubmitting = false,
   onSubmit,
 }: SessionEditorModalProps) {
-  const resolvedEntrepreneurOptions = entrepreneurOptions?.length
-    ? entrepreneurOptions
-    : entrepreneurs.map((entrepreneur) => ({
-        value: entrepreneur.id,
-        label: entrepreneur.businessName,
-        description: entrepreneur.representative,
-      }));
-  const resolvedTrainerOptions = trainerOptions?.length
-    ? trainerOptions
-    : trainers.map((trainer) => ({ value: trainer.id, label: trainer.fullName, description: trainer.role }));
-  const defaultEntrepreneurId = resolvedEntrepreneurOptions[0]?.value ?? '';
-  const defaultOwnerId = defaultTrainerId ?? resolvedTrainerOptions[0]?.value ?? '';
-  const [entrepreneurId, setEntrepreneurId] = React.useState(defaultEntrepreneurId);
-  const [trainerId, setTrainerId] = React.useState(defaultOwnerId);
+  const defaultEntrepreneur = entrepreneurs[0];
+  const [entrepreneurId, setEntrepreneurId] = React.useState(defaultEntrepreneur.id);
+  const [trainerId, setTrainerId] = React.useState(defaultTrainerId ?? trainers[0]?.id ?? '');
   const [sessionType, setSessionType] = React.useState<AdminSession['sessionType']>('Mentoring');
   const [topic, setTopic] = React.useState('');
   const [date, setDate] = React.useState('2026-07-20');
@@ -134,8 +115,9 @@ export function SessionEditorModal({
   React.useEffect(() => {
     if (!open) return;
 
-    setEntrepreneurId(initialSession?.entrepreneurId ?? defaultEntrepreneurId);
-    setTrainerId(initialSession?.trainerId ?? defaultOwnerId);
+    const trainerName = defaultTrainerName ?? trainers.find((trainer) => trainer.id === defaultTrainerId)?.fullName;
+    setEntrepreneurId(initialSession?.entrepreneurId ?? defaultEntrepreneur.id);
+    setTrainerId(initialSession?.trainerId ?? defaultTrainerId ?? trainers[0]?.id ?? '');
     setSessionType(initialSession?.sessionType ?? 'Mentoring');
     setTopic(initialSession?.topic ?? '');
     setDate(initialSession?.date ?? '2026-07-20');
@@ -144,7 +126,7 @@ export function SessionEditorModal({
     setMeetingProvider(initialSession?.meetingProvider ?? 'google-meet');
     setReason('');
     setError('');
-  }, [defaultEntrepreneurId, defaultOwnerId, initialSession, open]);
+  }, [defaultTrainerId, defaultTrainerName, defaultEntrepreneur.id, initialSession, open]);
 
   React.useEffect(() => {
     if (mode === 'create') {
@@ -152,10 +134,10 @@ export function SessionEditorModal({
     }
   }, [mode, sessionType, startTime]);
 
-  const selectedTrainer = resolvedTrainerOptions.find((trainer) => trainer.value === trainerId);
+  const selectedTrainer = trainers.find((trainer) => trainer.id === trainerId);
   const lockedToTrainer = actor === 'trainer' && Boolean(defaultTrainerId);
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!entrepreneurId) {
       setError('Select an entrepreneur.');
@@ -174,10 +156,10 @@ export function SessionEditorModal({
       return;
     }
 
-    await onSubmit({
+    onSubmit({
       entrepreneurId,
       trainerId: trainerId || undefined,
-      trainerName: selectedTrainer?.label ?? defaultTrainerName ?? 'BID programme team',
+      trainerName: selectedTrainer?.fullName ?? defaultTrainerName ?? 'BID programme team',
       sessionType,
       topic: topic.trim(),
       date,
@@ -201,7 +183,11 @@ export function SessionEditorModal({
           <FormAutocomplete
             value={entrepreneurId}
             onValueChange={setEntrepreneurId}
-            options={resolvedEntrepreneurOptions}
+            options={entrepreneurs.map((entrepreneur) => ({
+              value: entrepreneur.id,
+              label: entrepreneur.businessName,
+              description: entrepreneur.representative,
+            }))}
             placeholder="Search entrepreneur"
             searchPlaceholder="Search entrepreneurs..."
           />
@@ -219,7 +205,11 @@ export function SessionEditorModal({
             <FormAutocomplete
               value={trainerId}
               onValueChange={setTrainerId}
-              options={resolvedTrainerOptions}
+              options={trainers.map((trainer) => ({
+                value: trainer.id,
+                label: trainer.fullName,
+                description: trainer.role,
+              }))}
               disabled={lockedToTrainer}
               placeholder="Search trainer"
               searchPlaceholder="Search trainers..."
@@ -295,8 +285,8 @@ export function SessionEditorModal({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : mode === 'create' ? 'Create session' : 'Save reschedule'}
+          <Button type="submit">
+            {mode === 'create' ? 'Create session' : 'Save reschedule'}
           </Button>
         </div>
       </form>

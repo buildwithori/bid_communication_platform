@@ -100,7 +100,7 @@ export type BookingForm = z.infer<typeof bookingSchema>;
 export const deliverableSchema = z.object({
   deliverableId: z.string().min(1, 'Select the deliverable requirement'),
   name: z.string().optional(),
-  fileName: z.string().min(1, 'Choose the file to submit'),
+  fileName: z.string().min(1, 'Add a file name for this UI flow'),
   notes: z.string().optional(),
 });
 export type DeliverableForm = z.infer<typeof deliverableSchema>;
@@ -198,11 +198,6 @@ export const signupSchema = z.object({
   email: z.string().email('Enter a valid email'),
   country: z.string().min(1, 'Country is required'),
   phone: z.string().min(1, 'Phone number is required'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string().min(1, 'Confirm your password'),
-}).refine((values) => values.password === values.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
 });
 export type SignupForm = z.infer<typeof signupSchema>;
 

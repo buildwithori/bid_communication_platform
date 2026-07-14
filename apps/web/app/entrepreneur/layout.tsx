@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { EntrepreneurProvider, useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { entrepreneurNav } from '@/lib/nav/entrepreneur-nav';
@@ -10,7 +9,6 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { NotificationsModal } from '@/components/shared/NotificationsModal';
 import { routes } from '@/lib/routes';
-import { useNotifications } from '@/lib/notifications/use-notifications';
 
 const titles: Record<string, string> = {
   [routes.entrepreneur.dashboard]: 'Dashboard',
@@ -32,16 +30,9 @@ function useTitle() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { entrepreneur } = useEntrepreneurStore();
+  const { entrepreneur, notifications } = useEntrepreneurStore();
   const title = useTitle();
   const [notifOpen, setNotifOpen] = React.useState(false);
-  const {
-    notifications,
-    unreadCount,
-    markAllRead,
-    isMarkingAllRead,
-    openNotification,
-  } = useNotifications();
 
   const user = {
     initials: entrepreneur.initials,
@@ -65,10 +56,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           size="sm"
           onClick={() => setNotifOpen(true)}
           className="flex items-center gap-1.5"
-          aria-label={`Notifications (${unreadCount} unread)`}
+          aria-label={`Notifications (${notifications.length} unread)`}
         >
           <Bell className="h-3 w-3" />
-          {unreadCount}
+          {notifications.length}
         </Button>
       }
     >
@@ -76,10 +67,11 @@ function Shell({ children }: { children: React.ReactNode }) {
       <NotificationsModal
         open={notifOpen}
         onOpenChange={setNotifOpen}
-        notifications={notifications}
-        onNotificationClick={openNotification}
-        onMarkAllRead={markAllRead}
-        isMarkingAllRead={isMarkingAllRead}
+        notifications={notifications.map((notification) => ({
+          ...notification,
+          unread: true,
+          tone: 'danger',
+        }))}
       />
     </AppShell>
   );
@@ -91,10 +83,8 @@ export default function EntrepreneurLayout({
   children: React.ReactNode;
 }) {
   return (
-    <WorkspaceGuard allowedRoles={['entrepreneur']}>
-      <EntrepreneurProvider>
-        <Shell>{children}</Shell>
-      </EntrepreneurProvider>
-    </WorkspaceGuard>
+    <EntrepreneurProvider>
+      <Shell>{children}</Shell>
+    </EntrepreneurProvider>
   );
 }

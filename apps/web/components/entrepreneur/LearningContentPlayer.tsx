@@ -1,10 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import MuxPlayer from '@mux/mux-player-react/lazy';
 import {
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -20,13 +18,8 @@ import { Badge } from '@/components/shared/Badge';
 import { Modal } from '@/components/shared/Modal';
 import { ContentRating } from '@/components/entrepreneur/ContentRating';
 import { getContentTrainer } from '@/lib/content-trainer-access';
-import { syncLearnerProgress } from '@/lib/api/learning';
 import { cn } from '@/lib/utils';
 import type { BadgeTone, ContentItem, ContentType } from '@/types';
-
-type PlayerContentItem = ContentItem & {
-  trainerName?: string;
-};
 
 const typeMeta: Record<
   ContentType,
@@ -54,26 +47,16 @@ const typeMeta: Record<
 
 export function LearningContentPlayer({
   item,
-  programmeId,
   playlist,
   onChangeItem,
   onClose,
 }: {
   item: ContentItem | null;
-  programmeId?: string;
   playlist: ContentItem[];
   onChangeItem: (item: ContentItem) => void;
   onClose: () => void;
 }) {
   const [playerKey, setPlayerKey] = React.useState(0);
-  const queryClient = useQueryClient();
-  const syncMutation = useMutation({
-    mutationFn: syncLearnerProgress,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['learning-progress'] });
-    },
-  });
-  const lastSyncedAtRef = React.useRef<Record<string, number>>({});
   const currentIndex = item
     ? Math.max(playlist.findIndex((candidate) => candidate.id === item.id), 0)
     : -1;
@@ -86,51 +69,11 @@ export function LearningContentPlayer({
     setPlayerKey((current) => current + 1);
   }, [item?.id]);
 
-  const syncProgress = React.useCallback(
-    (
-      targetItem: ContentItem,
-      progressPercent: number,
-      options: {
-        completed?: boolean;
-        durationSeconds?: number;
-        force?: boolean;
-        lastPositionSeconds?: number;
-      } = {},
-    ) => {
-      if (!programmeId) return;
-
-      const boundedProgress = Math.max(0, Math.min(100, Math.round(progressPercent)));
-      const now = Date.now();
-      const lastSyncedAt = lastSyncedAtRef.current[targetItem.id] ?? 0;
-      if (!options.force && !options.completed && now - lastSyncedAt < 15_000) return;
-
-      lastSyncedAtRef.current[targetItem.id] = now;
-      syncMutation.mutate([
-        {
-          programmeId,
-          moduleId: targetItem.moduleId,
-          contentItemId: targetItem.id,
-          progressPercent: boundedProgress,
-          completed: options.completed,
-          durationSeconds: options.durationSeconds,
-          lastPositionSeconds: options.lastPositionSeconds,
-        },
-      ]);
-    },
-    [programmeId, syncMutation],
-  );
-
-  React.useEffect(() => {
-    if (!item || item.type === 'video') return;
-    syncProgress(item, Math.max(10, item.progress === 'completed' ? 100 : 10));
-  }, [item, syncProgress]);
-
   if (!item) return null;
 
   const meta = typeMeta[item.type];
   const Icon = meta.icon;
-  const fallbackTrainer = getContentTrainer(item.id);
-  const trainerName = (item as PlayerContentItem).trainerName ?? fallbackTrainer?.fullName;
+  const trainer = getContentTrainer(item.id);
   const openUrl = item.type === 'pdf' ? item.fileUrl : item.type === 'tool' ? item.toolUrl : undefined;
 
   return (
@@ -156,7 +99,7 @@ export function LearningContentPlayer({
                   </div>
                   <h3 className="mt-2 text-2xl font-semibold leading-tight text-ink">{item.title}</h3>
                   <div className="mt-1 text-sm text-ink-muted">
-                    {trainerName ? `By ${trainerName}` : 'BID learning content'}
+                    {trainer ? `By ${trainer.fullName}` : 'BID learning content'}
                   </div>
                 </div>
               </div>
@@ -175,25 +118,11 @@ export function LearningContentPlayer({
                     </a>
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={syncMutation.isPending}
-                  onClick={() => syncProgress(item, 100, { completed: true, force: true })}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  {item.progress === 'completed' ? 'Completed' : 'Mark complete'}
-                </Button>
               </div>
             </div>
           </div>
 
-          <ContentFrame
-            key={playerKey}
-            item={item}
-            onVideoComplete={(progress) => syncProgress(item, 100, { ...progress, completed: true, force: true })}
-            onVideoProgress={(progress) => syncProgress(item, progress.percent, progress)}
-          />
+          <ContentFrame key={playerKey} item={item} />
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Button
@@ -268,19 +197,7 @@ export function LearningContentPlayer({
   );
 }
 
-function ContentFrame({
-  item,
-  onVideoComplete,
-  onVideoProgress,
-}: {
-  item: ContentItem;
-  onVideoComplete?: (progress: { durationSeconds?: number; lastPositionSeconds?: number }) => void;
-  onVideoProgress?: (progress: {
-    durationSeconds?: number;
-    lastPositionSeconds?: number;
-    percent: number;
-  }) => void;
-}) {
+function ContentFrame({ item }: { item: ContentItem }) {
   if (item.type === 'video') {
     if (!item.muxPlaybackId) {
       return (
@@ -299,22 +216,6 @@ function ContentFrame({
           metadataVideoTitle={item.title}
           streamType="on-demand"
           className="aspect-video w-full"
-          onEnded={(event) => {
-            const target = event.currentTarget as unknown as HTMLMediaElement;
-            onVideoComplete?.({
-              durationSeconds: target.duration ? Math.floor(target.duration) : undefined,
-              lastPositionSeconds: Math.floor(target.currentTime || target.duration || 0),
-            });
-          }}
-          onTimeUpdate={(event) => {
-            const target = event.currentTarget as unknown as HTMLMediaElement;
-            if (!target.duration || Number.isNaN(target.duration)) return;
-            onVideoProgress?.({
-              durationSeconds: Math.floor(target.duration),
-              lastPositionSeconds: Math.floor(target.currentTime),
-              percent: (target.currentTime / target.duration) * 100,
-            });
-          }}
         />
       </div>
     );

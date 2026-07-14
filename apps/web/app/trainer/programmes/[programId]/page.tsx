@@ -1,21 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
+import { notFound, useParams } from 'next/navigation';
 import MuxPlayer from '@mux/mux-player-react/lazy';
-import {
-  ArrowLeft,
-  BookOpen,
-  CalendarDays,
-  CheckCircle2,
-  ExternalLink,
-  FileText,
-  PlayCircle,
-  Users,
-  Wrench,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, CheckCircle2, ExternalLink, FileText, PlayCircle, Users, Wrench, type LucideIcon } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/shared/Button';
 import { Card } from '@/components/shared/Card';
@@ -26,193 +15,116 @@ import { Modal } from '@/components/shared/Modal';
 import {
   DataTable,
   RowActions,
-  TableEmptyState,
   TableFilterAutocomplete,
   TableFilterInput,
   TablePagination,
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { listEntrepreneurs, type EntrepreneurRecord } from '@/lib/api/entrepreneurs';
-import {
-  getProgramme,
-  listProgrammeDeliverableRules,
-  type ProgrammeContentItem,
-  type ProgrammeDeliverableRule,
-  type ProgrammeDetail,
-  type ProgrammeLifecycle,
-} from '@/lib/api/programmes';
+import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
+import { deliverableReviews, deliverableReviewStatusMeta } from '@/lib/mock-data/admin-workflows';
+import { contentItems, modulesForProgram } from '@/lib/mock-data/programs';
+import { trainers } from '@/lib/mock-data/trainers';
+import { sectorById, stageById } from '@/lib/mock-data/definitions';
+import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
+import { entrepreneurHasProgramme } from '@/lib/programme-access';
+import { getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
 import { routes } from '@/lib/routes';
-import { cn } from '@/lib/utils';
-import type { BadgeTone } from '@/types';
+import type { BadgeTone, ContentItem, Entrepreneur, Module, Program } from '@/types';
 
-type WorkspaceTab = 'overview' | 'curriculum' | 'deliverables' | 'readiness' | 'entrepreneurs';
-type ProgrammeModule = ProgrammeDetail['modules'][number];
-
-type ReadinessStatus = 'ready' | 'needs_content';
-
-type TrainerDeliverableRow = {
-  id: string;
-  name: string;
-  due: string;
-  dueHelper: string;
-  requiredFor: string;
-  submitted: string;
-  active: boolean;
-};
-
+const currentTrainerId = 't-kofi';
 const ALL_FILTER = 'all';
 
-const lifecycleMeta: Record<ProgrammeLifecycle, { label: string; tone: BadgeTone }> = {
-  draft: { label: 'Draft', tone: 'neutral' },
-  scheduled: { label: 'Scheduled', tone: 'blue' },
-  active: { label: 'Active', tone: 'green' },
-  completed: { label: 'Completed', tone: 'neutral' },
-  archived: { label: 'Archived', tone: 'neutral' },
-};
+type WorkspaceTab = 'overview' | 'curriculum' | 'deliverables' | 'readiness' | 'entrepreneurs';
+type TrainerDeliverableStatus = 'missing' | 'pending-review' | 'changes-requested' | 'approved';
 
-const contentTypeMeta: Record<ProgrammeContentItem['type'], { label: string; icon: LucideIcon; tone: BadgeTone; bg: string; fg: string }> = {
-  video: { label: 'Video', icon: PlayCircle, tone: 'brand', bg: 'bg-bid-light', fg: 'text-bid' },
-  pdf: { label: 'PDF', icon: FileText, tone: 'blue', bg: 'bg-info-light', fg: 'text-info' },
-  tool: { label: 'Tool', icon: Wrench, tone: 'green', bg: 'bg-success-light', fg: 'text-success-dark' },
-};
+interface ProgrammeDeliverableRequirement {
+  id: string;
+  programmeId: string;
+  name: string;
+  dueRule: string;
+  requiredFor: string;
+}
+
+interface TrainerDeliverableRow {
+  id: string;
+  name: string;
+  dueRule: string;
+  requiredFor: string;
+  requiredCount: number;
+  submittedCount: number;
+  status: TrainerDeliverableStatus;
+  latestActivity: string;
+}
+
+const programmeDeliverableRequirements: ProgrammeDeliverableRequirement[] = [
+  { id: 'req-accelerator-bmc', programmeId: 'p-accelerator-c6', name: 'Business Model Canvas', dueRule: 'After Business Model Canvas Deep Dive', requiredFor: 'All entrepreneurs in this programme' },
+  { id: 'req-accelerator-finmodel', programmeId: 'p-accelerator-c6', name: 'Financial Model (3yr)', dueRule: 'Before investor-readiness review', requiredFor: 'Growth and scale stage entrepreneurs' },
+  { id: 'req-accelerator-q1', programmeId: 'p-accelerator-c6', name: 'Q1 Progress Report', dueRule: 'Quarterly', requiredFor: 'All entrepreneurs in this programme' },
+  { id: 'req-accelerator-pitch', programmeId: 'p-accelerator-c6', name: 'Pitch Deck v2', dueRule: 'Before demo day', requiredFor: 'All entrepreneurs in this programme' },
+  { id: 'req-fintech-finmodel', programmeId: 'p-readiness-fintech', name: 'Financial Model (3yr)', dueRule: 'Before investor matching', requiredFor: 'All entrepreneurs in this programme' },
+  { id: 'req-fintech-dd', programmeId: 'p-readiness-fintech', name: 'Due Diligence Pack', dueRule: 'After due diligence module', requiredFor: 'All entrepreneurs in this programme' },
+];
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatProgramDate(value: string) {
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+const formatProgramDate = (date: string) =>
+  new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+function normalise(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function moduleReadiness(module: ProgrammeModule): ReadinessStatus {
-  return module.contentItems.length > 0 && module.contentItems.every((item) => item.status === 'ready')
-    ? 'ready'
-    : 'needs_content';
+function programmeNameMatches(left: string, right: string) {
+  return normalise(left).replace(/\s+/g, '') === normalise(right).replace(/\s+/g, '');
 }
 
-function contentCounts(items: ProgrammeContentItem[]) {
-  return items.reduce(
-    (counts, item) => {
-      if (item.type === 'video') counts.videos += 1;
-      if (item.type === 'pdf') counts.files += 1;
-      if (item.type === 'tool') counts.tools += 1;
-      counts.total += 1;
-      return counts;
-    },
-    { total: 0, videos: 0, files: 0, tools: 0 },
-  );
+function deliverableMatchesRequirement(deliverable: string, requirement: string) {
+  const left = normalise(deliverable);
+  const right = normalise(requirement);
+  return left.includes(right) || right.includes(left);
 }
 
-function contentSourceLabel(item: ProgrammeContentItem) {
-  if (item.type === 'video') return item.video?.playbackId ? 'Video ready' : 'Video not ready';
-  if (item.type === 'pdf') return item.files[0]?.originalFilename ?? 'PDF not attached';
-  return item.tool?.toolName ?? item.tool?.url ?? 'Tool link missing';
+function getModuleContentItems(module: Module) {
+  return module.contentItemIds
+    .map((contentId) => contentItems.find((item) => item.id === contentId))
+    .filter(Boolean) as ContentItem[];
 }
 
-function durationLabel(seconds: number | null) {
-  if (!seconds) return null;
-  return `${Math.max(1, Math.round(seconds / 60))} min`;
+function StatusBadge({ program }: { program: Program }) {
+  const status = getProgrammeStatus(program);
+  return <Badge tone={getProgrammeStatusTone(status)}>{getProgrammeStatusLabel(status)}</Badge>;
 }
 
-function dueLabel(rule: ProgrammeDeliverableRule) {
-  if (rule.dueType === 'fixed_date') return rule.dueDate ? formatDate(rule.dueDate) : 'Fixed date not set';
-  if (rule.dueType === 'module_completion') return `After ${rule.dueAfterModule?.title ?? 'selected module'}`;
-  if (rule.recurringCadence === 'monthly') return 'Monthly';
-  if (rule.recurringCadence === 'six_monthly') return 'Every 6 months';
-  return 'Quarterly';
-}
-
-function dueHelper(rule: ProgrammeDeliverableRule) {
-  if (rule.dueType === 'fixed_date') return 'Same due date for every eligible entrepreneur.';
-  if (rule.dueType === 'module_completion') return 'Created when a learner completes the selected module.';
-  return 'Expected again for every reporting period.';
-}
-
-function requiredForLabel(rule: ProgrammeDeliverableRule) {
-  return rule.requiredForScope === 'stage' ? `${rule.requiredStage?.name ?? 'Selected'} stage` : 'All entrepreneurs';
-}
-
-function mapRuleToRow(rule: ProgrammeDeliverableRule): TrainerDeliverableRow {
-  return {
-    id: rule.id,
-    name: rule.name,
-    due: dueLabel(rule),
-    dueHelper: dueHelper(rule),
-    requiredFor: requiredForLabel(rule),
-    submitted: `${rule.submittedCount} / ${rule.assignedCount}`,
-    active: rule.active,
-  };
-}
-
-async function fetchTrainerEntrepreneurs(programme: ProgrammeDetail) {
-  const firstPage = await listEntrepreneurs({ take: 50 });
-  const items: EntrepreneurRecord[] = [...firstPage.items];
-  let cursor = firstPage.nextCursor;
-
-  while (cursor) {
-    const nextPage = await listEntrepreneurs({ take: 50, cursor });
-    items.push(...nextPage.items);
-    cursor = nextPage.nextCursor;
-  }
-
-  if (programme.accessType === 'free') return items;
-  return items.filter((entrepreneur) =>
-    entrepreneur.programmeAccess.assignedProgrammes.some((access) => access.id === programme.id),
-  );
+function deliverableStatusMeta(status: TrainerDeliverableStatus): { label: string; tone: BadgeTone } {
+  if (status === 'missing') return { label: 'Not submitted', tone: 'amber' };
+  if (status === 'pending-review') return deliverableReviewStatusMeta['pending-review'];
+  if (status === 'changes-requested') return deliverableReviewStatusMeta['changes-requested'];
+  return deliverableReviewStatusMeta.approved;
 }
 
 export default function TrainerProgrammeDetailPage() {
   const params = useParams<{ programId: string }>();
-  const router = useRouter();
+  const programmes = React.useMemo(() => getTrainerProgrammes(currentTrainerId), []);
+  const programme = programmes.find((item) => item.id === params.programId);
   const [tab, setTab] = React.useState<WorkspaceTab>('overview');
 
-  const programmeQuery = useQuery({
-    queryKey: ['programmes', 'trainer-detail', params.programId],
-    queryFn: () => getProgramme(params.programId),
-  });
-  const rulesQuery = useQuery({
-    queryKey: ['programme-deliverable-rules', params.programId, 'trainer'],
-    queryFn: () => listProgrammeDeliverableRules(params.programId),
-  });
-  const entrepreneursQuery = useQuery({
-    queryKey: ['entrepreneurs', 'trainer-programme', params.programId, programmeQuery.data?.accessType],
-    queryFn: () => fetchTrainerEntrepreneurs(programmeQuery.data as ProgrammeDetail),
-    enabled: Boolean(programmeQuery.data),
-  });
+  if (!programme) return notFound();
 
-  if (programmeQuery.isLoading) {
-    return <TableEmptyState title="Loading programme" description="Fetching programme context." />;
-  }
-
-  if (programmeQuery.isError || !programmeQuery.data) {
-    return (
-      <Card padding="lg">
-        <div className="grid min-h-[320px] place-items-center p-6 text-center">
-          <div>
-            <div className="text-lg font-semibold text-ink">Programme could not be loaded</div>
-            <p className="mt-2 text-sm text-ink-muted">You may not have access to this programme, or it may no longer be available.</p>
-            <Button type="button" variant="outline" className="mt-4" onClick={() => router.push(routes.trainer.programmes)}>
-              Back to programmes
-            </Button>
-          </div>
-        </div>
-      </Card>
-    );
-  }
-
-  const programme: ProgrammeDetail = programmeQuery.data;
-  const modules = programme.modules;
-  const contentItems = modules.flatMap((module) => module.contentItems);
-  const counts = contentCounts(contentItems);
-  const modulesWithoutContent = modules.filter((module) => moduleReadiness(module) !== 'ready');
+  const assignedEntrepreneurs = entrepreneurs.filter(
+    (entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur) && entrepreneurHasProgramme(entrepreneur, programme.id),
+  );
+  const modules = modulesForProgram(programme.id);
+  const content = modules.flatMap(getModuleContentItems);
+  const ownedContent = content.filter((item) => item.trainerId === currentTrainerId);
+  const modulesWithoutContent = modules.filter((module) => module.contentItemIds.length === 0);
+  const videos = content.filter((item) => item.type === 'video').length;
+  const files = content.filter((item) => item.type === 'pdf').length;
+  const tools = content.filter((item) => item.type === 'tool').length;
+  const capacityPercentage = Math.round((programme.entrepreneursCount / Math.max(programme.maxEntrepreneurs, 1)) * 100);
   const readinessScore = modules.length ? Math.round(((modules.length - modulesWithoutContent.length) / modules.length) * 100) : 0;
-  const capacityPercentage = programme.accessType === 'free'
-    ? 100
-    : Math.round((programme.enrollment.active / Math.max(programme.enrollment.capacity, 1)) * 100);
-  const lifecycle = lifecycleMeta[programme.lifecycle];
-  const deliverableRows = (rulesQuery.data?.items ?? []).map(mapRuleToRow);
-  const entrepreneurs = entrepreneursQuery.data ?? [];
 
   return (
     <>
@@ -220,19 +132,21 @@ export default function TrainerProgrammeDetailPage() {
         title="Programme detail"
         description="Read-only programme context for sessions, learner support, and deliverable reviews."
         actions={
-          <Button type="button" variant="outline" onClick={() => router.push(routes.trainer.programmes)}>
-            <ArrowLeft className="h-4 w-4" />
-            Back to programmes
+          <Button asChild variant="outline">
+            <Link href={routes.trainer.programmes}>
+              <ArrowLeft className="h-4 w-4" />
+              Back to programmes
+            </Link>
           </Button>
         }
       />
 
       <section className="space-y-4">
-        <Card padding="lg" accent="bid">
+        <Card accent={programme.accent} padding="lg">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Badge tone={lifecycle.tone}>{lifecycle.label}</Badge>
+                <StatusBadge program={programme} />
                 <Badge tone={programme.accessType === 'free' ? 'blue' : 'brand'}>
                   {programme.accessType === 'free' ? 'Free programme' : 'Assigned programme'}
                 </Badge>
@@ -248,19 +162,19 @@ export default function TrainerProgrammeDetailPage() {
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">Learner progress</div>
-                  <div className="mt-1 text-3xl font-semibold leading-none text-ink">{programme.learnerProgress.average}%</div>
+                  <div className="mt-1 text-3xl font-semibold leading-none text-ink">{programme.progress}%</div>
                 </div>
-                <div className="text-right text-xs leading-5 text-ink-muted">{programme.learnerProgress.trackedLearners} tracked</div>
+                <div className="text-right text-xs leading-5 text-ink-muted">Across this programme</div>
               </div>
-              <ProgressBar value={programme.learnerProgress.average} width="100%" className="mt-3 h-1.5" />
+              <ProgressBar value={programme.progress} width="100%" className="mt-3 h-1.5" />
             </div>
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <ProgrammeHealthCard label={programme.accessType === 'free' ? 'Access' : 'Enrollment'} value={programme.accessType === 'free' ? 'All entrepreneurs' : `${programme.enrollment.active}/${programme.enrollment.capacity}`} progress={programme.accessType === 'free' ? undefined : capacityPercentage} />
+            <ProgrammeHealthCard label={programme.accessType === 'free' ? 'Access' : 'Enrollment'} value={programme.accessType === 'free' ? 'All entrepreneurs' : `${programme.entrepreneursCount}/${programme.maxEntrepreneurs}`} progress={programme.accessType === 'free' ? undefined : capacityPercentage} />
             <ProgrammeHealthCard label="Modules" value={modules.length} helper={`${modulesWithoutContent.length} need content`} />
-            <ProgrammeHealthCard label="Learning assets" value={counts.total} helper={`${counts.videos} videos, ${counts.files} PDFs, ${counts.tools} tools`} />
-            <ProgrammeHealthCard label="Deliverable rules" value={deliverableRows.length} helper={rulesQuery.isLoading ? 'Loading rules' : 'Configured for this programme'} />
+            <ProgrammeHealthCard label="Content assets" value={content.length} helper={`${videos} videos, ${files} PDFs, ${tools} tools`} />
+            <ProgrammeHealthCard label="Content you own" value={ownedContent.length} helper="Ratings go to content owners" />
             <ProgrammeHealthCard label="Readiness" value={`${readinessScore}%`} progress={readinessScore} />
           </div>
         </Card>
@@ -288,95 +202,59 @@ export default function TrainerProgrammeDetailPage() {
           </div>
 
           {tab === 'overview' && (
-            <OverviewTab
-              programme={programme}
-              modules={modules}
-              counts={counts}
-              readinessScore={readinessScore}
-              modulesWithoutContent={modulesWithoutContent}
-              entrepreneurs={entrepreneurs}
-            />
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_340px]">
+              <Card>
+                <div className="mb-4 text-base font-semibold text-ink">Trainer context</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ContextMetric icon={Users} label="My entrepreneurs" value={assignedEntrepreneurs.length} />
+                  <ContextMetric icon={BookOpen} label="Modules" value={modules.length} />
+                  <ContextMetric icon={PlayCircle} label="Videos" value={videos} />
+                  <ContextMetric icon={FileText} label="Files and tools" value={files + tools} />
+                </div>
+              </Card>
+              <Card>
+                <div className="mb-2 text-base font-semibold text-ink">Readiness</div>
+                <div className="text-sm leading-6 text-ink-muted">{readinessScore}% of modules currently have learning content.</div>
+                <ProgressBar value={readinessScore} width="100%" className="mt-4 h-2" />
+                <div className="mt-4 rounded-xl bg-surface-subtle p-3 text-sm leading-6 text-ink-muted">
+                  {modulesWithoutContent.length > 0
+                    ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} still need content. Raise this with the admin team before entrepreneurs reach that point.`
+                    : 'Every module currently has at least one content item attached.'}
+                </div>
+              </Card>
+            </div>
           )}
-          {tab === 'curriculum' && <CurriculumTab modules={modules} allContentItems={contentItems} />}
-          {tab === 'deliverables' && <DeliverablesTab rows={deliverableRows} loading={rulesQuery.isLoading} error={rulesQuery.isError} />}
+
+          {tab === 'curriculum' && <CurriculumTab modules={modules} />}
+          {tab === 'deliverables' && <DeliverablesTab programme={programme} assignedEntrepreneurs={assignedEntrepreneurs} />}
           {tab === 'readiness' && <ReadinessTab programme={programme} modules={modules} readinessScore={readinessScore} modulesWithoutContent={modulesWithoutContent} capacityPercentage={capacityPercentage} />}
-          {tab === 'entrepreneurs' && <EntrepreneursTab entrepreneurs={entrepreneurs} loading={entrepreneursQuery.isLoading} error={entrepreneursQuery.isError} />}
+          {tab === 'entrepreneurs' && <EntrepreneursTab entrepreneurs={assignedEntrepreneurs} />}
         </Card>
       </section>
     </>
   );
 }
 
-function OverviewTab({
-  programme,
-  modules,
-  counts,
-  readinessScore,
-  modulesWithoutContent,
-  entrepreneurs,
-}: {
-  programme: ProgrammeDetail;
-  modules: ProgrammeModule[];
-  counts: ReturnType<typeof contentCounts>;
-  readinessScore: number;
-  modulesWithoutContent: ProgrammeModule[];
-  entrepreneurs: EntrepreneurRecord[];
-}) {
-  return (
-    <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_340px]">
-      <Card>
-        <div className="mb-4 text-base font-semibold text-ink">Trainer context</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ContextMetric icon={Users} label="My entrepreneurs" value={entrepreneurs.length} />
-          <ContextMetric icon={BookOpen} label="Modules" value={modules.length} />
-          <ContextMetric icon={PlayCircle} label="Videos" value={counts.videos} />
-          <ContextMetric icon={FileText} label="Files and tools" value={counts.files + counts.tools} />
-        </div>
-      </Card>
-      <Card>
-        <div className="mb-2 text-base font-semibold text-ink">Readiness</div>
-        <div className="text-sm leading-6 text-ink-muted">{readinessScore}% of modules currently have ready learning content.</div>
-        <ProgressBar value={readinessScore} width="100%" className="mt-4 h-2" />
-        <div className="mt-4 rounded-xl bg-surface-subtle p-3 text-sm leading-6 text-ink-muted">
-          {modulesWithoutContent.length > 0
-            ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} still need ready content. Raise this with the admin team before entrepreneurs reach that point.`
-            : 'Every module currently has ready content attached.'}
-        </div>
-        <div className="mt-3 text-xs text-ink-muted">
-          {programme.accessType === 'free' ? 'Free programmes are available to every entrepreneur.' : 'Assigned programmes require programme access.'}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function CurriculumTab({ modules, allContentItems }: { modules: ProgrammeModule[]; allContentItems: ProgrammeContentItem[] }) {
+function CurriculumTab({ modules }: { modules: Module[] }) {
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(6);
-  const [activeModule, setActiveModule] = React.useState<ProgrammeModule | null>(null);
-  const [previewItem, setPreviewItem] = React.useState<ProgrammeContentItem | null>(null);
-
+  const [activeModule, setActiveModule] = React.useState<Module | null>(null);
+  const [previewItem, setPreviewItem] = React.useState<ContentItem | null>(null);
   const filteredRows = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return modules;
-    return modules.filter((module) =>
-      [
-        module.title,
-        module.description ?? '',
-        String(module.position),
-        ...module.contentItems.map((item) => `${item.title} ${item.type} ${durationLabel(item.durationSeconds) ?? ''} ${item.trainer?.name ?? ''}`),
-      ]
+    return modules.filter((module) => {
+      const attachedItems = getModuleContentItems(module);
+      return [module.title, module.description ?? '', String(module.order), ...attachedItems.map((item) => `${item.title} ${item.type} ${item.durationLabel ?? ''}`)]
         .join(' ')
         .toLowerCase()
-        .includes(needle),
-    );
+        .includes(needle);
+    });
   }, [modules, query]);
-
-  React.useEffect(() => setPage(1), [query, pageSize, modules.length]);
   const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
-  const columns = React.useMemo<Column<ProgrammeModule>[]>(
+  const columns = React.useMemo<Column<Module>[]>(
     () => [
       {
         key: 'actions',
@@ -387,15 +265,15 @@ function CurriculumTab({ modules, allContentItems }: { modules: ProgrammeModule[
               { label: 'View module content', onSelect: () => setActiveModule(module) },
               {
                 label: 'Play first item',
-                disabled: module.contentItems.length === 0,
-                onSelect: () => setPreviewItem(module.contentItems[0] ?? null),
+                disabled: getModuleContentItems(module).length === 0,
+                onSelect: () => setPreviewItem(getModuleContentItems(module)[0] ?? null),
               },
             ]}
           />
         ),
         className: 'w-[84px]',
       },
-      { key: 'order', header: 'Order', cell: (module) => <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface-subtle text-xs font-semibold text-ink-muted">{module.position}</span> },
+      { key: 'order', header: 'Order', cell: (module) => <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface-subtle text-xs font-semibold text-ink-muted">{module.order}</span> },
       {
         key: 'module',
         header: 'Module',
@@ -403,18 +281,20 @@ function CurriculumTab({ modules, allContentItems }: { modules: ProgrammeModule[
           <button
             type="button"
             onClick={() => setActiveModule(module)}
-            className="block min-w-[300px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+            className="block min-w-[280px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
           >
             <span className="block font-semibold text-ink transition-colors group-hover:text-bid">{module.title}</span>
             {module.description && <span className="mt-1 line-clamp-2 block text-sm text-ink-muted">{module.description}</span>}
           </button>
         ),
       },
-      { key: 'content', header: 'Learning assets', cell: (module) => <ContentSummary items={module.contentItems} /> },
-      { key: 'status', header: 'Readiness', cell: (module) => moduleReadiness(module) === 'ready' ? <Badge tone="green">Ready</Badge> : <Badge tone="amber">Needs content</Badge> },
+      { key: 'content', header: 'Learning assets', cell: (module) => <ContentSummary module={module} /> },
+      { key: 'status', header: 'Readiness', cell: (module) => module.contentItemIds.length > 0 ? <Badge tone="green">Ready</Badge> : <Badge tone="amber">Needs content</Badge> },
     ],
     [],
   );
+
+  React.useEffect(() => setPage(1), [query, pageSize, modules.length]);
 
   return (
     <div className="mt-5">
@@ -429,75 +309,101 @@ function CurriculumTab({ modules, allContentItems }: { modules: ProgrammeModule[
       </TableToolbar>
       <DataTable columns={columns} rows={pageRows} rowKey={(module) => module.id} emptyMessage="No modules match this search." tableClassName="min-w-[980px]" />
       <TablePagination page={page} pageSize={pageSize} totalItems={filteredRows.length} pageSizeOptions={[6, 12, 24]} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
-      <TrainerModuleContentModal module={activeModule} onClose={() => setActiveModule(null)} onPreview={setPreviewItem} />
-      <TrainerContentPreviewModal items={activeModule ? activeModule.contentItems : allContentItems} item={previewItem} onChangeItem={setPreviewItem} onClose={() => setPreviewItem(null)} />
+      <TrainerModuleContentModal
+        module={activeModule}
+        onClose={() => setActiveModule(null)}
+        onPreview={setPreviewItem}
+      />
+      <TrainerContentPreviewModal
+        items={activeModule ? getModuleContentItems(activeModule) : contentItems}
+        item={previewItem}
+        onChangeItem={setPreviewItem}
+        onClose={() => setPreviewItem(null)}
+      />
     </div>
   );
 }
 
-function DeliverablesTab({ rows, loading, error }: { rows: TrainerDeliverableRow[]; loading: boolean; error: boolean }) {
+function DeliverablesTab({ programme, assignedEntrepreneurs }: { programme: Program; assignedEntrepreneurs: Entrepreneur[] }) {
   const [query, setQuery] = React.useState('');
-  const [activeFilter, setActiveFilter] = React.useState<typeof ALL_FILTER | 'active' | 'inactive'>(ALL_FILTER);
+  const [statusFilter, setStatusFilter] = React.useState<typeof ALL_FILTER | TrainerDeliverableStatus>(ALL_FILTER);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(5);
+  const assignedIds = React.useMemo(() => new Set(assignedEntrepreneurs.map((entrepreneur) => entrepreneur.id)), [assignedEntrepreneurs]);
+  const requirements = React.useMemo(() => programmeDeliverableRequirements.filter((requirement) => requirement.programmeId === programme.id), [programme.id]);
+
+  const rows = React.useMemo<TrainerDeliverableRow[]>(() => requirements.map((requirement) => {
+    const matchingReviews = deliverableReviews.filter((review) =>
+      assignedIds.has(review.entrepreneurId) &&
+      programmeNameMatches(review.programme, programme.name) &&
+      deliverableMatchesRequirement(review.deliverable, requirement.name),
+    );
+    const latestReview = matchingReviews.slice().sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+    const status: TrainerDeliverableStatus =
+      matchingReviews.some((review) => review.status === 'changes-requested')
+        ? 'changes-requested'
+        : matchingReviews.some((review) => review.status === 'pending-review')
+          ? 'pending-review'
+          : matchingReviews.length >= assignedEntrepreneurs.length && matchingReviews.length > 0
+            ? 'approved'
+            : 'missing';
+
+    return {
+      id: requirement.id,
+      name: requirement.name,
+      dueRule: requirement.dueRule,
+      requiredFor: requirement.requiredFor,
+      requiredCount: assignedEntrepreneurs.length,
+      submittedCount: matchingReviews.length,
+      status,
+      latestActivity: latestReview ? `${latestReview.businessName} submitted ${formatDate(latestReview.submittedAt)}` : 'No submission from your entrepreneurs yet',
+    };
+  }), [assignedEntrepreneurs.length, assignedIds, programme.name, requirements]);
 
   const filteredRows = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return rows.filter((row) => {
-      const matchesStatus = activeFilter === ALL_FILTER || (activeFilter === 'active' ? row.active : !row.active);
-      const matchesSearch = !needle || [row.name, row.due, row.dueHelper, row.requiredFor, row.submitted].join(' ').toLowerCase().includes(needle);
+      const meta = deliverableStatusMeta(row.status);
+      const matchesStatus = statusFilter === ALL_FILTER || row.status === statusFilter;
+      const matchesSearch = !needle || [row.name, row.dueRule, row.requiredFor, meta.label, row.latestActivity].join(' ').toLowerCase().includes(needle);
       return matchesStatus && matchesSearch;
     });
-  }, [activeFilter, query, rows]);
-
-  React.useEffect(() => setPage(1), [query, activeFilter, pageSize]);
+  }, [query, rows, statusFilter]);
   const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
-  const columns = React.useMemo<Column<TrainerDeliverableRow>[]>(
-    () => [
-      { key: 'deliverable', header: 'Deliverable', cell: (row) => <div className="min-w-[260px]"><div className="font-semibold text-ink">{row.name}</div><div className="mt-1 text-sm text-ink-muted">{row.requiredFor}</div></div> },
-      { key: 'due', header: 'Due', cell: (row) => <div className="min-w-[260px]"><div className="font-medium text-ink">{row.due}</div><div className="mt-1 text-sm text-ink-muted">{row.dueHelper}</div></div> },
-      { key: 'submitted', header: 'Submitted so far', cell: (row) => <span className="font-medium text-ink">{row.submitted}</span> },
-      { key: 'status', header: 'Status', cell: (row) => <Badge tone={row.active ? 'green' : 'neutral'}>{row.active ? 'Active' : 'Inactive'}</Badge> },
-    ],
-    [],
-  );
+  React.useEffect(() => setPage(1), [query, statusFilter, pageSize, programme.id]);
 
   return (
     <div className="mt-5">
       <TableToolbar>
         <div>
           <div className="text-sm font-medium text-ink">Filter deliverables</div>
-          <div className="mt-0.5 text-sm text-ink-muted">Read the submission rules configured by admins for this programme.</div>
+          <div className="mt-0.5 text-sm text-ink-muted">Track required submissions from your entrepreneurs in this programme.</div>
         </div>
         <div className="grid w-full gap-2 md:grid-cols-[minmax(220px,1fr)_190px] lg:w-[560px]">
           <TableFilterInput icon placeholder="Search deliverables..." value={query} onChange={(event) => setQuery(event.target.value)} />
           <TableFilterAutocomplete
-            value={activeFilter}
-            onValueChange={(value) => setActiveFilter(value as typeof activeFilter)}
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
             options={[
               { value: ALL_FILTER, label: 'All statuses' },
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
+              { value: 'missing', label: 'Not submitted' },
+              { value: 'pending-review', label: 'Pending review' },
+              { value: 'changes-requested', label: 'Changes required' },
+              { value: 'approved', label: 'Approved' },
             ]}
             placeholder="All statuses"
             searchPlaceholder="Search statuses..."
           />
         </div>
       </TableToolbar>
-      {loading ? (
-        <TableEmptyState title="Loading deliverables" description="Fetching required submissions." />
-      ) : error ? (
-        <TableEmptyState title="Deliverables could not be loaded" description="Refresh the page or try again shortly." />
-      ) : (
-        <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} emptyMessage="No deliverables match these filters." tableClassName="min-w-[980px]" />
-      )}
+      <DataTable columns={deliverableColumns} rows={pageRows} rowKey={(row) => row.id} emptyMessage="No deliverables match these filters." tableClassName="min-w-[980px]" />
       <TablePagination page={page} pageSize={pageSize} totalItems={filteredRows.length} pageSizeOptions={[5, 10, 20]} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
     </div>
   );
 }
 
-function ReadinessTab({ programme, modules, readinessScore, modulesWithoutContent, capacityPercentage }: { programme: ProgrammeDetail; modules: ProgrammeModule[]; readinessScore: number; modulesWithoutContent: ProgrammeModule[]; capacityPercentage: number }) {
+function ReadinessTab({ programme, modules, readinessScore, modulesWithoutContent, capacityPercentage }: { programme: Program; modules: Module[]; readinessScore: number; modulesWithoutContent: Module[]; capacityPercentage: number }) {
   const capacityNeedsAttention = programme.accessType !== 'free' && capacityPercentage >= 90;
 
   return (
@@ -507,7 +413,7 @@ function ReadinessTab({ programme, modules, readinessScore, modulesWithoutConten
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-base font-semibold text-ink">Launch readiness</div>
-              <Badge tone={modulesWithoutContent.length ? 'amber' : 'green'}>{modulesWithoutContent.length ? 'Needs attention' : 'Ready'}</Badge>
+              <Badge tone={modulesWithoutContent.length ? 'amber' : 'green'}>{modulesWithoutContent.length ? 'Needs attention' : 'Ready to launch'}</Badge>
             </div>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">Read-only checklist for programme health. Trainers can use this context when supporting learners and raising content gaps with admins.</p>
           </div>
@@ -525,8 +431,8 @@ function ReadinessTab({ programme, modules, readinessScore, modulesWithoutConten
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <ReadinessPanelItem icon={modulesWithoutContent.length ? FileText : CheckCircle2} title="Content coverage" status={modulesWithoutContent.length ? 'Needs content' : 'Complete'} description={modulesWithoutContent.length ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} still need at least one ready learning asset.` : 'Every module currently has ready learning content attached.'} tone={modulesWithoutContent.length ? 'warning' : 'success'} />
-        <ReadinessPanelItem icon={Users} title={programme.accessType === 'free' ? 'Access model' : 'Enrollment capacity'} status={programme.accessType === 'free' ? 'Open to all' : capacityNeedsAttention ? 'Nearly full' : 'Seats available'} description={programme.accessType === 'free' ? 'Every entrepreneur can access this programme without manual enrollment.' : `${programme.enrollment.active} of ${programme.enrollment.capacity} seats are currently filled.`} tone={capacityNeedsAttention ? 'warning' : 'neutral'} />
+        <ReadinessPanelItem icon={modulesWithoutContent.length ? FileText : CheckCircle2} title="Content coverage" status={modulesWithoutContent.length ? 'Needs content' : 'Complete'} description={modulesWithoutContent.length ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} still need at least one learning asset.` : 'Every module currently has at least one learning asset attached.'} tone={modulesWithoutContent.length ? 'warning' : 'success'} />
+        <ReadinessPanelItem icon={Users} title={programme.accessType === 'free' ? 'Access model' : 'Enrollment capacity'} status={programme.accessType === 'free' ? 'Open to all' : capacityNeedsAttention ? 'Nearly full' : 'Seats available'} description={programme.accessType === 'free' ? 'Every entrepreneur can access this programme without manual enrollment.' : `${programme.entrepreneursCount} of ${programme.maxEntrepreneurs} seats are currently filled.`} tone={capacityNeedsAttention ? 'warning' : 'neutral'} />
         <ReadinessPanelItem icon={FileText} title="Required submissions" status="Configured" description="Deliverable rules are listed in the Deliverables tab and drive entrepreneur submission queues." tone="neutral" />
       </div>
 
@@ -535,30 +441,31 @@ function ReadinessTab({ programme, modules, readinessScore, modulesWithoutConten
   );
 }
 
-function EntrepreneursTab({ entrepreneurs, loading, error }: { entrepreneurs: EntrepreneurRecord[]; loading: boolean; error: boolean }) {
+function EntrepreneursTab({ entrepreneurs }: { entrepreneurs: Entrepreneur[] }) {
   const [query, setQuery] = React.useState('');
   const [stageFilter, setStageFilter] = React.useState(ALL_FILTER);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(5);
-
   const stageOptions = React.useMemo(() => {
-    const options = entrepreneurs
-      .filter((entrepreneur) => entrepreneur.stage)
-      .map((entrepreneur) => ({ value: entrepreneur.stage!.id, label: entrepreneur.stage!.name }));
+    const options = entrepreneurs.map((entrepreneur) => {
+      const stage = stageById[entrepreneur.stage];
+      return { value: entrepreneur.stage, label: stage?.label ?? entrepreneur.stage };
+    });
     return [{ value: ALL_FILTER, label: 'All stages' }, ...Array.from(new Map(options.map((option) => [option.value, option])).values())];
   }, [entrepreneurs]);
-
   const filteredRows = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return entrepreneurs.filter((entrepreneur) => {
-      const matchesStage = stageFilter === ALL_FILTER || entrepreneur.stage?.id === stageFilter;
-      const matchesSearch = !needle || [entrepreneur.businessName, entrepreneur.representativeName, entrepreneur.email, entrepreneur.country, entrepreneur.stage?.name ?? '', entrepreneur.sector?.name ?? '', String(entrepreneur.learnerProgress.average)].join(' ').toLowerCase().includes(needle);
+      const stage = stageById[entrepreneur.stage];
+      const sector = sectorById[entrepreneur.sector];
+      const matchesStage = stageFilter === ALL_FILTER || entrepreneur.stage === stageFilter;
+      const matchesSearch = !needle || [entrepreneur.businessName, entrepreneur.representative, entrepreneur.email, entrepreneur.country, stage?.label ?? entrepreneur.stage, sector?.label ?? entrepreneur.sector, String(entrepreneur.metrics.trainingProgress)].join(' ').toLowerCase().includes(needle);
       return matchesStage && matchesSearch;
     });
   }, [entrepreneurs, query, stageFilter]);
+  const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
   React.useEffect(() => setPage(1), [entrepreneurs.length, pageSize, query, stageFilter]);
-  const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="mt-5">
@@ -572,16 +479,27 @@ function EntrepreneursTab({ entrepreneurs, loading, error }: { entrepreneurs: En
           <TableFilterAutocomplete value={stageFilter} onValueChange={setStageFilter} options={stageOptions} placeholder="All stages" searchPlaceholder="Search stages..." />
         </div>
       </TableToolbar>
-      {loading ? (
-        <TableEmptyState title="Loading entrepreneurs" description="Fetching entrepreneurs connected to this programme." />
-      ) : error ? (
-        <TableEmptyState title="Entrepreneurs could not be loaded" description="Refresh the page or try again shortly." />
-      ) : (
-        <DataTable columns={entrepreneurColumns} rows={pageRows} rowKey={(entrepreneur) => entrepreneur.entrepreneurUserId} emptyMessage="No entrepreneurs match these filters." tableClassName="min-w-[980px]" />
-      )}
+      <DataTable columns={entrepreneurColumns} rows={pageRows} rowKey={(entrepreneur) => entrepreneur.id} emptyMessage="No entrepreneurs match these filters." tableClassName="min-w-[880px]" />
       <TablePagination page={page} pageSize={pageSize} totalItems={filteredRows.length} pageSizeOptions={[5, 10, 20]} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
     </div>
   );
+}
+
+
+const contentTypeMeta: Record<ContentItem['type'], { label: string; icon: LucideIcon; tone: BadgeTone; bg: string; fg: string }> = {
+  video: { label: 'Video', icon: PlayCircle, tone: 'brand', bg: 'bg-bid-light', fg: 'text-bid' },
+  pdf: { label: 'PDF', icon: FileText, tone: 'blue', bg: 'bg-info-light', fg: 'text-info' },
+  tool: { label: 'Tool', icon: Wrench, tone: 'green', bg: 'bg-success-light', fg: 'text-success-dark' },
+};
+
+function getTrainerName(trainerId?: string) {
+  return trainers.find((trainer) => trainer.id === trainerId)?.fullName ?? 'No trainer owner';
+}
+
+function getContentSourceLabel(item: ContentItem) {
+  if (item.type === 'video') return item.muxPlaybackId ? 'Video ready' : 'Video not uploaded';
+  if (item.type === 'pdf') return item.fileUrl ? 'PDF attached' : 'PDF not attached';
+  return item.toolUrl ? item.toolUrl : 'Tool link not attached';
 }
 
 function TrainerModuleContentModal({
@@ -589,19 +507,19 @@ function TrainerModuleContentModal({
   onClose,
   onPreview,
 }: {
-  module: ProgrammeModule | null;
+  module: Module | null;
   onClose: () => void;
-  onPreview: (item: ProgrammeContentItem) => void;
+  onPreview: (item: ContentItem) => void;
 }) {
   const [query, setQuery] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(5);
-  const items = module?.contentItems ?? [];
+  const items = React.useMemo(() => (module ? getModuleContentItems(module) : []), [module]);
   const filteredItems = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return items;
     return items.filter((item) =>
-      [item.title, item.type, durationLabel(item.durationSeconds) ?? '', item.trainer?.name ?? '', contentSourceLabel(item)]
+      [item.title, item.chapter, item.type, item.durationLabel ?? '', getTrainerName(item.trainerId), getContentSourceLabel(item)]
         .join(' ')
         .toLowerCase()
         .includes(needle),
@@ -616,7 +534,7 @@ function TrainerModuleContentModal({
 
   React.useEffect(() => setPage(1), [query, pageSize]);
 
-  const columns = React.useMemo<Column<ProgrammeContentItem>[]>(
+  const columns = React.useMemo<Column<ContentItem>[]>(
     () => [
       {
         key: 'actions',
@@ -636,20 +554,20 @@ function TrainerModuleContentModal({
               onClick={() => onPreview(item)}
               className="flex min-w-[320px] items-start gap-3 rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
             >
-              <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', meta.bg)}>
-                <Icon className={cn('h-4 w-4', meta.fg)} />
+              <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${meta.bg}`}>
+                <Icon className={`h-4 w-4 ${meta.fg}`} />
               </span>
               <span className="min-w-0">
                 <span className="block font-semibold text-ink">{item.title}</span>
-                <span className="mt-1 block text-sm text-ink-muted">Item {item.position} · {durationLabel(item.durationSeconds) ?? meta.label}</span>
+                <span className="mt-1 block text-sm text-ink-muted">{item.chapter} · {item.durationLabel ?? meta.label}</span>
               </span>
             </button>
           );
         },
       },
       { key: 'type', header: 'Type', cell: (item) => <Badge tone={contentTypeMeta[item.type].tone}>{contentTypeMeta[item.type].label}</Badge> },
-      { key: 'trainer', header: 'Trainer owner', cell: (item) => <span className="text-sm text-ink-muted">{item.trainer?.name ?? 'No trainer owner'}</span> },
-      { key: 'source', header: 'Source', cell: (item) => <span className="block max-w-[280px] truncate text-sm text-ink-muted">{contentSourceLabel(item)}</span> },
+      { key: 'trainer', header: 'Trainer owner', cell: (item) => <span className="text-sm text-ink-muted">{getTrainerName(item.trainerId)}</span> },
+      { key: 'source', header: 'Source', cell: (item) => <span className="block max-w-[260px] truncate text-sm text-ink-muted">{getContentSourceLabel(item)}</span> },
     ],
     [onPreview],
   );
@@ -663,7 +581,7 @@ function TrainerModuleContentModal({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={items.length > 0 ? 'green' : 'amber'}>{items.length > 0 ? 'Ready' : 'Needs content'}</Badge>
-                  <Badge tone="neutral">Module {module.position}</Badge>
+                  <Badge tone="neutral">Module {module.order}</Badge>
                 </div>
                 <h3 className="mt-3 text-xl font-semibold tracking-[-0.01em] text-ink">{module.title}</h3>
                 {module.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">{module.description}</p> : null}
@@ -698,9 +616,9 @@ function TrainerContentPreviewModal({
   onChangeItem,
   onClose,
 }: {
-  items: ProgrammeContentItem[];
-  item: ProgrammeContentItem | null;
-  onChangeItem: (item: ProgrammeContentItem | null) => void;
+  items: ContentItem[];
+  item: ContentItem | null;
+  onChangeItem: (item: ContentItem | null) => void;
   onClose: () => void;
 }) {
   if (!item) return null;
@@ -709,7 +627,6 @@ function TrainerContentPreviewModal({
   const currentIndex = Math.max(items.findIndex((candidate) => candidate.id === item.id), 0);
   const previousItem = currentIndex > 0 ? items[currentIndex - 1] : undefined;
   const nextItem = currentIndex < items.length - 1 ? items[currentIndex + 1] : undefined;
-  const openUrl = item.type === 'pdf' ? item.files[0]?.downloadUrl : item.type === 'tool' ? item.tool?.url : null;
 
   return (
     <Modal open={!!item} onOpenChange={(open) => !open && onClose()} title="Preview curriculum content" width="xl">
@@ -717,17 +634,17 @@ function TrainerContentPreviewModal({
         <div className="rounded-xl border border-line bg-surface-subtle p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', meta.bg)}>
-                <Icon className={cn('h-5 w-5', meta.fg)} />
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${meta.bg}`}>
+                <Icon className={`h-5 w-5 ${meta.fg}`} />
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={meta.tone}>{meta.label}</Badge>
-                  <Badge tone="neutral">Item {item.position}</Badge>
+                  <Badge tone="neutral">{item.chapter}</Badge>
                   <span className="text-sm text-ink-muted">{currentIndex + 1} of {items.length}</span>
                 </div>
                 <h3 className="mt-2 text-xl font-semibold text-ink">{item.title}</h3>
-                <div className="mt-1 text-sm text-ink-muted">{durationLabel(item.durationSeconds) ?? meta.label} · {item.trainer?.name ?? 'No trainer owner'}</div>
+                <div className="mt-1 text-sm text-ink-muted">{item.durationLabel ?? meta.label} · {getTrainerName(item.trainerId)}</div>
               </div>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -739,28 +656,28 @@ function TrainerContentPreviewModal({
 
         <div className="overflow-hidden rounded-xl border border-line bg-black">
           {item.type === 'video' ? (
-            item.video?.playbackId ? (
-              <MuxPlayer playbackId={item.video.playbackId} metadataVideoTitle={item.title} streamType="on-demand" className="aspect-video w-full" />
+            item.muxPlaybackId ? (
+              <MuxPlayer playbackId={item.muxPlaybackId} metadataVideoTitle={item.title} streamType="on-demand" className="aspect-video w-full" />
             ) : (
-              <PreviewFallback title="Video not ready" description="This content item does not have a ready video yet." />
+              <PreviewFallback title="Video not uploaded" description="This content item does not have a video file yet." />
             )
           ) : item.type === 'pdf' ? (
-            item.files[0]?.downloadUrl ? (
-              <iframe title={item.title} src={item.files[0].downloadUrl} className="h-[68vh] w-full bg-white" />
+            item.fileUrl ? (
+              <iframe title={item.title} src={item.fileUrl} className="h-[68vh] w-full bg-white" />
             ) : (
               <PreviewFallback title="PDF not attached" description="This content item does not have a PDF file yet." />
             )
-          ) : item.tool?.url ? (
-            <iframe title={item.title} src={item.tool.url} className="h-[68vh] w-full bg-white" sandbox="allow-forms allow-popups allow-same-origin allow-scripts" />
+          ) : item.toolUrl ? (
+            <iframe title={item.title} src={item.toolUrl} className="h-[68vh] w-full bg-white" />
           ) : (
             <PreviewFallback title="Tool link missing" description="This embedded tool does not have a link yet." />
           )}
         </div>
 
-        {openUrl && item.type !== 'video' ? (
+        {(item.fileUrl || item.toolUrl) && item.type !== 'video' ? (
           <div className="flex justify-end">
             <Button asChild variant="outline">
-              <a href={openUrl} target="_blank" rel="noreferrer">
+              <a href={item.fileUrl ?? item.toolUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 Open in new tab
               </a>
@@ -783,23 +700,32 @@ function PreviewFallback({ title, description }: { title: string; description: s
   );
 }
 
-const readinessColumns: Column<ProgrammeModule>[] = [
-  { key: 'module', header: 'Module', cell: (module) => <div><div className="font-semibold text-ink">{module.title}</div><div className="mt-1 text-xs text-ink-muted">Order {module.position}</div></div>, className: 'min-w-[280px]' },
-  { key: 'coverage', header: 'Coverage', cell: (module) => <ContentSummary items={module.contentItems} /> },
-  { key: 'status', header: 'Launch status', cell: (module) => moduleReadiness(module) === 'ready' ? <Badge tone="green">Ready</Badge> : <Badge tone="amber">Needs content</Badge> },
+const deliverableColumns: Column<TrainerDeliverableRow>[] = [
+  { key: 'deliverable', header: 'Deliverable', cell: (row) => <div className="min-w-[260px]"><div className="font-semibold text-ink">{row.name}</div><div className="mt-1 text-sm text-ink-muted">{row.requiredFor}</div></div> },
+  { key: 'due', header: 'Due rule', cell: (row) => <span className="text-sm text-ink-muted">{row.dueRule}</span> },
+  { key: 'submitted', header: 'Learner submissions', cell: (row) => <span className="font-medium text-ink">{row.submittedCount}/{row.requiredCount}</span> },
+  { key: 'status', header: 'Status', cell: (row) => { const meta = deliverableStatusMeta(row.status); return <Badge tone={meta.tone}>{meta.label}</Badge>; } },
+  { key: 'latest', header: 'Latest activity', cell: (row) => <span className="line-clamp-2 min-w-[260px] text-sm text-ink-muted">{row.latestActivity}</span> },
 ];
 
-const entrepreneurColumns: Column<EntrepreneurRecord>[] = [
-  { key: 'business', header: 'Business', cell: (entrepreneur) => <div className="min-w-[240px]"><div className="font-semibold text-ink">{entrepreneur.businessName}</div><div className="mt-1 text-sm text-ink-muted">{entrepreneur.representativeName}</div></div> },
-  { key: 'stage', header: 'Stage / sector', cell: (entrepreneur) => <div className="flex min-w-[200px] flex-wrap gap-1.5">{entrepreneur.stage ? <Badge tone="blue">{entrepreneur.stage.name}</Badge> : <Badge tone="neutral">No stage</Badge>}{entrepreneur.sector ? <Badge tone="green">{entrepreneur.sector.name}</Badge> : <Badge tone="neutral">No sector</Badge>}</div> },
-  { key: 'progress', header: 'Training progress', cell: (entrepreneur) => <div className="min-w-[180px]"><ProgressBar value={entrepreneur.learnerProgress.average} width="100%" className="h-2" /><div className="mt-1 text-sm text-ink-muted">{entrepreneur.learnerProgress.average}% average</div></div> },
-  { key: 'access', header: 'Programme access', cell: (entrepreneur) => <span className="text-sm text-ink-muted">{entrepreneur.programmeAccess.assignedProgrammes.length} assigned</span> },
+const readinessColumns: Column<Module>[] = [
+  { key: 'module', header: 'Module', cell: (module) => <div><div className="font-semibold text-ink">{module.title}</div><div className="mt-1 text-xs text-ink-muted">Order {module.order}</div></div>, className: 'min-w-[280px]' },
+  { key: 'coverage', header: 'Coverage', cell: (module) => <ContentSummary module={module} /> },
+  { key: 'status', header: 'Launch status', cell: (module) => module.contentItemIds.length > 0 ? <Badge tone="green">Ready</Badge> : <Badge tone="amber">Needs content</Badge> },
 ];
 
-function ContentSummary({ items }: { items: ProgrammeContentItem[] }) {
-  const counts = contentCounts(items);
+const entrepreneurColumns: Column<Entrepreneur>[] = [
+  { key: 'business', header: 'Business', cell: (entrepreneur) => <div className="min-w-[240px]"><div className="font-semibold text-ink">{entrepreneur.businessName}</div><div className="mt-1 text-sm text-ink-muted">{entrepreneur.representative}</div></div> },
+  { key: 'stage', header: 'Stage / sector', cell: (entrepreneur) => <div className="flex min-w-[180px] flex-wrap gap-1.5"><Badge tone={stageById[entrepreneur.stage]?.color ?? 'neutral'}>{stageById[entrepreneur.stage]?.label ?? entrepreneur.stage}</Badge><Badge tone={sectorById[entrepreneur.sector]?.color ?? 'neutral'}>{sectorById[entrepreneur.sector]?.label ?? entrepreneur.sector}</Badge></div> },
+  { key: 'progress', header: 'Training progress', cell: (entrepreneur) => <div className="min-w-[180px]"><ProgressBar value={entrepreneur.metrics.trainingProgress} width="100%" className="h-2" /><div className="mt-1 text-sm text-ink-muted">{entrepreneur.metrics.trainingProgress}% complete</div></div> },
+  { key: 'deliverables', header: 'Deliverables', cell: (entrepreneur) => `${entrepreneur.metrics.deliverablesDone}/${entrepreneur.metrics.deliverablesTotal}` },
+];
+
+function ContentSummary({ module }: { module: Module }) {
+  const items = getModuleContentItems(module);
+  const counts = items.reduce<Record<ContentItem['type'], number>>((acc, item) => ({ ...acc, [item.type]: acc[item.type] + 1 }), { video: 0, pdf: 0, tool: 0 });
   if (items.length === 0) return <span className="text-sm text-ink-muted">No learning assets yet</span>;
-  return <div className="flex min-w-[240px] flex-wrap gap-1.5">{counts.videos > 0 && <Badge tone="blue">{counts.videos} videos</Badge>}{counts.files > 0 && <Badge tone="neutral">{counts.files} PDFs</Badge>}{counts.tools > 0 && <Badge tone="brand">{counts.tools} tools</Badge>}</div>;
+  return <div className="flex min-w-[240px] flex-wrap gap-1.5">{counts.video > 0 && <Badge tone="blue">{counts.video} videos</Badge>}{counts.pdf > 0 && <Badge tone="neutral">{counts.pdf} files</Badge>}{counts.tool > 0 && <Badge tone="brand">{counts.tool} tools</Badge>}</div>;
 }
 
 function ProgrammeHealthCard({ label, value, helper, progress }: { label: string; value: React.ReactNode; helper?: string; progress?: number }) {
@@ -818,11 +744,11 @@ function ContextMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: 
 }
 
 function ReadinessPanelItem({ icon: Icon, title, status, description, tone = 'neutral' }: { icon: LucideIcon; title: string; status: string; description: string; tone?: 'neutral' | 'warning' | 'success' }) {
-  const badgeTone: BadgeTone = tone === 'success' ? 'green' : tone === 'warning' ? 'amber' : 'neutral';
+  const badgeTone = tone === 'success' ? 'green' : tone === 'warning' ? 'amber' : 'neutral';
   return (
     <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-4">
       <div className="flex items-start gap-3">
-        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', tone === 'warning' ? 'bg-warning-light text-warning-dark' : tone === 'success' ? 'bg-success-light text-success-dark' : 'bg-surface-subtle text-bid')}>
+        <div className={tone === 'warning' ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning-light text-warning-dark' : tone === 'success' ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success-light text-success-dark' : 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-bid'}>
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">

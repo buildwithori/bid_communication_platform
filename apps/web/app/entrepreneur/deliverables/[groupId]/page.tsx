@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { notFound } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, MessageSquareText, UploadCloud } from 'lucide-react';
 import { Breadcrumb } from '@/components/shared/Breadcrumb';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -12,7 +11,6 @@ import { Button } from '@/components/shared/Button';
 import {
   DataTable,
   RowActions,
-  TableEmptyState,
   TableFilterInput,
   TableFilterSelect,
   TablePagination,
@@ -20,14 +18,11 @@ import {
   type Column,
 } from '@/components/shared/DataTable';
 import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
+import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
+import { deliverableGroups } from '@/lib/mock-data';
+import { entrepreneurHasProgramme } from '@/lib/programme-access';
 import { routes } from '@/lib/routes';
 import { Modal } from '@/components/shared/Modal';
-import {
-  listDeliverableInstances,
-  markDeliverableReviewRead,
-  type DeliverableInstance,
-} from '@/lib/api/deliverables';
-import { mapDeliverableInstanceToEntrepreneurDeliverable } from '@/lib/deliverables/entrepreneur';
 import type { BadgeTone, Deliverable, DeliverableFeedback, DeliverableStatus } from '@/types';
 
 const statusMeta: Record<DeliverableStatus, { label: string; tone: BadgeTone; helper: string }> = {
@@ -45,20 +40,6 @@ function formatDate(value?: string) {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-async function fetchProgrammeDeliverableInstances(programmeId: string) {
-  const firstPage = await listDeliverableInstances({ programmeId, take: 100 });
-  const items: DeliverableInstance[] = [...firstPage.items];
-  let cursor = firstPage.nextCursor;
-
-  while (cursor) {
-    const nextPage = await listDeliverableInstances({ programmeId, take: 100, cursor });
-    items.push(...nextPage.items);
-    cursor = nextPage.nextCursor;
-  }
-
-  return items;
 }
 
 function isActionable(deliverable: Deliverable) {
@@ -87,7 +68,7 @@ export default function DeliverableListPage({
 }: {
   params: { groupId: string };
 }) {
-  const queryClient = useQueryClient();
+  const { entrepreneur, deliverables, markDeliverableFeedbackRead } = useEntrepreneurStore();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [targetDeliverable, setTargetDeliverable] = React.useState<Deliverable | null>(null);
   const [feedbackTarget, setFeedbackTarget] = React.useState<Deliverable | null>(null);
@@ -95,29 +76,18 @@ export default function DeliverableListPage({
   const [statusFilter, setStatusFilter] = React.useState<'all' | DeliverableStatus>('all');
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
+  const group = deliverableGroups.find((item) => item.id === params.groupId);
+  if (!group) return notFound();
+  if (group.programmeId && !entrepreneurHasProgramme(entrepreneur, group.programmeId)) return notFound();
 
-  const instancesQuery = useQuery({
-    queryKey: ['deliverable-instances', 'entrepreneur', params.groupId],
-    queryFn: () => fetchProgrammeDeliverableInstances(params.groupId),
-  });
+  const groupItems = React.useMemo(() => {
+    if (group.id === 'g-general') {
+      return deliverables.filter((item) => item.group === 'general');
+    }
+    return deliverables.filter((item) => item.programmeId === group.programmeId);
+  }, [deliverables, group.id, group.programmeId]);
 
-  const groupItems = React.useMemo<Deliverable[]>(
-    () => (instancesQuery.data ?? []).map(mapDeliverableInstanceToEntrepreneurDeliverable),
-    [instancesQuery.data],
-  );
-  const programmeName = instancesQuery.data?.[0]?.programme.name ?? 'Programme deliverables';
-
-  const markReadMutation = useMutation({
-    mutationFn: async (feedbackIds: string[]) => {
-      await Promise.all(feedbackIds.map((id) => markDeliverableReviewRead(id)));
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['deliverable-instances', 'entrepreneur'] });
-      void queryClient.invalidateQueries({ queryKey: ['deliverable-instances', 'entrepreneur', params.groupId] });
-    },
-  });
-
-  const filteredItems = React.useMemo<Deliverable[]>(() => {
+  const filteredItems = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     return groupItems.filter((item) => {
       const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
@@ -156,8 +126,6 @@ export default function DeliverableListPage({
     setUploadOpen(true);
   };
 
-  if (!instancesQuery.isLoading && !instancesQuery.isError && groupItems.length === 0) return notFound();
-
   const columns: Column<Deliverable>[] = [
     {
       key: 'actions',
@@ -190,11 +158,7 @@ export default function DeliverableListPage({
         const feedback = getFeedbackHistory(deliverable);
         const unreadFeedback = getUnreadFeedback(deliverable);
         return (
-          <button
-            type="button"
-            onClick={() => (feedback.length > 0 ? setFeedbackTarget(deliverable) : openUpload(deliverable))}
-            className="flex min-w-[260px] items-start gap-3 text-left hover:text-bid"
-          >
+          <div className="flex min-w-[260px] items-start gap-3">
             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-bid-light text-bid">
               <Icon className="h-4 w-4" />
             </span>
@@ -202,11 +166,15 @@ export default function DeliverableListPage({
               <div className="font-semibold text-ink">{deliverable.name}</div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
                 <span>{meta.helper}</span>
-                {unreadFeedback.length > 0 && <Badge tone="amber">New feedback</Badge>}
-                {feedback.length > 0 && unreadFeedback.length === 0 && <Badge tone="neutral">Feedback read</Badge>}
+                {unreadFeedback.length > 0 && (
+                  <Badge tone="amber">New feedback</Badge>
+                )}
+                {feedback.length > 0 && unreadFeedback.length === 0 && (
+                  <Badge tone="neutral">Feedback read</Badge>
+                )}
               </div>
             </div>
-          </button>
+          </div>
         );
       },
     },
@@ -246,11 +214,11 @@ export default function DeliverableListPage({
       <Breadcrumb
         items={[
           { label: 'Deliverables', href: routes.entrepreneur.deliverables },
-          { label: programmeName },
+          { label: group.label },
         ]}
       />
       <PageHeader
-        title={programmeName}
+        title={group.label}
         description="Track required submissions, BID feedback, and approval status."
         actions={
           <Button onClick={() => openUpload()}>
@@ -310,16 +278,12 @@ export default function DeliverableListPage({
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        {instancesQuery.isLoading ? (
-          <TableEmptyState title="Loading deliverables" description="Fetching this programme's requirements." />
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={pageRows}
-            rowKey={(deliverable) => deliverable.id}
-            emptyMessage={instancesQuery.isError ? 'Deliverables could not be loaded.' : 'No deliverables match this view.'}
-          />
-        )}
+        <DataTable
+          columns={columns}
+          rows={pageRows}
+          rowKey={(deliverable) => deliverable.id}
+          emptyMessage="No deliverables match this view."
+        />
         <TablePagination
           page={page}
           pageSize={pageSize}
@@ -336,14 +300,12 @@ export default function DeliverableListPage({
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         deliverable={targetDeliverable}
-        groupId={params.groupId}
-        deliverableOptions={groupItems}
+        groupId={group.id}
       />
       <FeedbackHistoryModal
         deliverable={feedbackTarget}
-        isMarkingRead={markReadMutation.isPending}
         onClose={() => setFeedbackTarget(null)}
-        onMarkRead={(ids) => markReadMutation.mutate(ids)}
+        onMarkRead={(deliverableId, ids) => markDeliverableFeedbackRead(deliverableId, ids)}
         onResubmit={(deliverable) => {
           setFeedbackTarget(null);
           openUpload(deliverable);
@@ -355,15 +317,13 @@ export default function DeliverableListPage({
 
 function FeedbackHistoryModal({
   deliverable,
-  isMarkingRead,
   onClose,
   onMarkRead,
   onResubmit,
 }: {
   deliverable: Deliverable | null;
-  isMarkingRead: boolean;
   onClose: () => void;
-  onMarkRead: (ids: string[]) => void;
+  onMarkRead: (deliverableId: string, ids: string[]) => void;
   onResubmit: (deliverable: Deliverable) => void;
 }) {
   const feedback = React.useMemo(
@@ -383,8 +343,8 @@ function FeedbackHistoryModal({
   const previousFeedback = feedback.slice(1);
 
   const closeAndMarkRead = () => {
-    if (unreadIds.length > 0) {
-      onMarkRead(unreadIds);
+    if (deliverable && unreadIds.length > 0) {
+      onMarkRead(deliverable.id, unreadIds);
     }
     onClose();
   };
@@ -406,7 +366,6 @@ function FeedbackHistoryModal({
                   {statusMeta[deliverable.status].label}
                 </Badge>
                 {unreadIds.length > 0 && <Badge tone="amber">{unreadIds.length} new</Badge>}
-                {isMarkingRead && <Badge tone="blue">Saving read receipt</Badge>}
               </div>
               <div className="mt-2 text-sm text-ink-muted">
                 {deliverable.fileName ?? 'No file uploaded yet'}
@@ -497,7 +456,7 @@ function FeedbackHistoryModal({
                 type="button"
                 onClick={() => {
                   if (unreadIds.length > 0) {
-                    onMarkRead(unreadIds);
+                    onMarkRead(deliverable.id, unreadIds);
                   }
                   onResubmit(deliverable);
                 }}
