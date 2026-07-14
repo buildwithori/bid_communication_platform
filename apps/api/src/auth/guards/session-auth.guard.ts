@@ -1,4 +1,5 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { UserStatus } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import { AuthService } from '../auth.service';
 import { readSessionCookie } from '../auth.cookies';
@@ -24,6 +25,10 @@ export class SessionAuthGuard implements CanActivate {
 
     if (!user) {
       throw new UnauthorizedException('Authentication is required.');
+    }
+
+    if (user.status !== UserStatus.active || !user.emailVerifiedAt) {
+      throw new ForbiddenException('Verify your email before accessing this resource.');
     }
 
     request.user = user;

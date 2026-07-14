@@ -1,9 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
-const { randomBytes, scrypt: scryptCallback } = require('crypto');
-const { promisify } = require('util');
+const argon2 = require('argon2');
 
 const prisma = new PrismaClient();
-const scrypt = promisify(scryptCallback);
 
 const DEV_PASSWORD = 'Password123!';
 
@@ -67,9 +65,7 @@ const toolAreas = [
 ];
 
 async function hashPassword(password) {
-  const salt = randomBytes(16).toString('base64url');
-  const derived = await scrypt(password, salt, 64);
-  return `scrypt:${salt}:${derived.toString('base64url')}`;
+  return argon2.hash(password, { type: argon2.argon2id });
 }
 
 async function upsertUser(role, seed, invitedById = null) {

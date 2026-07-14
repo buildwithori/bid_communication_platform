@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { SignupDto } from './dto/signup.dto';
 import { TokenDto } from './dto/token.dto';
 import { clearSessionCookie, readSessionCookie, setSessionCookie } from './auth.cookies';
@@ -29,15 +30,16 @@ type CookieOptions = {
 
 @ApiTags('auth')
 @Controller('auth')
-@Public()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('signup')
   signup(@Body() dto: SignupDto) {
     return this.authService.signup(dto);
   }
 
+  @Public()
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: CookieResponse) {
     const result = await this.authService.login(dto);
@@ -47,21 +49,31 @@ export class AuthController {
     return body;
   }
 
+  @Public()
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
+  @Public()
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
 
+  @Public()
   @Post('verify-email')
   verifyEmail(@Body() dto: TokenDto) {
     return this.authService.verifyEmail(dto);
   }
 
+  @Public()
+  @Post('resend-verification')
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto);
+  }
+
+  @Public()
   @Post('refresh')
   async refresh(@Req() request: CookieRequest, @Res({ passthrough: true }) response: CookieResponse) {
     const result = await this.authService.refresh(readSessionCookie(request));
@@ -79,6 +91,7 @@ export class AuthController {
     return result;
   }
 
+  @Public()
   @Get('me')
   me(@Req() request: CookieRequest) {
     return this.authService.me(readSessionCookie(request));

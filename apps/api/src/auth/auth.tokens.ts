@@ -1,5 +1,6 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
+import * as argon2 from 'argon2';
 
 const scrypt = promisify(scryptCallback);
 const PASSWORD_KEY_BYTES = 64;
@@ -9,15 +10,16 @@ export function createPlainToken(bytes = 32) {
 }
 
 export async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString('base64url');
-  const derived = (await scrypt(password, salt, PASSWORD_KEY_BYTES)) as Buffer;
-
-  return `scrypt:${salt}:${derived.toString('base64url')}`;
+  return argon2.hash(password, { type: argon2.argon2id });
 }
 
 export async function verifyPassword(password: string, passwordHash: string | null) {
   if (!passwordHash) {
     return false;
+  }
+
+  if (passwordHash.startsWith('$argon2')) {
+    return argon2.verify(passwordHash, password);
   }
 
   const [algorithm, salt, stored] = passwordHash.split(':');

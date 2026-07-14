@@ -1,26 +1,29 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { BusinessRelationship, BusinessSource, User, UserRole, UserStatus } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../database/prisma.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
 import { TokenDto } from './dto/token.dto';
 import { addMinutes, createPlainToken, hashPassword, hashToken, verifyPassword } from './auth.tokens';
 
 const SESSION_DURATION_MINUTES = 60 * 24 * 30;
+const VERIFICATION_DURATION_MINUTES = 60 * 24;
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   async signup(dto: SignupDto) {
     const email = this.normalizeEmail(dto.email);
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
-
-    if (existingUser) {
-      throw new BadRequestException('An account already exists for this email.');
-    }
+    if (existingUser) throw new BadRequestException('An account already exists for this email.');
 
     const { firstName, lastName } = this.splitName(dto.representativeName);
     const plainVerificationToken = createPlainToken();
@@ -29,294 +32,173 @@ export class AuthService {
 
     const user = await this.prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
-        data: {
-          email,
-          firstName,
-          lastName,
-          phone: dto.phone.trim(),
-          passwordHash,
-          role: UserRole.entrepreneur,
-          status: UserStatus.pending,
-        },
+        data: { email, firstName, lastName, phone: dto.phone.trim(), passwordHash, role: UserRole.entrepreneur, status: UserStatus.pending },
       });
-
       const business = await tx.business.create({
         data: {
-          name: dto.businessName.trim(),
-          country: dto.country.trim(),
-          source: BusinessSource.self_registered,
-          onboardingCompletedAt: new Date(),
-          sectorId: dto.sectorId,
-          stageId: dto.stageId,
+          name: dto.businessName.trim(), country: dto.country.trim(), source: BusinessSource.self_registered,
+          onboardingCompletedAt: new Date(), sectorId: dto.sectorId, stageId: dto.stageId,
         },
       });
-
       await tx.businessMembership.create({
-        data: {
-          userId: createdUser.id,
-          businessId: business.id,
-          relationship: BusinessRelationship.representative,
-          isPrimary: true,
-        },
+        data: { userId: createdUser.id, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true },
       });
-
       await tx.emailVerificationToken.create({
-        data: {
-          userId: createdUser.id,
-          tokenHash: verificationTokenHash,
-          expiresAt: addMinutes(new Date(), 60 * 24),
-        },
+        data: { userId: createdUser.id, tokenHash: verificationTokenHash, expiresAt: addMinutes(new Date(), VERIFICATION_DURATION_MINUTES) },
       });
-
       return createdUser;
     });
 
-    return {
-      user: this.serializeUser(user),
-      verification: this.devTokenResponse(plainVerificationToken),
-    };
+    await this.email.sendVerification(user.email, this.displayName(user), plainVerificationToken);
+    return { user: this.serializeUser(user), verification: { queued: true } };
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: this.normalizeEmail(dto.email) },
-    });
-
-    if (!user || !(await verifyPassword(dto.password, user.passwordHash))) {
+    const found = await this.prisma.user.findUnique({ where: { email: this.normalizeEmail(dto.email) } });
+    if (!found || !(await verifyPassword(dto.password, found.passwordHash))) {
       throw new UnauthorizedException('Invalid email or password.');
     }
+    if (found.status === UserStatus.inactive) throw new UnauthorizedException('This account is inactive.');
 
+    const user = await this.prisma.user.update({ where: { id: found.id }, data: { lastLoginAt: new Date() } });
     const sessionToken = await this.createSession(user.id);
-
     return {
-      user: this.serializeUser(user),
-      sessionToken,
-      session: {
-        mode: 'cookie',
-        expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES),
-      },
+      user: this.serializeUser(user), sessionToken,
+      session: { mode: 'cookie', expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES) },
     };
   }
 
   async me(sessionToken?: string) {
-    if (!sessionToken) {
-      return { user: null };
-    }
-
+    if (!sessionToken) return { user: null };
     const user = await this.validateSession(sessionToken);
     return { user: user ? this.serializeUser(user) : null };
   }
 
   async validateSession(sessionToken?: string) {
-    if (!sessionToken) {
-      return null;
-    }
-
-    return this.findUserBySession(sessionToken);
+    return sessionToken ? this.findUserBySession(sessionToken) : null;
   }
 
   async refresh(sessionToken?: string) {
-    if (!sessionToken) {
-      throw new UnauthorizedException('Session is required.');
-    }
-
+    if (!sessionToken) throw new UnauthorizedException('Session is required.');
     const activeSession = await this.findActiveSession(sessionToken);
-    if (!activeSession) {
-      throw new UnauthorizedException('Session is invalid or expired.');
-    }
+    if (!activeSession) throw new UnauthorizedException('Session is invalid or expired.');
 
     const nextSessionToken = await this.prisma.$transaction(async (tx) => {
-      await tx.refreshToken.update({
-        where: { id: activeSession.id },
-        data: {
-          revokedAt: new Date(),
-          revokedReason: 'rotated',
-        },
-      });
-
+      await tx.refreshToken.update({ where: { id: activeSession.id }, data: { revokedAt: new Date(), revokedReason: 'rotated' } });
       return this.createSession(activeSession.userId, tx);
     });
-
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: activeSession.userId } });
-
     return {
-      user: this.serializeUser(user),
-      sessionToken: nextSessionToken,
-      session: {
-        mode: 'cookie',
-        expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES),
-      },
+      user: this.serializeUser(user), sessionToken: nextSessionToken,
+      session: { mode: 'cookie', expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES) },
     };
   }
 
   async logout(sessionToken?: string) {
-    if (!sessionToken) {
-      return { ok: true };
+    if (sessionToken) {
+      await this.prisma.refreshToken.updateMany({
+        where: { tokenHash: await hashToken(sessionToken), revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: 'logout' },
+      });
     }
-
-    await this.prisma.refreshToken.updateMany({
-      where: {
-        tokenHash: await hashToken(sessionToken),
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-        revokedReason: 'logout',
-      },
-    });
-
     return { ok: true };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: this.normalizeEmail(dto.email) },
-    });
-
-    if (!user) {
-      return { ok: true };
-    }
+    const user = await this.prisma.user.findUnique({ where: { email: this.normalizeEmail(dto.email) } });
+    if (!user || user.status === UserStatus.inactive) return { ok: true };
 
     const plainToken = createPlainToken();
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: await hashToken(plainToken),
-        expiresAt: addMinutes(new Date(), 30),
-      },
-    });
-
-    return {
-      ok: true,
-      reset: this.devTokenResponse(plainToken),
-    };
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({ where: { userId: user.id, consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.passwordResetToken.create({
+        data: { userId: user.id, tokenHash: await hashToken(plainToken), expiresAt: addMinutes(new Date(), 30) },
+      }),
+    ]);
+    await this.email.sendPasswordReset(user.email, this.displayName(user), plainToken);
+    return { ok: true };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
-    const tokenHash = await hashToken(dto.token);
-    const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash },
-    });
-
+    const resetToken = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash: await hashToken(dto.token) } });
     if (!resetToken || resetToken.consumedAt || resetToken.expiresAt < new Date()) {
       throw new BadRequestException('This reset link is invalid or has expired.');
     }
-
     await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: resetToken.userId },
-        data: { passwordHash: await hashPassword(dto.password) },
-      }),
-      this.prisma.passwordResetToken.update({
-        where: { id: resetToken.id },
-        data: { consumedAt: new Date() },
-      }),
+      this.prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash: await hashPassword(dto.password) } }),
+      this.prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { consumedAt: new Date() } }),
+      this.prisma.refreshToken.updateMany({ where: { userId: resetToken.userId, revokedAt: null }, data: { revokedAt: new Date(), revokedReason: 'password_reset' } }),
     ]);
-
     return { ok: true };
   }
 
   async verifyEmail(dto: TokenDto) {
-    const tokenHash = await hashToken(dto.token);
-    const verificationToken = await this.prisma.emailVerificationToken.findUnique({
-      where: { tokenHash },
-    });
-
+    const verificationToken = await this.prisma.emailVerificationToken.findUnique({ where: { tokenHash: await hashToken(dto.token) } });
     if (!verificationToken || verificationToken.consumedAt || verificationToken.expiresAt < new Date()) {
       throw new BadRequestException('This verification link is invalid or has expired.');
     }
-
     const now = new Date();
     const user = await this.prisma.$transaction(async (tx) => {
       const verifiedUser = await tx.user.update({
-        where: { id: verificationToken.userId },
-        data: {
-          emailVerifiedAt: now,
-          status: UserStatus.active,
-        },
+        where: { id: verificationToken.userId }, data: { emailVerifiedAt: now, status: UserStatus.active },
       });
-
-      await tx.emailVerificationToken.update({
-        where: { id: verificationToken.id },
-        data: { consumedAt: now },
-      });
-
+      await tx.emailVerificationToken.update({ where: { id: verificationToken.id }, data: { consumedAt: now } });
       return verifiedUser;
     });
-
+    void this.email.sendWelcome(user.email, this.displayName(user)).catch(() => undefined);
     return { user: this.serializeUser(user) };
+  }
+
+  async resendVerification(dto: ResendVerificationDto) {
+    const user = await this.prisma.user.findUnique({ where: { email: this.normalizeEmail(dto.email) } });
+    if (!user || user.emailVerifiedAt || user.status === UserStatus.inactive) return { ok: true };
+
+    const plainToken = createPlainToken();
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationToken.updateMany({ where: { userId: user.id, consumedAt: null }, data: { consumedAt: now } }),
+      this.prisma.emailVerificationToken.create({
+        data: { userId: user.id, tokenHash: await hashToken(plainToken), expiresAt: addMinutes(now, VERIFICATION_DURATION_MINUTES) },
+      }),
+    ]);
+    await this.email.sendVerification(user.email, this.displayName(user), plainToken);
+    return { ok: true };
   }
 
   private serializeUser(user: User) {
     return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      role: user.role,
-      status: user.status,
-      emailVerifiedAt: user.emailVerifiedAt,
+      id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone,
+      role: user.role, status: user.status, emailVerifiedAt: user.emailVerifiedAt,
     };
   }
 
-  private async createSession(
-    userId: string,
-    tx: Pick<PrismaService, 'refreshToken'> = this.prisma,
-  ) {
+  private async createSession(userId: string, tx: Pick<PrismaService, 'refreshToken'> = this.prisma) {
     const sessionToken = createPlainToken(48);
     await tx.refreshToken.create({
-      data: {
-        userId,
-        tokenHash: await hashToken(sessionToken),
-        expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES),
-      },
+      data: { userId, tokenHash: await hashToken(sessionToken), expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES) },
     });
-
     return sessionToken;
   }
 
   private async findUserBySession(sessionToken: string) {
     const activeSession = await this.findActiveSession(sessionToken);
-    if (!activeSession) {
-      return null;
-    }
-
-    return this.prisma.user.findUnique({ where: { id: activeSession.userId } });
+    return activeSession ? this.prisma.user.findUnique({ where: { id: activeSession.userId } }) : null;
   }
 
   private async findActiveSession(sessionToken: string) {
     return this.prisma.refreshToken.findFirst({
-      where: {
-        tokenHash: await hashToken(sessionToken),
-        revokedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
+      where: { tokenHash: await hashToken(sessionToken), revokedAt: null, expiresAt: { gt: new Date() } },
     });
   }
 
-  private normalizeEmail(email: string) {
-    return email.trim().toLowerCase();
-  }
+  private normalizeEmail(email: string) { return email.trim().toLowerCase(); }
 
   private splitName(name: string) {
     const parts = name.trim().split(/\s+/);
-    return {
-      firstName: parts[0] ?? null,
-      lastName: parts.slice(1).join(' ') || null,
-    };
+    return { firstName: parts[0] ?? null, lastName: parts.slice(1).join(' ') || null };
   }
 
-  private devTokenResponse(token: string) {
-    if (process.env.NODE_ENV === 'production') {
-      return { queued: true };
-    }
-
-    return {
-      queued: true,
-      devToken: token,
-    };
+  private displayName(user: Pick<User, 'firstName' | 'email'>) {
+    return user.firstName?.trim() || user.email.split('@')[0];
   }
 }
