@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
@@ -24,14 +25,40 @@ import { Modal } from '@/components/shared/Modal';
 import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
-import {
-  deliverableReviews,
-  deliverableReviewStatusMeta,
-  type DeliverableReview,
-  type DeliverableReviewStatus,
-} from '@/lib/mock-data/admin-workflows';
+import { listDeliverableReviews, type DeliverableReviewQueueItem } from '@/lib/api/deliverables';
+import type { BadgeTone } from '@/types';
 
-const today = new Date('2026-07-07');
+const today = new Date();
+
+type DeliverableReviewStatus = 'pending-review' | 'changes-requested' | 'approved';
+
+type DeliverableReview = {
+  id: string;
+  entrepreneurId: string;
+  deliverableId: string;
+  entrepreneur: string;
+  businessName: string;
+  programme: string;
+  programmeId: string;
+  deliverable: string;
+  fileName: string;
+  submittedAt: string;
+  dueAt: string;
+  dueRule: string;
+  dueSource: 'programme-requirement' | 'manual-override';
+  dueUpdatedAt?: string;
+  dueUpdatedBy?: string;
+  status: DeliverableReviewStatus;
+  reviewer?: string;
+  latestFeedback?: string;
+  feedbackReadAt?: string;
+};
+
+const deliverableReviewStatusMeta: Record<DeliverableReviewStatus, { label: string; tone: BadgeTone }> = {
+  'pending-review': { label: 'Pending review', tone: 'amber' },
+  'changes-requested': { label: 'Changes required', tone: 'blue' },
+  approved: { label: 'Approved', tone: 'green' },
+};
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -46,8 +73,66 @@ function daysBetween(start: string, end: Date) {
   return Math.max(Math.floor((end.getTime() - startDate.getTime()) / 86_400_000), 0);
 }
 
+
+function mapStatus(status: DeliverableReviewQueueItem['status']): DeliverableReviewStatus {
+  if (status === 'approved') return 'approved';
+  if (status === 'changes_required') return 'changes-requested';
+  return 'pending-review';
+}
+
+function cadenceLabel(cadence: DeliverableReviewQueueItem['rule']['recurringCadence']) {
+  if (cadence === 'monthly') return 'Monthly recurring requirement';
+  if (cadence === 'quarterly') return 'Quarterly recurring requirement';
+  if (cadence === 'six_monthly') return 'Six-month recurring requirement';
+  return 'Recurring programme requirement';
+}
+
+function dueRuleLabel(row: DeliverableReviewQueueItem) {
+  if (row.rule.dueType === 'module_completion') {
+    return row.rule.dueAfterModule ? `After ${row.rule.dueAfterModule.title}` : 'After module completion';
+  }
+  if (row.rule.dueType === 'recurring') return cadenceLabel(row.rule.recurringCadence);
+  return 'Fixed programme due date';
+}
+
+function mapReviewRow(row: DeliverableReviewQueueItem): DeliverableReview {
+  const latestSubmission = row.latestSubmission;
+  const latestReview = row.latestReview;
+  return {
+    id: row.id,
+    entrepreneurId: row.entrepreneur.userId,
+    deliverableId: row.ruleId,
+    entrepreneur: row.entrepreneur.name,
+    businessName: row.entrepreneur.businessName,
+    programme: row.programme.name,
+    programmeId: row.programme.id,
+    deliverable: row.deliverable,
+    fileName: latestSubmission?.file.originalFilename ?? 'No file attached',
+    submittedAt: latestSubmission?.submittedAt ?? row.updatedAt,
+    dueAt: row.dueDate,
+    dueRule: dueRuleLabel(row),
+    dueSource: row.dueSource === 'manual_override' ? 'manual-override' : 'programme-requirement',
+    dueUpdatedAt: row.dueUpdatedAt ?? undefined,
+    dueUpdatedBy: row.dueUpdatedBy?.name,
+    status: mapStatus(row.status),
+    reviewer: latestReview?.reviewer.name,
+    latestFeedback: latestReview?.feedback,
+    feedbackReadAt: latestReview?.readAt ?? undefined,
+  };
+}
+
 export default function DeliverableReviewsPage() {
-  const [reviews, setReviews] = React.useState(deliverableReviews);
+  const reviewsQuery = useQuery({
+    queryKey: ['deliverable-reviews', 'admin'],
+    queryFn: () => listDeliverableReviews({ take: 50 }),
+  });
+  const [reviewOverrides, setReviewOverrides] = React.useState<Record<string, Partial<DeliverableReview>>>({});
+  const reviews = React.useMemo<DeliverableReview[]>(() => {
+    return ((reviewsQuery.data?.items ?? []) as DeliverableReviewQueueItem[]).map((row) => {
+      const mapped = mapReviewRow(row);
+      return { ...mapped, ...reviewOverrides[mapped.id] };
+    });
+  }, [reviewOverrides, reviewsQuery.data?.items]);
   const [active, setActive] = React.useState<DeliverableReview | null>(null);
   const [previewTarget, setPreviewTarget] = React.useState<DeliverableReview | null>(null);
   const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReview | null>(null);
@@ -58,36 +143,31 @@ export default function DeliverableReviewsPage() {
   const [pageSize, setPageSize] = React.useState(10);
 
   const updateStatus = (id: string, status: DeliverableReviewStatus, feedback?: string) => {
-    setReviews((rows) =>
-      rows.map((row) =>
-        row.id === id
-          ? {
-              ...row,
-              status,
-              reviewer: 'Ama Darko',
-              latestFeedback: feedback?.trim() || row.latestFeedback,
-              feedbackReadAt: status === 'changes-requested' ? undefined : row.feedbackReadAt,
-            }
-          : row,
-      ),
-    );
+    const currentRow = reviews.find((row) => row.id === id);
+    setReviewOverrides((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        status,
+        reviewer: 'Ama Darko',
+        latestFeedback: feedback?.trim() || current[id]?.latestFeedback || currentRow?.latestFeedback,
+        feedbackReadAt: status === 'changes-requested' ? undefined : current[id]?.feedbackReadAt || currentRow?.feedbackReadAt,
+      },
+    }));
     toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
   };
 
   const updateDueDate = (id: string, dueAt: string) => {
-    setReviews((rows) =>
-      rows.map((row) =>
-        row.id === id
-          ? {
-              ...row,
-              dueAt,
-              dueSource: 'manual-override',
-              dueUpdatedAt: new Date().toISOString(),
-              dueUpdatedBy: 'Ama Darko',
-            }
-          : row,
-      ),
-    );
+    setReviewOverrides((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        dueAt,
+        dueSource: 'manual-override',
+        dueUpdatedAt: new Date().toISOString(),
+        dueUpdatedBy: 'Ama Darko',
+      },
+    }));
     setDueDateTarget(null);
     toast.success('Due date override saved');
   };
@@ -230,7 +310,7 @@ export default function DeliverableReviewsPage() {
       <Card className="mt-4">
         <CardHeader
           title="Review queue"
-          description={`${filteredReviews.length} submitted file${filteredReviews.length === 1 ? '' : 's'} in this view`}
+          description={reviewsQuery.isLoading ? 'Loading submitted files...' : `${filteredReviews.length} submitted file${filteredReviews.length === 1 ? '' : 's'} in this view`}
         />
         <TableToolbar>
           <div>
