@@ -27,27 +27,28 @@ export class StorageService {
 
     const endpointUrl = new URL(endpoint);
     const host = `${bucket}.${endpointUrl.host}`;
-    const encodedKey = input.storageKey.split('/').map(encodeURIComponent).join('/');
+    const encodedKey = input.storageKey.split('/').map((segment) => this.encodeRfc3986(segment)).join('/');
     const pathname = `/${encodedKey}`;
     const now = new Date();
     const amzDate = this.amzDate(now);
     const dateStamp = amzDate.slice(0, 8);
     const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
     const signedHeaders = input.method === 'PUT' ? 'content-type;host' : 'host';
-    const query = new URLSearchParams({
-      'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-      'X-Amz-Credential': `${accessKeyId}/${credentialScope}`,
-      'X-Amz-Date': amzDate,
-      'X-Amz-Expires': String(expiresInSeconds),
-      'X-Amz-SignedHeaders': signedHeaders,
-    });
+    const queryParams: Array<[string, string]> = [
+      ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+      ['X-Amz-Credential', `${accessKeyId}/${credentialScope}`],
+      ['X-Amz-Date', amzDate],
+      ['X-Amz-Expires', String(expiresInSeconds)],
+      ['X-Amz-SignedHeaders', signedHeaders],
+    ];
+    const canonicalQuery = this.canonicalQuery(queryParams);
     const canonicalHeaders = input.method === 'PUT'
       ? `content-type:${input.mimeType ?? 'application/octet-stream'}\nhost:${host}\n`
       : `host:${host}\n`;
     const canonicalRequest = [
       input.method,
       pathname,
-      query.toString(),
+      canonicalQuery,
       canonicalHeaders,
       signedHeaders,
       'UNSIGNED-PAYLOAD',
@@ -60,10 +61,10 @@ export class StorageService {
     ].join('\n');
     const signingKey = this.signingKey(secretAccessKey, dateStamp, region, 's3');
     const signature = createHmac('sha256', signingKey).update(stringToSign).digest('hex');
-    query.set('X-Amz-Signature', signature);
+    const signedQuery = this.canonicalQuery([...queryParams, ['X-Amz-Signature', signature]]);
 
     return {
-      url: `${endpointUrl.protocol}//${host}${pathname}?${query.toString()}`,
+      url: `${endpointUrl.protocol}//${host}${pathname}?${signedQuery}`,
       method: input.method,
       headers: input.method === 'PUT' ? { 'content-type': input.mimeType ?? 'application/octet-stream' } : {},
       expiresAt: new Date(now.getTime() + expiresInSeconds * 1000).toISOString(),
@@ -88,6 +89,22 @@ export class StorageService {
 
   private sha256(value: string) {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  private canonicalQuery(params: Array<[string, string]>) {
+    return [...params]
+      .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+        const keySort = leftKey.localeCompare(rightKey);
+        return keySort === 0 ? leftValue.localeCompare(rightValue) : keySort;
+      })
+      .map(([key, value]) => `${this.encodeRfc3986(key)}=${this.encodeRfc3986(value)}`)
+      .join('&');
+  }
+
+  private encodeRfc3986(value: string) {
+    return encodeURIComponent(value).replace(/[!'()*]/g, (character) => (
+      `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    ));
   }
 
   private signingKey(secret: string, dateStamp: string, region: string, service: string) {
