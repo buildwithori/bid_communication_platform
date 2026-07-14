@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { LearnerProgressStatus, Prisma, ProgrammeAccessType, ProgressSource, User, UserRole } from '@prisma/client';
+import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, LearnerProgressStatus, Prisma, ProgrammeAccessType, ProgressSource, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { LearnerProgressQueryDto } from './dto/learner-progress-query.dto';
 import { LearnerContentProgressInputDto, SyncLearnerProgressDto } from './dto/sync-learner-progress.dto';
@@ -273,6 +273,15 @@ export class LearningService {
           lastSyncedAt: syncedAt,
         },
       });
+
+      if (moduleProgress.status === LearnerProgressStatus.completed) {
+        await this.createModuleCompletionDeliverableInstances(
+          entrepreneurUserId,
+          programmeId,
+          programmeModule.moduleId,
+          syncedAt,
+        );
+      }
     }
 
     const moduleRows = await this.prisma.learnerModuleProgress.findMany({
@@ -337,6 +346,60 @@ export class LearningService {
         completedAt: programmeStatus === LearnerProgressStatus.completed ? syncedAt : null,
         lastSyncedAt: syncedAt,
       },
+    });
+  }
+
+  private async createModuleCompletionDeliverableInstances(
+    entrepreneurUserId: string,
+    programmeId: string,
+    moduleId: string,
+    completedAt: Date,
+  ) {
+    const settings = await this.prisma.companySettings.findUnique({ where: { singletonKey: 'default' } });
+    const dueDays = settings?.moduleCompletionDeliverableDueDays ?? 0;
+    const dueDate = new Date(completedAt);
+    dueDate.setDate(dueDate.getDate() + dueDays);
+
+    const rules = await this.prisma.programmeDeliverableRule.findMany({
+      where: {
+        programmeId,
+        dueType: DeliverableDueType.module_completion,
+        dueAfterModuleId: moduleId,
+        active: true,
+      },
+      select: {
+        id: true,
+        programmeId: true,
+        requiredForScope: true,
+        requiredStageId: true,
+      },
+    });
+
+    if (!rules.length) return;
+
+    const entrepreneur = await this.prisma.user.findUnique({
+      where: { id: entrepreneurUserId },
+      select: {
+        businessMemberships: {
+          where: { isPrimary: true },
+          take: 1,
+          select: { business: { select: { stageId: true } } },
+        },
+      },
+    });
+    const stageId = entrepreneur?.businessMemberships[0]?.business.stageId ?? null;
+
+    await this.prisma.deliverableInstance.createMany({
+      data: rules
+        .filter((rule) => rule.requiredForScope !== DeliverableRequiredScope.stage || rule.requiredStageId === stageId)
+        .map((rule) => ({
+          ruleId: rule.id,
+          entrepreneurUserId,
+          programmeId: rule.programmeId,
+          dueDate,
+          status: DeliverableInstanceStatus.not_submitted,
+        })),
+      skipDuplicates: true,
     });
   }
 

@@ -1,9 +1,24 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
+import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 
 const DEFAULT_TAKE = 20;
+
+const deliverableRuleInclude = {
+  dueAfterModule: { select: { id: true, title: true } },
+  requiredStage: { select: { id: true, name: true, key: true } },
+  instances: {
+    select: {
+      id: true,
+      status: true,
+      submissions: { select: { id: true }, take: 1 },
+    },
+  },
+} satisfies Prisma.ProgrammeDeliverableRuleInclude;
+
+type ProgrammeDeliverableRuleWithInclude = Prisma.ProgrammeDeliverableRuleGetPayload<{ include: typeof deliverableRuleInclude }>;
 
 @Injectable()
 export class ProgrammesService {
@@ -48,6 +63,72 @@ export class ProgrammesService {
     const items = rows.slice(0, take).map((programme) => this.mapProgrammeListItem(programme));
 
     return { items, nextCursor };
+  }
+
+  async listDeliverableRules(user: User, programmeId: string) {
+    if (!(await this.canReadProgramme(user, programmeId))) {
+      throw new ForbiddenException('You do not have access to this programme.');
+    }
+
+    const rules = await this.prisma.programmeDeliverableRule.findMany({
+      where: { programmeId },
+      orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
+      include: this.deliverableRuleInclude(),
+    });
+
+    return { items: rules.map((rule) => this.mapDeliverableRule(rule)) };
+  }
+
+  async createDeliverableRule(user: User, programmeId: string, dto: CreateProgrammeDeliverableRuleDto) {
+    if (user.role !== UserRole.admin) {
+      throw new ForbiddenException('Only admins can manage programme deliverable rules.');
+    }
+
+    await this.ensureProgrammeExists(programmeId);
+    await this.validateDeliverableRuleInput(programmeId, dto);
+
+    const rule = await this.prisma.programmeDeliverableRule.create({
+      data: this.deliverableRuleData(programmeId, dto) as Prisma.ProgrammeDeliverableRuleUncheckedCreateInput,
+      include: this.deliverableRuleInclude(),
+    });
+
+    await this.createImmediateDeliverableInstances(rule.id);
+
+    return this.mapDeliverableRule(
+      await this.prisma.programmeDeliverableRule.findUniqueOrThrow({
+        where: { id: rule.id },
+        include: this.deliverableRuleInclude(),
+      }),
+    );
+  }
+
+  async updateDeliverableRule(
+    user: User,
+    programmeId: string,
+    ruleId: string,
+    dto: UpsertProgrammeDeliverableRuleDto,
+  ) {
+    if (user.role !== UserRole.admin) {
+      throw new ForbiddenException('Only admins can manage programme deliverable rules.');
+    }
+
+    const existing = await this.prisma.programmeDeliverableRule.findFirst({
+      where: { id: ruleId, programmeId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Programme deliverable rule was not found.');
+
+    await this.validateDeliverableRuleInput(programmeId, dto, ruleId);
+
+    const updated = await this.prisma.programmeDeliverableRule.update({
+      where: { id: ruleId },
+      data: this.deliverableRuleData(programmeId, dto, true) as Prisma.ProgrammeDeliverableRuleUncheckedUpdateInput,
+      include: this.deliverableRuleInclude(),
+    });
+
+    await this.createImmediateDeliverableInstances(ruleId);
+
+    return this.mapDeliverableRule(updated);
   }
 
   async getProgramme(user: User, id: string) {
@@ -103,6 +184,193 @@ export class ProgrammesService {
     }
 
     return this.mapProgrammeDetail(programme);
+  }
+
+  private deliverableRuleInclude() {
+    return deliverableRuleInclude;
+  }
+
+  private deliverableRuleData(
+    programmeId: string,
+    dto: CreateProgrammeDeliverableRuleDto | UpsertProgrammeDeliverableRuleDto,
+    partial = false,
+  ): Prisma.ProgrammeDeliverableRuleUncheckedCreateInput | Prisma.ProgrammeDeliverableRuleUncheckedUpdateInput {
+    const dueType = dto.dueType;
+    const requiredForScope = dto.requiredForScope ?? (!partial ? DeliverableRequiredScope.all : undefined);
+
+    return {
+      programmeId,
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+      ...(dueType !== undefined ? { dueType } : {}),
+      ...(dueType !== undefined || dto.dueDate !== undefined
+        ? { dueDate: dueType === DeliverableDueType.fixed_date && dto.dueDate ? this.dateOnly(dto.dueDate) : null }
+        : {}),
+      ...(dueType !== undefined || dto.dueAfterModuleId !== undefined
+        ? { dueAfterModuleId: dueType === DeliverableDueType.module_completion ? dto.dueAfterModuleId ?? null : null }
+        : {}),
+      ...(dueType !== undefined || dto.recurringCadence !== undefined
+        ? { recurringCadence: dueType === DeliverableDueType.recurring ? dto.recurringCadence ?? null : null }
+        : {}),
+      ...(requiredForScope !== undefined ? { requiredForScope } : {}),
+      ...(requiredForScope !== undefined || dto.requiredStageId !== undefined
+        ? { requiredStageId: requiredForScope === DeliverableRequiredScope.stage ? dto.requiredStageId ?? null : null }
+        : {}),
+      ...(dto.active !== undefined ? { active: dto.active } : {}),
+    };
+  }
+
+  private async validateDeliverableRuleInput(
+    programmeId: string,
+    dto: CreateProgrammeDeliverableRuleDto | UpsertProgrammeDeliverableRuleDto,
+    currentRuleId?: string,
+  ) {
+    if (dto.name?.trim()) {
+      const duplicate = await this.prisma.programmeDeliverableRule.findFirst({
+        where: {
+          programmeId,
+          name: { equals: dto.name.trim(), mode: 'insensitive' },
+          ...(currentRuleId ? { id: { not: currentRuleId } } : {}),
+        },
+        select: { id: true },
+      });
+      if (duplicate) throw new BadRequestException('A deliverable rule with this name already exists in this programme.');
+    }
+
+    if (dto.dueType === DeliverableDueType.fixed_date && !dto.dueDate) {
+      throw new BadRequestException('A fixed-date deliverable needs a due date.');
+    }
+    if (dto.dueType === DeliverableDueType.module_completion && !dto.dueAfterModuleId) {
+      throw new BadRequestException('A module-completion deliverable needs a module.');
+    }
+    if (dto.dueType === DeliverableDueType.recurring && !dto.recurringCadence) {
+      throw new BadRequestException('A recurring deliverable needs a cadence.');
+    }
+    if (dto.requiredForScope === DeliverableRequiredScope.stage && !dto.requiredStageId) {
+      throw new BadRequestException('A stage-specific deliverable needs a business stage.');
+    }
+
+    if (dto.dueAfterModuleId) {
+      const moduleBelongsToProgramme = await this.prisma.programmeModule.count({
+        where: { programmeId, moduleId: dto.dueAfterModuleId },
+      });
+      if (moduleBelongsToProgramme === 0) {
+        throw new BadRequestException('The selected module does not belong to this programme.');
+      }
+    }
+
+    if (dto.requiredStageId) {
+      const stage = await this.prisma.businessStage.findFirst({
+        where: { id: dto.requiredStageId, active: true },
+        select: { id: true },
+      });
+      if (!stage) throw new BadRequestException('The selected business stage is not active.');
+    }
+  }
+
+  private async createImmediateDeliverableInstances(ruleId: string) {
+    const rule = await this.prisma.programmeDeliverableRule.findUnique({
+      where: { id: ruleId },
+      include: { programme: { select: { accessType: true } } },
+    });
+    if (!rule || !rule.active || rule.dueType !== DeliverableDueType.fixed_date || !rule.dueDate) return;
+
+    const dueDate = rule.dueDate;
+    const entrepreneurIds = await this.eligibleEntrepreneurIdsForRule(rule);
+    const status = dueDate.getTime() < Date.now()
+      ? DeliverableInstanceStatus.overdue
+      : DeliverableInstanceStatus.not_submitted;
+
+    await Promise.all(
+      entrepreneurIds.map((entrepreneurUserId) =>
+        this.prisma.deliverableInstance.upsert({
+          where: {
+            ruleId_entrepreneurUserId_programmeId: {
+              ruleId: rule.id,
+              entrepreneurUserId,
+              programmeId: rule.programmeId,
+            },
+          },
+          update: {
+            dueDate,
+            status,
+          },
+          create: {
+            ruleId: rule.id,
+            entrepreneurUserId,
+            programmeId: rule.programmeId,
+            dueDate,
+            status,
+          },
+        }),
+      ),
+    );
+  }
+
+  private async eligibleEntrepreneurIdsForRule(rule: {
+    programmeId: string;
+    requiredForScope: DeliverableRequiredScope;
+    requiredStageId: string | null;
+    programme: { accessType: ProgrammeAccessType };
+  }) {
+    const stageFilter =
+      rule.requiredForScope === DeliverableRequiredScope.stage && rule.requiredStageId
+        ? {
+            businessMemberships: {
+              some: {
+                isPrimary: true,
+                business: { stageId: rule.requiredStageId },
+              },
+            },
+          }
+        : {};
+
+    if (rule.programme.accessType === ProgrammeAccessType.free) {
+      const users = await this.prisma.user.findMany({
+        where: { role: UserRole.entrepreneur, ...stageFilter },
+        select: { id: true },
+      });
+      return users.map((user) => user.id);
+    }
+
+    const grants = await this.prisma.programmeAccessGrant.findMany({
+      where: {
+        programmeId: rule.programmeId,
+        revokedAt: null,
+        entrepreneur: stageFilter,
+      },
+      select: { entrepreneurUserId: true },
+    });
+    return grants.map((grant) => grant.entrepreneurUserId);
+  }
+
+  private mapDeliverableRule(rule: ProgrammeDeliverableRuleWithInclude) {
+    const submittedCount = rule.instances.filter((instance) => instance.submissions.length > 0).length;
+
+    return {
+      id: rule.id,
+      programmeId: rule.programmeId,
+      name: rule.name,
+      dueType: rule.dueType,
+      dueDate: rule.dueDate?.toISOString() ?? null,
+      dueAfterModule: rule.dueAfterModule,
+      recurringCadence: rule.recurringCadence,
+      requiredForScope: rule.requiredForScope,
+      requiredStage: rule.requiredStage,
+      active: rule.active,
+      submittedCount,
+      assignedCount: rule.instances.length,
+      createdAt: rule.createdAt.toISOString(),
+      updatedAt: rule.updatedAt.toISOString(),
+    };
+  }
+
+  private async ensureProgrammeExists(programmeId: string) {
+    const programme = await this.prisma.programme.findUnique({ where: { id: programmeId }, select: { id: true } });
+    if (!programme) throw new NotFoundException('Programme was not found.');
+  }
+
+  private dateOnly(value: string) {
+    return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
   }
 
   private buildProgrammeWhere(user: User, query: ProgrammeQueryDto): Prisma.ProgrammeWhereInput {
