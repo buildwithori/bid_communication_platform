@@ -120,6 +120,30 @@ enum ToolRequestStatus {
   declined
 }
 
+enum SessionType {
+  mentor_checkin
+  office_hours
+  investor_prep
+}
+
+enum SessionStatus {
+  requested
+  confirmed
+  declined
+  cancelled
+  completed
+}
+
+enum SessionSource {
+  entrepreneur_request
+  team_created
+}
+
+enum SessionNoteVisibility {
+  internal
+  participant
+}
+
 enum LearnerProgressStatus {
   not_started
   in_progress
@@ -207,6 +231,10 @@ model User {
   deliverableSubmissions      DeliverableSubmission[]    @relation("DeliverableSubmissionSubmittedBy")
   deliverableReviews          DeliverableReview[]        @relation("DeliverableReviewReviewer")
   updatedDeliverableDueDates  DeliverableInstance[]      @relation("DeliverableDueDateUpdatedBy")
+  requestedSessions           Session[]                  @relation("SessionEntrepreneur")
+  ownedSessions               Session[]                  @relation("SessionOwner")
+  createdSessions             Session[]                  @relation("SessionCreatedBy")
+  sessionNotes                SessionNote[]              @relation("SessionNoteAuthor")
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
@@ -478,6 +506,7 @@ model Programme {
   toolAccess           ToolProgrammeAccess[]
   deliverableRules     ProgrammeDeliverableRule[]
   deliverableInstances DeliverableInstance[]
+  sessions             Session[]
 
   @@index([accessType])
   @@index([publishedAt, archivedAt])
@@ -937,3 +966,56 @@ model DeliverableReview {
   @@index([decision])
   @@map("deliverable_reviews")
 }
+
+model Session {
+  id                 String        @id @default(cuid())
+  entrepreneurUserId String        @map("entrepreneur_user_id")
+  programmeId        String?       @map("programme_id")
+  ownerUserId        String?       @map("owner_user_id")
+  createdById        String        @map("created_by_id")
+  type               SessionType
+  topic              String
+  notes              String?
+  source             SessionSource @default(entrepreneur_request)
+  status             SessionStatus @default(requested)
+  startAt            DateTime      @map("start_at")
+  endAt              DateTime      @map("end_at")
+  timezone           String        @default("UTC")
+  meetingProvider    String        @default("google_meet") @map("meeting_provider")
+  meetingUrl         String?       @map("meeting_url")
+  declinedReason     String?       @map("declined_reason")
+  cancelledReason    String?       @map("cancelled_reason")
+  completedAt        DateTime?     @map("completed_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  entrepreneur User          @relation("SessionEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme    Programme?    @relation(fields: [programmeId], references: [id])
+  owner        User?         @relation("SessionOwner", fields: [ownerUserId], references: [id])
+  createdBy    User          @relation("SessionCreatedBy", fields: [createdById], references: [id])
+  notesHistory SessionNote[]
+
+  @@index([entrepreneurUserId, status])
+  @@index([ownerUserId, status])
+  @@index([programmeId])
+  @@index([status, startAt])
+  @@index([source, status])
+  @@map("sessions")
+}
+
+model SessionNote {
+  id         String                @id @default(cuid())
+  sessionId  String                @map("session_id")
+  authorId   String                @map("author_id")
+  note       String
+  visibility SessionNoteVisibility @default(internal)
+  createdAt  DateTime              @default(now()) @map("created_at")
+
+  session Session @relation(fields: [sessionId], references: [id])
+  author  User    @relation("SessionNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([authorId])
+  @@map("session_notes")
+}
+

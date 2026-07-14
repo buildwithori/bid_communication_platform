@@ -8,6 +8,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ProgrammesModule } from './programmes/programmes.module';
 import { EntrepreneursModule } from './entrepreneurs/entrepreneurs.module';
 import { TrainersModule } from './trainers/trainers.module';
+import { SessionsModule } from './sessions/sessions.module';
 import { LearningModule } from './learning/learning.module';
 import { ContentModule } from './content/content.module';
 import { DeliverablesModule } from './deliverables/deliverables.module';
@@ -27,6 +28,7 @@ import { FilesModule } from './files/files.module';
     ProgrammesModule,
     EntrepreneursModule,
     TrainersModule,
+    SessionsModule,
     LearningModule,
     ContentModule,
     DeliverablesModule,
