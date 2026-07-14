@@ -135,8 +135,7 @@ export class FilesService {
       throw new ForbiddenException('Only admins can upload this type of file.');
     }
 
-    if (dto.usage === 'content_pdf') {
-      if (!dto.contentItemId) throw new BadRequestException('A content item is required for content PDF uploads.');
+    if (dto.usage === 'content_pdf' && dto.contentItemId) {
       const contentItem = await this.prisma.contentItem.findUnique({ where: { id: dto.contentItemId }, select: { id: true, type: true } });
       if (!contentItem) throw new NotFoundException('Content item was not found.');
       if (contentItem.type !== 'pdf') throw new BadRequestException('Only PDF content items can receive PDF uploads.');

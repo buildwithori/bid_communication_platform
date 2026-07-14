@@ -7,12 +7,24 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { ContentService } from './content.service';
 import { UpsertContentRatingDto } from './dto/upsert-content-rating.dto';
+import { CreateContentItemDto } from './dto/create-content-item.dto';
 
 @ApiTags('content')
 @Controller('content')
 @UseGuards(SessionAuthGuard, RolesGuard)
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
+
+
+  @Post('modules/:moduleId/items')
+  @Roles(UserRole.admin)
+  createModuleContentItem(
+    @CurrentUser() user: User,
+    @Param('moduleId') moduleId: string,
+    @Body() input: CreateContentItemDto,
+  ) {
+    return this.contentService.createModuleContentItem(user, moduleId, input);
+  }
 
   @Get('ratings/:contentItemId/me')
   @Roles(UserRole.entrepreneur)
