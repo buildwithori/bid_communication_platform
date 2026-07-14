@@ -38,6 +38,7 @@ export function mapToolRecordToUi(record: ToolRecord): Tool {
     hiddenEntrepreneurIds: record.audience.hiddenEntrepreneurUserIds,
     pdfAssetId: record.pdfAsset?.id,
     pdfFileName: record.pdfAsset?.originalFilename,
+    pdfUrl: record.pdfAsset?.downloadUrl ?? undefined,
     embedUrl: record.embeddedUrl ?? undefined,
     updatedAt: record.updatedAt,
     iconKey: isToolIcon(record.iconKey) ? record.iconKey : 'plus',

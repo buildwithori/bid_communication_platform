@@ -25,6 +25,7 @@ export type ToolRecord = {
     sizeBytes: string;
     status: string;
     storageKey: string;
+    downloadUrl: string | null;
   } | null;
   audience: {
     programmeIds: string[];

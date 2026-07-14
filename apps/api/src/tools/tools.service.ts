@@ -8,6 +8,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { StorageService } from '../files/storage.service';
 import { ToolQueryDto } from './dto/tool-query.dto';
 import { CreateToolDto, UpsertToolDto } from './dto/upsert-tool.dto';
 
@@ -36,7 +37,10 @@ type ToolWithInclude = Prisma.ToolGetPayload<{ include: typeof toolInclude }>;
 
 @Injectable()
 export class ToolsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async listTools(user: User, query: ToolQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
@@ -293,6 +297,9 @@ export class ToolsService {
             sizeBytes: tool.pdfAsset.sizeBytes.toString(),
             status: tool.pdfAsset.status,
             storageKey: tool.pdfAsset.storageKey,
+            downloadUrl: tool.pdfAsset.status === 'ready'
+              ? this.storage.presign({ method: 'GET', storageKey: tool.pdfAsset.storageKey, expiresInSeconds: 5 * 60 }).url
+              : null,
           }
         : null,
       audience: {
