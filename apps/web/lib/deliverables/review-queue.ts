@@ -14,6 +14,9 @@ export type DeliverableReviewRow = {
   programmeId: string;
   deliverable: string;
   fileName: string;
+  fileMimeType: string | null;
+  fileUrl: string | null;
+  fileSizeBytes: string | null;
   submittedAt: string;
   dueAt: string;
   dueRule: string;
@@ -46,6 +49,9 @@ export function mapDeliverableReviewRow(row: DeliverableReviewQueueItem): Delive
     programmeId: row.programme.id,
     deliverable: row.deliverable,
     fileName: latestSubmission?.file.originalFilename ?? 'No file attached',
+    fileMimeType: latestSubmission?.file.mimeType ?? null,
+    fileUrl: latestSubmission?.file.downloadUrl ?? null,
+    fileSizeBytes: latestSubmission?.file.sizeBytes ?? null,
     submittedAt: latestSubmission?.submittedAt ?? row.updatedAt,
     dueAt: row.dueDate,
     dueRule: dueRuleLabel(row),

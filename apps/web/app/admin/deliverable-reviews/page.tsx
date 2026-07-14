@@ -24,6 +24,7 @@ import {
 import { Modal } from '@/components/shared/Modal';
 import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
+import { DeliverableFilePreviewModal } from '@/components/deliverables/DeliverableFilePreviewModal';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
 import {
   listDeliverableReviews,
@@ -69,8 +70,8 @@ export default function DeliverableReviewsPage() {
     },
   });
   const dueDateMutation = useMutation({
-    mutationFn: (payload: { instanceId: string; dueDate: string }) =>
-      saveDeliverableDueDate(payload.instanceId, { dueDate: payload.dueDate }),
+    mutationFn: (payload: { instanceId: string; dueDate: string; reason?: string }) =>
+      saveDeliverableDueDate(payload.instanceId, { dueDate: payload.dueDate, reason: payload.reason }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deliverable-reviews', 'admin'] });
     },
@@ -122,9 +123,9 @@ export default function DeliverableReviewsPage() {
     );
   };
 
-  const updateDueDate = (id: string, dueAt: string) => {
+  const updateDueDate = (id: string, dueAt: string, reason?: string) => {
     dueDateMutation.mutate(
-      { instanceId: id, dueDate: dueAt },
+      { instanceId: id, dueDate: dueAt, reason },
       {
         onSuccess: () => {
           setReviewOverrides((current) => ({
@@ -345,7 +346,7 @@ export default function DeliverableReviewsPage() {
           setActive(null);
         }}
       />
-      <FilePreviewModal
+      <DeliverableFilePreviewModal
         review={previewTarget}
         onClose={() => setPreviewTarget(null)}
       />
@@ -355,48 +356,6 @@ export default function DeliverableReviewsPage() {
         onSave={updateDueDate}
       />
     </>
-  );
-}
-
-function FilePreviewModal({
-  review,
-  onClose,
-}: {
-  review: DeliverableReview | null;
-  onClose: () => void;
-}) {
-  return (
-    <Modal
-      open={!!review}
-      onOpenChange={(open) => !open && onClose()}
-      title={review ? `Preview ${review.fileName}` : 'Preview file'}
-      width="wide"
-    >
-      {review && (
-        <div className="space-y-4">
-          <div className="rounded-lg border border-line bg-surface px-4 py-4">
-            <div className="font-semibold text-ink">{review.fileName}</div>
-            <div className="mt-1 text-sm text-ink-muted">
-              {review.businessName} · {review.deliverable}
-            </div>
-            <div className="mt-1 text-sm text-ink-muted">
-              Submitted {formatDate(review.submittedAt)}
-            </div>
-          </div>
-          <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-line bg-surface-subtle p-6 text-center">
-            <div>
-              <div className="text-sm font-semibold text-ink">File preview area</div>
-              <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
-                When storage is connected, this panel will render the submitted file preview or secure download.
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button type="button" onClick={onClose}>Close preview</Button>
-          </div>
-        </div>
-      )}
-    </Modal>
   );
 }
 

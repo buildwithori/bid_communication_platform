@@ -3,9 +3,9 @@
 import * as React from 'react';
 import { Modal } from '@/components/shared/Modal';
 import { Button } from '@/components/shared/Button';
-import { FormField } from '@/components/shared/FormField';
+import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { DatePicker } from '@/components/shared/DatePicker';
-import type { DeliverableReview } from '@/lib/mock-data/admin-workflows';
+import type { DeliverableReviewRow } from '@/lib/deliverables/review-queue';
 
 function formatDate(value?: string) {
   if (!value) return 'No due date';
@@ -21,14 +21,16 @@ export function UpdateDeliverableDueDateModal({
   onClose,
   onSave,
 }: {
-  review: DeliverableReview | null;
+  review: DeliverableReviewRow | null;
   onClose: () => void;
-  onSave: (reviewId: string, dueAt: string) => void;
+  onSave: (reviewId: string, dueAt: string, reason?: string) => void;
 }) {
   const [dueAt, setDueAt] = React.useState('');
+  const [reason, setReason] = React.useState('');
 
   React.useEffect(() => {
     setDueAt(review?.dueAt ?? '');
+    setReason('');
   }, [review]);
 
   const hasChanged = Boolean(review && dueAt && dueAt !== review.dueAt);
@@ -38,6 +40,7 @@ export function UpdateDeliverableDueDateModal({
       open={!!review}
       onOpenChange={(open) => !open && onClose()}
       title="Override due date"
+      width="wide"
     >
       {review ? (
         <div>
@@ -64,6 +67,15 @@ export function UpdateDeliverableDueDateModal({
             This changes the due date for this entrepreneur's deliverable only. It does not change the programme deliverable rule.
           </p>
 
+          <FormField label="Reason" optional>
+            <FormTextarea
+              rows={3}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Add context for why this due date is changing..."
+            />
+          </FormField>
+
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
@@ -73,7 +85,7 @@ export function UpdateDeliverableDueDateModal({
               disabled={!hasChanged}
               onClick={() => {
                 if (!review || !dueAt) return;
-                onSave(review.id, dueAt);
+                onSave(review.id, dueAt, reason.trim() || undefined);
               }}
             >
               Save override
