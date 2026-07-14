@@ -75,7 +75,7 @@ Rationale:
   - `postgres`: PostgreSQL database.
   - `redis`: BullMQ queue/cache backend.
   - `mailpit`: development email catcher.
-  - optional local tooling such as an admin database UI when needed.
+  - `pgadmin`: local-only database inspection UI. Do not include it in production Compose.
 
 The frontend and backend must be separate services in the same Compose project. They should communicate through environment-configured service URLs, not hardcoded localhost assumptions.
 

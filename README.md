@@ -65,12 +65,21 @@ Local Docker runs the application as a small system:
 - `postgres`: PostgreSQL on `localhost:5433` by default
 - `redis`: Redis on `localhost:6379`
 - `mailpit`: local email catcher on `http://localhost:8025`
+- `pgadmin`: local PostgreSQL admin UI on `http://localhost:5050`
 
 Start the local stack:
 
 ```bash
 npm run docker:dev
 ```
+
+Local pgAdmin account:
+
+- Email: `admin@example.com`
+- Password: `admin`
+- Host when registering the server: `postgres`
+- Port: `5432`
+- Database/user/password: `bid` / `bid` / `bid`
 
 Production compose is intentionally separate:
 
