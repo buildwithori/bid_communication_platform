@@ -14,6 +14,7 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY prisma/schema.prisma prisma/schema.prisma
 
 RUN npm ci
+RUN npm run prisma:generate
 
 COPY apps/api apps/api
 COPY packages/shared packages/shared
@@ -42,6 +43,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY prisma/schema.prisma prisma/schema.prisma
 RUN npm ci --omit=dev --workspace @bid/api --workspace @bid/shared
+RUN npm run prisma:generate
 
 COPY --from=builder /workspace/apps/api/dist apps/api/dist
 COPY --from=builder /workspace/packages/shared/dist packages/shared/dist

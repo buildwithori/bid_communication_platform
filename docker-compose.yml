@@ -30,6 +30,8 @@ services:
       WEB_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://bid:bid@postgres:5432/bid_hub?schema=public
       REDIS_URL: redis://redis:6379
+      DOCKER_PRISMA_SETUP: "true"
+      DOCKER_APPLY_MIGRATIONS: "true"
     ports:
       - "4000:4000"
     healthcheck:

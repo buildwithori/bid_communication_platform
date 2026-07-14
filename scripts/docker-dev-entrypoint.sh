@@ -39,4 +39,26 @@ if [ "$current_checksum" != "$saved_checksum" ]; then
   trap - EXIT INT TERM
 fi
 
+
+if [ "${DOCKER_PRISMA_SETUP:-false}" = "true" ]; then
+  prisma_checksum_file="node_modules/.prisma-schema.sha256"
+  prisma_checksum="$(sha256sum prisma/schema.prisma | awk '{print $1}')"
+  saved_prisma_checksum=""
+
+  if [ -f "$prisma_checksum_file" ]; then
+    saved_prisma_checksum="$(cat "$prisma_checksum_file")"
+  fi
+
+  if [ "$prisma_checksum" != "$saved_prisma_checksum" ]; then
+    echo "prisma/schema.prisma changed; regenerating Prisma Client..."
+    npm run prisma:generate
+    printf '%s' "$prisma_checksum" > "$prisma_checksum_file"
+  fi
+
+  if [ "${DOCKER_APPLY_MIGRATIONS:-false}" = "true" ]; then
+    echo "Applying Prisma migrations..."
+    npx prisma migrate deploy
+  fi
+fi
+
 exec "$@"
