@@ -71,7 +71,7 @@ export class AuthService {
   async me(sessionToken?: string) {
     if (!sessionToken) return { user: null };
     const user = await this.validateSession(sessionToken);
-    return { user: user ? this.serializeUser(user) : null };
+    return { user: user ? await this.serializeUserWithOnboarding(user) : null };
   }
 
   async validateSession(sessionToken?: string) {
@@ -165,6 +165,14 @@ export class AuthService {
     return { ok: true };
   }
 
+  private async serializeUserWithOnboarding(user: User) {
+    if (user.role !== UserRole.entrepreneur) return { ...this.serializeUser(user), onboardingRequired: false };
+    const membership = await this.prisma.businessMembership.findFirst({
+      where: { userId: user.id, isPrimary: true }, include: { business: true },
+    });
+    return { ...this.serializeUser(user), onboardingRequired: !membership?.business.onboardingCompletedAt };
+  }
+
   private serializeUser(user: User) {
     return {
       id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone,
@@ -172,7 +180,7 @@ export class AuthService {
     };
   }
 
-  private async createSession(userId: string, tx: Pick<PrismaService, 'refreshToken'> = this.prisma) {
+  async createSession(userId: string, tx: Pick<PrismaService, 'refreshToken'> = this.prisma) {
     const sessionToken = createPlainToken(48);
     await tx.refreshToken.create({
       data: { userId, tokenHash: await hashToken(sessionToken), expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES) },

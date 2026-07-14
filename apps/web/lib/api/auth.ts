@@ -9,6 +9,7 @@ export type AuthUser = {
   role: 'entrepreneur' | 'admin' | 'trainer';
   status: 'pending' | 'active' | 'inactive';
   emailVerifiedAt: string | null;
+  onboardingRequired?: boolean;
 };
 
 type DevTokenResponse = {
@@ -86,4 +87,23 @@ export function resendVerification(payload: { email: string }) {
 export function getGoogleAuthUrl(mode: 'login' | 'signup') {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
   return `${baseUrl}/auth/google/start?mode=${mode}`;
+}
+
+export type GoogleOnboardingPayload = {
+  businessName: string;
+  representativeName: string;
+  email: string;
+  country: string;
+  phone: string;
+};
+
+export function getGoogleOnboarding() {
+  return apiRequest<{ user: AuthUser }>('/auth/onboarding');
+}
+
+export function completeGoogleOnboarding(payload: GoogleOnboardingPayload) {
+  return apiRequest<{ user: AuthUser }>('/auth/onboarding', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

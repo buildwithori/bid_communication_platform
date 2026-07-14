@@ -52,3 +52,44 @@ export function readSessionCookie(request: CookieRequest) {
     ?.slice(1)
     .join('=');
 }
+
+const GOOGLE_OAUTH_COOKIE_NAME = 'bid_google_oauth';
+const GOOGLE_OAUTH_COOKIE_MAX_AGE_MS = 1000 * 60 * 10;
+
+export function setGoogleOAuthCookie(response: CookieResponse, state: string, mode: 'login' | 'signup') {
+  response.cookie(GOOGLE_OAUTH_COOKIE_NAME, `${state}.${mode}`, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/api/auth/google',
+    maxAge: GOOGLE_OAUTH_COOKIE_MAX_AGE_MS,
+  });
+}
+
+export function readGoogleOAuthCookie(request: CookieRequest) {
+  const value = readCookie(request, GOOGLE_OAUTH_COOKIE_NAME);
+  if (!value) return undefined;
+  const separator = value.lastIndexOf('.');
+  if (separator < 1) return undefined;
+  const mode = value.slice(separator + 1);
+  if (mode !== 'login' && mode !== 'signup') return undefined;
+  return { state: value.slice(0, separator), mode } as const;
+}
+
+export function clearGoogleOAuthCookie(response: CookieResponse) {
+  response.clearCookie(GOOGLE_OAUTH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/api/auth/google',
+  });
+}
+
+function readCookie(request: CookieRequest, cookieName: string) {
+  return request.headers.cookie
+    ?.split(';')
+    .map((part) => part.trim().split('='))
+    .find(([name]) => name === cookieName)
+    ?.slice(1)
+    .join('=');
+}
