@@ -167,7 +167,7 @@ export class ProgrammesService {
                         },
                         videoAsset: true,
                         fileAssets: true,
-                        toolLink: true,
+                        toolLink: { include: { tool: { select: { id: true, name: true, embeddedUrl: true } } } },
                       },
                     },
                   },
@@ -534,7 +534,7 @@ export class ProgrammesService {
               trainer: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
               videoAsset: { playbackId: string | null; muxAssetId: string | null; status: string } | null;
               fileAssets: Array<{ id: string; originalFilename: string; mimeType: string; sizeBytes: bigint; status: string; storageKey: string }>;
-              toolLink: { source: string; toolId: string | null; externalUrl: string | null } | null;
+              toolLink: { source: string; toolId: string | null; externalUrl: string | null; tool: { id: string; name: string; embeddedUrl: string | null } | null } | null;
             };
           }>;
         };
@@ -577,7 +577,9 @@ export class ProgrammesService {
           ? {
               source: contentItem.toolLink.source,
               toolId: contentItem.toolLink.toolId,
+              toolName: contentItem.toolLink.tool?.name ?? null,
               externalUrl: contentItem.toolLink.externalUrl,
+              url: contentItem.toolLink.tool?.embeddedUrl ?? contentItem.toolLink.externalUrl,
             }
           : null,
       }));

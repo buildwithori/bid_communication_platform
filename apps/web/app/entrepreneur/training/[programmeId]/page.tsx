@@ -118,7 +118,7 @@ function mapContentItem(
     pdfFileName: item.files[0]?.originalFilename,
     fileUrl: item.files[0]?.downloadUrl ?? undefined,
     linkedToolId: item.tool?.toolId ?? undefined,
-    toolUrl: item.tool?.externalUrl ?? undefined,
+    toolUrl: item.tool?.url ?? undefined,
     progress: progressStatus(progressPercent),
   };
 }

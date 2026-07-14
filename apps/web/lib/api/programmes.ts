@@ -67,7 +67,9 @@ export type ProgrammeContentItem = {
   tool: {
     source: string;
     toolId: string | null;
+    toolName: string | null;
     externalUrl: string | null;
+    url: string | null;
   } | null;
 };
 
