@@ -27,7 +27,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       target: development
-    command: sh scripts/docker-dev-entrypoint.sh npm run email:dev
+    command: npm run email:dev
     environment:
       HOSTNAME: 0.0.0.0
     ports:
@@ -41,6 +41,9 @@ services:
       - .:/workspace
       - root_node_modules:/workspace/node_modules
       - email_preview_next:/workspace/apps/api/.react-email
+    depends_on:
+      api:
+        condition: service_healthy
 
   api:
     build:
