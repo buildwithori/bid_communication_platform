@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { DeliverableInstanceStatus, Prisma, User, UserRole } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { DeliverableInstanceStatus, DeliverableReviewDecision, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
+import { ReviewDeliverableDto } from './dto/review-deliverable.dto';
+import { UpdateDeliverableDueDateDto } from './dto/update-deliverable-due-date.dto';
 
 const DEFAULT_TAKE = 20;
 
@@ -94,6 +96,89 @@ export class DeliverablesService {
 
     const nextCursor = rows.length > take ? rows[take]?.id ?? null : null;
     return { items: rows.slice(0, take).map((instance) => this.mapReviewQueueItem(instance)), nextCursor };
+  }
+
+
+  async reviewSubmission(user: User, submissionId: string, dto: ReviewDeliverableDto) {
+    if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
+      throw new ForbiddenException('You cannot review deliverables.');
+    }
+
+    const submission = await this.prisma.deliverableSubmission.findUnique({
+      where: { id: submissionId },
+      include: { instance: { include: { programme: true } } },
+    });
+    if (!submission) throw new NotFoundException('Deliverable submission was not found.');
+    await this.ensureCanActOnInstance(user, submission.instanceId);
+
+    if (dto.decision === DeliverableReviewDecision.changes_required && !dto.feedback?.trim()) {
+      throw new BadRequestException('Feedback is required when requesting changes.');
+    }
+
+    const review = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.deliverableReview.create({
+        data: {
+          submissionId,
+          reviewerId: user.id,
+          reviewerRole: user.role,
+          decision: dto.decision,
+          feedback: dto.feedback?.trim() || (dto.decision === DeliverableReviewDecision.approved ? 'Approved.' : ''),
+        },
+      });
+
+      await tx.deliverableInstance.update({
+        where: { id: submission.instanceId },
+        data: {
+          status: dto.decision === DeliverableReviewDecision.approved
+            ? DeliverableInstanceStatus.approved
+            : DeliverableInstanceStatus.changes_required,
+        },
+      });
+
+      return created;
+    });
+
+    return review;
+  }
+
+  async updateDueDate(user: User, instanceId: string, dto: UpdateDeliverableDueDateDto) {
+    if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
+      throw new ForbiddenException('You cannot update deliverable due dates.');
+    }
+
+    await this.ensureCanActOnInstance(user, instanceId);
+
+    const updated = await this.prisma.deliverableInstance.update({
+      where: { id: instanceId },
+      data: {
+        dueDate: new Date(dto.dueDate),
+        dueUpdatedAt: new Date(),
+        dueUpdatedById: user.id,
+        dueUpdateReason: dto.reason?.trim() || null,
+      },
+      include: deliverableInstanceInclude,
+    });
+
+    return this.mapInstance(updated);
+  }
+
+  private async ensureCanActOnInstance(user: User, instanceId: string) {
+    const count = await this.prisma.deliverableInstance.count({
+      where: {
+        id: instanceId,
+        ...this.reviewScopeWhere(user),
+      },
+    });
+
+    if (count === 0) {
+      throw new NotFoundException('Deliverable was not found in your review scope.');
+    }
+  }
+
+  private reviewScopeWhere(user: User): Prisma.DeliverableInstanceWhereInput {
+    if (user.role === UserRole.admin) return {};
+    if (user.role === UserRole.trainer) return this.readScopeWhere(user);
+    return { id: '__none__' };
   }
 
   private buildInstanceWhere(

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
@@ -24,7 +24,12 @@ import {
   type Column,
 } from '@/components/shared/DataTable';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
-import { listDeliverableReviews, type DeliverableReviewQueueItem } from '@/lib/api/deliverables';
+import {
+  listDeliverableReviews,
+  reviewDeliverableSubmission,
+  updateDeliverableDueDate as saveDeliverableDueDate,
+  type DeliverableReviewQueueItem,
+} from '@/lib/api/deliverables';
 import {
   deliverableReviewStatusMeta,
   mapDeliverableReviewRow,
@@ -52,9 +57,24 @@ function daysBetween(start: string, end: Date) {
 
 
 export default function TrainerDeliverableReviewsPage() {
+  const queryClient = useQueryClient();
   const reviewsQuery = useQuery({
     queryKey: ['deliverable-reviews', 'trainer'],
     queryFn: () => listDeliverableReviews({ take: 50 }),
+  });
+  const reviewMutation = useMutation({
+    mutationFn: (payload: { submissionId: string; decision: 'approved' | 'changes_required'; feedback?: string }) =>
+      reviewDeliverableSubmission(payload.submissionId, { decision: payload.decision, feedback: payload.feedback }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['deliverable-reviews', 'trainer'] });
+    },
+  });
+  const dueDateMutation = useMutation({
+    mutationFn: (payload: { instanceId: string; dueDate: string }) =>
+      saveDeliverableDueDate(payload.instanceId, { dueDate: payload.dueDate }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['deliverable-reviews', 'trainer'] });
+    },
   });
   const [reviewOverrides, setReviewOverrides] = React.useState<Record<string, Partial<DeliverableReview>>>({});
   const reviews = React.useMemo<DeliverableReview[]>(() => {
@@ -86,32 +106,55 @@ export default function TrainerDeliverableReviewsPage() {
 
   const updateStatus = (id: string, status: DeliverableReviewStatus, feedback?: string) => {
     const currentRow = reviews.find((row) => row.id === id);
-    setReviewOverrides((current) => ({
-      ...current,
-      [id]: {
-        ...current[id],
-        status,
-        reviewer: 'Kofi Mensah',
-        latestFeedback: feedback?.trim() || current[id]?.latestFeedback || currentRow?.latestFeedback,
-        feedbackReadAt: status === 'changes-requested' ? undefined : current[id]?.feedbackReadAt || currentRow?.feedbackReadAt,
+    if (!currentRow?.submissionId) {
+      toast.error('No submitted file is available to review.');
+      return;
+    }
+
+    reviewMutation.mutate(
+      {
+        submissionId: currentRow.submissionId,
+        decision: status === 'approved' ? 'approved' : 'changes_required',
+        feedback,
       },
-    }));
-    toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
+      {
+        onSuccess: () => {
+          setReviewOverrides((current) => ({
+            ...current,
+            [id]: {
+              ...current[id],
+              status,
+              reviewer: 'Kofi Mensah',
+              latestFeedback: feedback?.trim() || current[id]?.latestFeedback || currentRow.latestFeedback,
+              feedbackReadAt: status === 'changes-requested' ? undefined : current[id]?.feedbackReadAt || currentRow.feedbackReadAt,
+            },
+          }));
+          toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
+        },
+      },
+    );
   };
 
   const updateDueDate = (id: string, dueAt: string) => {
-    setReviewOverrides((current) => ({
-      ...current,
-      [id]: {
-        ...current[id],
-        dueAt,
-        dueSource: 'manual-override',
-        dueUpdatedAt: new Date().toISOString(),
-        dueUpdatedBy: 'Kofi Mensah',
+    dueDateMutation.mutate(
+      { instanceId: id, dueDate: dueAt },
+      {
+        onSuccess: () => {
+          setReviewOverrides((current) => ({
+            ...current,
+            [id]: {
+              ...current[id],
+              dueAt,
+              dueSource: 'manual-override',
+              dueUpdatedAt: new Date().toISOString(),
+              dueUpdatedBy: 'Kofi Mensah',
+            },
+          }));
+          setDueDateTarget(null);
+          toast.success('Due date override saved');
+        },
       },
-    }));
-    setDueDateTarget(null);
-    toast.success('Due date override saved');
+    );
   };
 
   const filteredReviews = React.useMemo(() => {

@@ -7,6 +7,7 @@ export type DeliverableReviewRow = {
   id: string;
   entrepreneurId: string;
   deliverableId: string;
+  submissionId: string | null;
   entrepreneur: string;
   businessName: string;
   programme: string;
@@ -38,6 +39,7 @@ export function mapDeliverableReviewRow(row: DeliverableReviewQueueItem): Delive
     id: row.id,
     entrepreneurId: row.entrepreneur.userId,
     deliverableId: row.ruleId,
+    submissionId: latestSubmission?.id ?? null,
     entrepreneur: row.entrepreneur.name,
     businessName: row.entrepreneur.businessName,
     programme: row.programme.name,

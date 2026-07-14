@@ -119,3 +119,24 @@ export function listDeliverableReviews(query?: DeliverableQuery) {
     `/deliverable-reviews${toQueryString(query)}`,
   );
 }
+
+
+export function reviewDeliverableSubmission(
+  submissionId: string,
+  payload: { decision: DeliverableReviewDecision; feedback?: string },
+) {
+  return apiRequest<{ id: string }>(`/deliverable-submissions/${submissionId}/reviews`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDeliverableDueDate(
+  instanceId: string,
+  payload: { dueDate: string; reason?: string },
+) {
+  return apiRequest<DeliverableInstance>(`/deliverable-instances/${instanceId}/due-date`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
