@@ -1,6 +1,18 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, SessionNoteVisibility, SessionSource, SessionStatus, User, UserRole } from '@prisma/client';
+import {
+  NotificationChannel,
+  NotificationEntityType,
+  NotificationSeverity,
+  NotificationType,
+  Prisma,
+  SessionNoteVisibility,
+  SessionSource,
+  SessionStatus,
+  User,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CompleteSessionDto, RescheduleSessionDto, SessionReasonDto, AddSessionNoteDto } from './dto/session-action.dto';
 import { SessionQueryDto } from './dto/session-query.dto';
@@ -35,7 +47,10 @@ type SessionWithInclude = Prisma.SessionGetPayload<{ include: typeof sessionIncl
 
 @Injectable()
 export class SessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async listSessions(user: User, query: SessionQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
@@ -96,6 +111,19 @@ export class SessionsService {
       include: sessionInclude,
     });
 
+    if (created.status === SessionStatus.requested) {
+      await this.notifyTeamOfSessionRequest(user, created);
+    } else {
+      await this.notifyEntrepreneur(
+        user,
+        created,
+        NotificationType.session_confirmed,
+        'Session booked',
+        `${this.userName(user)} booked ${created.topic}.`,
+        NotificationSeverity.success,
+      );
+    }
+
     return this.mapSession(created);
   }
 
@@ -117,6 +145,15 @@ export class SessionsService {
       include: sessionInclude,
     });
 
+    await this.notifyEntrepreneur(
+      user,
+      updated,
+      NotificationType.session_confirmed,
+      'Session confirmed',
+      `${this.userName(user)} accepted ${updated.topic}.`,
+      NotificationSeverity.success,
+    );
+
     return this.mapSession(updated);
   }
 
@@ -137,6 +174,15 @@ export class SessionsService {
       include: sessionInclude,
     });
 
+    await this.notifyEntrepreneur(
+      user,
+      updated,
+      NotificationType.session_declined,
+      'Session declined',
+      `${this.userName(user)} declined ${updated.topic}.`,
+      NotificationSeverity.warning,
+    );
+
     return this.mapSession(updated);
   }
 
@@ -154,6 +200,14 @@ export class SessionsService {
       data: { status: SessionStatus.cancelled, cancelledReason: dto.reason.trim() },
       include: sessionInclude,
     });
+    await this.notifyEntrepreneur(
+      user,
+      updated,
+      NotificationType.session_cancelled,
+      'Session cancelled',
+      `${this.userName(user)} cancelled ${updated.topic}.`,
+      NotificationSeverity.warning,
+    );
     return this.mapSession(updated);
   }
 
@@ -187,6 +241,15 @@ export class SessionsService {
       return tx.session.update({ where: { id }, data: { startAt, endAt }, include: sessionInclude });
     });
 
+    await this.notifyEntrepreneur(
+      user,
+      updated,
+      NotificationType.session_rescheduled,
+      'Session rescheduled',
+      `${this.userName(user)} rescheduled ${updated.topic}.`,
+      NotificationSeverity.info,
+    );
+
     return this.mapSession(updated);
   }
 
@@ -208,6 +271,15 @@ export class SessionsService {
       }
       return tx.session.update({ where: { id }, data: { status: SessionStatus.completed, completedAt: new Date() }, include: sessionInclude });
     });
+
+    await this.notifyEntrepreneur(
+      user,
+      updated,
+      NotificationType.session_completed,
+      'Session completed',
+      `${this.userName(user)} marked ${updated.topic} as completed.`,
+      NotificationSeverity.success,
+    );
 
     return this.mapSession(updated);
   }
@@ -346,6 +418,68 @@ export class SessionsService {
       .replace(/^-+|-+$/g, '')
       .slice(0, 32) || 'bid-session';
     return `https://meet.google.com/${slug}`;
+  }
+
+  private async notifyTeamOfSessionRequest(actor: User, session: SessionWithInclude) {
+    const recipients = await this.prisma.user.findMany({
+      where: { role: { in: [UserRole.admin, UserRole.trainer] }, status: 'active' },
+      select: { id: true, role: true },
+    });
+
+    await Promise.all(
+      recipients.map((recipient) =>
+        this.notifications.createNotification({
+          recipientUserId: recipient.id,
+          actorUserId: actor.id,
+          type: NotificationType.session_request,
+          title: 'New session request',
+          body: `${this.sessionEntrepreneurName(session)} requested ${this.sessionTypeLabel(session.type)}.`,
+          severity: NotificationSeverity.info,
+          entityType: NotificationEntityType.session,
+          entityId: session.id,
+          actionUrl: recipient.role === UserRole.admin ? '/admin/sessions' : '/trainer/sessions',
+          channels: [NotificationChannel.in_app, NotificationChannel.email],
+        }),
+      ),
+    );
+  }
+
+  private async notifyEntrepreneur(
+    actor: User,
+    session: SessionWithInclude,
+    type: NotificationType,
+    title: string,
+    body: string,
+    severity: NotificationSeverity,
+  ) {
+    if (actor.id === session.entrepreneurUserId) return;
+
+    await this.notifications.createNotification({
+      recipientUserId: session.entrepreneurUserId,
+      actorUserId: actor.id,
+      type,
+      title,
+      body,
+      severity,
+      entityType: NotificationEntityType.session,
+      entityId: session.id,
+      actionUrl: '/entrepreneur/schedule',
+      channels: [NotificationChannel.in_app, NotificationChannel.email],
+    });
+  }
+
+  private sessionEntrepreneurName(session: SessionWithInclude) {
+    const business = session.entrepreneur.businessMemberships[0]?.business;
+    return business?.name ?? this.userName(session.entrepreneur);
+  }
+
+  private sessionTypeLabel(type: SessionWithInclude['type']) {
+    const labels: Record<SessionWithInclude['type'], string> = {
+      mentor_checkin: 'a mentor check-in',
+      office_hours: 'an office hours session',
+      investor_prep: 'an investor prep session',
+    };
+    return labels[type];
   }
 
   private mapSession(session: SessionWithInclude) {

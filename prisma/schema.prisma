@@ -148,6 +148,9 @@ enum NotificationType {
   session_request
   session_confirmed
   session_rescheduled
+  session_declined
+  session_cancelled
+  session_completed
   deliverable_review
   deliverable_changes_requested
   tool_request_updated
