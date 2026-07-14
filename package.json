@@ -10,6 +10,7 @@
     "dev": "npm run dev:web",
     "dev:web": "npm --workspace @bid/web run dev",
     "dev:api": "npm --workspace @bid/api run start:dev",
+    "email:dev": "npm --workspace @bid/api run email:dev",
     "build": "npm run build:shared && npm run build:web && npm run build:api",
     "build:web": "npm --workspace @bid/web run build",
     "build:api": "npm --workspace @bid/api run build",

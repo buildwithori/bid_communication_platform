@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { BusinessRelationship, BusinessSource, User, UserRole, UserStatus } from '@prisma/client';
-import { EmailService } from '../email/email.service';
+import { AuthEmailService } from './auth-email.service';
 import { PrismaService } from '../database/prisma.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -17,7 +17,7 @@ const VERIFICATION_DURATION_MINUTES = 60 * 24;
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly email: EmailService,
+    private readonly email: AuthEmailService,
   ) {}
 
   async signup(dto: SignupDto) {

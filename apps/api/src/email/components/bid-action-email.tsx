@@ -1,42 +1,30 @@
 import * as React from 'react';
-import { Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text } from 'react-email';
 
-type ActionEmailProps = {
+export type BidActionEmailProps = {
   preview: string;
   heading: string;
   greeting: string;
   body: string;
   actionLabel: string;
   actionUrl: string;
-  expiry: string;
+  expiryNote?: string;
 };
 
-function BidActionEmail(props: ActionEmailProps) {
+export function BidActionEmail(props: BidActionEmailProps) {
   return (
-    <Html><Head /><Preview>{props.preview}</Preview><Body style={styles.body}>
+    <Html lang="en"><Head /><Preview>{props.preview}</Preview><Body style={styles.body}>
       <Container style={styles.container}>
         <Section style={styles.brand}>BID Hub</Section>
         <Heading style={styles.heading}>{props.heading}</Heading>
         <Text style={styles.text}>{props.greeting}</Text>
         <Text style={styles.text}>{props.body}</Text>
         <Button href={props.actionUrl} style={styles.button}>{props.actionLabel}</Button>
-        <Text style={styles.muted}>This link expires {props.expiry}. If you did not request this, you can safely ignore this email.</Text>
+        {props.expiryNote ? <Text style={styles.muted}>{props.expiryNote}</Text> : null}
         <Hr style={styles.rule} /><Text style={styles.footer}>BID Hub · Building investment-ready businesses</Text>
       </Container>
     </Body></Html>
   );
-}
-
-export function VerificationEmail({ name, url }: { name: string; url: string }) {
-  return <BidActionEmail preview="Verify your BID Hub email" heading="Verify your email" greeting={`Hello ${name},`} body="Confirm your email address to activate your entrepreneur workspace." actionLabel="Verify email" actionUrl={url} expiry="in 24 hours" />;
-}
-
-export function PasswordResetEmail({ name, url }: { name: string; url: string }) {
-  return <BidActionEmail preview="Reset your BID Hub password" heading="Reset your password" greeting={`Hello ${name},`} body="We received a request to reset the password for your BID Hub account." actionLabel="Reset password" actionUrl={url} expiry="in 30 minutes" />;
-}
-
-export function WelcomeEmail({ name, dashboardUrl }: { name: string; dashboardUrl: string }) {
-  return <BidActionEmail preview="Welcome to BID Hub" heading="Your workspace is ready" greeting={`Welcome ${name},`} body="Your email is verified and your BID Hub entrepreneur workspace is ready to use." actionLabel="Open BID Hub" actionUrl={dashboardUrl} expiry="when you sign out" />;
 }
 
 const styles: Record<string, React.CSSProperties> = {

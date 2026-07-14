@@ -143,7 +143,7 @@ Jobs cover:
 ### Email
 
 - Resend for transactional email delivery.
-- React Email for template rendering and reusable email components.
+- React Email for template rendering and reusable email components. Templates live with their owning feature module; the shared email module owns only reusable brand components, rendering, and transport. The recursive React Email preview server discovers module templates through `npm run email:dev`.
 - Mailpit for local development email catching.
 - BID email brand system to be created during backend implementation.
 

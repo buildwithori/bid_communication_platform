@@ -23,7 +23,7 @@ The backend should support the product for years, not just make the current scre
 - Background jobs: BullMQ with Redis.
 - Video platform: Mux Video.
 - Video player: `@mux/mux-player-react`.
-- Email: Resend for delivery, React Email for templates/components, and Mailpit as the local development email catcher.
+- Email: Resend for delivery, React Email for templates/components, and Mailpit as the local development email catcher. Each feature module owns its email templates and a small module-specific email orchestrator; the global email infrastructure service only renders and delivers generic messages. Run `npm run email:dev` to preview all module-owned templates on port 3001.
 - Calendar provider: Google Calendar first, but keep session fields provider-agnostic.
 - First production deployment runs all Compose services on one DigitalOcean Droplet.
 - Browser auth uses secure httpOnly cookie sessions backed by server-side hashed session/refresh records; do not use client-managed bearer tokens for normal web auth.
