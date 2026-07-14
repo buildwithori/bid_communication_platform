@@ -100,7 +100,7 @@ export type BookingForm = z.infer<typeof bookingSchema>;
 export const deliverableSchema = z.object({
   deliverableId: z.string().min(1, 'Select the deliverable requirement'),
   name: z.string().optional(),
-  fileName: z.string().min(1, 'Add a file name for this UI flow'),
+  fileName: z.string().min(1, 'Choose the file to submit'),
   notes: z.string().optional(),
 });
 export type DeliverableForm = z.infer<typeof deliverableSchema>;
