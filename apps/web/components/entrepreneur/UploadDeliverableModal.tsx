@@ -48,29 +48,34 @@ export function UploadDeliverableModal({
   onOpenChange,
   deliverable,
   groupId,
+  deliverableOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deliverable?: Deliverable | null;
   groupId?: string;
+  deliverableOptions?: Deliverable[];
 }) {
   const { deliverables, submitDeliverable } = useEntrepreneurStore();
+  const sourceDeliverables = deliverableOptions ?? deliverables;
   const activeGroup = React.useMemo(
     () => (groupId ? deliverableGroups.find((group) => group.id === groupId) : undefined),
     [groupId],
   );
   const eligibleDeliverables = React.useMemo(
     () =>
-      deliverables.filter((item) => {
+      sourceDeliverables.filter((item) => {
         const matchesGroup =
           !groupId ||
-          (activeGroup?.id === 'g-general'
-            ? item.group === 'general'
-            : item.programmeId === activeGroup?.programmeId);
+          (deliverableOptions
+            ? item.programmeId === groupId || item.group === 'general'
+            : activeGroup?.id === 'g-general'
+              ? item.group === 'general'
+              : item.programmeId === activeGroup?.programmeId);
         const needsSubmission = item.status === 'pending' || item.status === 'overdue' || item.status === 'changes-requested';
         return matchesGroup && needsSubmission;
       }),
-    [activeGroup, deliverables, groupId],
+    [activeGroup, deliverableOptions, groupId, sourceDeliverables],
   );
 
   const form = useForm<DeliverableForm>({

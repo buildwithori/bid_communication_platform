@@ -38,6 +38,12 @@ export class DeliverablesController {
     return this.deliverablesService.reviewSubmission(user, id, dto);
   }
 
+  @Post('deliverable-reviews/:id/read')
+  @Roles(UserRole.entrepreneur)
+  markReviewRead(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.deliverablesService.markReviewRead(user, id);
+  }
+
   @Patch('deliverable-instances/:id/due-date')
   @Roles(UserRole.admin, UserRole.trainer)
   updateDueDate(

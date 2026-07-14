@@ -141,6 +141,27 @@ export class DeliverablesService {
     return review;
   }
 
+  async markReviewRead(user: User, reviewId: string) {
+    if (user.role !== UserRole.entrepreneur) {
+      throw new ForbiddenException('Only entrepreneurs can mark deliverable feedback as read.');
+    }
+
+    const readAt = new Date();
+    const result = await this.prisma.deliverableReview.updateMany({
+      where: {
+        id: reviewId,
+        submission: { instance: { entrepreneurUserId: user.id } },
+      },
+      data: { readAt },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Feedback was not found for this entrepreneur.');
+    }
+
+    return { id: reviewId, readAt: readAt.toISOString() };
+  }
+
   async updateDueDate(user: User, instanceId: string, dto: UpdateDeliverableDueDateDto) {
     if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
       throw new ForbiddenException('You cannot update deliverable due dates.');

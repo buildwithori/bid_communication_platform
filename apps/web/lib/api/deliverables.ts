@@ -121,6 +121,13 @@ export function listDeliverableReviews(query?: DeliverableQuery) {
 }
 
 
+
+export function markDeliverableReviewRead(reviewId: string) {
+  return apiRequest<{ id: string; readAt: string }>(`/deliverable-reviews/${reviewId}/read`, {
+    method: 'POST',
+  });
+}
+
 export function reviewDeliverableSubmission(
   submissionId: string,
   payload: { decision: DeliverableReviewDecision; feedback?: string },

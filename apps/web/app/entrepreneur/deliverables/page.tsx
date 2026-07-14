@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, Clock3, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardHeader } from '@/components/shared/Card';
@@ -18,19 +19,15 @@ import {
   TableToolbar,
 } from '@/components/shared/DataTable';
 import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
-import { programs } from '@/lib/mock-data/programs';
-import { deliverableGroups } from '@/lib/mock-data';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { entrepreneurHasProgramme } from '@/lib/programme-access';
+import { listDeliverableInstances, type DeliverableInstance } from '@/lib/api/deliverables';
+import {
+  getEntrepreneurDeliverableGroups,
+  mapDeliverableInstanceToEntrepreneurDeliverable,
+  type EntrepreneurDeliverableGroup,
+} from '@/lib/deliverables/entrepreneur';
 import { cn } from '@/lib/utils';
-import type { BadgeTone, Deliverable, DeliverableGroup, DeliverableStatus, Program } from '@/types';
+import type { BadgeTone, Deliverable, DeliverableStatus } from '@/types';
 import { routes } from '@/lib/routes';
-
-const groupProgrammeMap: Record<string, Program | undefined> = {};
-programs.forEach((program) => {
-  const group = deliverableGroups.find((item) => item.programmeId === program.id);
-  if (group) groupProgrammeMap[group.id] = program;
-});
 
 type StatusFilter = 'all' | 'needs-action' | 'under-review' | 'approved';
 
@@ -62,13 +59,24 @@ function formatDate(value?: string) {
   });
 }
 
+async function fetchEntrepreneurDeliverableInstances() {
+  const firstPage = await listDeliverableInstances({ take: 100 });
+  const items: DeliverableInstance[] = [...firstPage.items];
+  let cursor = firstPage.nextCursor;
+
+  while (cursor) {
+    const nextPage = await listDeliverableInstances({ take: 100, cursor });
+    items.push(...nextPage.items);
+    cursor = nextPage.nextCursor;
+  }
+
+  return items;
+}
+
 function getDeliverablesForGroup(
-  group: DeliverableGroup,
+  group: EntrepreneurDeliverableGroup,
   deliverables: Deliverable[],
 ) {
-  if (group.id === 'g-general') {
-    return deliverables.filter((item) => item.group === 'general');
-  }
   return deliverables.filter((item) => item.programmeId === group.programmeId);
 }
 
@@ -116,7 +124,6 @@ function matchesStatus(summary: GroupSummary, filter: StatusFilter) {
 
 export default function DeliverablesPage() {
   const router = useRouter();
-  const { entrepreneur, deliverables } = useEntrepreneurStore();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('all');
@@ -124,9 +131,20 @@ export default function DeliverablesPage() {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(6);
 
-  const accessibleGroups = React.useMemo(() => {
-    return deliverableGroups.filter((group) => !group.programmeId || entrepreneurHasProgramme(entrepreneur, group.programmeId));
-  }, [entrepreneur]);
+  const deliverablesQuery = useQuery({
+    queryKey: ['deliverable-instances', 'entrepreneur'],
+    queryFn: fetchEntrepreneurDeliverableInstances,
+  });
+
+  const apiInstances = deliverablesQuery.data ?? [];
+  const deliverables = React.useMemo(
+    () => apiInstances.map(mapDeliverableInstanceToEntrepreneurDeliverable),
+    [apiInstances],
+  );
+  const accessibleGroups = React.useMemo(
+    () => getEntrepreneurDeliverableGroups(apiInstances),
+    [apiInstances],
+  );
 
   const groupOptions = React.useMemo(
     () => accessibleGroups.map((group) => ({ value: group.id, label: group.label })),
@@ -159,15 +177,13 @@ export default function DeliverablesPage() {
     return accessibleGroups.filter((group) => {
       const items = getDeliverablesForGroup(group, deliverables);
       const summary = summaries.get(group.id) ?? getGroupSummary(items);
-      const program = groupProgrammeMap[group.id];
       const matchesGroup = groupFilter === 'all' || group.id === groupFilter;
       const matchesCurrentStatus = matchesStatus(summary, statusFilter);
       const matchesQuery =
         !needle ||
         [
           group.label,
-          program?.description ?? '',
-          group.programmeId ? 'programme deliverables' : 'general deliverables',
+          group.description,
           ...items.map((item) => `${item.name} ${item.fileName ?? ''} ${item.notes ?? ''}`),
           ...items.flatMap((item) => item.feedbackHistory?.map((feedback) => feedback.message) ?? []),
         ]
@@ -210,7 +226,7 @@ export default function DeliverablesPage() {
       <Card className="mt-4">
         <CardHeader
           title="Deliverable workspace"
-          description={`${filteredGroups.length} group${filteredGroups.length === 1 ? '' : 's'} in this view`}
+          description={`${filteredGroups.length} programme${filteredGroups.length === 1 ? '' : 's'} in this view`}
         />
         <TableToolbar>
           <div>
@@ -229,10 +245,10 @@ export default function DeliverablesPage() {
             <TableFilterAutocomplete
               value={groupFilter}
               onValueChange={setGroupFilter}
-              options={[{ value: 'all', label: 'All groups' }, ...groupOptions]}
-              placeholder="All groups"
-              searchPlaceholder="Search groups..."
-              emptyMessage="No group found."
+              options={[{ value: 'all', label: 'All programmes' }, ...groupOptions]}
+              placeholder="All programmes"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No programme found."
             />
             <TableFilterSelect
               value={statusFilter}
@@ -246,10 +262,11 @@ export default function DeliverablesPage() {
           </div>
         </TableToolbar>
 
-        {pageRows.length > 0 ? (
+        {deliverablesQuery.isLoading ? (
+          <TableEmptyState title="Loading deliverables" description="Fetching your submission requirements." />
+        ) : pageRows.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {pageRows.map((group) => {
-              const program = groupProgrammeMap[group.id];
               const items = getDeliverablesForGroup(group, deliverables);
               const summary = summaries.get(group.id) ?? getGroupSummary(items);
               const primaryBadge = getPrimaryBadge(summary);
@@ -282,7 +299,7 @@ export default function DeliverablesPage() {
                       {group.label}
                     </div>
                     <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">
-                      {program?.description ?? 'General submissions requested by BID outside a specific programme.'}
+                      {group.description}
                     </p>
                   </div>
 
@@ -301,20 +318,20 @@ export default function DeliverablesPage() {
                           <div className="mt-0.5 text-sm text-ink-muted">{formatDate(nextDue.dueDate)}</div>
                         </div>
                       </div>
+                    ) : summary.unreadFeedback > 0 ? (
+                      <div className="flex items-start gap-2">
+                        <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                        <div>
+                          <div className="text-sm font-medium text-ink">New feedback available</div>
+                          <div className="mt-0.5 text-sm text-ink-muted">Open this programme to review BID feedback.</div>
+                        </div>
+                      </div>
                     ) : summary.submitted > 0 ? (
                       <div className="flex items-start gap-2">
                         <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-info" />
                         <div>
                           <div className="text-sm font-medium text-ink">Waiting for BID review</div>
                           <div className="mt-0.5 text-sm text-ink-muted">Submitted work is in the review queue.</div>
-                        </div>
-                      </div>
-                    ) : summary.unreadFeedback > 0 ? (
-                      <div className="flex items-start gap-2">
-                        <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                        <div>
-                          <div className="text-sm font-medium text-ink">New feedback available</div>
-                          <div className="mt-0.5 text-sm text-ink-muted">Open this group to review BID feedback.</div>
                         </div>
                       </div>
                     ) : summary.total > 0 && summary.approved === summary.total ? (
@@ -343,7 +360,7 @@ export default function DeliverablesPage() {
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="text-ink-muted">{completion}% approved</span>
                       <span className="inline-flex items-center gap-1 font-medium text-bid">
-                        Open group <ArrowRight className="h-4 w-4" />
+                        Open programme <ArrowRight className="h-4 w-4" />
                       </span>
                     </div>
                   </div>
@@ -353,8 +370,8 @@ export default function DeliverablesPage() {
           </div>
         ) : (
           <TableEmptyState
-            title="No deliverable groups found"
-            description="Try changing the search term or status filter."
+            title={deliverablesQuery.isError ? 'Deliverables could not be loaded' : 'No deliverable programmes found'}
+            description={deliverablesQuery.isError ? 'Please refresh the page and try again.' : 'Try changing the search term or status filter.'}
           />
         )}
 
@@ -371,7 +388,7 @@ export default function DeliverablesPage() {
         />
       </Card>
 
-      <UploadDeliverableModal open={uploadOpen} onOpenChange={setUploadOpen} />
+      <UploadDeliverableModal open={uploadOpen} onOpenChange={setUploadOpen} deliverableOptions={deliverables} />
     </>
   );
 }
