@@ -33,16 +33,22 @@ import {
 } from '@/components/shared/DataTable';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toolRequestSchema, type ToolRequestForm } from '@/lib/forms/schemas';
 import { toast } from 'sonner';
-import { toolRequests, toolRequestStatusMeta, type ToolRequest } from '@/lib/mock-data/admin-workflows';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { toolAreaOptions } from '@/lib/tool-areas';
 import { cn } from '@/lib/utils';
-import { formatProgrammeAccess } from '@/lib/programme-access';
 import { listTools } from '@/lib/api/tools';
 import { mapToolRecordToUi } from '@/lib/tools/tool-records';
+import { listToolAreas } from '@/lib/api/settings';
+import {
+  createToolRequest as createToolRequestRecord,
+  listToolRequests,
+} from '@/lib/api/tool-requests';
+import {
+  mapToolRequestRecordToUi,
+  toolRequestStatusMeta,
+  type ToolRequest,
+} from '@/lib/tool-requests';
 import type { LucideIcon } from 'lucide-react';
 import type { Tool } from '@/types';
 
@@ -103,19 +109,22 @@ function RequestToolModal({
   open,
   onOpenChange,
   onRequestCreated,
+  toolAreaOptions,
+  isSubmitting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onRequestCreated: (values: ToolRequestForm) => void;
+  onRequestCreated: (values: ToolRequestForm) => Promise<void>;
+  toolAreaOptions: Array<{ value: string; label: string }>;
+  isSubmitting: boolean;
 }) {
   const form = useForm<ToolRequestForm>({
     resolver: zodResolver(toolRequestSchema),
     defaultValues: { name: '', category: '', neededBy: '', reason: '' },
   });
 
-  const onSubmit = (values: ToolRequestForm) => {
-    onRequestCreated(values);
-    onOpenChange(false);
+  const onSubmit = async (values: ToolRequestForm) => {
+    await onRequestCreated(values);
     form.reset();
   };
 
@@ -147,8 +156,8 @@ function RequestToolModal({
             {...form.register('reason')}
           />
         </FormField>
-        <Button type="submit" className="w-full">
-          Send request
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? 'Sending request...' : 'Send request'}
         </Button>
       </form>
     </Modal>
@@ -358,10 +367,26 @@ function RequestInfoPanel({ title, text }: { title: string; text: string }) {
 }
 
 export default function ToolsPage() {
-  const { entrepreneur } = useEntrepreneurStore();
+  const queryClient = useQueryClient();
   const toolsQuery = useQuery({
     queryKey: ['tools', 'entrepreneur'],
     queryFn: () => listTools({ take: 100 }),
+  });
+  const toolAreasQuery = useQuery({
+    queryKey: ['lookups', 'tool-areas', 'active'],
+    queryFn: () => listToolAreas({ active: true }),
+  });
+  const requestsQuery = useQuery({
+    queryKey: ['tool-requests', 'entrepreneur'],
+    queryFn: () => listToolRequests({ take: 100 }),
+  });
+  const createRequestMutation = useMutation({
+    mutationFn: createToolRequestRecord,
+    onSuccess: (_request, payload) => {
+      queryClient.invalidateQueries({ queryKey: ['tool-requests'] });
+      setRequestOpen(false);
+      toast.success('Request sent to BID team!', { description: payload.title });
+    },
   });
   const [tab, setTab] = React.useState<ToolTab>('all');
   const [query, setQuery] = React.useState('');
@@ -375,13 +400,20 @@ export default function ToolsPage() {
   const [requestOpen, setRequestOpen] = React.useState(false);
   const [activeRequest, setActiveRequest] = React.useState<ToolRequest | null>(null);
   const [activeTool, setActiveTool] = React.useState<Tool | null>(null);
-  const [myRequests, setMyRequests] = React.useState<ToolRequest[]>(() =>
-    toolRequests.filter((request) => request.businessName === entrepreneur.businessName),
-  );
 
   const accessibleTools = React.useMemo<Tool[]>(
     () => (toolsQuery.data?.items ?? []).map(mapToolRecordToUi),
     [toolsQuery.data?.items],
+  );
+
+  const toolAreaOptions = React.useMemo<Array<{ value: string; label: string }>>(
+    () => ((toolAreasQuery.data ?? []) as Array<{ id: string; name: string }>).map((area) => ({ value: area.id, label: area.name })),
+    [toolAreasQuery.data],
+  );
+
+  const myRequests = React.useMemo<ToolRequest[]>(
+    () => (requestsQuery.data?.items ?? []).map(mapToolRequestRecordToUi),
+    [requestsQuery.data?.items],
   );
 
   const filtered = React.useMemo<Tool[]>(() => {
@@ -411,7 +443,7 @@ export default function ToolsPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
-  const filteredRequests = React.useMemo(() => {
+  const filteredRequests = React.useMemo<ToolRequest[]>(() => {
     const needle = requestQuery.trim().toLowerCase();
     return myRequests.filter((request) => {
       const matchesQuery =
@@ -421,7 +453,7 @@ export default function ToolsPage() {
           .toLowerCase()
           .includes(needle);
       const matchesStatus = requestStatus === 'all' || request.status === requestStatus;
-      const matchesCategory = requestCategory === 'all' || request.category === requestCategory;
+      const matchesCategory = requestCategory === 'all' || request.categoryId === requestCategory;
       return matchesQuery && matchesStatus && matchesCategory;
     });
   }, [myRequests, requestCategory, requestQuery, requestStatus]);
@@ -485,22 +517,13 @@ export default function ToolsPage() {
     },
   ];
 
-  const createToolRequest = (values: ToolRequestForm) => {
-    const request: ToolRequest = {
-      id: `tr-${Date.now()}`,
-      businessName: entrepreneur.businessName,
-      requesterName: entrepreneur.representative,
-      programme: formatProgrammeAccess(entrepreneur),
-      toolName: values.name,
-      category: values.category,
-      reason: values.reason || 'No additional context provided.',
-      requestedAt: '2026-07-07',
-      requestedAgo: 'Just now',
-      neededBy: values.neededBy || undefined,
-      status: 'under-review',
-    };
-    setMyRequests((current) => [request, ...current]);
-    toast.success('Request sent to BID team!', { description: values.name });
+  const createToolRequest = async (values: ToolRequestForm) => {
+    await createRequestMutation.mutateAsync({
+      title: values.name,
+      toolAreaId: values.category,
+      businessNeed: values.reason?.trim() || 'No additional context provided.',
+      neededBy: values.neededBy || null,
+    });
   };
 
   return (
@@ -559,13 +582,26 @@ export default function ToolsPage() {
               />
             </div>
           </TableToolbar>
-          <DataTable
-            columns={requestColumns}
-            rows={requestRows}
-            rowKey={(request) => request.id}
-            emptyMessage="No tool requests match this view."
-            tableClassName="min-w-[920px]"
-          />
+          {requestsQuery.isLoading ? (
+            <div className="grid min-h-[180px] place-items-center rounded-xl border border-line bg-surface-subtle text-sm text-ink-muted">
+              Loading requests...
+            </div>
+          ) : requestsQuery.isError ? (
+            <div className="grid min-h-[180px] place-items-center rounded-xl border border-line bg-surface-subtle p-6 text-center">
+              <div>
+                <div className="text-base font-semibold text-ink">Requests could not be loaded</div>
+                <p className="mt-2 text-sm text-ink-muted">Please refresh the page or try again later.</p>
+              </div>
+            </div>
+          ) : (
+            <DataTable
+              columns={requestColumns}
+              rows={requestRows}
+              rowKey={(request) => request.id}
+              emptyMessage="No tool requests match this view."
+              tableClassName="min-w-[920px]"
+            />
+          )}
           <TablePagination
             page={requestPage}
             pageSize={requestPageSize}
@@ -642,7 +678,13 @@ export default function ToolsPage() {
         </Card>
       )}
 
-      <RequestToolModal open={requestOpen} onOpenChange={setRequestOpen} onRequestCreated={createToolRequest} />
+      <RequestToolModal
+        open={requestOpen}
+        onOpenChange={setRequestOpen}
+        onRequestCreated={createToolRequest}
+        toolAreaOptions={toolAreaOptions}
+        isSubmitting={createRequestMutation.isPending}
+      />
       <ViewToolRequestModal
         request={activeRequest}
         onClose={() => setActiveRequest(null)}
