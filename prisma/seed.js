@@ -218,6 +218,50 @@ const entrepreneurToolSeeds = [
   },
 ];
 
+const toolRequestSeeds = [
+  {
+    id: 'tr-cap-table',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    title: 'Cap table modelling tool',
+    toolAreaKey: 'fundraising',
+    businessNeed: 'We need to model founder dilution, SAFE notes, and new investor ownership before our Series A conversations.',
+    neededBy: '2026-07-18',
+    status: 'in_development',
+    adminDecisionNote: 'Approved for development. BID will scope this as an online tool for fundraising support, starting with cap table scenarios, SAFE notes, and investor ownership modelling.',
+    decidedAt: '2026-07-06',
+  },
+  {
+    id: 'tr-investor-outreach',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    title: 'Investor outreach tracker',
+    toolAreaKey: 'fundraising',
+    businessNeed: 'We need a lightweight way to track investor conversations, next steps, warm introductions, and follow-up dates during the fundraising sprint.',
+    neededBy: '2026-08-01',
+    status: 'under_review',
+  },
+  {
+    id: 'tr-runway',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    title: 'Monthly cash runway calculator',
+    toolAreaKey: 'finance',
+    businessNeed: 'We want to compare monthly burn, expected revenue, and hiring plans to understand how long our current cash balance will last.',
+    status: 'built',
+    linkedToolId: 'tool-finmodel',
+    adminDecisionNote: 'Built and added to the tools library as a finance resource. It includes burn rate, runway, hiring assumptions, and revenue sensitivity inputs.',
+    decidedAt: '2026-07-03',
+  },
+  {
+    id: 'tr-whatsapp-investor',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    title: 'WhatsApp investor broadcast resource',
+    toolAreaKey: 'marketing',
+    businessNeed: 'We wanted a resource that can send investor updates over WhatsApp after monthly traction milestones.',
+    status: 'declined',
+    adminDecisionNote: 'Declined for now because investor update distribution should stay email-based inside BID workflows.',
+    decidedAt: '2026-07-02',
+  },
+];
+
 
 const entrepreneurSeeds = [
   {
@@ -579,6 +623,47 @@ async function seedEntrepreneurTools(adminUserId, toolAreaIdByKey) {
   }
 }
 
+async function seedToolRequests(adminUserId, toolAreaIdByKey) {
+  const entrepreneurByEmail = new Map(
+    (await prisma.user.findMany({ where: { role: 'entrepreneur' }, select: { id: true, email: true } })).map((user) => [user.email, user.id]),
+  );
+
+  for (const requestSeed of toolRequestSeeds) {
+    const entrepreneurUserId = entrepreneurByEmail.get(requestSeed.entrepreneurEmail);
+    const toolAreaId = toolAreaIdByKey.get(requestSeed.toolAreaKey);
+    if (!entrepreneurUserId || !toolAreaId) continue;
+
+    await prisma.toolRequest.upsert({
+      where: { id: requestSeed.id },
+      update: {
+        entrepreneurUserId,
+        title: requestSeed.title,
+        businessNeed: requestSeed.businessNeed,
+        toolAreaId,
+        neededBy: requestSeed.neededBy ? new Date(`${requestSeed.neededBy}T00:00:00.000Z`) : null,
+        status: requestSeed.status,
+        linkedToolId: requestSeed.linkedToolId ?? null,
+        adminDecisionNote: requestSeed.adminDecisionNote ?? null,
+        decidedById: requestSeed.status === 'under_review' ? null : adminUserId,
+        decidedAt: requestSeed.decidedAt ? new Date(`${requestSeed.decidedAt}T00:00:00.000Z`) : null,
+      },
+      create: {
+        id: requestSeed.id,
+        entrepreneurUserId,
+        title: requestSeed.title,
+        businessNeed: requestSeed.businessNeed,
+        toolAreaId,
+        neededBy: requestSeed.neededBy ? new Date(`${requestSeed.neededBy}T00:00:00.000Z`) : null,
+        status: requestSeed.status,
+        linkedToolId: requestSeed.linkedToolId ?? null,
+        adminDecisionNote: requestSeed.adminDecisionNote ?? null,
+        decidedById: requestSeed.status === 'under_review' ? null : adminUserId,
+        decidedAt: requestSeed.decidedAt ? new Date(`${requestSeed.decidedAt}T00:00:00.000Z`) : null,
+      },
+    });
+  }
+}
+
 async function seedTrainersAndProgrammes() {
   const sectorRows = await prisma.sector.findMany();
   const stageRows = await prisma.businessStage.findMany();
@@ -759,6 +844,7 @@ async function seedTrainersAndProgrammes() {
 
   await seedEntrepreneurs(adminUser.id, sectorIdByKey, stageIdByKey);
   await seedEntrepreneurTools(adminUser.id, toolAreaIdByKey);
+  await seedToolRequests(adminUser.id, toolAreaIdByKey);
 }
 
 async function main() {
