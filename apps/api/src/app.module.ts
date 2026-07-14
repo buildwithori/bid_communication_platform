@@ -14,6 +14,7 @@ import { ContentModule } from './content/content.module';
 import { DeliverablesModule } from './deliverables/deliverables.module';
 import { ToolsModule } from './tools/tools.module';
 import { FilesModule } from './files/files.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { FilesModule } from './files/files.module';
     DeliverablesModule,
     ToolsModule,
     FilesModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -144,6 +144,45 @@ enum SessionNoteVisibility {
   participant
 }
 
+enum NotificationType {
+  session_request
+  session_confirmed
+  session_rescheduled
+  deliverable_review
+  deliverable_changes_requested
+  tool_request_updated
+  trainer_nudge
+  system
+}
+
+enum NotificationSeverity {
+  info
+  success
+  warning
+  critical
+}
+
+enum NotificationEntityType {
+  session
+  deliverable_instance
+  tool_request
+  programme
+  entrepreneur
+  content_item
+}
+
+enum NotificationChannel {
+  in_app
+  email
+}
+
+enum NotificationDeliveryStatus {
+  pending
+  sent
+  failed
+  skipped
+}
+
 enum LearnerProgressStatus {
   not_started
   in_progress
@@ -235,6 +274,9 @@ model User {
   ownedSessions               Session[]                  @relation("SessionOwner")
   createdSessions             Session[]                  @relation("SessionCreatedBy")
   sessionNotes                SessionNote[]              @relation("SessionNoteAuthor")
+  receivedNotifications       Notification[]             @relation("NotificationRecipient")
+  actedNotifications          Notification[]             @relation("NotificationActor")
+  notificationPreferences     NotificationPreference[]
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
@@ -1019,3 +1061,62 @@ model SessionNote {
   @@map("session_notes")
 }
 
+
+model Notification {
+  id              String                  @id @default(cuid())
+  recipientUserId String                  @map("recipient_user_id")
+  actorUserId     String?                 @map("actor_user_id")
+  type            NotificationType
+  title           String
+  body            String
+  severity        NotificationSeverity    @default(info)
+  entityType      NotificationEntityType? @map("entity_type")
+  entityId        String?                 @map("entity_id")
+  actionUrl       String?                 @map("action_url")
+  readAt          DateTime?               @map("read_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  recipient  User                   @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  actor      User?                  @relation("NotificationActor", fields: [actorUserId], references: [id])
+  deliveries NotificationDelivery[]
+
+  @@index([recipientUserId, readAt, createdAt])
+  @@index([recipientUserId, type])
+  @@index([entityType, entityId])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id             String                     @id @default(cuid())
+  notificationId String                     @map("notification_id")
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(pending)
+  sentAt         DateTime?                  @map("sent_at")
+  failedAt       DateTime?                  @map("failed_at")
+  failureReason  String?                    @map("failure_reason")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id])
+
+  @@unique([notificationId, channel])
+  @@index([channel, status])
+  @@map("notification_deliveries")
+}
+
+model NotificationPreference {
+  id           String           @id @default(cuid())
+  userId       String           @map("user_id")
+  type         NotificationType
+  inAppEnabled Boolean          @default(true) @map("in_app_enabled")
+  emailEnabled Boolean          @default(true) @map("email_enabled")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("notification_preferences")
+}
