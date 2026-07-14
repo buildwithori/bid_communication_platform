@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BusinessMembership, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
+import { UpsertFundraisingRoundDto, UpsertPeriodicUpdateDto, UpsertProgrammeGoalDto } from './dto/profile-records.dto';
 
 const DEFAULT_TAKE = 20;
 
@@ -83,6 +84,161 @@ export class EntrepreneursService {
     return this.mapEntrepreneur(membership);
   }
 
+  async getProfileRecords(user: User, entrepreneurUserId: string) {
+    await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
+
+    const [programmeGoals, fundraisingRounds, periodicUpdates] = await Promise.all([
+      this.prisma.programmeGoal.findMany({
+        where: { entrepreneurUserId },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        include: this.programmeGoalInclude(),
+      }),
+      this.prisma.fundraisingRound.findMany({
+        where: { entrepreneurUserId },
+        orderBy: [{ date: 'desc' }, { id: 'desc' }],
+        include: this.fundraisingRoundInclude(),
+      }),
+      this.prisma.periodicUpdate.findMany({
+        where: { entrepreneurUserId },
+        orderBy: [{ periodEnd: 'desc' }, { id: 'desc' }],
+        include: this.periodicUpdateInclude(),
+      }),
+    ]);
+
+    return {
+      programmeGoals: programmeGoals.map((goal) => this.mapProgrammeGoal(goal)),
+      fundraisingRounds: fundraisingRounds.map((round) => this.mapFundraisingRound(round)),
+      periodicUpdates: periodicUpdates.map((update) => this.mapPeriodicUpdate(update)),
+    };
+  }
+
+  async createProgrammeGoal(user: User, entrepreneurUserId: string, dto: UpsertProgrammeGoalDto) {
+    await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
+    await this.validateProgrammeGoal(entrepreneurUserId, dto);
+
+    const goal = await this.prisma.programmeGoal.create({
+      data: {
+        entrepreneurUserId,
+        programmeId: dto.programmeId || null,
+        goalTypeId: dto.goalTypeId,
+        targetAmountCents: dto.targetAmountCents ?? null,
+        description: this.optionalText(dto.description),
+        evidence: this.optionalText(dto.evidence),
+        milestoneAchieved: dto.milestoneAchieved ?? false,
+      },
+      include: this.programmeGoalInclude(),
+    });
+
+    return this.mapProgrammeGoal(goal);
+  }
+
+  async updateProgrammeGoal(user: User, entrepreneurUserId: string, goalId: string, dto: UpsertProgrammeGoalDto) {
+    await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
+    await this.ensureProgrammeGoalBelongsToEntrepreneur(goalId, entrepreneurUserId);
+    await this.validateProgrammeGoal(entrepreneurUserId, dto);
+
+    const goal = await this.prisma.programmeGoal.update({
+      where: { id: goalId },
+      data: {
+        programmeId: dto.programmeId || null,
+        goalTypeId: dto.goalTypeId,
+        targetAmountCents: dto.targetAmountCents ?? null,
+        description: this.optionalText(dto.description),
+        evidence: this.optionalText(dto.evidence),
+        milestoneAchieved: dto.milestoneAchieved ?? false,
+      },
+      include: this.programmeGoalInclude(),
+    });
+
+    return this.mapProgrammeGoal(goal);
+  }
+
+  async createFundraisingRound(user: User, entrepreneurUserId: string, dto: UpsertFundraisingRoundDto) {
+    await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
+    await this.validateFundraisingRound(entrepreneurUserId, dto);
+
+    const round = await this.prisma.fundraisingRound.create({
+      data: {
+        entrepreneurUserId,
+        programmeId: dto.programmeId || null,
+        programmeGoalId: dto.programmeGoalId || null,
+        name: dto.name.trim(),
+        amountCents: dto.amountCents,
+        currency: (dto.currency || 'USD').trim().toUpperCase(),
+        source: this.optionalText(dto.source),
+        date: new Date(dto.date),
+      },
+      include: this.fundraisingRoundInclude(),
+    });
+
+    return this.mapFundraisingRound(round);
+  }
+
+  async updateFundraisingRound(user: User, entrepreneurUserId: string, roundId: string, dto: UpsertFundraisingRoundDto) {
+    await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
+    await this.ensureFundraisingRoundBelongsToEntrepreneur(roundId, entrepreneurUserId);
+    await this.validateFundraisingRound(entrepreneurUserId, dto);
+
+    const round = await this.prisma.fundraisingRound.update({
+      where: { id: roundId },
+      data: {
+        programmeId: dto.programmeId || null,
+        programmeGoalId: dto.programmeGoalId || null,
+        name: dto.name.trim(),
+        amountCents: dto.amountCents,
+        currency: (dto.currency || 'USD').trim().toUpperCase(),
+        source: this.optionalText(dto.source),
+        date: new Date(dto.date),
+      },
+      include: this.fundraisingRoundInclude(),
+    });
+
+    return this.mapFundraisingRound(round);
+  }
+
+  async createPeriodicUpdate(user: User, entrepreneurUserId: string, dto: UpsertPeriodicUpdateDto) {
+    await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
+    await this.validatePeriodicUpdate(entrepreneurUserId, dto);
+
+    const update = await this.prisma.periodicUpdate.create({
+      data: {
+        entrepreneurUserId,
+        programmeId: dto.programmeId || null,
+        periodStart: new Date(dto.periodStart),
+        periodEnd: new Date(dto.periodEnd),
+        jobsCreated: dto.jobsCreated,
+        jobsWomen: dto.jobsWomen,
+        jobsMen: dto.jobsMen,
+        notes: this.optionalText(dto.notes),
+      },
+      include: this.periodicUpdateInclude(),
+    });
+
+    return this.mapPeriodicUpdate(update);
+  }
+
+  async updatePeriodicUpdate(user: User, entrepreneurUserId: string, updateId: string, dto: UpsertPeriodicUpdateDto) {
+    await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
+    await this.ensurePeriodicUpdateBelongsToEntrepreneur(updateId, entrepreneurUserId);
+    await this.validatePeriodicUpdate(entrepreneurUserId, dto);
+
+    const update = await this.prisma.periodicUpdate.update({
+      where: { id: updateId },
+      data: {
+        programmeId: dto.programmeId || null,
+        periodStart: new Date(dto.periodStart),
+        periodEnd: new Date(dto.periodEnd),
+        jobsCreated: dto.jobsCreated,
+        jobsWomen: dto.jobsWomen,
+        jobsMen: dto.jobsMen,
+        notes: this.optionalText(dto.notes),
+      },
+      include: this.periodicUpdateInclude(),
+    });
+
+    return this.mapPeriodicUpdate(update);
+  }
+
   private buildMembershipWhere(user: User, query: EntrepreneurQueryDto): Prisma.BusinessMembershipWhereInput {
     const filters: Prisma.BusinessMembershipWhereInput[] = [
       { isPrimary: true, user: { role: UserRole.entrepreneur } },
@@ -143,6 +299,129 @@ export class EntrepreneursService {
     };
   }
 
+  private async assertCanReadEntrepreneur(user: User, entrepreneurUserId: string) {
+    if (user.role === UserRole.admin) return;
+    if (user.role === UserRole.entrepreneur && user.id === entrepreneurUserId) return;
+
+    if (user.role === UserRole.trainer) {
+      const membership = await this.prisma.businessMembership.findFirst({
+        where: {
+          ...this.buildMembershipWhere(user, {}),
+          userId: entrepreneurUserId,
+        },
+        select: { id: true },
+      });
+      if (membership) return;
+    }
+
+    throw new ForbiddenException('You do not have access to this entrepreneur.');
+  }
+
+  private async assertCanWriteEntrepreneur(user: User, entrepreneurUserId: string) {
+    if (user.role === UserRole.admin) return;
+    if (user.role === UserRole.entrepreneur && user.id === entrepreneurUserId) return;
+    throw new ForbiddenException('You cannot update this entrepreneur profile.');
+  }
+
+  private async validateProgrammeGoal(entrepreneurUserId: string, dto: UpsertProgrammeGoalDto) {
+    const goalType = await this.prisma.programmeGoalType.findFirst({
+      where: { id: dto.goalTypeId, active: true },
+      select: { id: true, requiresTargetAmount: true },
+    });
+    if (!goalType) throw new BadRequestException('Select a valid active goal type.');
+    if (goalType.requiresTargetAmount && !dto.targetAmountCents) {
+      throw new BadRequestException('This goal type requires a target amount.');
+    }
+    await this.assertProgrammeAccess(entrepreneurUserId, dto.programmeId || null);
+  }
+
+  private async validateFundraisingRound(entrepreneurUserId: string, dto: UpsertFundraisingRoundDto) {
+    await this.assertProgrammeAccess(entrepreneurUserId, dto.programmeId || null);
+
+    if (dto.programmeGoalId) {
+      const goal = await this.prisma.programmeGoal.findFirst({
+        where: { id: dto.programmeGoalId, entrepreneurUserId },
+        select: { id: true, programmeId: true },
+      });
+      if (!goal) throw new BadRequestException('Select a valid goal owned by this entrepreneur.');
+      if (goal.programmeId && dto.programmeId && goal.programmeId !== dto.programmeId) {
+        throw new BadRequestException('The linked goal belongs to a different programme.');
+      }
+    }
+  }
+
+  private async validatePeriodicUpdate(entrepreneurUserId: string, dto: UpsertPeriodicUpdateDto) {
+    const start = new Date(dto.periodStart);
+    const end = new Date(dto.periodEnd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      throw new BadRequestException('Select a valid reporting period.');
+    }
+    if (dto.jobsWomen + dto.jobsMen > dto.jobsCreated) {
+      throw new BadRequestException('Women and men job counts cannot exceed total jobs created.');
+    }
+    await this.assertProgrammeAccess(entrepreneurUserId, dto.programmeId || null);
+  }
+
+  private async assertProgrammeAccess(entrepreneurUserId: string, programmeId: string | null) {
+    if (!programmeId) return;
+
+    const programme = await this.prisma.programme.findFirst({
+      where: {
+        id: programmeId,
+        OR: [
+          { accessType: 'free' },
+          { accessGrants: { some: { entrepreneurUserId, revokedAt: null } } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!programme) {
+      throw new BadRequestException('This entrepreneur does not have access to the selected programme.');
+    }
+  }
+
+  private async ensureProgrammeGoalBelongsToEntrepreneur(id: string, entrepreneurUserId: string) {
+    const goal = await this.prisma.programmeGoal.findFirst({ where: { id, entrepreneurUserId }, select: { id: true } });
+    if (!goal) throw new NotFoundException('Programme goal was not found.');
+  }
+
+  private async ensureFundraisingRoundBelongsToEntrepreneur(id: string, entrepreneurUserId: string) {
+    const round = await this.prisma.fundraisingRound.findFirst({ where: { id, entrepreneurUserId }, select: { id: true } });
+    if (!round) throw new NotFoundException('Fundraising round was not found.');
+  }
+
+  private async ensurePeriodicUpdateBelongsToEntrepreneur(id: string, entrepreneurUserId: string) {
+    const update = await this.prisma.periodicUpdate.findFirst({ where: { id, entrepreneurUserId }, select: { id: true } });
+    if (!update) throw new NotFoundException('Periodic update was not found.');
+  }
+
+  private programmeGoalInclude() {
+    return {
+      programme: { select: { id: true, name: true } },
+      goalType: { select: { id: true, name: true, key: true, requiresTargetAmount: true } },
+    } satisfies Prisma.ProgrammeGoalInclude;
+  }
+
+  private fundraisingRoundInclude() {
+    return {
+      programme: { select: { id: true, name: true } },
+      programmeGoal: {
+        select: {
+          id: true,
+          description: true,
+          goalType: { select: { id: true, name: true, key: true } },
+        },
+      },
+    } satisfies Prisma.FundraisingRoundInclude;
+  }
+
+  private periodicUpdateInclude() {
+    return {
+      programme: { select: { id: true, name: true } },
+    } satisfies Prisma.PeriodicUpdateInclude;
+  }
+
   private membershipInclude() {
     return {
       user: {
@@ -197,6 +476,59 @@ export class EntrepreneursService {
         },
       },
     } satisfies Prisma.BusinessMembershipInclude;
+  }
+
+  private mapProgrammeGoal(goal: Prisma.ProgrammeGoalGetPayload<{ include: ReturnType<EntrepreneursService['programmeGoalInclude']> }>) {
+    return {
+      id: goal.id,
+      entrepreneurUserId: goal.entrepreneurUserId,
+      programme: goal.programme,
+      goalType: goal.goalType,
+      targetAmountCents: goal.targetAmountCents,
+      description: goal.description,
+      evidence: goal.evidence,
+      milestoneAchieved: goal.milestoneAchieved,
+      createdAt: goal.createdAt.toISOString(),
+      updatedAt: goal.updatedAt.toISOString(),
+    };
+  }
+
+  private mapFundraisingRound(round: Prisma.FundraisingRoundGetPayload<{ include: ReturnType<EntrepreneursService['fundraisingRoundInclude']> }>) {
+    return {
+      id: round.id,
+      entrepreneurUserId: round.entrepreneurUserId,
+      programme: round.programme,
+      programmeGoal: round.programmeGoal,
+      name: round.name,
+      amountCents: round.amountCents,
+      currency: round.currency,
+      source: round.source,
+      date: round.date.toISOString(),
+      createdAt: round.createdAt.toISOString(),
+      updatedAt: round.updatedAt.toISOString(),
+    };
+  }
+
+  private mapPeriodicUpdate(update: Prisma.PeriodicUpdateGetPayload<{ include: ReturnType<EntrepreneursService['periodicUpdateInclude']> }>) {
+    return {
+      id: update.id,
+      entrepreneurUserId: update.entrepreneurUserId,
+      programme: update.programme,
+      periodStart: update.periodStart.toISOString(),
+      periodEnd: update.periodEnd.toISOString(),
+      submittedAt: update.submittedAt.toISOString(),
+      jobsCreated: update.jobsCreated,
+      jobsWomen: update.jobsWomen,
+      jobsMen: update.jobsMen,
+      notes: update.notes,
+      createdAt: update.createdAt.toISOString(),
+      updatedAt: update.updatedAt.toISOString(),
+    };
+  }
+
+  private optionalText(value?: string | null) {
+    const trimmed = value?.trim();
+    return trimmed || null;
   }
 
   private mapEntrepreneur(row: EntrepreneurMembership) {

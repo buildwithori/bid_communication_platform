@@ -276,6 +276,9 @@ model User {
   hiddenToolOverrides         ToolHiddenEntrepreneur[]   @relation("ToolHiddenBy")
   toolRequests                ToolRequest[]              @relation("ToolRequestEntrepreneur")
   decidedToolRequests         ToolRequest[]              @relation("ToolRequestDecidedBy")
+  programmeGoals              ProgrammeGoal[]            @relation("ProgrammeGoalEntrepreneur")
+  fundraisingRounds           FundraisingRound[]         @relation("FundraisingRoundEntrepreneur")
+  periodicUpdates             PeriodicUpdate[]           @relation("PeriodicUpdateEntrepreneur")
   deliverableInstances        DeliverableInstance[]      @relation("DeliverableInstanceEntrepreneur")
   deliverableSubmissions      DeliverableSubmission[]    @relation("DeliverableSubmissionSubmittedBy")
   deliverableReviews          DeliverableReview[]        @relation("DeliverableReviewReviewer")
@@ -445,6 +448,8 @@ model ProgrammeGoalType {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
+  programmeGoals ProgrammeGoal[]
+
   @@index([active])
   @@map("programme_goal_types")
 }
@@ -554,6 +559,9 @@ model Programme {
   archivedBy           User?                      @relation("ProgrammeArchivedBy", fields: [archivedById], references: [id])
   modules              ProgrammeModule[]
   accessGrants         ProgrammeAccessGrant[]
+  programmeGoals       ProgrammeGoal[]
+  fundraisingRounds    FundraisingRound[]
+  periodicUpdates      PeriodicUpdate[]
   contentProgress      LearnerContentProgress[]
   moduleProgress       LearnerModuleProgress[]
   progress             LearnerProgrammeProgress[]
@@ -587,6 +595,74 @@ model ProgrammeAccessGrant {
   @@index([entrepreneurUserId, revokedAt])
   @@index([grantedById])
   @@map("programme_access_grants")
+}
+
+model ProgrammeGoal {
+  id                 String   @id @default(cuid())
+  entrepreneurUserId String   @map("entrepreneur_user_id")
+  programmeId        String?  @map("programme_id")
+  goalTypeId         String   @map("goal_type_id")
+  targetAmountCents  Int?     @map("target_amount_cents")
+  description        String?
+  evidence           String?
+  milestoneAchieved  Boolean  @default(false) @map("milestone_achieved")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  entrepreneur      User               @relation("ProgrammeGoalEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme         Programme?         @relation(fields: [programmeId], references: [id])
+  goalType          ProgrammeGoalType  @relation(fields: [goalTypeId], references: [id])
+  fundraisingRounds FundraisingRound[]
+
+  @@index([entrepreneurUserId])
+  @@index([programmeId])
+  @@index([goalTypeId])
+  @@map("programme_goals")
+}
+
+model FundraisingRound {
+  id                 String   @id @default(cuid())
+  entrepreneurUserId String   @map("entrepreneur_user_id")
+  programmeId        String?  @map("programme_id")
+  programmeGoalId    String?  @map("programme_goal_id")
+  name               String
+  amountCents        Int      @map("amount_cents")
+  currency           String   @default("USD")
+  source             String?
+  date               DateTime
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  entrepreneur  User           @relation("FundraisingRoundEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme     Programme?     @relation(fields: [programmeId], references: [id])
+  programmeGoal ProgrammeGoal? @relation(fields: [programmeGoalId], references: [id])
+
+  @@index([entrepreneurUserId, date])
+  @@index([programmeId])
+  @@index([programmeGoalId])
+  @@map("fundraising_rounds")
+}
+
+model PeriodicUpdate {
+  id                 String   @id @default(cuid())
+  entrepreneurUserId String   @map("entrepreneur_user_id")
+  programmeId        String?  @map("programme_id")
+  periodStart        DateTime @map("period_start")
+  periodEnd          DateTime @map("period_end")
+  submittedAt        DateTime @default(now()) @map("submitted_at")
+  jobsCreated        Int      @default(0) @map("jobs_created")
+  jobsWomen          Int      @default(0) @map("jobs_women")
+  jobsMen            Int      @default(0) @map("jobs_men")
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  entrepreneur User       @relation("PeriodicUpdateEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme    Programme? @relation(fields: [programmeId], references: [id])
+
+  @@index([entrepreneurUserId, periodEnd])
+  @@index([programmeId])
+  @@map("periodic_updates")
 }
 
 model LearningModule {
@@ -1072,7 +1148,6 @@ model SessionNote {
   @@index([authorId])
   @@map("session_notes")
 }
-
 
 model Notification {
   id              String                  @id @default(cuid())
