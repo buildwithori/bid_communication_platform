@@ -21,6 +21,7 @@ export type ToolRequest = {
   linkedToolId?: string;
   linkedToolName?: string;
   status: ToolRequestStatus;
+  availableTransitions: ToolRequestStatus[];
 };
 
 export const apiToUiToolRequestStatus: Record<ApiToolRequestStatus, ToolRequestStatus> = {
@@ -63,6 +64,7 @@ export function mapToolRequestRecordToUi(record: ToolRequestRecord): ToolRequest
     linkedToolId: record.linkedTool?.id,
     linkedToolName: record.linkedTool?.name,
     status: apiToUiToolRequestStatus[record.status],
+    availableTransitions: record.availableTransitions.map((status) => apiToUiToolRequestStatus[status]),
   };
 }
 

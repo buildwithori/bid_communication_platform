@@ -120,6 +120,9 @@ export default function AdminToolRequestsPage() {
     toast.success(msg);
   };
 
+  const canTransition = (request: ToolRequest, status: ToolRequestStatus) =>
+    request.availableTransitions.includes(status);
+
   const decideRequest = async (status: ToolRequestStatus, msg: string) => {
     if (!activeRequest) return;
     await updateRequest(
@@ -139,57 +142,33 @@ export default function AdminToolRequestsPage() {
       { label: 'View request', onSelect: () => openRequest(request) },
     ];
 
-    if (request.status === 'under-review') {
-      actions.push(
-        'separator',
-        {
-          label: 'Approve for development',
-          onSelect: () =>
-            void updateRequest(request.id, { status: 'in-development' }, 'Tool request approved for development'),
-        },
-        {
-          label: 'Decline request',
-          destructive: true,
-          onSelect: () =>
-            void updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
-        },
-      );
+    const statusActions: RowAction[] = [];
+    if (canTransition(request, 'in-development')) {
+      statusActions.push({
+        label: 'Approve for development',
+        onSelect: () =>
+          void updateRequest(request.id, { status: 'in-development' }, 'Tool request approved for development'),
+      });
     }
-
-    if (request.status === 'in-development') {
-      actions.push(
-        'separator',
-        {
-          label: 'Review build decision',
-          onSelect: () => openRequest(request),
-        },
-        {
-          label: 'Decline request',
-          destructive: true,
-          onSelect: () =>
-            void updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
-        },
-      );
+    if (canTransition(request, 'built')) {
+      statusActions.push({ label: 'Review build decision', onSelect: () => openRequest(request) });
+    }
+    if (canTransition(request, 'declined')) {
+      statusActions.push({ label: 'Decline request', destructive: true, onSelect: () => openRequest(request) });
+    }
+    if (canTransition(request, 'under-review')) {
+      statusActions.push({
+        label: 'Reopen review',
+        onSelect: () =>
+          void updateRequest(request.id, { status: 'under-review', linkedToolId: 'none' }, 'Tool request reopened for review'),
+      });
     }
 
     if (request.status === 'built') {
-      actions.push(
-        'separator',
-        { label: 'View in library', onSelect: () => router.push(routes.admin.entrepreneurTools) },
-      );
+      statusActions.push({ label: 'View in library', onSelect: () => router.push(routes.admin.entrepreneurTools) });
     }
 
-    if (request.status === 'declined') {
-      actions.push(
-        'separator',
-        {
-          label: 'Reopen review',
-          onSelect: () =>
-            void updateRequest(request.id, { status: 'under-review', linkedToolId: 'none' }, 'Tool request reopened for review'),
-        },
-      );
-    }
-
+    if (statusActions.length > 0) actions.push('separator', ...statusActions);
     return actions;
   };
 
@@ -393,6 +372,9 @@ export default function AdminToolRequestsPage() {
         linkedToolOptions={linkedToolOptions}
         isSaving={updateRequestMutation.isPending}
         onClose={() => setActiveId(null)}
+        canMoveToDevelopment={activeRequest ? canTransition(activeRequest, 'in-development') : false}
+        canMarkBuilt={activeRequest ? canTransition(activeRequest, 'built') : false}
+        canDecline={activeRequest ? canTransition(activeRequest, 'declined') : false}
         onMoveToDevelopment={() => void decideRequest('in-development', 'Tool request approved for development')}
         onMarkBuilt={() => void decideRequest('built', 'Tool marked as built and ready for the library')}
         onDecline={() => void decideRequest('declined', 'Tool request declined')}
@@ -410,6 +392,9 @@ function ToolRequestReviewModal({
   onLinkedToolIdChange,
   linkedToolOptions,
   isSaving,
+  canMoveToDevelopment,
+  canMarkBuilt,
+  canDecline,
   onClose,
   onMoveToDevelopment,
   onMarkBuilt,
@@ -423,12 +408,18 @@ function ToolRequestReviewModal({
   onLinkedToolIdChange: (value: string) => void;
   linkedToolOptions: Array<{ value: string; label: string }>;
   isSaving: boolean;
+  canMoveToDevelopment: boolean;
+  canMarkBuilt: boolean;
+  canDecline: boolean;
   onClose: () => void;
   onMoveToDevelopment: () => void;
   onMarkBuilt: () => void;
   onDecline: () => void;
   onViewLibrary: () => void;
 }) {
+  const hasDecisionNote = decisionNote.trim().length > 0;
+  const hasLinkedTool = linkedToolId !== 'none';
+
   return (
     <Modal
       open={!!request}
@@ -462,7 +453,7 @@ function ToolRequestReviewModal({
             <InfoPanel title="Why the entrepreneur wants this" text={request.reason} />
           </div>
 
-          {(request.status === 'in-development' || request.status === 'built') && (
+          {(canMarkBuilt || request.status === 'built') && (
             <FormField label="Linked tool" optional className="mt-4">
               <FormSelect
                 value={linkedToolId}
@@ -473,7 +464,7 @@ function ToolRequestReviewModal({
             </FormField>
           )}
 
-          <FormField label="Admin decision note" optional className="mt-4">
+          <FormField label="Admin decision note" optional={!canDecline} className="mt-4">
             <FormTextarea
               rows={4}
               placeholder="Capture why BID is approving, building, or declining this request..."
@@ -484,17 +475,14 @@ function ToolRequestReviewModal({
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Close</Button>
-            {request.status === 'under-review' && (
-              <>
-                <Button type="button" variant="destructive" onClick={onDecline} disabled={isSaving}>Decline</Button>
-                <Button type="button" onClick={onMoveToDevelopment} disabled={isSaving}>Approve for development</Button>
-              </>
+            {canDecline && (
+              <Button type="button" variant="destructive" onClick={onDecline} disabled={isSaving || !hasDecisionNote}>Decline</Button>
             )}
-            {request.status === 'in-development' && (
-              <>
-                <Button type="button" variant="destructive" onClick={onDecline} disabled={isSaving}>Decline</Button>
-                <Button type="button" onClick={onMarkBuilt} disabled={isSaving}>Mark as built</Button>
-              </>
+            {canMoveToDevelopment && (
+              <Button type="button" onClick={onMoveToDevelopment} disabled={isSaving}>Approve for development</Button>
+            )}
+            {canMarkBuilt && (
+              <Button type="button" onClick={onMarkBuilt} disabled={isSaving || !hasLinkedTool}>Mark as built</Button>
             )}
             {request.status === 'built' && (
               <Button type="button" onClick={onViewLibrary}>View tool library</Button>

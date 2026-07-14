@@ -14,6 +14,7 @@ export type ToolRequestRecord = {
   };
   neededBy: string | null;
   status: ApiToolRequestStatus;
+  availableTransitions: ApiToolRequestStatus[];
   adminDecisionNote: string | null;
   decidedAt: string | null;
   decidedBy: {

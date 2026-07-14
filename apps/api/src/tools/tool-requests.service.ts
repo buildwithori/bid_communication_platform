@@ -6,6 +6,22 @@ import { CreateToolRequestDto, UpdateToolRequestDto } from './dto/upsert-tool-re
 
 const DEFAULT_TAKE = 20;
 
+
+const toolRequestTransitions: Record<ToolRequestStatus, ToolRequestStatus[]> = {
+  [ToolRequestStatus.under_review]: [
+    ToolRequestStatus.in_development,
+    ToolRequestStatus.built,
+    ToolRequestStatus.declined,
+  ],
+  [ToolRequestStatus.in_development]: [
+    ToolRequestStatus.under_review,
+    ToolRequestStatus.built,
+    ToolRequestStatus.declined,
+  ],
+  [ToolRequestStatus.built]: [ToolRequestStatus.under_review],
+  [ToolRequestStatus.declined]: [ToolRequestStatus.under_review],
+};
+
 const toolRequestInclude = {
   toolArea: { select: { id: true, name: true, key: true } },
   linkedTool: { select: { id: true, name: true, status: true } },
@@ -98,15 +114,27 @@ export class ToolRequestsService {
     }
 
     const nextStatus = dto.status ?? existing.status;
+    const nextLinkedToolId = dto.linkedToolId !== undefined ? dto.linkedToolId || null : existing.linkedToolId;
+    const nextDecisionNote = dto.adminDecisionNote !== undefined ? dto.adminDecisionNote?.trim() || null : existing.adminDecisionNote;
     const isDecision = dto.status !== undefined && dto.status !== existing.status;
     const reopening = nextStatus === ToolRequestStatus.under_review;
+
+    if (isDecision) {
+      this.ensureAllowedTransition(existing.status, nextStatus);
+    }
+    if (nextStatus === ToolRequestStatus.built && !nextLinkedToolId) {
+      throw new BadRequestException('Link the built tool before marking this request as built.');
+    }
+    if (nextStatus === ToolRequestStatus.declined && !nextDecisionNote) {
+      throw new BadRequestException('Add a decision note before declining a tool request.');
+    }
 
     const updated = await this.prisma.toolRequest.update({
       where: { id },
       data: {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.adminDecisionNote !== undefined ? { adminDecisionNote: dto.adminDecisionNote?.trim() || null } : {}),
-        ...(dto.linkedToolId !== undefined ? { linkedToolId: dto.linkedToolId || null } : {}),
+        ...(dto.adminDecisionNote !== undefined ? { adminDecisionNote: nextDecisionNote } : {}),
+        ...(dto.linkedToolId !== undefined ? { linkedToolId: nextLinkedToolId } : {}),
         ...(isDecision && !reopening ? { decidedById: user.id, decidedAt: new Date() } : {}),
         ...(reopening ? { decidedById: null, decidedAt: null } : {}),
       },
@@ -114,6 +142,17 @@ export class ToolRequestsService {
     });
 
     return this.mapRequest(updated);
+  }
+
+
+  private ensureAllowedTransition(current: ToolRequestStatus, next: ToolRequestStatus) {
+    if (current === next) return;
+    if (toolRequestTransitions[current].includes(next)) return;
+    throw new BadRequestException(`Cannot move a tool request from ${current} to ${next}.`);
+  }
+
+  private availableTransitions(status: ToolRequestStatus) {
+    return toolRequestTransitions[status];
   }
 
   private buildWhere(user: User, query: ToolRequestQueryDto): Prisma.ToolRequestWhereInput {
@@ -163,6 +202,7 @@ export class ToolRequestsService {
       toolArea: request.toolArea,
       neededBy: request.neededBy?.toISOString() ?? null,
       status: request.status,
+      availableTransitions: this.availableTransitions(request.status),
       adminDecisionNote: request.adminDecisionNote,
       decidedAt: request.decidedAt?.toISOString() ?? null,
       decidedBy: request.decidedBy ? this.mapUser(request.decidedBy) : null,
