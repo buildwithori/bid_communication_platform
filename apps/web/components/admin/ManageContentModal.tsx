@@ -19,6 +19,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useForm } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronLeft, ChevronRight, FileText, GripVertical, PlayCircle, Wrench } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
@@ -27,8 +29,12 @@ import { Button } from '@/components/shared/Button';
 import { useAdminStore } from '@/lib/stores/admin-store';
 import { toolById, tools } from '@/lib/mock-data';
 import { contentItemSchema, type ContentItemForm } from '@/lib/forms/schemas';
+import { createModuleContentItem } from '@/lib/api/content';
+import { createDirectUpload } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
 import type { Module, ContentItem } from '@/types';
+
+const MAX_CONTENT_FILE_SIZE_BYTES = 250 * 1024 * 1024;
 
 const typeMeta = {
   video: { label: 'Video', icon: PlayCircle, bg: 'bg-bid-light', fg: 'text-bid' },
@@ -409,6 +415,8 @@ export function AddContentItemModal({
   const { addContentItem, trainers } = useAdminStore();
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
   const pdfInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [videoFile, setVideoFile] = React.useState<File | null>(null);
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const embeddedToolOptions = React.useMemo(
     () => tools.filter((tool) => tool.type === 'embed' && tool.status === 'published' && tool.embedUrl),
     [],
@@ -433,8 +441,7 @@ export function AddContentItemModal({
   const contentType = form.watch('type');
   const toolSource = form.watch('toolSource') ?? 'library';
 
-  const handleSubmit = (values: ContentItemForm) => {
-    addContentItem(module.id, values);
+  const resetForm = React.useCallback(() => {
     form.reset({
       title: '',
       type: 'video',
@@ -446,8 +453,57 @@ export function AddContentItemModal({
       linkedToolId: '',
       toolUrl: '',
     });
-    onOpenChange(false);
-    onAdded?.(module);
+    setVideoFile(null);
+    setPdfFile(null);
+    if (videoInputRef.current) videoInputRef.current.value = '';
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+  }, [form, trainers]);
+
+  const createContentMutation = useMutation({
+    mutationFn: async (values: ContentItemForm) => {
+      let fileAssetId: string | undefined;
+      if (values.type === 'pdf') {
+        if (!pdfFile) throw new Error('Choose the PDF file to attach.');
+        if (pdfFile.size > MAX_CONTENT_FILE_SIZE_BYTES) throw new Error('PDF file must be 250 MB or smaller.');
+        const directUpload = await createDirectUpload({
+          originalFilename: pdfFile.name,
+          mimeType: pdfFile.type || 'application/pdf',
+          sizeBytes: pdfFile.size,
+          usage: 'content_pdf',
+        });
+        if (directUpload.upload.provider === 'digitalocean_spaces') {
+          const response = await fetch(directUpload.upload.url, {
+            method: directUpload.upload.method,
+            headers: directUpload.upload.headers,
+            body: pdfFile,
+          });
+          if (!response.ok) throw new Error('The PDF could not be uploaded. Please try again.');
+        }
+        fileAssetId = directUpload.file.id;
+      }
+
+      await createModuleContentItem(module.id, {
+        title: values.title,
+        type: values.type,
+        trainerId: values.trainerId,
+        fileAssetId,
+        toolId: values.type === 'tool' && values.toolSource === 'library' ? values.linkedToolId : undefined,
+        externalUrl: values.type === 'tool' && values.toolSource === 'custom' ? values.toolUrl : undefined,
+      });
+
+      return values;
+    },
+    onSuccess: (values) => {
+      addContentItem(module.id, values);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Could not add content item.');
+    },
+  });
+
+  const handleSubmit = (values: ContentItemForm) => {
+    createContentMutation.mutate(values);
   };
 
   return (
@@ -465,10 +521,16 @@ export function AddContentItemModal({
             onValueChange={(value) => {
               const nextType = value as ContentItem['type'];
               form.setValue('type', nextType, { shouldValidate: true });
-              if (nextType !== 'video') form.setValue('videoFileName', '', { shouldValidate: true });
+              if (nextType !== 'video') {
+                form.setValue('videoFileName', '', { shouldValidate: true });
+                setVideoFile(null);
+                if (videoInputRef.current) videoInputRef.current.value = '';
+              }
               if (nextType !== 'pdf') {
                 form.setValue('pdfFileName', '', { shouldValidate: true });
                 form.setValue('fileUrl', '', { shouldValidate: true });
+                setPdfFile(null);
+                if (pdfInputRef.current) pdfInputRef.current.value = '';
               }
               if (nextType !== 'tool') {
                 form.setValue('toolSource', 'library', { shouldValidate: true });
@@ -509,7 +571,8 @@ export function AddContentItemModal({
               accept="video/mp4,video/quicktime,video/*"
               className="hidden"
               onChange={(event) => {
-                const file = event.target.files?.[0];
+                const file = event.target.files?.[0] ?? null;
+                setVideoFile(file);
                 if (file) form.setValue('videoFileName', file.name, { shouldValidate: true });
               }}
             />
@@ -537,7 +600,15 @@ export function AddContentItemModal({
               accept="application/pdf,.pdf"
               className="hidden"
               onChange={(event) => {
-                const file = event.target.files?.[0];
+                const file = event.target.files?.[0] ?? null;
+                if (file && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                  toast.error('Choose a PDF file.');
+                  event.target.value = '';
+                  setPdfFile(null);
+                  form.setValue('pdfFileName', '', { shouldValidate: true });
+                  return;
+                }
+                setPdfFile(file);
                 if (file) form.setValue('pdfFileName', file.name, { shouldValidate: true });
               }}
             />
@@ -612,8 +683,8 @@ export function AddContentItemModal({
             )}
           </div>
         ) : null}
-        <Button type="submit" className="w-full">
-          Add to module
+        <Button type="submit" className="w-full" disabled={createContentMutation.isPending}>
+          {createContentMutation.isPending ? 'Adding...' : 'Add to module'}
         </Button>
       </form>
     </Modal>
