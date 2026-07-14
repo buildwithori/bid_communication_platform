@@ -32,19 +32,25 @@ Do not seed every entity just to test a feature. For feature development, create
 
 ## Feature Order
 
-### 1. Platform Foundation
+### 1. Platform Foundation And Loading System
 
 Scope:
 - Docker local/prod setup.
 - NestJS app shell, Prisma, health checks, global validation, auth guard defaults.
 - Shared API client setup in the frontend without changing feature UIs.
+- Shared request/response envelope and error handling.
+- Cursor pagination helpers for lists, tables, lookup endpoints, and autocomplete endpoints.
+- Shared frontend loading primitives: page skeletons, table skeletons, chart skeletons, modal skeletons, autocomplete loading rows, and inline button spinner states.
 - Company settings required by app boot.
+- Audit context and audit outbox foundation.
 
 Done when:
 - `docker compose up` starts web, api, postgres, redis, Mailpit, and pgAdmin locally.
 - Web and API health routes are reachable.
 - Protected endpoints reject unauthenticated requests.
 - pgAdmin can connect to the local Postgres database.
+- A feature can use shared API pagination and loading primitives without inventing one-off patterns.
+- Default guards make product endpoints authenticated unless explicitly marked public.
 
 ### 2. Auth And Account Entry
 
@@ -53,6 +59,8 @@ Scope:
 - Google signup/login.
 - Onboarding only for Google signup or accounts missing required signup fields.
 - HTTP-only cookie sessions.
+- Workspace route guards and role redirects.
+- Auth email templates through React Email and Resend/Mailpit.
 
 Frontend routes:
 - `/auth/login`
@@ -67,30 +75,66 @@ Done when:
 - Google signup routes missing required business/contact fields to onboarding.
 - Role redirects are correct after login.
 - Auth UI remains visually consistent with the existing design.
+- Auth forms have validation, inline pending button states, and page-specific loading states.
 
-### 3. Admin Invites And Admin Settings
+### 3. Company Settings, Lookups, And Taxonomies
+
+Scope:
+- Company settings.
+- Sectors.
+- Business stages.
+- Programme goal types.
+- Tool areas.
+- Default currency, timezone, session provider, notification defaults, and periodic update overdue rule.
+- Autocomplete/list endpoints for all growing lookup data.
+
+Frontend routes:
+- `/admin/settings`
+- `/admin/settings/company`
+- `/admin/settings/sectors`
+- `/admin/settings/stages`
+- `/admin/settings/goal-types`
+- Any legacy settings route should redirect or be intentionally removed when this slice is touched.
+
+Done when:
+- Admin settings pages are backed by authenticated APIs.
+- Lookup endpoints are paginated/searchable and can power lazy autocomplete controls.
+- Mutations validate uniqueness and active/inactive state.
+- Settings changes emit audit events.
+
+### 4. Admin Team Invites And Admin Settings
 
 Scope:
 - Admin directory.
 - Invite admin.
+- Admin detail view.
 - Admin profile/settings.
 - Google Calendar connection for admins.
-- Admin notifications entry point.
+- Admin notification entry point.
+
+Frontend routes:
+- `/admin/admins`
 
 Done when:
 - Admins can be invited and listed.
 - Admin detail view is implemented, not a dead action.
 - Calendar connection state is visible.
 - Admin notification modal uses the shared notification component.
+- List/search/filter endpoints are paginated and scoped.
 
-### 4. Trainer Invites And Trainer Settings
+### 5. Trainer Invites And Trainer Settings
 
 Scope:
 - Trainer directory.
 - Invite trainer.
 - Trainer profile/settings.
+- Trainer specialisms.
 - Google Calendar connection.
 - Trainer notification entry point.
+
+Frontend routes:
+- `/admin/trainers`
+- `/trainer/settings`
 
 Business rule:
 - Trainers can only accept Google Meet session requests when their supported calendar is connected.
@@ -100,8 +144,9 @@ Done when:
 - Trainer directory and workload views use content ownership language internally but simple user-facing labels.
 - Trainer calendar connection is clear and authenticated.
 - Trainer actions are limited to sessions and deliverable reviews.
+- Trainer lookup/autocomplete endpoints are lazy, searchable, and paginated.
 
-### 5. Entrepreneur Profile And Access
+### 6. Entrepreneur Profile And Access
 
 Scope:
 - Entrepreneur directory.
@@ -112,6 +157,11 @@ Scope:
 - Programme goals.
 - Fundraising rounds.
 - Periodic updates.
+- Admin-created entrepreneur records and entrepreneur self-service profile updates.
+
+Frontend routes:
+- `/admin/entrepreneurs`
+- `/entrepreneur/profile`
 
 Business rules:
 - Programme access is per entrepreneur user.
@@ -121,21 +171,46 @@ Business rules:
 
 Done when:
 - Profile pages support multiple programmes cleanly.
-- Programme and tool lists use capped `+n more` display.
+- Programme and tool lists use capped visual display while full data remains paginated/viewable.
 - Profile modals do not contain stale "primary programme" assumptions.
 - Filters are autocomplete where data can grow.
+- Profile dashboard/detail metrics are returned by aggregate endpoints where needed.
 
-### 6. Programmes, Modules, And Content
+### 7. File, Video, And Asset Infrastructure
+
+Scope:
+- DigitalOcean Spaces file upload flow for PDFs, deliverables, downloadable tools, report exports, and other non-video files.
+- Mux direct upload flow for videos.
+- Mux webhook handling.
+- Signed file access and signed Mux playback.
+- File preview/download metadata.
+- Upload progress and failure states.
+
+Done when:
+- Admins can request direct uploads without exposing secrets.
+- File records store metadata and storage keys, not raw binaries.
+- Video records store Mux asset/playback state and become ready through webhook processing.
+- UI upload controls use loading/progress states and never ask users for raw storage/playback IDs.
+
+### 8. Programmes, Modules, And Content Library
 
 Scope:
 - Programme directory.
 - Programme create/edit/archive.
 - Programme detail workspace.
 - Free programme support.
-- Modules.
-- Module reorder.
+- Module create/edit/reuse/reorder.
+- Content library.
 - Content items: video, PDF, embedded tool.
 - Trainer attribution on content items.
+- Trainer readonly programme context and curriculum/content preview.
+
+Frontend routes:
+- `/admin/programs`
+- `/admin/programs/[programId]`
+- `/admin/content`
+- `/trainer/programmes`
+- `/trainer/programmes/[programId]`
 
 Business rules:
 - Programme status is derived from publishing and date window.
@@ -148,16 +223,25 @@ Business rules:
 Done when:
 - Admin programme detail is fully functional.
 - Trainer programme detail is readonly but can view curriculum/content.
-- Module and content lists paginate or cap safely when they grow.
-- Drag and drop reorder exists where order matters.
+- Module and content lists paginate or cap visually with full pagination/infinite scrolling available.
+- Drag and drop reorder exists where order matters, with a fallback move-to-position action for paginated lists.
 
-### 7. Learner Progress
+### 9. Learner Progress And Training Library
 
 Scope:
+- Entrepreneur training library.
+- Programme detail learning path.
+- Module content player.
 - Programme progress.
 - Module progress.
 - Content completion.
 - Content ratings.
+- Trainer learner impact derived from content ownership.
+
+Frontend routes:
+- `/entrepreneur/training`
+- `/entrepreneur/training/[programmeId]`
+- `/trainer/entrepreneurs`
 
 Business rules:
 - Progress is tracked only for entrepreneurs.
@@ -166,10 +250,11 @@ Business rules:
 
 Done when:
 - Entrepreneur training library shows real programme/module/content progress.
+- Content player supports video, PDF, and embedded tools with customer-grade loading states.
 - Progress APIs are efficient and idempotent.
-- Trainer dashboards infer learner impact from content ownership.
+- Trainer learner views are inferred from content ownership and are paginated/searchable.
 
-### 8. Deliverables
+### 10. Deliverables
 
 Scope:
 - Programme deliverable rules.
@@ -179,6 +264,12 @@ Scope:
 - Trainer review queue.
 - Feedback history and unread feedback state.
 - Due date override.
+
+Frontend routes:
+- `/admin/deliverable-reviews`
+- `/trainer/deliverable-reviews`
+- `/entrepreneur/deliverables`
+- `/entrepreneur/deliverables/[groupId]`
 
 Business rules:
 - Due dates come from programme deliverable rules unless manually overridden.
@@ -190,7 +281,7 @@ Done when:
 - Admin and trainer review queues expose due date, submitted file, review action, and feedback trail.
 - Due-date updates are audited.
 
-### 9. Entrepreneur Tools
+### 11. Entrepreneur Tools And Tool Requests
 
 Scope:
 - Admin tool library.
@@ -199,6 +290,12 @@ Scope:
 - Tool visibility rules.
 - Entrepreneur tools page.
 - Tool requests.
+- Admin decisions and state transitions.
+
+Frontend routes:
+- `/admin/entrepreneur-tools`
+- `/admin/tool-requests`
+- `/entrepreneur/tools`
 
 Business rules:
 - Tools can be globally visible, programme-scoped, entrepreneur-scoped, or hidden for specific entrepreneurs.
@@ -210,16 +307,24 @@ Done when:
 - Admin can create and manage tools.
 - Entrepreneurs see only tools they should access.
 - Tool requests have complete admin and entrepreneur views.
+- Tool request states expose only valid next actions.
 
-### 10. Sessions
+### 12. Sessions And Calendar
 
 Scope:
 - Book session.
 - Admin session queue.
 - Trainer session queue.
+- Entrepreneur schedule.
 - Accept/decline/reschedule/complete.
 - Session notes.
+- Google Calendar connection and availability.
 - Google Meet link generation.
+
+Frontend routes:
+- `/admin/sessions`
+- `/trainer/sessions`
+- `/entrepreneur/schedule`
 
 Business rules:
 - If an entrepreneur selects "any available BID team member", the request stays open until an eligible admin/trainer accepts it.
@@ -230,14 +335,17 @@ Done when:
 - Entrepreneur, trainer, and admin views show the same session state machine.
 - Meeting links appear only after confirmation.
 - Reschedule and completion flows are implemented.
+- Calendar availability and time-slot endpoints are backend-computed and scoped.
 
-### 11. Notifications
+### 13. Notifications And Email
 
 Scope:
 - In-app notifications.
 - Email notifications with Resend and React Email.
 - Notification preferences.
 - Mailpit for local development.
+- Notification bell/modal for admin, trainer, and entrepreneur workspaces.
+- Product event fanout for sessions, deliverables, tools, auth, invitations, reporting, and system notices.
 
 Business rules:
 - Notification preferences should be general and user-facing.
@@ -247,15 +355,44 @@ Done when:
 - Shared notification modal works across roles.
 - Important events are emitted from lifecycle services.
 - Dev emails are visible in Mailpit.
+- Delivery status and read state are persisted.
 
-### 12. Reporting And Analytics
+### 14. Dashboards And Operational Aggregates
+
+Scope:
+- Admin dashboard.
+- Trainer dashboard.
+- Entrepreneur dashboard.
+- Dashboard cards, charts, queues, and next-action summaries.
+- Dedicated aggregate endpoints for each role dashboard.
+
+Frontend routes:
+- `/admin/dashboard`
+- `/trainer/dashboard`
+- `/entrepreneur/dashboard`
+
+Business rules:
+- Dashboards should not fetch large raw lists and aggregate in React.
+- Each dashboard metric must have a clear source table, filter, authorization scope, and date window when relevant.
+- Dashboard queues can cap visually, but must link to full paginated management pages.
+
+Done when:
+- Each role dashboard uses backend aggregate/query endpoints.
+- Charts and stats render with page-specific skeletons while loading.
+- Empty dashboard states make sense for the minimal seed database.
+
+### 15. Reporting And Analytics
 
 Scope:
 - Programme reporting.
 - Jobs created.
 - Funds mobilised.
 - Overdue updates.
-- Exports.
+- Report filters.
+- CSV/Excel exports.
+
+Frontend routes:
+- `/admin/reporting`
 
 Business rules:
 - Jobs created by programme are derived from periodic updates linked to a programme.
@@ -266,6 +403,23 @@ Done when:
 - Reports explain their data source.
 - Filters are autocomplete for growing lists.
 - CSV/Excel export works before PDF complexity.
+- Reporting queries are DB-backed aggregates, not frontend-heavy calculations.
+
+### 16. Audit, Observability, And Hardening
+
+Scope:
+- Audit outbox processor.
+- Immutable audit log writes.
+- Sensitive-field redaction.
+- Request correlation IDs.
+- Backend logging and health checks for jobs, storage, video, calendar, email, and notification queues.
+- Security/error review across completed feature slices.
+
+Done when:
+- Important lifecycle actions emit audit events automatically.
+- Audit processing retries safely and does not roll back completed business transactions.
+- Operational failures are visible during local development and production deployment.
+- Completed endpoints have tests around auth, validation, and scope.
 
 ## Integration Checklist For Every Feature
 
