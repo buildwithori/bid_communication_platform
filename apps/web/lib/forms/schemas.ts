@@ -196,8 +196,13 @@ export const signupSchema = z.object({
   businessName: z.string().min(1, 'Business name is required'),
   representative: z.string().min(1, 'Representative name is required'),
   email: z.string().email('Enter a valid email'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string().min(1, 'Confirm your password'),
   country: z.string().min(1, 'Country is required'),
   phone: z.string().min(1, 'Phone number is required'),
+}).refine((values) => values.password === values.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 export type SignupForm = z.infer<typeof signupSchema>;
 

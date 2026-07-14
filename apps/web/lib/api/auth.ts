@@ -75,3 +75,15 @@ export function logout() {
     method: 'POST',
   });
 }
+
+export function resendVerification(payload: { email: string }) {
+  return apiRequest<{ ok: boolean }>('/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getGoogleAuthUrl(mode: 'login' | 'signup') {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
+  return `${baseUrl}/auth/google/start?mode=${mode}`;
+}
