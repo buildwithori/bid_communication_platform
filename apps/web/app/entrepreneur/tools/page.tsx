@@ -41,7 +41,8 @@ import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { toolAreaOptions } from '@/lib/tool-areas';
 import { cn } from '@/lib/utils';
 import { formatProgrammeAccess } from '@/lib/programme-access';
-import { listTools, type ApiToolVisibility, type ToolRecord } from '@/lib/api/tools';
+import { listTools } from '@/lib/api/tools';
+import { mapToolRecordToUi } from '@/lib/tools/tool-records';
 import type { LucideIcon } from 'lucide-react';
 import type { Tool } from '@/types';
 
@@ -55,32 +56,6 @@ const iconMap: Record<Tool['iconKey'], LucideIcon> = {
   plus: Plus,
   calendar: CalendarDays,
 };
-
-const toolVisibilityMap: Record<ApiToolVisibility, Tool['visibility']> = {
-  all_entrepreneurs: 'all-entrepreneurs',
-  programmes: 'programmes',
-  entrepreneurs: 'entrepreneurs',
-};
-
-function mapToolRecord(record: ToolRecord): Tool {
-  const iconKey = record.iconKey in iconMap ? (record.iconKey as Tool['iconKey']) : 'plus';
-
-  return {
-    id: record.id,
-    name: record.name,
-    description: record.description,
-    type: record.type === 'embedded_tool' ? 'embed' : 'pdf',
-    toolArea: record.toolArea.name,
-    status: record.status,
-    visibility: toolVisibilityMap[record.visibility],
-    programmeIds: record.audience.programmeIds,
-    entrepreneurIds: record.audience.entrepreneurUserIds,
-    pdfFileName: record.pdfAsset?.originalFilename,
-    embedUrl: record.embeddedUrl ?? undefined,
-    updatedAt: record.updatedAt,
-    iconKey,
-  };
-}
 
 function ToolCard({ tool, onClick }: { tool: Tool; onClick?: () => void }) {
   const Icon = iconMap[tool.iconKey] ?? Wrench;
@@ -405,7 +380,7 @@ export default function ToolsPage() {
   );
 
   const accessibleTools = React.useMemo<Tool[]>(
-    () => (toolsQuery.data?.items ?? []).map(mapToolRecord),
+    () => (toolsQuery.data?.items ?? []).map(mapToolRecordToUi),
     [toolsQuery.data?.items],
   );
 
