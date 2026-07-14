@@ -62,6 +62,7 @@ export type ProgrammeContentItem = {
     mimeType: string;
     sizeBytes: string;
     status: string;
+    downloadUrl: string | null;
   }>;
   tool: {
     source: string;

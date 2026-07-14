@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { StorageService } from '../files/storage.service';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 
@@ -22,7 +23,10 @@ type ProgrammeDeliverableRuleWithInclude = Prisma.ProgrammeDeliverableRuleGetPay
 
 @Injectable()
 export class ProgrammesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async listProgrammes(user: User, query: ProgrammeQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
@@ -529,7 +533,7 @@ export class ProgrammesService {
               status: string;
               trainer: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
               videoAsset: { playbackId: string | null; muxAssetId: string | null; status: string } | null;
-              fileAssets: Array<{ id: string; originalFilename: string; mimeType: string; sizeBytes: bigint; status: string }>;
+              fileAssets: Array<{ id: string; originalFilename: string; mimeType: string; sizeBytes: bigint; status: string; storageKey: string }>;
               toolLink: { source: string; toolId: string | null; externalUrl: string | null } | null;
             };
           }>;
@@ -565,6 +569,9 @@ export class ProgrammesService {
           mimeType: file.mimeType,
           sizeBytes: file.sizeBytes.toString(),
           status: file.status,
+          downloadUrl: file.status === 'ready'
+            ? this.storage.presign({ method: 'GET', storageKey: file.storageKey, expiresInSeconds: 5 * 60 }).url
+            : null,
         })),
         tool: contentItem.toolLink
           ? {

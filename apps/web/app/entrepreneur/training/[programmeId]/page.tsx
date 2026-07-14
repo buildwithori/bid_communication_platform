@@ -116,6 +116,7 @@ function mapContentItem(
     trainerName: item.trainer?.name,
     muxPlaybackId: item.video?.playbackId ?? undefined,
     pdfFileName: item.files[0]?.originalFilename,
+    fileUrl: item.files[0]?.downloadUrl ?? undefined,
     linkedToolId: item.tool?.toolId ?? undefined,
     toolUrl: item.tool?.externalUrl ?? undefined,
     progress: progressStatus(progressPercent),
