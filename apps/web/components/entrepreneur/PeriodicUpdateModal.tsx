@@ -10,20 +10,22 @@ import {
   periodicUpdateSchema,
   type PeriodicUpdateForm,
 } from '@/lib/forms/schemas';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 
 export function PeriodicUpdateModal({
   open,
   onOpenChange,
   defaultProgrammeId,
   programmeOptions = [],
+  onSubmitUpdate,
+  isSubmitting = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultProgrammeId: string;
   programmeOptions?: Array<{ value: string; label: string; description?: string }>;
+  onSubmitUpdate: (values: PeriodicUpdateForm) => Promise<void> | void;
+  isSubmitting?: boolean;
 }) {
-  const { submitPeriodicUpdate } = useEntrepreneurStore();
   const form = useForm<PeriodicUpdateForm>({
     resolver: zodResolver(periodicUpdateSchema),
     defaultValues: {
@@ -45,8 +47,8 @@ export function PeriodicUpdateModal({
     ...programmeOptions,
   ];
 
-  const onSubmit = (values: PeriodicUpdateForm) => {
-    submitPeriodicUpdate(values);
+  const onSubmit = async (values: PeriodicUpdateForm) => {
+    await onSubmitUpdate(values);
     onOpenChange(false);
     form.reset({
       programmeId: defaultProgrammeId,
@@ -106,8 +108,8 @@ export function PeriodicUpdateModal({
             {...form.register('notes')}
           />
         </FormField>
-        <Button type="submit" className="mt-1 w-full">
-          Submit update
+        <Button type="submit" className="mt-1 w-full" disabled={isSubmitting}>
+          {isSubmitting ? 'Submitting...' : 'Submit update'}
         </Button>
       </form>
     </Modal>

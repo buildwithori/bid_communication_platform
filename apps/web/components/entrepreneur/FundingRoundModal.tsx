@@ -8,7 +8,6 @@ import { FormAutocomplete, FormField, FormInput } from '@/components/shared/Form
 import { Button } from '@/components/shared/Button';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { fundingRoundSchema, type FundingRoundForm } from '@/lib/forms/schemas';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import type { FundingRound } from '@/types';
 
 export function FundingRoundModal({
@@ -17,14 +16,17 @@ export function FundingRoundModal({
   round,
   goalOptions = [],
   programmeOptions = [],
+  onSubmitRound,
+  isSubmitting = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   round?: FundingRound | null;
   goalOptions?: Array<{ value: string; label: string; description?: string }>;
   programmeOptions?: Array<{ value: string; label: string; description?: string }>;
+  onSubmitRound: (values: FundingRoundForm, round?: FundingRound | null) => Promise<void> | void;
+  isSubmitting?: boolean;
 }) {
-  const { addFundingRound, updateFundingRound } = useEntrepreneurStore();
   const form = useForm<FundingRoundForm>({
     resolver: zodResolver(fundingRoundSchema),
     defaultValues: {
@@ -49,12 +51,8 @@ export function FundingRoundModal({
     });
   }, [form, open, round]);
 
-  const onSubmit = (values: FundingRoundForm) => {
-    if (round) {
-      updateFundingRound(round.id, values);
-    } else {
-      addFundingRound(values);
-    }
+  const onSubmit = async (values: FundingRoundForm) => {
+    await onSubmitRound(values, round);
     onOpenChange(false);
     form.reset();
   };
@@ -117,8 +115,8 @@ export function FundingRoundModal({
             emptyMessage="No fundraising goal found."
           />
         </FormField>
-        <Button type="submit" className="mt-1 w-full">
-          {round ? 'Save changes' : 'Add round'}
+        <Button type="submit" className="mt-1 w-full" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : round ? 'Save changes' : 'Add round'}
         </Button>
       </form>
     </Modal>
