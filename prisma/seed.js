@@ -263,6 +263,116 @@ const toolRequestSeeds = [
 ];
 
 
+const deliverableRuleSeeds = [
+  {
+    id: 'dr-accelerator-bmc',
+    programmeId: 'p-accelerator-c6',
+    name: 'Business Model Canvas',
+    dueType: 'module_completion',
+    dueAfterModuleId: 'm-bmc',
+    requiredForScope: 'all',
+  },
+  {
+    id: 'dr-accelerator-financial-model',
+    programmeId: 'p-accelerator-c6',
+    name: 'Financial Model (3yr)',
+    dueType: 'fixed_date',
+    dueDate: '2026-07-20',
+    requiredForScope: 'all',
+  },
+  {
+    id: 'dr-accelerator-quarterly-financials',
+    programmeId: 'p-accelerator-c6',
+    name: 'Financial Statements Q1',
+    dueType: 'recurring',
+    recurringCadence: 'quarterly',
+    requiredForScope: 'all',
+  },
+  {
+    id: 'dr-fintech-pitch-deck',
+    programmeId: 'p-readiness-fintech',
+    name: 'Pitch Deck v2',
+    dueType: 'fixed_date',
+    dueDate: '2026-07-28',
+    requiredForScope: 'stage',
+    requiredStageKey: 'growth',
+  },
+];
+
+const deliverableInstanceSeeds = [
+  {
+    ruleId: 'dr-accelerator-quarterly-financials',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    dueDate: '2026-04-05',
+    status: 'approved',
+    submission: {
+      id: 'sub-amara-q1-report',
+      fileName: 'Q1 Report.pdf',
+      mimeType: 'application/pdf',
+      submittedAt: '2026-04-02',
+      note: 'Q1 revenue and jobs update attached.',
+      reviews: [
+        {
+          reviewerEmail: DEV_ADMIN_EMAIL,
+          decision: 'approved',
+          feedback: 'Strong revenue trajectory. This is accepted for BID reporting.',
+          createdAt: '2026-04-06',
+          readAt: '2026-04-06',
+        },
+      ],
+    },
+  },
+  {
+    ruleId: 'dr-accelerator-bmc',
+    entrepreneurEmail: 'kwame@farmlink.gh',
+    dueDate: '2026-07-13',
+    status: 'submitted',
+    submission: {
+      id: 'sub-kwame-bmc',
+      fileName: 'FarmLink_BMC_v2.pdf',
+      mimeType: 'application/pdf',
+      submittedAt: '2026-07-05',
+      note: 'Updated business model canvas after customer interviews.',
+      reviews: [],
+    },
+  },
+  {
+    ruleId: 'dr-accelerator-financial-model',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    dueDate: '2026-07-20',
+    status: 'changes_required',
+    submission: {
+      id: 'sub-amara-financial-model',
+      fileName: 'PayBridge_financial_model_v1.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      submittedAt: '2026-07-01',
+      note: 'Initial model with revenue, burn, and hiring assumptions.',
+      reviews: [
+        {
+          reviewerEmail: 'kofi.mensah@bid.org',
+          decision: 'changes_required',
+          feedback: 'Please add monthly cash-flow assumptions and separate revenue lines by customer segment.',
+          createdAt: '2026-07-04',
+          readAt: null,
+        },
+      ],
+    },
+  },
+  {
+    ruleId: 'dr-accelerator-quarterly-financials',
+    entrepreneurEmail: 'kwame@farmlink.gh',
+    dueDate: '2026-07-02',
+    status: 'overdue',
+  },
+  {
+    ruleId: 'dr-fintech-pitch-deck',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    dueDate: '2026-07-28',
+    status: 'not_submitted',
+  },
+];
+
+
 const entrepreneurSeeds = [
   {
     email: 'amara@paybridge.africa',
@@ -664,6 +774,133 @@ async function seedToolRequests(adminUserId, toolAreaIdByKey) {
   }
 }
 
+
+function dateOnly(value) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+async function seedDeliverables(adminUserId, stageIdByKey) {
+  const userByEmail = new Map(
+    (await prisma.user.findMany({ select: { id: true, email: true, role: true } })).map((user) => [user.email, user]),
+  );
+
+  for (const ruleSeed of deliverableRuleSeeds) {
+    await prisma.programmeDeliverableRule.upsert({
+      where: { id: ruleSeed.id },
+      update: {
+        programmeId: ruleSeed.programmeId,
+        name: ruleSeed.name,
+        dueType: ruleSeed.dueType,
+        dueDate: ruleSeed.dueDate ? dateOnly(ruleSeed.dueDate) : null,
+        dueAfterModuleId: ruleSeed.dueAfterModuleId ?? null,
+        recurringCadence: ruleSeed.recurringCadence ?? null,
+        requiredForScope: ruleSeed.requiredForScope,
+        requiredStageId: ruleSeed.requiredStageKey ? stageIdByKey.get(ruleSeed.requiredStageKey) ?? null : null,
+        active: true,
+      },
+      create: {
+        id: ruleSeed.id,
+        programmeId: ruleSeed.programmeId,
+        name: ruleSeed.name,
+        dueType: ruleSeed.dueType,
+        dueDate: ruleSeed.dueDate ? dateOnly(ruleSeed.dueDate) : null,
+        dueAfterModuleId: ruleSeed.dueAfterModuleId ?? null,
+        recurringCadence: ruleSeed.recurringCadence ?? null,
+        requiredForScope: ruleSeed.requiredForScope,
+        requiredStageId: ruleSeed.requiredStageKey ? stageIdByKey.get(ruleSeed.requiredStageKey) ?? null : null,
+        active: true,
+      },
+    });
+  }
+
+  for (const instanceSeed of deliverableInstanceSeeds) {
+    const entrepreneur = userByEmail.get(instanceSeed.entrepreneurEmail);
+    if (!entrepreneur) continue;
+
+    const rule = await prisma.programmeDeliverableRule.findUnique({ where: { id: instanceSeed.ruleId } });
+    if (!rule) continue;
+
+    const instance = await prisma.deliverableInstance.upsert({
+      where: {
+        ruleId_entrepreneurUserId_programmeId: {
+          ruleId: rule.id,
+          entrepreneurUserId: entrepreneur.id,
+          programmeId: rule.programmeId,
+        },
+      },
+      update: {
+        dueDate: dateOnly(instanceSeed.dueDate),
+        status: instanceSeed.status,
+        dueUpdatedAt: null,
+        dueUpdatedById: null,
+        dueUpdateReason: null,
+      },
+      create: {
+        ruleId: rule.id,
+        entrepreneurUserId: entrepreneur.id,
+        programmeId: rule.programmeId,
+        dueDate: dateOnly(instanceSeed.dueDate),
+        status: instanceSeed.status,
+      },
+    });
+
+    if (!instanceSeed.submission) continue;
+
+    const fileAsset = await prisma.fileAsset.upsert({
+      where: { storageKey: `seed/deliverables/${instanceSeed.submission.id}/${instanceSeed.submission.fileName}` },
+      update: {
+        originalFilename: instanceSeed.submission.fileName,
+        mimeType: instanceSeed.submission.mimeType,
+        sizeBytes: BigInt(320000),
+        status: 'ready',
+      },
+      create: {
+        storageKey: `seed/deliverables/${instanceSeed.submission.id}/${instanceSeed.submission.fileName}`,
+        originalFilename: instanceSeed.submission.fileName,
+        mimeType: instanceSeed.submission.mimeType,
+        sizeBytes: BigInt(320000),
+        status: 'ready',
+      },
+    });
+
+    const submission = await prisma.deliverableSubmission.upsert({
+      where: { id: instanceSeed.submission.id },
+      update: {
+        instanceId: instance.id,
+        submittedById: entrepreneur.id,
+        fileAssetId: fileAsset.id,
+        note: instanceSeed.submission.note ?? null,
+        submittedAt: dateOnly(instanceSeed.submission.submittedAt),
+      },
+      create: {
+        id: instanceSeed.submission.id,
+        instanceId: instance.id,
+        submittedById: entrepreneur.id,
+        fileAssetId: fileAsset.id,
+        note: instanceSeed.submission.note ?? null,
+        submittedAt: dateOnly(instanceSeed.submission.submittedAt),
+      },
+    });
+
+    await prisma.deliverableReview.deleteMany({ where: { submissionId: submission.id } });
+    for (const reviewSeed of instanceSeed.submission.reviews) {
+      const reviewer = userByEmail.get(reviewSeed.reviewerEmail) ?? userByEmail.get(DEV_ADMIN_EMAIL);
+      if (!reviewer) continue;
+      await prisma.deliverableReview.create({
+        data: {
+          submissionId: submission.id,
+          reviewerId: reviewer.id,
+          reviewerRole: reviewer.role,
+          decision: reviewSeed.decision,
+          feedback: reviewSeed.feedback,
+          createdAt: dateOnly(reviewSeed.createdAt),
+          readAt: reviewSeed.readAt ? dateOnly(reviewSeed.readAt) : null,
+        },
+      });
+    }
+  }
+}
+
 async function seedTrainersAndProgrammes() {
   const sectorRows = await prisma.sector.findMany();
   const stageRows = await prisma.businessStage.findMany();
@@ -845,6 +1082,7 @@ async function seedTrainersAndProgrammes() {
   await seedEntrepreneurs(adminUser.id, sectorIdByKey, stageIdByKey);
   await seedEntrepreneurTools(adminUser.id, toolAreaIdByKey);
   await seedToolRequests(adminUser.id, toolAreaIdByKey);
+  await seedDeliverables(adminUser.id, stageIdByKey);
 }
 
 async function main() {

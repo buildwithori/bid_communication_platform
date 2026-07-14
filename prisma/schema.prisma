@@ -132,6 +132,36 @@ enum ProgressSource {
   system
 }
 
+enum DeliverableDueType {
+  fixed_date
+  module_completion
+  recurring
+}
+
+enum DeliverableRecurringCadence {
+  monthly
+  quarterly
+  six_monthly
+}
+
+enum DeliverableRequiredScope {
+  all
+  stage
+}
+
+enum DeliverableInstanceStatus {
+  not_submitted
+  submitted
+  changes_required
+  approved
+  overdue
+}
+
+enum DeliverableReviewDecision {
+  approved
+  changes_required
+}
+
 model User {
   id              String     @id @default(cuid())
   email           String     @unique
@@ -173,6 +203,10 @@ model User {
   hiddenToolOverrides         ToolHiddenEntrepreneur[]   @relation("ToolHiddenBy")
   toolRequests                ToolRequest[]              @relation("ToolRequestEntrepreneur")
   decidedToolRequests         ToolRequest[]              @relation("ToolRequestDecidedBy")
+  deliverableInstances        DeliverableInstance[]      @relation("DeliverableInstanceEntrepreneur")
+  deliverableSubmissions      DeliverableSubmission[]    @relation("DeliverableSubmissionSubmittedBy")
+  deliverableReviews          DeliverableReview[]        @relation("DeliverableReviewReviewer")
+  updatedDeliverableDueDates  DeliverableInstance[]      @relation("DeliverableDueDateUpdatedBy")
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
@@ -312,7 +346,8 @@ model BusinessStage {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  businesses Business[]
+  businesses       Business[]
+  deliverableRules ProgrammeDeliverableRule[]
 
   @@index([active])
   @@map("business_stages")
@@ -333,17 +368,16 @@ model ProgrammeGoalType {
 }
 
 model ToolArea {
-  id        String   @id @default(cuid())
-  name      String
-  key       String   @unique
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([active])
+  id           String        @id @default(cuid())
+  name         String
+  key          String        @unique
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
   tools        Tool[]
   toolRequests ToolRequest[]
 
+  @@index([active])
   @@map("tool_areas")
 }
 
@@ -434,14 +468,16 @@ model Programme {
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  publishedBy     User?                      @relation("ProgrammePublishedBy", fields: [publishedById], references: [id])
-  archivedBy      User?                      @relation("ProgrammeArchivedBy", fields: [archivedById], references: [id])
-  modules         ProgrammeModule[]
-  accessGrants    ProgrammeAccessGrant[]
-  contentProgress LearnerContentProgress[]
-  moduleProgress  LearnerModuleProgress[]
-  progress        LearnerProgrammeProgress[]
-  toolAccess      ToolProgrammeAccess[]
+  publishedBy          User?                      @relation("ProgrammePublishedBy", fields: [publishedById], references: [id])
+  archivedBy           User?                      @relation("ProgrammeArchivedBy", fields: [archivedById], references: [id])
+  modules              ProgrammeModule[]
+  accessGrants         ProgrammeAccessGrant[]
+  contentProgress      LearnerContentProgress[]
+  moduleProgress       LearnerModuleProgress[]
+  progress             LearnerProgrammeProgress[]
+  toolAccess           ToolProgrammeAccess[]
+  deliverableRules     ProgrammeDeliverableRule[]
+  deliverableInstances DeliverableInstance[]
 
   @@index([accessType])
   @@index([publishedAt, archivedAt])
@@ -478,10 +514,11 @@ model LearningModule {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  programmes      ProgrammeModule[]
-  contentItems    ModuleContentItem[]
-  contentProgress LearnerContentProgress[]
-  progress        LearnerModuleProgress[]
+  programmes            ProgrammeModule[]
+  contentItems          ModuleContentItem[]
+  contentProgress       LearnerContentProgress[]
+  progress              LearnerModuleProgress[]
+  deliverableRulesAfter ProgrammeDeliverableRule[] @relation("DeliverableRuleDueAfterModule")
 
   @@map("modules")
 }
@@ -571,8 +608,9 @@ model FileAsset {
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  contentItem ContentItem? @relation(fields: [contentItemId], references: [id])
-  toolPdfAsset Tool?       @relation("ToolPdfAsset")
+  contentItem            ContentItem?            @relation(fields: [contentItemId], references: [id])
+  toolPdfAsset           Tool?                   @relation("ToolPdfAsset")
+  deliverableSubmissions DeliverableSubmission[]
 
   @@index([contentItemId])
   @@index([status])
@@ -595,34 +633,33 @@ model ContentToolLink {
   @@map("content_tool_links")
 }
 
-
 model Tool {
-  id            String                     @id @default(cuid())
-  name          String
-  description   String
-  type          EntrepreneurToolType
-  toolAreaId    String                     @map("tool_area_id")
-  iconKey       String                     @map("icon_key")
-  visibility    EntrepreneurToolVisibility @default(all_entrepreneurs)
-  status        EntrepreneurToolStatus     @default(draft)
-  pdfAssetId    String?                    @unique @map("pdf_asset_id")
-  embeddedUrl   String?                    @map("embedded_url")
-  createdById   String                     @map("created_by_id")
-  updatedById   String?                    @map("updated_by_id")
-  publishedAt   DateTime?                  @map("published_at")
-  archivedAt    DateTime?                  @map("archived_at")
-  createdAt     DateTime                   @default(now()) @map("created_at")
-  updatedAt     DateTime                   @updatedAt @map("updated_at")
+  id          String                     @id @default(cuid())
+  name        String
+  description String
+  type        EntrepreneurToolType
+  toolAreaId  String                     @map("tool_area_id")
+  iconKey     String                     @map("icon_key")
+  visibility  EntrepreneurToolVisibility @default(all_entrepreneurs)
+  status      EntrepreneurToolStatus     @default(draft)
+  pdfAssetId  String?                    @unique @map("pdf_asset_id")
+  embeddedUrl String?                    @map("embedded_url")
+  createdById String                     @map("created_by_id")
+  updatedById String?                    @map("updated_by_id")
+  publishedAt DateTime?                  @map("published_at")
+  archivedAt  DateTime?                  @map("archived_at")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
 
-  toolArea       ToolArea                   @relation(fields: [toolAreaId], references: [id])
-  pdfAsset       FileAsset?                 @relation("ToolPdfAsset", fields: [pdfAssetId], references: [id])
-  createdBy      User                       @relation("ToolCreatedBy", fields: [createdById], references: [id])
-  updatedBy      User?                      @relation("ToolUpdatedBy", fields: [updatedById], references: [id])
-  programmeAccess ToolProgrammeAccess[]
-  entrepreneurAccess ToolEntrepreneurAccess[]
+  toolArea            ToolArea                 @relation(fields: [toolAreaId], references: [id])
+  pdfAsset            FileAsset?               @relation("ToolPdfAsset", fields: [pdfAssetId], references: [id])
+  createdBy           User                     @relation("ToolCreatedBy", fields: [createdById], references: [id])
+  updatedBy           User?                    @relation("ToolUpdatedBy", fields: [updatedById], references: [id])
+  programmeAccess     ToolProgrammeAccess[]
+  entrepreneurAccess  ToolEntrepreneurAccess[]
   hiddenEntrepreneurs ToolHiddenEntrepreneur[]
-  contentLinks    ContentToolLink[]
-  linkedToolRequests ToolRequest[]
+  contentLinks        ContentToolLink[]
+  linkedToolRequests  ToolRequest[]
 
   @@index([toolAreaId])
   @@index([visibility, status])
@@ -806,4 +843,97 @@ model LearnerProgrammeProgress {
   @@index([programmeId])
   @@index([status])
   @@map("learner_programme_progress")
+}
+
+model ProgrammeDeliverableRule {
+  id               String                       @id @default(cuid())
+  programmeId      String                       @map("programme_id")
+  name             String
+  dueType          DeliverableDueType           @map("due_type")
+  dueDate          DateTime?                    @map("due_date")
+  dueAfterModuleId String?                      @map("due_after_module_id")
+  recurringCadence DeliverableRecurringCadence? @map("recurring_cadence")
+  requiredForScope DeliverableRequiredScope     @default(all) @map("required_for_scope")
+  requiredStageId  String?                      @map("required_stage_id")
+  active           Boolean                      @default(true)
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+
+  programme      Programme             @relation(fields: [programmeId], references: [id])
+  dueAfterModule LearningModule?       @relation("DeliverableRuleDueAfterModule", fields: [dueAfterModuleId], references: [id])
+  requiredStage  BusinessStage?        @relation(fields: [requiredStageId], references: [id])
+  instances      DeliverableInstance[]
+
+  @@index([programmeId, active])
+  @@index([dueType])
+  @@index([dueAfterModuleId])
+  @@index([requiredStageId])
+  @@map("programme_deliverable_rules")
+}
+
+model DeliverableInstance {
+  id                 String                    @id @default(cuid())
+  ruleId             String                    @map("rule_id")
+  entrepreneurUserId String                    @map("entrepreneur_user_id")
+  programmeId        String                    @map("programme_id")
+  dueDate            DateTime                  @map("due_date")
+  status             DeliverableInstanceStatus @default(not_submitted)
+  dueUpdatedAt       DateTime?                 @map("due_updated_at")
+  dueUpdatedById     String?                   @map("due_updated_by_id")
+  dueUpdateReason    String?                   @map("due_update_reason")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+
+  rule         ProgrammeDeliverableRule @relation(fields: [ruleId], references: [id])
+  entrepreneur User                     @relation("DeliverableInstanceEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme    Programme                @relation(fields: [programmeId], references: [id])
+  dueUpdatedBy User?                    @relation("DeliverableDueDateUpdatedBy", fields: [dueUpdatedById], references: [id])
+  submissions  DeliverableSubmission[]
+
+  @@unique([ruleId, entrepreneurUserId, programmeId])
+  @@index([entrepreneurUserId, status])
+  @@index([programmeId, status])
+  @@index([dueDate])
+  @@index([dueUpdatedById])
+  @@map("deliverable_instances")
+}
+
+model DeliverableSubmission {
+  id            String   @id @default(cuid())
+  instanceId    String   @map("instance_id")
+  submittedById String   @map("submitted_by_id")
+  fileAssetId   String   @map("file_asset_id")
+  note          String?
+  submittedAt   DateTime @default(now()) @map("submitted_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  instance    DeliverableInstance @relation(fields: [instanceId], references: [id])
+  submittedBy User                @relation("DeliverableSubmissionSubmittedBy", fields: [submittedById], references: [id])
+  fileAsset   FileAsset           @relation(fields: [fileAssetId], references: [id])
+  reviews     DeliverableReview[]
+
+  @@index([instanceId, submittedAt])
+  @@index([submittedById])
+  @@index([fileAssetId])
+  @@map("deliverable_submissions")
+}
+
+model DeliverableReview {
+  id           String                    @id @default(cuid())
+  submissionId String                    @map("submission_id")
+  reviewerId   String                    @map("reviewer_id")
+  reviewerRole UserRole                  @map("reviewer_role")
+  decision     DeliverableReviewDecision
+  feedback     String
+  readAt       DateTime?                 @map("read_at")
+  createdAt    DateTime                  @default(now()) @map("created_at")
+
+  submission DeliverableSubmission @relation(fields: [submissionId], references: [id])
+  reviewer   User                  @relation("DeliverableReviewReviewer", fields: [reviewerId], references: [id])
+
+  @@index([submissionId, createdAt])
+  @@index([reviewerId])
+  @@index([decision])
+  @@map("deliverable_reviews")
 }
