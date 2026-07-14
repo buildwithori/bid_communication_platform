@@ -76,10 +76,14 @@ npm run docker:dev
 Local pgAdmin account:
 
 - Email: `admin@example.com`
-- Password: `admin`
-- Host when registering the server: `postgres`
+- Password: `admin123`
+
+The local Postgres server is pre-registered as `BID Hub Local Postgres`. If you ever need to add it manually, use:
+
+- Host: `postgres`
 - Port: `5432`
-- Database/user/password: `bid` / `bid` / `bid`
+- Database: `bid_hub`
+- Username/password: `bid` / `bid`
 
 Production compose is intentionally separate:
 

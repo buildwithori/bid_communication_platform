@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "BID Hub Local Postgres",
+      "Group": "Local Docker",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "bid_hub",
+      "Username": "bid",
+      "SSLMode": "prefer"
+    }
+  }
+}
