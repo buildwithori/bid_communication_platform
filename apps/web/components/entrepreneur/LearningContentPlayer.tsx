@@ -24,6 +24,10 @@ import { syncLearnerProgress } from '@/lib/api/learning';
 import { cn } from '@/lib/utils';
 import type { BadgeTone, ContentItem, ContentType } from '@/types';
 
+type PlayerContentItem = ContentItem & {
+  trainerName?: string;
+};
+
 const typeMeta: Record<
   ContentType,
   { label: string; icon: LucideIcon; tone: BadgeTone; iconClass: string }
@@ -66,7 +70,7 @@ export function LearningContentPlayer({
   const syncMutation = useMutation({
     mutationFn: syncLearnerProgress,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['learning', 'progress'] });
+      void queryClient.invalidateQueries({ queryKey: ['learning-progress'] });
     },
   });
   const lastSyncedAtRef = React.useRef<Record<string, number>>({});
@@ -125,7 +129,8 @@ export function LearningContentPlayer({
 
   const meta = typeMeta[item.type];
   const Icon = meta.icon;
-  const trainer = getContentTrainer(item.id);
+  const fallbackTrainer = getContentTrainer(item.id);
+  const trainerName = (item as PlayerContentItem).trainerName ?? fallbackTrainer?.fullName;
   const openUrl = item.type === 'pdf' ? item.fileUrl : item.type === 'tool' ? item.toolUrl : undefined;
 
   return (
@@ -151,7 +156,7 @@ export function LearningContentPlayer({
                   </div>
                   <h3 className="mt-2 text-2xl font-semibold leading-tight text-ink">{item.title}</h3>
                   <div className="mt-1 text-sm text-ink-muted">
-                    {trainer ? `By ${trainer.fullName}` : 'BID learning content'}
+                    {trainerName ? `By ${trainerName}` : 'BID learning content'}
                   </div>
                 </div>
               </div>
