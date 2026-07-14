@@ -83,6 +83,39 @@ export type ProgrammeDetail = ProgrammeBase & {
   }>;
 };
 
+
+export type ProgrammeDeliverableDueType = 'fixed_date' | 'module_completion' | 'recurring';
+export type ProgrammeDeliverableRecurringCadence = 'monthly' | 'quarterly' | 'six_monthly';
+export type ProgrammeDeliverableRequiredScope = 'all' | 'stage';
+
+export type ProgrammeDeliverableRule = {
+  id: string;
+  programmeId: string;
+  name: string;
+  dueType: ProgrammeDeliverableDueType;
+  dueDate: string | null;
+  dueAfterModule: { id: string; title: string } | null;
+  recurringCadence: ProgrammeDeliverableRecurringCadence | null;
+  requiredForScope: ProgrammeDeliverableRequiredScope;
+  requiredStage: { id: string; name: string; key: string } | null;
+  active: boolean;
+  submittedCount: number;
+  assignedCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpsertProgrammeDeliverableRulePayload = {
+  name?: string;
+  dueType?: ProgrammeDeliverableDueType;
+  dueDate?: string;
+  dueAfterModuleId?: string;
+  recurringCadence?: ProgrammeDeliverableRecurringCadence;
+  requiredForScope?: ProgrammeDeliverableRequiredScope;
+  requiredStageId?: string;
+  active?: boolean;
+};
+
 export type ProgrammeQuery = {
   search?: string;
   accessType?: ProgrammeAccessType;
@@ -112,4 +145,30 @@ export function listProgrammes(query?: ProgrammeQuery) {
 
 export function getProgramme(id: string) {
   return apiRequest<ProgrammeDetail>(`/programmes/${id}`);
+}
+
+
+export function listProgrammeDeliverableRules(programmeId: string) {
+  return apiRequest<{ items: ProgrammeDeliverableRule[] }>(`/programmes/${programmeId}/deliverable-rules`);
+}
+
+export function createProgrammeDeliverableRule(
+  programmeId: string,
+  payload: UpsertProgrammeDeliverableRulePayload & { name: string; dueType: ProgrammeDeliverableDueType },
+) {
+  return apiRequest<ProgrammeDeliverableRule>(`/programmes/${programmeId}/deliverable-rules`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateProgrammeDeliverableRule(
+  programmeId: string,
+  ruleId: string,
+  payload: UpsertProgrammeDeliverableRulePayload,
+) {
+  return apiRequest<ProgrammeDeliverableRule>(`/programmes/${programmeId}/deliverable-rules/${ruleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
 }
