@@ -299,6 +299,72 @@ const deliverableRuleSeeds = [
   },
 ];
 
+const sessionSeeds = [
+  {
+    id: 'session-amara-mentor-confirmed',
+    entrepreneurEmail: 'amara@paybridge.africa',
+    programmeId: 'p-accelerator-c6',
+    ownerKey: 'kofi',
+    createdBy: 'entrepreneur',
+    type: 'mentor_checkin',
+    topic: 'Mentor check-in - pricing model review',
+    notes: 'Review pricing assumptions before the next investor update.',
+    source: 'entrepreneur_request',
+    status: 'confirmed',
+    startAt: '2026-07-17T09:00:00.000Z',
+    endAt: '2026-07-17T09:45:00.000Z',
+    meetingUrl: 'https://meet.google.com/bid-amara-pricing',
+  },
+  {
+    id: 'session-kwame-open-investor-prep',
+    entrepreneurEmail: 'kwame@farmlink.gh',
+    programmeId: 'p-accelerator-c6',
+    ownerKey: null,
+    createdBy: 'entrepreneur',
+    type: 'investor_prep',
+    topic: 'Investor follow-up strategy',
+    notes: 'Open BID team request; first available team member can accept.',
+    source: 'entrepreneur_request',
+    status: 'requested',
+    startAt: '2026-07-18T14:00:00.000Z',
+    endAt: '2026-07-18T15:00:00.000Z',
+    meetingUrl: null,
+  },
+  {
+    id: 'session-nadia-office-hours-completed',
+    entrepreneurEmail: 'nadia@healthfirst.ng',
+    programmeId: 'p-readiness-fintech',
+    ownerKey: 'esi',
+    createdBy: 'admin',
+    type: 'office_hours',
+    topic: 'BID office hours - investor readiness',
+    notes: 'Group coaching session for readiness blockers.',
+    source: 'team_created',
+    status: 'completed',
+    startAt: '2026-07-09T13:00:00.000Z',
+    endAt: '2026-07-09T14:30:00.000Z',
+    meetingUrl: 'https://meet.google.com/bid-office-hours-readiness',
+    completedAt: '2026-07-09T14:35:00.000Z',
+    sessionNote: 'Reviewed diligence checklist and next content to complete.',
+  },
+  {
+    id: 'session-kwame-declined',
+    entrepreneurEmail: 'kwame@farmlink.gh',
+    programmeId: 'p-accelerator-c6',
+    ownerKey: 'kofi',
+    createdBy: 'admin',
+    type: 'mentor_checkin',
+    topic: 'Short-notice mentor check-in',
+    notes: 'Requested outside available calendar window.',
+    source: 'team_created',
+    status: 'declined',
+    startAt: '2026-07-11T10:00:00.000Z',
+    endAt: '2026-07-11T10:45:00.000Z',
+    meetingUrl: null,
+    declinedReason: 'Trainer calendar was already committed for this time.',
+  },
+];
+
 const deliverableInstanceSeeds = [
   {
     ruleId: 'dr-accelerator-quarterly-financials',
@@ -901,6 +967,77 @@ async function seedDeliverables(adminUserId, stageIdByKey) {
   }
 }
 
+async function seedSessions(adminUserId, trainerIdByKey) {
+  const entrepreneurUsers = await prisma.user.findMany({
+    where: { role: 'entrepreneur' },
+    select: { id: true, email: true },
+  });
+  const entrepreneurIdByEmail = new Map(entrepreneurUsers.map((user) => [user.email, user.id]));
+
+  for (const session of sessionSeeds) {
+    const entrepreneurUserId = entrepreneurIdByEmail.get(session.entrepreneurEmail);
+    if (!entrepreneurUserId) continue;
+    const ownerUserId = session.ownerKey ? trainerIdByKey.get(session.ownerKey) : null;
+    const createdById = session.createdBy === 'entrepreneur' ? entrepreneurUserId : adminUserId;
+
+    await prisma.session.upsert({
+      where: { id: session.id },
+      update: {
+        entrepreneurUserId,
+        programmeId: session.programmeId ?? null,
+        ownerUserId,
+        createdById,
+        type: session.type,
+        topic: session.topic,
+        notes: session.notes ?? null,
+        source: session.source,
+        status: session.status,
+        startAt: new Date(session.startAt),
+        endAt: new Date(session.endAt),
+        timezone: 'Africa/Accra',
+        meetingProvider: 'google_meet',
+        meetingUrl: session.meetingUrl ?? null,
+        declinedReason: session.declinedReason ?? null,
+        cancelledReason: null,
+        completedAt: session.completedAt ? new Date(session.completedAt) : null,
+      },
+      create: {
+        id: session.id,
+        entrepreneurUserId,
+        programmeId: session.programmeId ?? null,
+        ownerUserId,
+        createdById,
+        type: session.type,
+        topic: session.topic,
+        notes: session.notes ?? null,
+        source: session.source,
+        status: session.status,
+        startAt: new Date(session.startAt),
+        endAt: new Date(session.endAt),
+        timezone: 'Africa/Accra',
+        meetingProvider: 'google_meet',
+        meetingUrl: session.meetingUrl ?? null,
+        declinedReason: session.declinedReason ?? null,
+        completedAt: session.completedAt ? new Date(session.completedAt) : null,
+      },
+    });
+
+    if (session.sessionNote && ownerUserId) {
+      await prisma.sessionNote.upsert({
+        where: { id: `${session.id}-note` },
+        update: { note: session.sessionNote, visibility: 'internal', authorId: ownerUserId },
+        create: {
+          id: `${session.id}-note`,
+          sessionId: session.id,
+          authorId: ownerUserId,
+          note: session.sessionNote,
+          visibility: 'internal',
+        },
+      });
+    }
+  }
+}
+
 async function seedTrainersAndProgrammes() {
   const sectorRows = await prisma.sector.findMany();
   const stageRows = await prisma.businessStage.findMany();
@@ -1083,6 +1220,7 @@ async function seedTrainersAndProgrammes() {
   await seedEntrepreneurTools(adminUser.id, toolAreaIdByKey);
   await seedToolRequests(adminUser.id, toolAreaIdByKey);
   await seedDeliverables(adminUser.id, stageIdByKey);
+  await seedSessions(adminUser.id, trainerIdByKey);
 }
 
 async function main() {
