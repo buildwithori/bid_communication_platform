@@ -122,6 +122,17 @@ export function listDeliverableReviews(query?: DeliverableQuery) {
 
 
 
+
+export function submitDeliverableInstance(
+  instanceId: string,
+  payload: { originalFilename: string; mimeType?: string; sizeBytes?: number; note?: string },
+) {
+  return apiRequest<DeliverableInstance>(`/deliverable-instances/${instanceId}/submissions`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function markDeliverableReviewRead(reviewId: string) {
   return apiRequest<{ id: string; readAt: string }>(`/deliverable-reviews/${reviewId}/read`, {
     method: 'POST',

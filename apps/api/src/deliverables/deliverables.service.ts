@@ -1,10 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliverableInstanceStatus, DeliverableReviewDecision, Prisma, User, UserRole } from '@prisma/client';
+import { AssetStatus, DeliverableInstanceStatus, DeliverableReviewDecision, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { ReviewDeliverableDto } from './dto/review-deliverable.dto';
 import { UpdateDeliverableDueDateDto } from './dto/update-deliverable-due-date.dto';
+import { SubmitDeliverableDto } from './dto/submit-deliverable.dto';
 
 const DEFAULT_TAKE = 20;
 
@@ -98,6 +99,51 @@ export class DeliverablesService {
     return { items: rows.slice(0, take).map((instance) => this.mapReviewQueueItem(instance)), nextCursor };
   }
 
+
+  async submitDeliverable(user: User, instanceId: string, dto: SubmitDeliverableDto) {
+    if (user.role !== UserRole.entrepreneur) {
+      throw new ForbiddenException('Only entrepreneurs can submit deliverables.');
+    }
+
+    const instance = await this.prisma.deliverableInstance.findFirst({
+      where: { id: instanceId, entrepreneurUserId: user.id },
+      select: { id: true, status: true },
+    });
+    if (!instance) throw new NotFoundException('Deliverable was not found for this entrepreneur.');
+    if (instance.status === DeliverableInstanceStatus.approved) {
+      throw new BadRequestException('Approved deliverables cannot be resubmitted.');
+    }
+
+    const filename = dto.originalFilename.trim();
+    const submitted = await this.prisma.$transaction(async (tx) => {
+      const file = await tx.fileAsset.create({
+        data: {
+          storageKey: this.deliverableStorageKey(instanceId, filename),
+          originalFilename: filename,
+          mimeType: dto.mimeType?.trim() || this.inferMimeType(filename),
+          sizeBytes: BigInt(dto.sizeBytes ?? 1),
+          status: AssetStatus.ready,
+        },
+      });
+
+      await tx.deliverableSubmission.create({
+        data: {
+          instanceId,
+          submittedById: user.id,
+          fileAssetId: file.id,
+          note: dto.note?.trim() || null,
+        },
+      });
+
+      return tx.deliverableInstance.update({
+        where: { id: instanceId },
+        data: { status: DeliverableInstanceStatus.submitted },
+        include: deliverableInstanceInclude,
+      });
+    });
+
+    return this.mapInstance(submitted);
+  }
 
   async reviewSubmission(user: User, submissionId: string, dto: ReviewDeliverableDto) {
     if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
@@ -351,6 +397,23 @@ export class DeliverablesService {
 
   private userName(user: { firstName: string | null; lastName: string | null; email: string }) {
     return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+  }
+
+  private deliverableStorageKey(instanceId: string, filename: string) {
+    const safeName = filename
+      .toLowerCase()
+      .replace(/[^a-z0-9.]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'deliverable-file';
+    return `deliverables/${instanceId}/${Date.now()}-${safeName}`;
+  }
+
+  private inferMimeType(filename: string) {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    if (extension === 'pdf') return 'application/pdf';
+    if (extension === 'pptx') return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    if (extension === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (extension === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return 'application/octet-stream';
   }
 
   private daysSince(date: Date) {

@@ -4,11 +4,14 @@ import { AlertTriangle, CheckCircle2, Clock3, FileText, UploadCloud } from 'luci
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField, FormTextarea, FormInput } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import { Badge } from '@/components/shared/Badge';
 import { deliverableSchema, type DeliverableForm } from '@/lib/forms/schemas';
+import { submitDeliverableInstance } from '@/lib/api/deliverables';
 import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { deliverableGroups } from '@/lib/mock-data';
 import type { BadgeTone, Deliverable, DeliverableStatus } from '@/types';
@@ -56,8 +59,10 @@ export function UploadDeliverableModal({
   groupId?: string;
   deliverableOptions?: Deliverable[];
 }) {
+  const queryClient = useQueryClient();
   const { deliverables, submitDeliverable } = useEntrepreneurStore();
   const sourceDeliverables = deliverableOptions ?? deliverables;
+  const usesApiDeliverables = Boolean(deliverableOptions);
   const activeGroup = React.useMemo(
     () => (groupId ? deliverableGroups.find((group) => group.id === groupId) : undefined),
     [groupId],
@@ -99,7 +104,27 @@ export function UploadDeliverableModal({
     });
   }, [deliverable, form, open]);
 
+  const submitMutation = useMutation({
+    mutationFn: (values: DeliverableForm) =>
+      submitDeliverableInstance(values.deliverableId, {
+        originalFilename: values.fileName,
+        note: values.notes,
+        sizeBytes: 1,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['deliverable-instances', 'entrepreneur'] });
+      toast.success('Deliverable submitted for review');
+      onOpenChange(false);
+      form.reset();
+    },
+  });
+
   const onSubmit = (values: DeliverableForm) => {
+    if (usesApiDeliverables) {
+      submitMutation.mutate(values);
+      return;
+    }
+
     submitDeliverable(values);
     onOpenChange(false);
     form.reset();
@@ -227,7 +252,7 @@ export function UploadDeliverableModal({
           />
         </FormField>
 
-        <Button type="submit" className="w-full" disabled={!canSubmit}>
+        <Button type="submit" className="w-full" disabled={!canSubmit || submitMutation.isPending}>
           {isResubmission ? 'Resubmit for review' : 'Submit for review'}
         </Button>
       </form>

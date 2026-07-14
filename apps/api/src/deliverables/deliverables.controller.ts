@@ -10,6 +10,7 @@ import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { DeliverablesService } from './deliverables.service';
 import { ReviewDeliverableDto } from './dto/review-deliverable.dto';
 import { UpdateDeliverableDueDateDto } from './dto/update-deliverable-due-date.dto';
+import { SubmitDeliverableDto } from './dto/submit-deliverable.dto';
 
 @ApiTags('deliverables')
 @Controller()
@@ -27,6 +28,16 @@ export class DeliverablesController {
     return this.deliverablesService.listReviewQueue(user, query);
   }
 
+
+  @Post('deliverable-instances/:id/submissions')
+  @Roles(UserRole.entrepreneur)
+  submitDeliverable(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: SubmitDeliverableDto,
+  ) {
+    return this.deliverablesService.submitDeliverable(user, id, dto);
+  }
 
   @Post('deliverable-submissions/:id/reviews')
   @Roles(UserRole.admin, UserRole.trainer)
