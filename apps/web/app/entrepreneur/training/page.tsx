@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   BookOpen,
@@ -31,17 +32,28 @@ import {
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { contentItems, modulesForProgram, programs } from '@/lib/mock-data/programs';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
+import { getLearnerProgress } from '@/lib/api/learning';
+import { getProgramme, listProgrammes, type ProgrammeDetail, type ProgrammeLifecycle, type ProgrammeListItem } from '@/lib/api/programmes';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
-import { getEntrepreneurProgrammes, isProgrammeOperational } from '@/lib/programme-access';
-import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
-import { useLearnerProgressOverlay } from '@/lib/training/progress';
-import type { BadgeTone, Program } from '@/types';
+import type { BadgeTone } from '@/types';
 
 type CatalogueKind = 'programme' | 'free-resource';
 type ProgressFilter = 'all' | 'continue' | 'not-started' | 'completed' | 'available';
+
+type CatalogueProgramme = ProgrammeListItem & {
+  progress: number;
+  accent: 'bid' | 'info' | 'success';
+};
+
+const lifecycleMeta: Record<ProgrammeLifecycle, { label: string; tone: BadgeTone }> = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  scheduled: { label: 'Scheduled', tone: 'blue' },
+  active: { label: 'Active', tone: 'green' },
+  completed: { label: 'Completed', tone: 'neutral' },
+  archived: { label: 'Archived', tone: 'neutral' },
+};
+
 
 type CatalogueRow =
   | {
@@ -49,7 +61,7 @@ type CatalogueRow =
       kind: 'programme';
       title: string;
       description: string;
-      programme: Program;
+      programme: CatalogueProgramme;
       progress: number;
       modules: number;
       assets: number;
@@ -133,22 +145,21 @@ const ALL = 'all';
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-function getProgrammeContent(program: Program) {
-  const modules = modulesForProgram(program.id);
-  const attachedItems = modules.flatMap((module) =>
-    module.contentItemIds
-      .map((contentId) => contentItems.find((item) => item.id === contentId))
-      .filter(Boolean) as typeof contentItems,
-  );
-  const nextModule = modules.find((module) =>
-    module.contentItemIds.some((contentId) => contentItems.find((item) => item.id === contentId)?.progress !== 'completed'),
-  ) ?? modules[0];
-  const typeCounts = attachedItems.reduce<Record<string, number>>(
-    (acc, item) => ({ ...acc, [item.type]: (acc[item.type] ?? 0) + 1 }),
-    { video: 0, pdf: 0, tool: 0 },
-  );
+function programmeAccent(index: number): CatalogueProgramme['accent'] {
+  const accents: Array<CatalogueProgramme['accent']> = ['bid', 'info', 'success'];
+  return accents[index % accents.length];
+}
 
-  return { modules, attachedItems, nextModule, typeCounts };
+function toCatalogueProgramme(
+  programme: ProgrammeListItem,
+  index: number,
+  progressByProgrammeId: Map<string, number>,
+): CatalogueProgramme {
+  return {
+    ...programme,
+    progress: progressByProgrammeId.get(programme.id) ?? 0,
+    accent: programmeAccent(index),
+  };
 }
 
 function getProgressKey(progress: number): ProgressFilter {
@@ -157,9 +168,8 @@ function getProgressKey(progress: number): ProgressFilter {
   return 'not-started';
 }
 
-function buildProgrammeRow(programme: Program): CatalogueRow {
-  const content = getProgrammeContent(programme);
-  const status = getProgrammeStatus(programme);
+function buildProgrammeRow(programme: CatalogueProgramme): CatalogueRow {
+  const lifecycle = lifecycleMeta[programme.lifecycle];
   const progressKey = getProgressKey(programme.progress);
   const accessLabel = programme.accessType === 'free' ? 'Free programme' : 'Programme access';
 
@@ -170,24 +180,23 @@ function buildProgrammeRow(programme: Program): CatalogueRow {
     description: programme.description ?? '',
     programme,
     progress: programme.progress,
-    modules: content.modules.length,
-    assets: content.attachedItems.length,
-    videos: content.typeCounts.video ?? 0,
-    files: content.typeCounts.pdf ?? 0,
-    tools: content.typeCounts.tool ?? 0,
-    statusLabel: getProgrammeStatusLabel(status),
-    statusTone: getProgrammeStatusTone(status),
+    modules: programme.modules.total,
+    assets: programme.content.total,
+    videos: programme.content.videos,
+    files: programme.content.pdfs,
+    tools: programme.content.tools,
+    statusLabel: lifecycle.label,
+    statusTone: lifecycle.tone,
     accessLabel,
     progressKey,
     topic: 'programme',
     searchText: [
       programme.name,
       programme.description ?? '',
-      getProgrammeStatusLabel(status),
+      lifecycle.label,
       accessLabel,
       progressKey,
-      ...content.modules.map((module) => module.title),
-      ...content.attachedItems.map((item) => `${item.title} ${item.type}`),
+      programme.accessType,
     ].join(' '),
   };
 }
@@ -207,16 +216,46 @@ function buildResourceRow(resource: FreeResource): CatalogueRow {
 
 export default function TrainingLibraryPage() {
   const router = useRouter();
-  const { entrepreneur } = useEntrepreneurStore();
-  const progressOverlay = useLearnerProgressOverlay();
-  const accessibleProgrammes = React.useMemo(
-    () => getEntrepreneurProgrammes(entrepreneur, programs)
-      .filter(isProgrammeOperational)
-      .map(progressOverlay.overlayProgramme),
-    [entrepreneur, progressOverlay.overlayProgramme],
+  const programmesQuery = useQuery({
+    queryKey: ['programmes', 'entrepreneur-training'],
+    queryFn: () => listProgrammes({ take: 100 }),
+  });
+  const progressQuery = useQuery({
+    queryKey: ['learning-progress', 'entrepreneur-training'],
+    queryFn: () => getLearnerProgress(),
+  });
+  const progressByProgrammeId = React.useMemo<Map<string, number>>(() => {
+    return new Map(
+      ((progressQuery.data?.programmes ?? []) as Array<{ programmeId: string; progressPercent: number }>).map((progress) => [
+        progress.programmeId,
+        progress.progressPercent,
+      ]),
+    );
+  }, [progressQuery.data?.programmes]);
+  const accessibleProgrammes = React.useMemo<CatalogueProgramme[]>(
+    () => ((programmesQuery.data?.items ?? []) as ProgrammeListItem[])
+      .filter((programme) => programme.publishedAt && programme.lifecycle !== 'archived')
+      .map((programme, index) => toCatalogueProgramme(programme, index, progressByProgrammeId)),
+    [programmesQuery.data?.items, progressByProgrammeId],
   );
   const currentProgramme = accessibleProgrammes.find((programme) => programme.accessType !== 'free') ?? accessibleProgrammes[0];
-  const currentProgrammeContent = currentProgramme ? getProgrammeContent(currentProgramme) : null;
+  const currentProgrammeDetailQuery = useQuery({
+    queryKey: ['programmes', 'entrepreneur-training', currentProgramme?.id],
+    queryFn: () => getProgramme(currentProgramme!.id),
+    enabled: Boolean(currentProgramme?.id),
+  });
+  const moduleProgressById = React.useMemo<Map<string, number>>(() => {
+    return new Map(
+      ((progressQuery.data?.modules ?? []) as Array<{ moduleId: string; progressPercent: number }>).map((progress) => [
+        progress.moduleId,
+        progress.progressPercent,
+      ]),
+    );
+  }, [progressQuery.data?.modules]);
+  const nextModule = React.useMemo<ProgrammeDetail['modules'][number] | undefined>(() => {
+    const modules = (currentProgrammeDetailQuery.data?.modules ?? []) as ProgrammeDetail['modules'];
+    return modules.find((module) => (moduleProgressById.get(module.id) ?? 0) < 100) ?? modules[0];
+  }, [currentProgrammeDetailQuery.data?.modules, moduleProgressById]);
   const [query, setQuery] = React.useState('');
   const [kindFilter, setKindFilter] = React.useState<typeof ALL | CatalogueKind>(ALL);
   const [progressFilter, setProgressFilter] = React.useState<ProgressFilter>(ALL);
@@ -383,7 +422,18 @@ export default function TrainingLibraryPage() {
       />
 
       <Card padding="lg" className="mb-4">
-        {currentProgramme ? (
+        {programmesQuery.isLoading ? (
+          <div className="grid min-h-[260px] place-items-center rounded-xl border border-line bg-surface-subtle text-sm text-ink-muted">
+            Loading your learning catalogue...
+          </div>
+        ) : programmesQuery.isError ? (
+          <div className="grid min-h-[260px] place-items-center rounded-xl border border-line bg-surface-subtle p-6 text-center">
+            <div>
+              <div className="text-base font-semibold text-ink">Training catalogue could not be loaded</div>
+              <p className="mt-2 text-sm text-ink-muted">Please refresh the page or try again later.</p>
+            </div>
+          </div>
+        ) : currentProgramme ? (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -391,8 +441,8 @@ export default function TrainingLibraryPage() {
                 <Badge tone={currentProgramme.accessType === 'free' ? 'blue' : 'brand'}>
                   {currentProgramme.accessType === 'free' ? 'Free programme' : 'Programme access'}
                 </Badge>
-                <Badge tone={getProgrammeStatusTone(getProgrammeStatus(currentProgramme))}>
-                  {getProgrammeStatusLabel(getProgrammeStatus(currentProgramme))}
+                <Badge tone={lifecycleMeta[currentProgramme.lifecycle].tone}>
+                  {lifecycleMeta[currentProgramme.lifecycle].label}
                 </Badge>
               </div>
               <h2 className="text-2xl font-semibold leading-tight text-ink">{currentProgramme.name}</h2>
@@ -413,9 +463,9 @@ export default function TrainingLibraryPage() {
 
               <div className="mt-5 rounded-xl border border-line bg-surface-subtle px-4 py-3">
                 <div className="text-sm text-ink-muted">Next module</div>
-                <div className="mt-1 font-semibold text-ink">{currentProgrammeContent?.nextModule?.title ?? 'No modules yet'}</div>
-                {currentProgrammeContent?.nextModule?.description && (
-                  <p className="mt-1 text-sm leading-6 text-ink-muted">{currentProgrammeContent.nextModule.description}</p>
+                <div className="mt-1 font-semibold text-ink">{nextModule?.title ?? 'Open programme to view modules'}</div>
+                {nextModule?.description && (
+                  <p className="mt-1 text-sm leading-6 text-ink-muted">{nextModule.description}</p>
                 )}
               </div>
 
@@ -431,9 +481,9 @@ export default function TrainingLibraryPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <LearningSummary icon={BookOpen} label="Modules" value={currentProgrammeContent?.modules.length ?? 0} />
-              <LearningSummary icon={PlayCircle} label="Videos" value={currentProgrammeContent?.typeCounts.video ?? 0} />
-              <LearningSummary icon={FileText} label="Files & tools" value={(currentProgrammeContent?.typeCounts.pdf ?? 0) + (currentProgrammeContent?.typeCounts.tool ?? 0)} />
+              <LearningSummary icon={BookOpen} label="Modules" value={currentProgramme.modules.total} />
+              <LearningSummary icon={PlayCircle} label="Videos" value={currentProgramme.content.videos} />
+              <LearningSummary icon={FileText} label="Files & tools" value={currentProgramme.content.pdfs + currentProgramme.content.tools} />
             </div>
           </div>
         ) : (
