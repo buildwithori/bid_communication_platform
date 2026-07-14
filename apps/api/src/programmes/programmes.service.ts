@@ -63,7 +63,7 @@ export class ProgrammesService {
       },
     });
 
-    const nextCursor = rows.length > take ? rows[take]?.id ?? null : null;
+    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
     const items = rows.slice(0, take).map((programme) => this.mapProgrammeListItem(programme));
 
     return { items, nextCursor };

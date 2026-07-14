@@ -62,7 +62,7 @@ export class EntrepreneursService {
       include: this.membershipInclude(),
     });
 
-    const nextCursor = rows.length > take ? rows[take]?.id ?? null : null;
+    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
     const items = rows.slice(0, take).map((row) => this.mapEntrepreneur(row));
 
     return { items, nextCursor };

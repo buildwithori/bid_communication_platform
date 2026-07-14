@@ -1,9 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { AddSessionNoteDto, CompleteSessionDto, RescheduleSessionDto, SessionReasonDto } from './dto/session-action.dto';
 import { SessionQueryDto } from './dto/session-query.dto';
@@ -11,7 +9,6 @@ import { SessionsService } from './sessions.service';
 
 @ApiTags('sessions')
 @Controller('sessions')
-@UseGuards(SessionAuthGuard, RolesGuard)
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
 

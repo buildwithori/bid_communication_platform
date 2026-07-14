@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
@@ -16,6 +17,13 @@ import { ToolsModule } from './tools/tools.module';
 import { FilesModule } from './files/files.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { SessionAuthGuard } from './auth/guards/session-auth.guard';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
+import { RequestContextInterceptor } from './common/request-context/request-context.interceptor';
+import { RequestContextModule } from './common/request-context/request-context.module';
+import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
 
 @Module({
   imports: [
@@ -24,6 +32,7 @@ import { AuditModule } from './audit/audit.module';
       validate: validateEnv,
     }),
     DatabaseModule,
+    RequestContextModule,
     AuthModule,
     HealthModule,
     SettingsModule,
@@ -39,5 +48,16 @@ import { AuditModule } from './audit/audit.module';
     NotificationsModule,
     AuditModule,
   ],
+  providers: [
+    { provide: APP_GUARD, useClass: SessionAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
+    { provide: APP_FILTER, useClass: ApiExceptionFilter },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

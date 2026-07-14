@@ -1,17 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { ProgrammeQueryDto } from './dto/programme-query.dto';
 import { ProgrammesService } from './programmes.service';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 
 @ApiTags('programmes')
 @Controller('programmes')
-@UseGuards(SessionAuthGuard, RolesGuard)
 export class ProgrammesController {
   constructor(private readonly programmesService: ProgrammesService) {}
 

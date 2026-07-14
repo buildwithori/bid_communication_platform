@@ -1,10 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { DeliverablesService } from './deliverables.service';
@@ -14,7 +12,6 @@ import { SubmitDeliverableDto } from './dto/submit-deliverable.dto';
 
 @ApiTags('deliverables')
 @Controller()
-@UseGuards(SessionAuthGuard, RolesGuard)
 export class DeliverablesController {
   constructor(private readonly deliverablesService: DeliverablesService) {}
 

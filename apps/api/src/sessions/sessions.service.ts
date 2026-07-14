@@ -62,7 +62,7 @@ export class SessionsService {
       include: sessionInclude,
     });
 
-    const nextCursor = rows.length > take ? rows[take]?.id ?? null : null;
+    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
     return { items: rows.slice(0, take).map((session) => this.mapSession(session)), nextCursor };
   }
 

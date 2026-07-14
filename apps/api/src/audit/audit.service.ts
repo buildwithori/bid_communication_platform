@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AuditOutboxStatus, Prisma, PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { RequestContextService } from '../common/request-context/request-context.service';
 import { PrismaService } from '../database/prisma.service';
 
 type AuditClient = Prisma.TransactionClient | PrismaService | PrismaClient;
@@ -19,15 +20,19 @@ export type AuditEventInput = {
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly requestContext: RequestContextService,
+  ) {}
 
   enqueue(input: AuditEventInput, client: AuditClient = this.prisma) {
+    const context = this.requestContext.get();
     const eventKey = input.eventKey ?? `${input.action}:${input.entityType}:${input.entityId ?? 'none'}:${randomUUID()}`;
     return client.auditOutbox.upsert({
       where: { eventKey },
       create: {
         eventKey,
-        actorUserId: input.actorUserId ?? null,
+        actorUserId: input.actorUserId ?? context?.actorUserId ?? null,
         action: input.action,
         entityType: input.entityType,
         entityId: input.entityId ?? null,
@@ -97,10 +102,11 @@ export class AuditService {
   }
 
   private buildPayload(input: AuditEventInput): Prisma.InputJsonObject {
+    const context = this.requestContext.get();
     return {
-      metadata: input.payload ?? null,
-      ipAddress: input.ipAddress ?? null,
-      userAgent: input.userAgent ?? null,
+      metadata: { requestId: context?.requestId ?? null, data: input.payload ?? null },
+      ipAddress: input.ipAddress ?? context?.ipAddress ?? null,
+      userAgent: input.userAgent ?? context?.userAgent ?? null,
     };
   }
 

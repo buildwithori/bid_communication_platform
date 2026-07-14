@@ -1,7 +1,8 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { CursorPaginationDto } from '../pagination/cursor-pagination.dto';
 
-export class LookupQueryDto {
+export class LookupQueryDto extends CursorPaginationDto {
   @IsOptional()
   @IsString()
   @MaxLength(120)

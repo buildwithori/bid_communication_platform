@@ -61,7 +61,7 @@ export class TrainersService {
     });
 
     const visibleRows = rows.slice(0, take);
-    const nextCursor = rows.length > take ? rows[take]?.id ?? null : null;
+    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
     const context = await this.trainerContext(visibleRows.map((row) => row.id));
     const items = visibleRows.map((row) => this.mapTrainer(row, context, user));
 

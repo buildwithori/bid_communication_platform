@@ -1,9 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { LookupQueryDto } from '../common/dto/lookup-query.dto';
 import {
   CreateBusinessStageDto,
@@ -20,7 +18,6 @@ import { SettingsService } from './settings.service';
 
 @ApiTags('settings')
 @Controller()
-@UseGuards(SessionAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 

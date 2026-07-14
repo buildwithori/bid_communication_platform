@@ -1,16 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
 import { UpsertFundraisingRoundDto, UpsertPeriodicUpdateDto, UpsertProgrammeGoalDto } from './dto/profile-records.dto';
 import { EntrepreneursService } from './entrepreneurs.service';
 
 @ApiTags('entrepreneurs')
 @Controller('entrepreneurs')
-@UseGuards(SessionAuthGuard, RolesGuard)
 export class EntrepreneursController {
   constructor(private readonly entrepreneursService: EntrepreneursService) {}
 

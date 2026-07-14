@@ -54,7 +54,7 @@ export class NotificationsService {
       include: notificationInclude,
     });
 
-    const nextCursor = rows.length > take ? rows[take]?.id ?? null : null;
+    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
     return { items: rows.slice(0, take).map((notification) => this.mapNotification(notification)), nextCursor };
   }
 

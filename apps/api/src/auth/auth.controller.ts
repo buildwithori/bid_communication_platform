@@ -7,7 +7,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
 import { TokenDto } from './dto/token.dto';
 import { clearSessionCookie, readSessionCookie, setSessionCookie } from './auth.cookies';
-
+import { Public } from './decorators/public.decorator';
 type CookieRequest = {
   headers: {
     cookie?: string;
@@ -29,6 +29,7 @@ type CookieOptions = {
 
 @ApiTags('auth')
 @Controller('auth')
+@Public()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

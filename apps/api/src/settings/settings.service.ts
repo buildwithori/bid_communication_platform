@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { LookupQueryDto } from '../common/dto/lookup-query.dto';
+import { cursorArgs, pageSize, toCursorPage } from '../common/pagination/cursor-pagination.dto';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
 import {
   CreateBusinessStageDto,
@@ -165,36 +166,48 @@ export class SettingsService {
     });
   }
 
-  listSectors(query: LookupQueryDto) {
-    return this.prisma.sector.findMany({
+  async listSectors(query: LookupQueryDto) {
+    const take = pageSize(query);
+    const rows = await this.prisma.sector.findMany({
       where: this.buildLookupWhere<Prisma.SectorWhereInput>(query),
-      orderBy: [{ active: 'desc' }, { name: 'asc' }],
-      take: 100,
+      orderBy: [{ active: 'desc' }, { name: 'asc' }, { id: 'asc' }],
+      take: take + 1,
+      ...cursorArgs(query.cursor),
     });
+    return toCursorPage(rows, take, (row) => row.id);
   }
 
-  listBusinessStages(query: LookupQueryDto) {
-    return this.prisma.businessStage.findMany({
+  async listBusinessStages(query: LookupQueryDto) {
+    const take = pageSize(query);
+    const rows = await this.prisma.businessStage.findMany({
       where: this.buildLookupWhere<Prisma.BusinessStageWhereInput>(query),
-      orderBy: [{ active: 'desc' }, { name: 'asc' }],
-      take: 100,
+      orderBy: [{ active: 'desc' }, { name: 'asc' }, { id: 'asc' }],
+      take: take + 1,
+      ...cursorArgs(query.cursor),
     });
+    return toCursorPage(rows, take, (row) => row.id);
   }
 
-  listProgrammeGoalTypes(query: LookupQueryDto) {
-    return this.prisma.programmeGoalType.findMany({
+  async listProgrammeGoalTypes(query: LookupQueryDto) {
+    const take = pageSize(query);
+    const rows = await this.prisma.programmeGoalType.findMany({
       where: this.buildLookupWhere<Prisma.ProgrammeGoalTypeWhereInput>(query),
-      orderBy: [{ active: 'desc' }, { name: 'asc' }],
-      take: 100,
+      orderBy: [{ active: 'desc' }, { name: 'asc' }, { id: 'asc' }],
+      take: take + 1,
+      ...cursorArgs(query.cursor),
     });
+    return toCursorPage(rows, take, (row) => row.id);
   }
 
-  listToolAreas(query: LookupQueryDto) {
-    return this.prisma.toolArea.findMany({
+  async listToolAreas(query: LookupQueryDto) {
+    const take = pageSize(query);
+    const rows = await this.prisma.toolArea.findMany({
       where: this.buildLookupWhere<Prisma.ToolAreaWhereInput>(query),
-      orderBy: [{ active: 'desc' }, { name: 'asc' }],
-      take: 100,
+      orderBy: [{ active: 'desc' }, { name: 'asc' }, { id: 'asc' }],
+      take: take + 1,
+      ...cursorArgs(query.cursor),
     });
+    return toCursorPage(rows, take, (row) => row.id);
   }
 
   private normalizeKey(value: string) {
