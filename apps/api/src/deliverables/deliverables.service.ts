@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { AssetStatus, DeliverableInstanceStatus, DeliverableReviewDecision, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { FilesService } from '../files/files.service';
+import { StorageService } from '../files/storage.service';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { ReviewDeliverableDto } from './dto/review-deliverable.dto';
@@ -70,6 +71,7 @@ export class DeliverablesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
+    private readonly storage: StorageService,
   ) {}
 
   async listInstances(user: User, query: DeliverableInstanceQueryDto) {
@@ -395,6 +397,9 @@ export class DeliverablesService {
         sizeBytes: submission.fileAsset.sizeBytes.toString(),
         storageKey: submission.fileAsset.storageKey,
         status: submission.fileAsset.status,
+        downloadUrl: submission.fileAsset.status === 'ready'
+          ? this.storage.presign({ method: 'GET', storageKey: submission.fileAsset.storageKey, expiresInSeconds: 5 * 60 }).url
+          : null,
       },
     };
   }

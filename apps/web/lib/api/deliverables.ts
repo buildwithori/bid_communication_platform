@@ -19,6 +19,7 @@ export type DeliverableFile = {
   sizeBytes: string;
   storageKey: string;
   status: string;
+  downloadUrl: string | null;
 };
 
 export type DeliverableReview = {
