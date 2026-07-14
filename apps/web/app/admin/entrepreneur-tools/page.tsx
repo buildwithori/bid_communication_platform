@@ -36,6 +36,7 @@ import {
 } from '@/lib/tool-access';
 import { listEntrepreneurs, type EntrepreneurRecord } from '@/lib/api/entrepreneurs';
 import { createTool as createToolRecord, listTools, updateTool as updateToolRecord } from '@/lib/api/tools';
+import { createDirectUpload } from '@/lib/api/files';
 import { listProgrammes, type ProgrammeListItem } from '@/lib/api/programmes';
 import { listToolAreas, type LookupRecord } from '@/lib/api/settings';
 import { buildToolPayloadFromUi, mapToolRecordToUi } from '@/lib/tools/tool-records';
@@ -507,6 +508,7 @@ type ToolDraft = {
   status: ToolStatus;
   visibility: ToolVisibility;
   iconKey: Tool['iconKey'];
+  pdfAssetId: string;
   pdfFileName: string;
   embedUrl: string;
 };
@@ -532,6 +534,7 @@ function ToolEditorModal({
 }) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [draft, setDraft] = React.useState<ToolDraft>(() => emptyDraft());
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [selectedProgrammeIds, setSelectedProgrammeIds] = React.useState<string[]>([]);
   const [selectedEntrepreneurIds, setSelectedEntrepreneurIds] = React.useState<string[]>([]);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -539,6 +542,7 @@ function ToolEditorModal({
   React.useEffect(() => {
     if (!open) return;
     setDraft(toolToDraft(tool));
+    setPdfFile(null);
     setSelectedProgrammeIds(tool?.programmeIds ?? []);
     setSelectedEntrepreneurIds(tool?.entrepreneurIds ?? []);
     setErrors({});
@@ -564,7 +568,7 @@ function ToolEditorModal({
     if (!draft.name.trim()) next.name = 'Tool name is required.';
     if (!draft.description.trim()) next.description = 'Description is required.';
     if (!draft.toolArea.trim()) next.toolArea = 'Select a tool area.';
-    if (draft.type === 'pdf' && draft.status === 'published' && !tool?.pdfAssetId) next.pdfFileName = 'Attach a PDF before publishing.';
+    if (draft.type === 'pdf' && draft.status === 'published' && !draft.pdfAssetId && !pdfFile) next.pdfFileName = 'Attach a PDF before publishing.';
     if (draft.type === 'embed') {
       if (!draft.embedUrl.trim()) next.embedUrl = 'Add the online tool link.';
       else {
@@ -581,6 +585,39 @@ function ToolEditorModal({
     event.preventDefault();
     if (!validate()) return;
     const isPdf = draft.type === 'pdf';
+    let nextPdfAssetId = isPdf ? draft.pdfAssetId : '';
+    let nextPdfFileName = isPdf ? draft.pdfFileName.trim() : '';
+
+    if (isPdf && pdfFile) {
+      if (pdfFile.type !== 'application/pdf') {
+        setErrors((current) => ({ ...current, pdfFileName: 'Choose a PDF file.' }));
+        return;
+      }
+      if (pdfFile.size > 250 * 1024 * 1024) {
+        setErrors((current) => ({ ...current, pdfFileName: 'PDF must be 250 MB or smaller.' }));
+        return;
+      }
+
+      const directUpload = await createDirectUpload({
+        originalFilename: pdfFile.name,
+        mimeType: pdfFile.type,
+        sizeBytes: pdfFile.size,
+        usage: 'tool_pdf',
+      });
+
+      if (directUpload.upload.provider === 'digitalocean_spaces') {
+        const uploadResponse = await fetch(directUpload.upload.url, {
+          method: directUpload.upload.method,
+          headers: directUpload.upload.headers,
+          body: pdfFile,
+        });
+        if (!uploadResponse.ok) throw new Error('PDF upload failed. Please try again.');
+      }
+
+      nextPdfAssetId = directUpload.file.id;
+      nextPdfFileName = directUpload.file.originalFilename;
+    }
+
     const saved: Tool = {
       id: tool?.id ?? `tool-${Date.now()}`,
       name: draft.name.trim(),
@@ -592,8 +629,8 @@ function ToolEditorModal({
       visibility: draft.visibility,
       programmeIds: draft.visibility === 'programmes' ? selectedProgrammeIds : [],
       entrepreneurIds: draft.visibility === 'entrepreneurs' ? selectedEntrepreneurIds : [],
-      pdfAssetId: isPdf ? tool?.pdfAssetId : undefined,
-      pdfFileName: isPdf && tool?.pdfAssetId ? draft.pdfFileName.trim() || tool?.pdfFileName : undefined,
+      pdfAssetId: isPdf ? nextPdfAssetId : undefined,
+      pdfFileName: isPdf ? nextPdfFileName : undefined,
       pdfUrl: isPdf ? tool?.pdfUrl : undefined,
       embedUrl: isPdf ? undefined : draft.embedUrl.trim(),
       updatedAt: new Date().toISOString(),
@@ -653,7 +690,11 @@ function ToolEditorModal({
                   className="hidden"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) setField('pdfFileName', file.name);
+                    if (file) {
+                      setPdfFile(file);
+                      setField('pdfFileName', file.name);
+                      setField('pdfAssetId', '');
+                    }
                   }}
                 />
                 <button
@@ -735,6 +776,7 @@ function emptyDraft(): ToolDraft {
     status: 'draft',
     visibility: 'all-entrepreneurs',
     iconKey: 'document',
+    pdfAssetId: '',
     pdfFileName: '',
     embedUrl: '',
   };
@@ -750,6 +792,7 @@ function toolToDraft(tool: Tool | null): ToolDraft {
     status: getToolStatus(tool),
     visibility: getToolVisibility(tool),
     iconKey: tool.iconKey,
+    pdfAssetId: tool.pdfAssetId ?? '',
     pdfFileName: tool.pdfFileName ?? '',
     embedUrl: tool.embedUrl ?? '',
   };
