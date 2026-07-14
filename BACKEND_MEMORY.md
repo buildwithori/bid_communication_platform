@@ -46,6 +46,10 @@ Frontend and backend should run as separate Docker Compose services. The fronten
 
 As backend work begins, keep the UI and backend in conversation. If the real data model exposes missing, misleading, or incomplete UI, update the UI as part of the implementation. Ask focused questions when a business rule is genuinely unclear instead of guessing.
 
+Backend/frontend integration must happen one complete business feature at a time. Do not broadly replace mock UI with partial API wiring across many pages. Preserve the existing UI, wire the feature being built, and leave unrelated screens on their current mock/store flow until their feature slice is started.
+
+Default seed data should be minimal: one admin user, one trainer user, one entrepreneur user, and essential company/settings lookup data. Do not keep adding entity-heavy seed data for every feature; use local scripts, API requests, or temporary commands when endpoint testing needs records.
+
 Maintain both local and production Docker setup:
 
 - Local: `docker-compose.yml` for development, source mounts, hot reload, Postgres, Redis, Mailpit, and developer-friendly defaults.
