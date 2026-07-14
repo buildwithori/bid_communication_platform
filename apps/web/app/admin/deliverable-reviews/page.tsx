@@ -26,39 +26,14 @@ import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
 import { listDeliverableReviews, type DeliverableReviewQueueItem } from '@/lib/api/deliverables';
-import type { BadgeTone } from '@/types';
+import {
+  deliverableReviewStatusMeta,
+  mapDeliverableReviewRow,
+  type DeliverableReviewRow as DeliverableReview,
+  type DeliverableReviewStatus,
+} from '@/lib/deliverables/review-queue';
 
 const today = new Date();
-
-type DeliverableReviewStatus = 'pending-review' | 'changes-requested' | 'approved';
-
-type DeliverableReview = {
-  id: string;
-  entrepreneurId: string;
-  deliverableId: string;
-  entrepreneur: string;
-  businessName: string;
-  programme: string;
-  programmeId: string;
-  deliverable: string;
-  fileName: string;
-  submittedAt: string;
-  dueAt: string;
-  dueRule: string;
-  dueSource: 'programme-requirement' | 'manual-override';
-  dueUpdatedAt?: string;
-  dueUpdatedBy?: string;
-  status: DeliverableReviewStatus;
-  reviewer?: string;
-  latestFeedback?: string;
-  feedbackReadAt?: string;
-};
-
-const deliverableReviewStatusMeta: Record<DeliverableReviewStatus, { label: string; tone: BadgeTone }> = {
-  'pending-review': { label: 'Pending review', tone: 'amber' },
-  'changes-requested': { label: 'Changes required', tone: 'blue' },
-  approved: { label: 'Approved', tone: 'green' },
-};
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -74,52 +49,6 @@ function daysBetween(start: string, end: Date) {
 }
 
 
-function mapStatus(status: DeliverableReviewQueueItem['status']): DeliverableReviewStatus {
-  if (status === 'approved') return 'approved';
-  if (status === 'changes_required') return 'changes-requested';
-  return 'pending-review';
-}
-
-function cadenceLabel(cadence: DeliverableReviewQueueItem['rule']['recurringCadence']) {
-  if (cadence === 'monthly') return 'Monthly recurring requirement';
-  if (cadence === 'quarterly') return 'Quarterly recurring requirement';
-  if (cadence === 'six_monthly') return 'Six-month recurring requirement';
-  return 'Recurring programme requirement';
-}
-
-function dueRuleLabel(row: DeliverableReviewQueueItem) {
-  if (row.rule.dueType === 'module_completion') {
-    return row.rule.dueAfterModule ? `After ${row.rule.dueAfterModule.title}` : 'After module completion';
-  }
-  if (row.rule.dueType === 'recurring') return cadenceLabel(row.rule.recurringCadence);
-  return 'Fixed programme due date';
-}
-
-function mapReviewRow(row: DeliverableReviewQueueItem): DeliverableReview {
-  const latestSubmission = row.latestSubmission;
-  const latestReview = row.latestReview;
-  return {
-    id: row.id,
-    entrepreneurId: row.entrepreneur.userId,
-    deliverableId: row.ruleId,
-    entrepreneur: row.entrepreneur.name,
-    businessName: row.entrepreneur.businessName,
-    programme: row.programme.name,
-    programmeId: row.programme.id,
-    deliverable: row.deliverable,
-    fileName: latestSubmission?.file.originalFilename ?? 'No file attached',
-    submittedAt: latestSubmission?.submittedAt ?? row.updatedAt,
-    dueAt: row.dueDate,
-    dueRule: dueRuleLabel(row),
-    dueSource: row.dueSource === 'manual_override' ? 'manual-override' : 'programme-requirement',
-    dueUpdatedAt: row.dueUpdatedAt ?? undefined,
-    dueUpdatedBy: row.dueUpdatedBy?.name,
-    status: mapStatus(row.status),
-    reviewer: latestReview?.reviewer.name,
-    latestFeedback: latestReview?.feedback,
-    feedbackReadAt: latestReview?.readAt ?? undefined,
-  };
-}
 
 export default function DeliverableReviewsPage() {
   const reviewsQuery = useQuery({
@@ -129,7 +58,7 @@ export default function DeliverableReviewsPage() {
   const [reviewOverrides, setReviewOverrides] = React.useState<Record<string, Partial<DeliverableReview>>>({});
   const reviews = React.useMemo<DeliverableReview[]>(() => {
     return ((reviewsQuery.data?.items ?? []) as DeliverableReviewQueueItem[]).map((row) => {
-      const mapped = mapReviewRow(row);
+      const mapped = mapDeliverableReviewRow(row);
       return { ...mapped, ...reviewOverrides[mapped.id] };
     });
   }, [reviewOverrides, reviewsQuery.data?.items]);

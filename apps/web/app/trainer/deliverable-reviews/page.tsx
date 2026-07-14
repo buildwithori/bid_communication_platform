@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
@@ -23,18 +24,17 @@ import {
   type Column,
 } from '@/components/shared/DataTable';
 import { deliverableReviewSchema, type DeliverableReviewForm } from '@/lib/forms/schemas';
+import { listDeliverableReviews, type DeliverableReviewQueueItem } from '@/lib/api/deliverables';
 import {
-  deliverableReviews,
   deliverableReviewStatusMeta,
-  type DeliverableReview,
+  mapDeliverableReviewRow,
+  reviewLabel,
+  reviewTone,
+  type DeliverableReviewRow as DeliverableReview,
   type DeliverableReviewStatus,
-} from '@/lib/mock-data/admin-workflows';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
-import type { BadgeTone } from '@/types';
+} from '@/lib/deliverables/review-queue';
 
-const currentTrainerId = 't-kofi';
-const today = new Date('2026-07-07');
+const today = new Date();
 const ALL = 'all';
 
 function formatDate(value: string) {
@@ -51,27 +51,18 @@ function daysBetween(start: string, end: Date) {
 }
 
 
-function normalise(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function programmeNamesMatch(left: string, right?: string) {
-  if (!right) return false;
-  return normalise(left).replace(/\s+/g, '') === normalise(right).replace(/\s+/g, '');
-}
-
-function reviewTone(row: DeliverableReview): BadgeTone {
-  if (row.status === 'pending-review' && new Date(row.dueAt) < today) return 'red';
-  return deliverableReviewStatusMeta[row.status].tone;
-}
-
-function reviewLabel(row: DeliverableReview) {
-  if (row.status === 'pending-review' && new Date(row.dueAt) < today) return 'Overdue review';
-  return deliverableReviewStatusMeta[row.status].label;
-}
-
 export default function TrainerDeliverableReviewsPage() {
-  const [reviews, setReviews] = React.useState<DeliverableReview[]>(deliverableReviews);
+  const reviewsQuery = useQuery({
+    queryKey: ['deliverable-reviews', 'trainer'],
+    queryFn: () => listDeliverableReviews({ take: 50 }),
+  });
+  const [reviewOverrides, setReviewOverrides] = React.useState<Record<string, Partial<DeliverableReview>>>({});
+  const reviews = React.useMemo<DeliverableReview[]>(() => {
+    return ((reviewsQuery.data?.items ?? []) as DeliverableReviewQueueItem[]).map((row) => {
+      const mapped = mapDeliverableReviewRow(row);
+      return { ...mapped, ...reviewOverrides[mapped.id] };
+    });
+  }, [reviewOverrides, reviewsQuery.data?.items]);
   const [query, setQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<typeof ALL | DeliverableReviewStatus | 'overdue'>(ALL);
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
@@ -81,19 +72,12 @@ export default function TrainerDeliverableReviewsPage() {
   const [previewTarget, setPreviewTarget] = React.useState<DeliverableReview | null>(null);
   const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReview | null>(null);
 
-  const supportedEntrepreneurs = React.useMemo(
-    () => entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)),
-    [],
-  );
-  const supportedIds = React.useMemo(
-    () => new Set(supportedEntrepreneurs.map((entrepreneur) => entrepreneur.id)),
-    [supportedEntrepreneurs],
-  );
-  const programmeOptions = React.useMemo(() => getTrainerProgrammes(currentTrainerId), []);
-  const scopedReviews = React.useMemo(
-    () => reviews.filter((review) => supportedIds.has(review.entrepreneurId)),
-    [reviews, supportedIds],
-  );
+  const programmeOptions = React.useMemo(() => {
+    const seen = new Map<string, string>();
+    reviews.forEach((review) => seen.set(review.programmeId, review.programme));
+    return Array.from(seen, ([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name));
+  }, [reviews]);
+  const scopedReviews = reviews;
 
   const pending = scopedReviews.filter((row) => row.status === 'pending-review').length;
   const changes = scopedReviews.filter((row) => row.status === 'changes-requested').length;
@@ -101,36 +85,31 @@ export default function TrainerDeliverableReviewsPage() {
   const approved = scopedReviews.filter((row) => row.status === 'approved').length;
 
   const updateStatus = (id: string, status: DeliverableReviewStatus, feedback?: string) => {
-    setReviews((rows) =>
-      rows.map((row) =>
-        row.id === id
-          ? {
-              ...row,
-              status,
-              reviewer: 'Kofi Mensah',
-              latestFeedback: feedback?.trim() || row.latestFeedback,
-              feedbackReadAt: status === 'changes-requested' ? undefined : row.feedbackReadAt,
-            }
-          : row,
-      ),
-    );
+    const currentRow = reviews.find((row) => row.id === id);
+    setReviewOverrides((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        status,
+        reviewer: 'Kofi Mensah',
+        latestFeedback: feedback?.trim() || current[id]?.latestFeedback || currentRow?.latestFeedback,
+        feedbackReadAt: status === 'changes-requested' ? undefined : current[id]?.feedbackReadAt || currentRow?.feedbackReadAt,
+      },
+    }));
     toast.success(status === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
   };
 
   const updateDueDate = (id: string, dueAt: string) => {
-    setReviews((rows) =>
-      rows.map((row) =>
-        row.id === id
-          ? {
-              ...row,
-              dueAt,
-              dueSource: 'manual-override',
-              dueUpdatedAt: new Date().toISOString(),
-              dueUpdatedBy: 'Kofi Mensah',
-            }
-          : row,
-      ),
-    );
+    setReviewOverrides((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        dueAt,
+        dueSource: 'manual-override',
+        dueUpdatedAt: new Date().toISOString(),
+        dueUpdatedBy: 'Kofi Mensah',
+      },
+    }));
     setDueDateTarget(null);
     toast.success('Due date override saved');
   };
@@ -148,8 +127,7 @@ export default function TrainerDeliverableReviewsPage() {
       const matchesStatus =
         statusFilter === ALL ||
         (statusFilter === 'overdue' ? isOverdue : row.status === statusFilter);
-      const selectedProgramme = programmeOptions.find((item) => item.id === programmeFilter);
-      const matchesProgramme = programmeFilter === ALL || programmeNamesMatch(row.programme, selectedProgramme?.name);
+      const matchesProgramme = programmeFilter === ALL || row.programmeId === programmeFilter;
       return matchesQuery && matchesStatus && matchesProgramme;
     });
   }, [programmeFilter, programmeOptions, query, scopedReviews, statusFilter]);
@@ -232,7 +210,7 @@ export default function TrainerDeliverableReviewsPage() {
     {
       key: 'status',
       header: 'Status',
-      cell: (row) => <Badge tone={reviewTone(row)}>{reviewLabel(row)}</Badge>,
+      cell: (row) => <Badge tone={reviewTone(row, today)}>{reviewLabel(row, today)}</Badge>,
     },
   ];
 
@@ -256,7 +234,7 @@ export default function TrainerDeliverableReviewsPage() {
       <Card className="mt-4">
         <CardHeader
           title="Review queue"
-          description={`${filteredReviews.length} submitted file${filteredReviews.length === 1 ? '' : 's'} in this view`}
+          description={reviewsQuery.isLoading ? 'Loading submitted files...' : `${filteredReviews.length} submitted file${filteredReviews.length === 1 ? '' : 's'} in this view`}
         />
         <TableToolbar>
           <div>
