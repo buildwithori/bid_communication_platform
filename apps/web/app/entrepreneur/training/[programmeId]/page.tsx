@@ -27,8 +27,8 @@ import {
   TableToolbar,
 } from '@/components/shared/DataTable';
 import { LearningContentPlayer } from '@/components/entrepreneur/LearningContentPlayer';
-import { deliverableGroups } from '@/lib/mock-data';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
+import { listDeliverableInstances, type DeliverableInstance } from '@/lib/api/deliverables';
+import { mapDeliverableInstanceToEntrepreneurDeliverable } from '@/lib/deliverables/entrepreneur';
 import { getLearnerProgress } from '@/lib/api/learning';
 import { getProgramme, type ProgrammeContentItem, type ProgrammeDetail, type ProgrammeLifecycle } from '@/lib/api/programmes';
 import { routes } from '@/lib/routes';
@@ -157,13 +157,26 @@ function buildModuleSummaries(
   });
 }
 
+async function fetchProgrammeDeliverableInstances(programmeId: string) {
+  const firstPage = await listDeliverableInstances({ programmeId, take: 50 });
+  const items: DeliverableInstance[] = [...firstPage.items];
+  let cursor = firstPage.nextCursor;
+
+  while (cursor) {
+    const nextPage = await listDeliverableInstances({ programmeId, take: 50, cursor });
+    items.push(...nextPage.items);
+    cursor = nextPage.nextCursor;
+  }
+
+  return items;
+}
+
 export default function ProgrammeModulesPage({
   params,
 }: {
   params: { programmeId: string };
 }) {
   const router = useRouter();
-  const { deliverables } = useEntrepreneurStore();
   const programmeQuery = useQuery({
     queryKey: ['programmes', 'entrepreneur-detail', params.programmeId],
     queryFn: () => getProgramme(params.programmeId),
@@ -171,6 +184,10 @@ export default function ProgrammeModulesPage({
   const progressQuery = useQuery({
     queryKey: ['learning-progress', 'programme', params.programmeId],
     queryFn: () => getLearnerProgress({ programmeId: params.programmeId }),
+  });
+  const deliverablesQuery = useQuery({
+    queryKey: ['deliverable-instances', 'entrepreneur', params.programmeId, 'training-detail'],
+    queryFn: () => fetchProgrammeDeliverableInstances(params.programmeId),
   });
 
   const moduleProgressById = React.useMemo<Map<string, number>>(() => {
@@ -211,9 +228,9 @@ export default function ProgrammeModulesPage({
     return buildModuleSummaries(program, moduleProgressById, contentProgressById);
   }, [contentProgressById, moduleProgressById, program]);
 
-  const programmeDeliverables = React.useMemo(
-    () => deliverables.filter((deliverable) => deliverable.programmeId === params.programmeId),
-    [deliverables, params.programmeId],
+  const programmeDeliverables = React.useMemo<Deliverable[]>(
+    () => (deliverablesQuery.data ?? []).map(mapDeliverableInstanceToEntrepreneurDeliverable),
+    [deliverablesQuery.data],
   );
   const contentPlaylist = React.useMemo<LearningContentItem[]>(
     () => moduleSummaries.flatMap((module) => module.items),
@@ -226,8 +243,6 @@ export default function ProgrammeModulesPage({
     moduleSummaries.find((module) => module.status !== 'completed') ?? moduleSummaries[0];
   const nextContent =
     contentPlaylist.find((item) => item.progress !== 'completed') ?? contentPlaylist[0] ?? null;
-  const deliverableGroup = deliverableGroups.find((group) => group.programmeId === params.programmeId);
-
   const [query, setQuery] = React.useState('');
   const [filter, setFilter] = React.useState<ModuleFilter>(ALL);
   const [page, setPage] = React.useState(1);
@@ -463,7 +478,7 @@ export default function ProgrammeModulesPage({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => router.push(deliverableGroup ? routes.entrepreneur.deliverableGroup(deliverableGroup.id) : routes.entrepreneur.deliverables)}
+                  onClick={() => router.push(routes.entrepreneur.deliverableGroup(params.programmeId))}
                 >
                   View all
                 </Button>
@@ -475,7 +490,7 @@ export default function ProgrammeModulesPage({
                   <button
                     key={deliverable.id}
                     type="button"
-                    onClick={() => router.push(deliverableGroup ? routes.entrepreneur.deliverableGroup(deliverableGroup.id) : routes.entrepreneur.deliverables)}
+                    onClick={() => router.push(routes.entrepreneur.deliverableGroup(params.programmeId))}
                     className="w-full rounded-xl border border-line bg-white p-3 text-left transition hover:bg-surface-subtle"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -492,7 +507,11 @@ export default function ProgrammeModulesPage({
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-line-strong bg-surface-subtle px-4 py-8 text-center text-sm text-ink-muted">
-                No deliverables are required for this programme yet.
+                {deliverablesQuery.isLoading
+                  ? 'Loading programme deliverables...'
+                  : deliverablesQuery.isError
+                    ? 'Programme deliverables could not be loaded.'
+                    : 'No deliverables are required for this programme yet.'}
               </div>
             )}
           </Card>
