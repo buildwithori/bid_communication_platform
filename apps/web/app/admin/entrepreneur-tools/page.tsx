@@ -23,9 +23,6 @@ import {
   type Column,
   type RowAction,
 } from '@/components/shared/DataTable';
-import { tools as seedTools } from '@/lib/mock-data';
-import { programs } from '@/lib/mock-data/programs';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
 import { sectorById, stageById } from '@/lib/mock-data/definitions';
 import {
   describeToolAudience,
@@ -121,14 +118,6 @@ function toolAreaLabel(tool: Tool) {
   return tool.toolArea || 'No tool area';
 }
 
-function normaliseTool(tool: Tool): Tool {
-  return {
-    ...tool,
-    status: getToolStatus(tool),
-    visibility: getToolVisibility(tool),
-  };
-}
-
 function toAudienceProgramme(programme: ProgrammeListItem | Program): AudienceProgramme {
   return {
     id: programme.id,
@@ -185,7 +174,7 @@ export default function AdminEntrepreneurToolsPage() {
   const [editorOpen, setEditorOpen] = React.useState(false);
 
   const toolRows = React.useMemo<Tool[]>(
-    () => toolsQuery.data?.items.map(mapToolRecordToUi) ?? seedTools.map(normaliseTool),
+    () => toolsQuery.data?.items.map(mapToolRecordToUi) ?? [],
     [toolsQuery.data?.items],
   );
 
@@ -200,12 +189,12 @@ export default function AdminEntrepreneurToolsPage() {
   );
 
   const audienceProgrammes = React.useMemo<AudienceProgramme[]>(
-    () => (programmesQuery.data?.items ?? programs).map(toAudienceProgramme),
+    () => (programmesQuery.data?.items ?? []).map(toAudienceProgramme),
     [programmesQuery.data?.items],
   );
 
   const audienceEntrepreneurs = React.useMemo<AudienceEntrepreneur[]>(
-    () => (entrepreneursQuery.data?.items ?? entrepreneurs).map(toAudienceEntrepreneur),
+    () => (entrepreneursQuery.data?.items ?? []).map(toAudienceEntrepreneur),
     [entrepreneursQuery.data?.items],
   );
 
@@ -453,16 +442,22 @@ export default function AdminEntrepreneurToolsPage() {
         </TableToolbar>
         {toolsQuery.isError && (
           <div className="mb-3 rounded-xl border border-danger/15 bg-danger/10 px-4 py-3 text-sm text-danger">
-            Tools could not be loaded from the API. Showing local seed data as a fallback.
+            Tools could not be loaded. Please refresh the page and try again.
           </div>
         )}
-        <DataTable
-          columns={columns}
-          rows={pageRows}
-          rowKey={(tool) => tool.id}
-          emptyMessage="No tools match this view."
-          tableClassName="min-w-[1080px]"
-        />
+        {toolsQuery.isLoading ? (
+          <div className="grid min-h-[220px] place-items-center rounded-xl border border-line bg-surface-subtle text-sm text-ink-muted">
+            Loading tools...
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={pageRows}
+            rowKey={(tool) => tool.id}
+            emptyMessage={toolsQuery.isError ? 'Tools could not be loaded.' : 'No tools match this view.'}
+            tableClassName="min-w-[1080px]"
+          />
+        )}
         <TablePagination
           page={page}
           pageSize={pageSize}
