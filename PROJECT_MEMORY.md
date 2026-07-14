@@ -87,6 +87,10 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Country fields should use `FormAutocomplete`/autocomplete globally, not plain inputs or standard selects, because the list can grow.
 - Modal animations should stay smooth and centered via the shared `Modal` and global modal keyframes.
 - Avoid UI that only works for a tiny dataset. Prefer search/filter/pagination from the start.
+- Every fetching view needs a page-specific skeleton that matches the final layout closely enough to feel smooth. Use skeleton cards, rows, charts, and headers that fit the page instead of a generic centered spinner for full-page loading.
+- Async buttons must show an inline loading spinner beside the label and disable duplicate submissions while pending.
+- Autocomplete and scalable select controls should fetch lazily when opened or searched. Do not fetch all options on page load just to populate a closed control.
+- Autocomplete, select, and lookup UIs must support pagination or infinite scrolling. Do not build UI around a hidden fixed result cap.
 
 ## Current Important Decisions
 
@@ -99,6 +103,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Backend runtime/deployment direction: local and production Docker Compose setup with separate services for the Next.js frontend and NestJS API, plus Postgres and Redis services. Local Compose includes Mailpit for email catching and pgAdmin for local database inspection; pgAdmin should pre-register the local Postgres service as `BID Hub Local Postgres` using Docker hostname `postgres`; production Compose must not include pgAdmin. Production uses built images, production env, restart policies, health checks, and DigitalOcean Spaces for non-video file storage. First production deployment runs on one DigitalOcean Droplet.
 - Backend auth uses secure httpOnly cookie sessions for the browser app, not client-managed bearer tokens.
 - Backend product endpoints should require authentication by default. Public endpoints must be explicit exceptions, such as auth entry points or health checks; role checks are layered on only when needed.
+- Backend endpoints must be designed for scale from the start. Lists, lookups, autocomplete sources, dashboards, and reports need backend-side search/filter/sort/pagination or server-side aggregation. The frontend should not fetch large datasets and compute business summaries in React.
 - One entrepreneur user belongs to one business at launch.
 - Admins have full permissions at launch.
 - Trainers are read-only except for sessions and deliverable reviews.

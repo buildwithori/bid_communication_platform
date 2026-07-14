@@ -13,6 +13,11 @@ This document is the working plan for backend and frontend integration. The goal
 - Do not use the phrase "formal programme" in UI labels. A programme is a programme; access type is only a filter/business rule.
 - Audit logs should be emitted by lifecycle hooks/services in the background. Feature code should not manually create audit rows in every controller action.
 - Keep local and production Docker separate. Local includes developer tools like Mailpit and pgAdmin; production does not.
+- Every list, lookup, autocomplete, and table endpoint must be designed for growth. Do not hard-cap results as a hidden product limit. Use cursor pagination or infinite-scroll friendly pagination everywhere, including autocomplete sources.
+- Autocomplete/select data should be fetched lazily when the control opens or when the user searches, not eagerly for every page load.
+- Frontend screens must show a page-specific skeleton whenever server-side or client-side data is loading. Do not leave blank pages or generic spinners for full-page fetches.
+- Buttons that trigger async work must show an inline loading spinner beside the button label and prevent duplicate submission while pending.
+- Backend APIs should do the heavy lifting: filtering, searching, aggregation, counts, dashboard metrics, and report summaries should be computed in the database/query layer, not assembled with large client-side datasets.
 
 ## Seed Policy
 
@@ -276,6 +281,9 @@ During build:
 - Use optimistic or local fallback state only when it improves UX and does not lie about persistence.
 
 Before commit:
+- Confirm list and autocomplete endpoints are paginated/infinite-scroll ready and do not rely on hidden caps.
+- Confirm dashboards and summaries are backed by server-side aggregate queries, not frontend-heavy processing.
+- Confirm every fetching view has a tailored skeleton and every async button has inline loading state.
 - Run focused API and web typechecks.
 - Manually test the primary route in Docker or local dev.
 - Commit backend, frontend, and docs in reviewable chunks.

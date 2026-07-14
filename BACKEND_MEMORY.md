@@ -74,7 +74,9 @@ Email templates should be built as a reusable BID email brand system with React 
 - Treat notifications as a full product system. Create a durable notification record once, track per-channel delivery status, respect company/user preferences, and process in-app/email fanout through background jobs instead of scattering ad hoc notification writes across services.
 - Do not delete business records casually. Prefer soft delete or status transitions for important records.
 - Design every list endpoint for search, filters, sorting, pagination, and future backend-backed tables.
-- Use cursor pagination for large or growing datasets. Offset pagination is acceptable only for small lookup data.
+- Design every autocomplete/lookup endpoint for scale too. No hidden hard caps. Use cursor pagination or infinite-scroll friendly pagination, and return enough metadata for the UI to request the next page.
+- Use cursor pagination for large or growing datasets. Offset pagination is acceptable only for small lookup data, and only when it still exposes explicit page size/page metadata.
+- Push filtering, searching, counts, dashboard metrics, reporting summaries, and business aggregations into database-backed query services. The frontend should not fetch large datasets and compute aggregates in React.
 - Use stable identifiers. Do not expose sequential assumptions to the UI.
 - Store files in DigitalOcean Spaces, not the database.
 - Store only file metadata, storage keys, Mux asset IDs/playback IDs, and processing state in Postgres.
@@ -222,6 +224,7 @@ Initial access rules:
 - Add indexes for foreign keys, search filters, status filters, and dashboard counts.
 - Avoid storing derived dashboard totals as primary truth unless they are snapshots.
 - For analytics/reporting, start with query services/materialized views before introducing a warehouse.
+- For dashboard cards and charts, prefer dedicated aggregate endpoints or query-service methods that return exactly the shaped metrics the UI needs, with clear filters and authorization scope.
 
 ## API Rules
 
