@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/shared/Button';
-import { NotificationsModal, type AppNotification } from '@/components/shared/NotificationsModal';
+import { NotificationsModal } from '@/components/shared/NotificationsModal';
 import { adminNav } from '@/lib/nav/admin-nav';
 import { trainerNav } from '@/lib/nav/trainer-nav';
+import { useNotifications } from '@/lib/notifications/use-notifications';
 import { routes } from '@/lib/routes';
 
 interface TrainerSession {
@@ -44,39 +45,16 @@ function useTitle() {
   return 'BID Admin';
 }
 
-const adminNotifications: AppNotification[] = [
-  {
-    id: 'an-session-open',
-    title: 'Open session request needs an owner',
-    meta: 'PayBridge Africa Ltd · Investor prep · Any available BID team member',
-    unread: true,
-    tone: 'warning',
-  },
-  {
-    id: 'an-deliverable-review',
-    title: 'Deliverable waiting for review',
-    meta: 'FarmLink GH · Business Model Canvas · Submitted Jul 5, 2026',
-    unread: true,
-    tone: 'info',
-  },
-  {
-    id: 'an-overdue-updates',
-    title: 'Entrepreneurs have overdue impact updates',
-    meta: '3 businesses crossed the company follow-up rule',
-    unread: true,
-    tone: 'danger',
-  },
-  {
-    id: 'an-tool-request',
-    title: 'Tool request moved to development',
-    meta: 'Cap table modelling tool · PayBridge Africa Ltd',
-  },
-];
-
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
   const [notifOpen, setNotifOpen] = React.useState(false);
-  const unreadCount = adminNotifications.filter((notification) => notification.unread).length;
+  const {
+    notifications,
+    unreadCount,
+    markAllRead,
+    isMarkingAllRead,
+    openNotification,
+  } = useNotifications();
 
   return (
     <AppShell
@@ -108,7 +86,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <NotificationsModal
         open={notifOpen}
         onOpenChange={setNotifOpen}
-        notifications={adminNotifications}
+        notifications={notifications}
+        onNotificationClick={openNotification}
+        onMarkAllRead={markAllRead}
+        isMarkingAllRead={isMarkingAllRead}
       />
     </AppShell>
   );

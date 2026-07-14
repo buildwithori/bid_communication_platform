@@ -1,6 +1,7 @@
 'use client';
 
 import { Modal } from '@/components/shared/Modal';
+import { Button } from '@/components/shared/Button';
 import { cn } from '@/lib/utils';
 
 export type NotificationTone = 'info' | 'warning' | 'danger' | 'success' | 'neutral';
@@ -11,6 +12,7 @@ export type AppNotification = {
   meta: string;
   unread?: boolean;
   tone?: NotificationTone;
+  actionUrl?: string | null;
 };
 
 const dotClassName: Record<NotificationTone, string> = {
@@ -25,19 +27,54 @@ export function NotificationsModal({
   open,
   onOpenChange,
   notifications,
+  onNotificationClick,
+  onMarkAllRead,
+  isMarkingAllRead = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   notifications: AppNotification[];
+  onNotificationClick?: (notification: AppNotification) => void;
+  onMarkAllRead?: () => void;
+  isMarkingAllRead?: boolean;
 }) {
+  const unreadCount = notifications.filter((notification) => notification.unread).length;
+
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Notifications">
+    <Modal open={open} onOpenChange={onOpenChange} title="Notifications" width="md">
+      {notifications.length > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-subtle px-3 py-2">
+          <span className="text-sm text-ink-muted">
+            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+          </span>
+          {onMarkAllRead && unreadCount > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onMarkAllRead}
+              disabled={isMarkingAllRead}
+            >
+              Mark all read
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex flex-col divide-y divide-line">
         {notifications.map((notification) => {
           const tone = notification.unread ? notification.tone ?? 'info' : 'neutral';
+          const isClickable = Boolean(onNotificationClick);
 
           return (
-            <div key={notification.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+            <button
+              key={notification.id}
+              type="button"
+              onClick={() => onNotificationClick?.(notification)}
+              className={cn(
+                'flex w-full items-start gap-3 py-3 text-left first:pt-0 last:pb-0',
+                isClickable && 'rounded-lg transition-colors hover:bg-surface-subtle',
+              )}
+            >
               <span
                 className={cn(
                   'mt-1.5 h-2 w-2 shrink-0 rounded-full',
@@ -52,7 +89,7 @@ export function NotificationsModal({
                   {notification.meta}
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
         {notifications.length === 0 && (

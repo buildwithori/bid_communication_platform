@@ -10,6 +10,7 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { NotificationsModal } from '@/components/shared/NotificationsModal';
 import { routes } from '@/lib/routes';
+import { useNotifications } from '@/lib/notifications/use-notifications';
 
 const titles: Record<string, string> = {
   [routes.entrepreneur.dashboard]: 'Dashboard',
@@ -31,9 +32,16 @@ function useTitle() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { entrepreneur, notifications } = useEntrepreneurStore();
+  const { entrepreneur } = useEntrepreneurStore();
   const title = useTitle();
   const [notifOpen, setNotifOpen] = React.useState(false);
+  const {
+    notifications,
+    unreadCount,
+    markAllRead,
+    isMarkingAllRead,
+    openNotification,
+  } = useNotifications();
 
   const user = {
     initials: entrepreneur.initials,
@@ -57,10 +65,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           size="sm"
           onClick={() => setNotifOpen(true)}
           className="flex items-center gap-1.5"
-          aria-label={`Notifications (${notifications.length} unread)`}
+          aria-label={`Notifications (${unreadCount} unread)`}
         >
           <Bell className="h-3 w-3" />
-          {notifications.length}
+          {unreadCount}
         </Button>
       }
     >
@@ -68,11 +76,10 @@ function Shell({ children }: { children: React.ReactNode }) {
       <NotificationsModal
         open={notifOpen}
         onOpenChange={setNotifOpen}
-        notifications={notifications.map((notification) => ({
-          ...notification,
-          unread: true,
-          tone: 'danger',
-        }))}
+        notifications={notifications}
+        onNotificationClick={openNotification}
+        onMarkAllRead={markAllRead}
+        isMarkingAllRead={isMarkingAllRead}
       />
     </AppShell>
   );
