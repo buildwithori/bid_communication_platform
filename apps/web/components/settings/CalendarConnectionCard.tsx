@@ -1,18 +1,22 @@
-'use client';
+"use client";
 
-import { CalendarCheck, CheckCircle2 } from 'lucide-react';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Card, CardHeader } from '@/components/shared/Card';
+import { CalendarCheck, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader } from "@/components/shared/Card";
 
 export function CalendarConnectionCard({
   connected,
   accountEmail,
+  isConnecting = false,
+  isDisconnecting = false,
   onConnect,
   onDisconnect,
 }: {
   connected: boolean;
   accountEmail?: string;
+  isConnecting?: boolean;
+  isDisconnecting?: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
 }) {
@@ -28,17 +32,25 @@ export function CalendarConnectionCard({
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <CheckCircle2 className={connected ? 'h-4 w-4 text-success' : 'h-4 w-4 text-ink-faint'} />
-                {connected ? 'Google Calendar connected' : 'Google Calendar not connected'}
+                <CheckCircle2
+                  className={
+                    connected
+                      ? "h-4 w-4 text-success"
+                      : "h-4 w-4 text-ink-faint"
+                  }
+                />
+                {connected
+                  ? "Google Calendar connected"
+                  : "Google Calendar not connected"}
               </div>
               <p className="mt-1 text-sm leading-6 text-ink-muted">
                 {connected
-                  ? `${accountEmail || 'Your Google account'} is authenticated with Google Calendar.`
-                  : 'Authenticate with Google to let BID check availability and manage session events.'}
+                  ? `${accountEmail || "Your Google account"} is authenticated with Google Calendar.`
+                  : "Authenticate with Google to let BID check availability and manage session events."}
               </p>
             </div>
-            <Badge tone={connected ? 'green' : 'amber'}>
-              {connected ? 'Connected' : 'Action needed'}
+            <Badge tone={connected ? "green" : "amber"}>
+              {connected ? "Connected" : "Action needed"}
             </Badge>
           </div>
         </div>
@@ -50,11 +62,18 @@ export function CalendarConnectionCard({
               variant="outline"
               className="border-danger/35 text-danger hover:border-danger/55 hover:bg-danger/10 hover:text-danger-dark"
               onClick={onDisconnect}
+              isLoading={isDisconnecting}
+              loadingLabel="Disconnecting"
             >
               Disconnect
             </Button>
           ) : (
-            <Button type="button" onClick={onConnect}>
+            <Button
+              type="button"
+              onClick={onConnect}
+              isLoading={isConnecting}
+              loadingLabel="Opening Google"
+            >
               Authenticate with Google
             </Button>
           )}
