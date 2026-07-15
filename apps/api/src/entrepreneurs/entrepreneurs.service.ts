@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { BusinessMembership, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
+import { ProfileRecordQueryDto } from './dto/profile-record-query.dto';
 import { UpsertFundraisingRoundDto, UpsertPeriodicUpdateDto, UpsertProgrammeGoalDto } from './dto/profile-records.dto';
 
 const DEFAULT_TAKE = 20;
@@ -54,18 +55,53 @@ export class EntrepreneursService {
 
   async listEntrepreneurs(user: User, query: EntrepreneurQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
-    const rows = await this.prisma.businessMembership.findMany({
-      where: this.buildMembershipWhere(user, query),
-      orderBy: [{ joinedAt: 'desc' }, { id: 'desc' }],
-      take: take + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: this.membershipInclude(),
-    });
+    const where = this.buildMembershipWhere(user, query);
+    const baseWhere = this.buildMembershipWhere(user, {});
+    const [rows, totalItems, totalEntrepreneurs, activeEntrepreneurs, withProgrammes] =
+      await this.prisma.$transaction([
+        this.prisma.businessMembership.findMany({
+          where,
+          orderBy: [{ joinedAt: 'desc' }, { id: 'desc' }],
+          take: take + 1,
+          ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+          include: this.membershipInclude(),
+        }),
+        this.prisma.businessMembership.count({ where }),
+        this.prisma.businessMembership.count({ where: baseWhere }),
+        this.prisma.businessMembership.count({
+          where: { AND: [baseWhere, { business: { status: 'active' } }] },
+        }),
+        this.prisma.businessMembership.count({
+          where: {
+            AND: [
+              baseWhere,
+              {
+                user: {
+                  entrepreneurProgrammeGrants: {
+                    some: { revokedAt: null },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ]);
 
-    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
-    const items = rows.slice(0, take).map((row) => this.mapEntrepreneur(row));
-
-    return { items, nextCursor };
+    const visibleRows = rows.slice(0, take);
+    return {
+      items: visibleRows.map((row) => this.mapEntrepreneur(row)),
+      nextCursor:
+        rows.length > take
+          ? visibleRows[visibleRows.length - 1]?.id ?? null
+          : null,
+      totalItems,
+      summary: {
+        totalEntrepreneurs,
+        activeEntrepreneurs,
+        unassignedEntrepreneurs: totalEntrepreneurs - withProgrammes,
+        withProgrammes,
+      },
+    };
   }
 
   async getEntrepreneur(user: User, entrepreneurUserId: string) {
@@ -84,31 +120,118 @@ export class EntrepreneursService {
     return this.mapEntrepreneur(membership);
   }
 
-  async getProfileRecords(user: User, entrepreneurUserId: string) {
+  async listProgrammeGoals(
+    user: User,
+    entrepreneurUserId: string,
+    query: ProfileRecordQueryDto,
+  ) {
     await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
-
-    const [programmeGoals, fundraisingRounds, periodicUpdates] = await Promise.all([
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.ProgrammeGoalWhereInput = {
+      entrepreneurUserId,
+      ...(query.programmeId ? { programmeId: query.programmeId } : {}),
+      ...(query.search?.trim()
+        ? {
+            OR: [
+              { description: { contains: query.search.trim(), mode: 'insensitive' } },
+              { evidence: { contains: query.search.trim(), mode: 'insensitive' } },
+              { goalType: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
+              { programme: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.programmeGoal.findMany({
-        where: { entrepreneurUserId },
+        where,
         orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: this.programmeGoalInclude(),
       }),
+      this.prisma.programmeGoal.count({ where }),
+    ]);
+    const items = rows.slice(0, take);
+    return {
+      items: items.map((goal) => this.mapProgrammeGoal(goal)),
+      nextCursor: rows.length > take ? items[items.length - 1]?.id ?? null : null,
+      totalItems,
+    };
+  }
+
+  async listFundraisingRounds(
+    user: User,
+    entrepreneurUserId: string,
+    query: ProfileRecordQueryDto,
+  ) {
+    await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.FundraisingRoundWhereInput = {
+      entrepreneurUserId,
+      ...(query.programmeId ? { programmeId: query.programmeId } : {}),
+      ...(query.search?.trim()
+        ? {
+            OR: [
+              { name: { contains: query.search.trim(), mode: 'insensitive' } },
+              { source: { contains: query.search.trim(), mode: 'insensitive' } },
+              { currency: { contains: query.search.trim(), mode: 'insensitive' } },
+              { programme: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.fundraisingRound.findMany({
-        where: { entrepreneurUserId },
+        where,
         orderBy: [{ date: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: this.fundraisingRoundInclude(),
       }),
+      this.prisma.fundraisingRound.count({ where }),
+    ]);
+    const items = rows.slice(0, take);
+    return {
+      items: items.map((round) => this.mapFundraisingRound(round)),
+      nextCursor: rows.length > take ? items[items.length - 1]?.id ?? null : null,
+      totalItems,
+    };
+  }
+
+  async listPeriodicUpdates(
+    user: User,
+    entrepreneurUserId: string,
+    query: ProfileRecordQueryDto,
+  ) {
+    await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.PeriodicUpdateWhereInput = {
+      entrepreneurUserId,
+      ...(query.programmeId ? { programmeId: query.programmeId } : {}),
+      ...(query.search?.trim()
+        ? {
+            OR: [
+              { notes: { contains: query.search.trim(), mode: 'insensitive' } },
+              { programme: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.periodicUpdate.findMany({
-        where: { entrepreneurUserId },
+        where,
         orderBy: [{ periodEnd: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: this.periodicUpdateInclude(),
       }),
+      this.prisma.periodicUpdate.count({ where }),
     ]);
-
+    const items = rows.slice(0, take);
     return {
-      programmeGoals: programmeGoals.map((goal) => this.mapProgrammeGoal(goal)),
-      fundraisingRounds: fundraisingRounds.map((round) => this.mapFundraisingRound(round)),
-      periodicUpdates: periodicUpdates.map((update) => this.mapPeriodicUpdate(update)),
+      items: items.map((update) => this.mapPeriodicUpdate(update)),
+      nextCursor: rows.length > take ? items[items.length - 1]?.id ?? null : null,
+      totalItems,
     };
   }
 

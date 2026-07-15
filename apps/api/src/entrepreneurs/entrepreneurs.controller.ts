@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
+import { ProfileRecordQueryDto } from './dto/profile-record-query.dto';
 import { UpsertFundraisingRoundDto, UpsertPeriodicUpdateDto, UpsertProgrammeGoalDto } from './dto/profile-records.dto';
 import { EntrepreneursService } from './entrepreneurs.service';
 
@@ -16,9 +17,43 @@ export class EntrepreneursController {
     return this.entrepreneursService.listEntrepreneurs(user, query);
   }
 
-  @Get(':entrepreneurUserId/profile-records')
-  getProfileRecords(@CurrentUser() user: User, @Param('entrepreneurUserId') entrepreneurUserId: string) {
-    return this.entrepreneursService.getProfileRecords(user, entrepreneurUserId);
+  @Get(':entrepreneurUserId/programme-goals')
+  listProgrammeGoals(
+    @CurrentUser() user: User,
+    @Param('entrepreneurUserId') entrepreneurUserId: string,
+    @Query() query: ProfileRecordQueryDto,
+  ) {
+    return this.entrepreneursService.listProgrammeGoals(
+      user,
+      entrepreneurUserId,
+      query,
+    );
+  }
+
+  @Get(':entrepreneurUserId/fundraising-rounds')
+  listFundraisingRounds(
+    @CurrentUser() user: User,
+    @Param('entrepreneurUserId') entrepreneurUserId: string,
+    @Query() query: ProfileRecordQueryDto,
+  ) {
+    return this.entrepreneursService.listFundraisingRounds(
+      user,
+      entrepreneurUserId,
+      query,
+    );
+  }
+
+  @Get(':entrepreneurUserId/periodic-updates')
+  listPeriodicUpdates(
+    @CurrentUser() user: User,
+    @Param('entrepreneurUserId') entrepreneurUserId: string,
+    @Query() query: ProfileRecordQueryDto,
+  ) {
+    return this.entrepreneursService.listPeriodicUpdates(
+      user,
+      entrepreneurUserId,
+      query,
+    );
   }
 
   @Post(':entrepreneurUserId/programme-goals')
