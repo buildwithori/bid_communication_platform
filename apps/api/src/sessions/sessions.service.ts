@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  CalendarConnectionStatus,
+  CalendarProvider,
   NotificationChannel,
   NotificationEntityType,
   NotificationSeverity,
@@ -134,12 +136,30 @@ export class SessionsService {
       throw new BadRequestException('Only requested sessions can be accepted.');
     }
 
+    const meetingProvider = session.meetingProvider || 'google_meet';
+    if (meetingProvider === 'google_meet') {
+      const calendarConnection = await this.prisma.calendarConnection.findUnique({
+        where: {
+          userId_provider: {
+            userId: user.id,
+            provider: CalendarProvider.google,
+          },
+        },
+        select: { status: true },
+      });
+      if (calendarConnection?.status !== CalendarConnectionStatus.connected) {
+        throw new BadRequestException(
+          'Connect Google Calendar before accepting Google Meet session requests.',
+        );
+      }
+    }
+
     const updated = await this.prisma.session.update({
       where: { id },
       data: {
         ownerUserId: user.id,
         status: SessionStatus.confirmed,
-        meetingProvider: session.meetingProvider || 'google_meet',
+        meetingProvider,
         meetingUrl: session.meetingUrl ?? this.generateMeetingUrl(session.topic, session.startAt),
       },
       include: sessionInclude,
