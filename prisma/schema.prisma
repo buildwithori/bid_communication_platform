@@ -314,6 +314,7 @@ model User {
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
   uploadedFiles               FileAsset[]                 @relation("FileAssetUploadedBy")
+  uploadedVideos              VideoAsset[]                @relation("VideoAssetUploadedBy")
 
   @@index([role, status])
   @@index([invitedById])
@@ -779,19 +780,40 @@ model ModuleContentItem {
 
 model VideoAsset {
   id            String      @id @default(cuid())
-  contentItemId String      @unique @map("content_item_id")
+  contentItemId String?     @unique @map("content_item_id")
   muxAssetId    String?     @unique @map("mux_asset_id")
   muxUploadId   String?     @unique @map("mux_upload_id")
   playbackId    String?     @map("playback_id")
   duration      Int?
   status        AssetStatus @default(pending)
+  playbackPolicy String?     @map("playback_policy")
+  uploadedById  String?     @map("uploaded_by_id")
+  readyAt       DateTime?   @map("ready_at")
+  failureReason String?     @map("failure_reason")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
-  contentItem ContentItem @relation(fields: [contentItemId], references: [id])
+  contentItem   ContentItem?        @relation(fields: [contentItemId], references: [id])
+  uploadedBy    User?               @relation("VideoAssetUploadedBy", fields: [uploadedById], references: [id])
+  webhookEvents VideoWebhookEvent[]
 
   @@index([status])
+  @@index([uploadedById, status])
   @@map("video_assets")
+}
+
+model VideoWebhookEvent {
+  id           String    @id
+  eventType    String    @map("event_type")
+  videoAssetId String?   @map("video_asset_id")
+  receivedAt   DateTime  @default(now()) @map("received_at")
+  processedAt  DateTime? @map("processed_at")
+
+  videoAsset VideoAsset? @relation(fields: [videoAssetId], references: [id])
+
+  @@index([eventType, receivedAt])
+  @@index([videoAssetId])
+  @@map("video_webhook_events")
 }
 
 model FileAsset {

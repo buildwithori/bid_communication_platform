@@ -27,9 +27,8 @@ export class CreateContentItemDto {
   fileAssetId?: string;
 
   @ValidateIf((dto: CreateContentItemDto) => dto.type === ContentItemType.video)
-  @IsOptional()
   @IsString()
-  muxPlaybackId?: string;
+  videoAssetId?: string;
 
   @ValidateIf((dto: CreateContentItemDto) => dto.type === ContentItemType.tool && !dto.externalUrl)
   @IsString()

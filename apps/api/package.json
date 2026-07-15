@@ -10,7 +10,8 @@
     "email:dev": "email dev --dir src --port 3001",
     "typecheck": "tsc --noEmit",
     "test:audit": "node --test -r ts-node/register test/audit-redaction.test.ts",
-    "test:files": "node --test -r ts-node/register test/file-signature.test.ts"
+    "test:files": "node --test -r ts-node/register test/file-signature.test.ts",
+    "test:video": "node --test -r ts-node/register test/mux-signature.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",

@@ -18,6 +18,7 @@ import { ContentModule } from './content/content.module';
 import { DeliverablesModule } from './deliverables/deliverables.module';
 import { ToolsModule } from './tools/tools.module';
 import { FilesModule } from './files/files.module';
+import { VideoModule } from './video/video.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -51,6 +52,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     DeliverablesModule,
     ToolsModule,
     FilesModule,
+    VideoModule,
     NotificationsModule,
     AuditModule,
   ],

@@ -51,6 +51,14 @@ const envSchema = z.object({
       z.enum(["true", "false"]).transform((value) => value === "true"),
     ])
     .default(false),
+  MUX_TOKEN_ID: z.string().optional().transform((value) => value || undefined),
+  MUX_TOKEN_SECRET: z.string().optional().transform((value) => value || undefined),
+  MUX_WEBHOOK_SECRET: z.string().optional().transform((value) => value || undefined),
+  MUX_SIGNING_KEY_ID: z.string().optional().transform((value) => value || undefined),
+  MUX_SIGNING_PRIVATE_KEY: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;

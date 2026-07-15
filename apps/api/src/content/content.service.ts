@@ -1,5 +1,6 @@
 import {
   ForbiddenException,
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -30,6 +31,9 @@ export class ContentService {
     const pdfAsset = input.type === ContentItemType.pdf
       ? await this.filesService.markReadyForUser(user, input.fileAssetId as string, FileAssetUsage.content_pdf)
       : null;
+    const videoAsset = input.type === ContentItemType.video
+      ? await this.ensureVideoAsset(user, input.videoAssetId as string)
+      : null;
 
     const created = await this.prisma.$transaction(async (tx) => {
       const maxPosition = await tx.moduleContentItem.aggregate({
@@ -44,18 +48,18 @@ export class ContentService {
           type: input.type,
           trainerId: input.trainerId || null,
           durationSeconds: input.durationSeconds ?? null,
-          status: this.initialContentStatus(input),
+          status: this.initialContentStatus(input, videoAsset?.status),
         },
       });
 
-      if (input.type === ContentItemType.video) {
-        await tx.videoAsset.create({
-          data: {
-            contentItemId: contentItem.id,
-            playbackId: input.muxPlaybackId?.trim() || null,
-            status: input.muxPlaybackId ? AssetStatus.ready : AssetStatus.pending,
-          },
+      if (videoAsset) {
+        const attached = await tx.videoAsset.updateMany({
+          where: { id: videoAsset.id, contentItemId: null },
+          data: { contentItemId: contentItem.id },
         });
+        if (attached.count !== 1) {
+          throw new BadRequestException('This video upload is already attached.');
+        }
       }
 
       if (pdfAsset) {
@@ -157,6 +161,25 @@ export class ContentService {
     if (!trainer) throw new NotFoundException('Trainer was not found.');
   }
 
+  private async ensureVideoAsset(user: User, videoAssetId: string) {
+    const video = await this.prisma.videoAsset.findUnique({
+      where: { id: videoAssetId },
+    });
+    if (!video) throw new NotFoundException('Uploaded video was not found.');
+    if (video.uploadedById !== user.id || video.contentItemId) {
+      throw new ForbiddenException('Uploaded video is not in your upload scope.');
+    }
+    if (
+      video.status === AssetStatus.failed ||
+      video.status === AssetStatus.archived
+    ) {
+      throw new BadRequestException(
+        'Upload a valid video before creating this content item.',
+      );
+    }
+    return video;
+  }
+
   private async ensureToolSource(input: CreateContentItemDto) {
     if (input.toolId) {
       const tool = await this.prisma.tool.findUnique({ where: { id: input.toolId }, select: { id: true, type: true, embeddedUrl: true } });
@@ -172,9 +195,14 @@ export class ContentService {
     }
   }
 
-  private initialContentStatus(input: CreateContentItemDto) {
+  private initialContentStatus(
+    input: CreateContentItemDto,
+    videoStatus?: AssetStatus,
+  ) {
     if (input.type === ContentItemType.video) {
-      return input.muxPlaybackId ? ContentItemStatus.ready : ContentItemStatus.processing;
+      if (videoStatus === AssetStatus.ready) return ContentItemStatus.ready;
+      if (videoStatus === AssetStatus.failed) return ContentItemStatus.failed;
+      return ContentItemStatus.processing;
     }
     return ContentItemStatus.ready;
   }
@@ -189,7 +217,7 @@ export class ContentService {
     createdAt: Date;
     updatedAt: Date;
     trainer: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
-    videoAsset: { id: string; playbackId: string | null; status: AssetStatus } | null;
+    videoAsset: { id: string; duration: number | null; status: AssetStatus } | null;
     fileAssets: Array<{ id: string; originalFilename: string; mimeType: string; sizeBytes: bigint; status: AssetStatus }>;
     toolLink: { id: string; toolId: string | null; externalUrl: string | null; source: ToolLinkSource; tool: { id: string; name: string; embeddedUrl: string | null } | null } | null;
     modules: Array<{ moduleId: string; position: number }>;
@@ -204,7 +232,11 @@ export class ContentService {
       durationSeconds: item.durationSeconds,
       durationLabel: item.durationSeconds ? `${Math.round(item.durationSeconds / 60)} min` : null,
       status: item.status,
-      muxPlaybackId: item.videoAsset?.playbackId ?? null,
+      video: item.videoAsset ? {
+        id: item.videoAsset.id,
+        durationSeconds: item.videoAsset.duration,
+        status: item.videoAsset.status,
+      } : null,
       file: file ? {
         id: file.id,
         originalFilename: file.originalFilename,
