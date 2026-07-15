@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "outDir": "./.docker/dist"
+  },
+  "exclude": ["node_modules", "dist", ".docker", "test", "**/*.spec.ts"]
+}

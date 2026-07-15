@@ -50,7 +50,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       target: development
-    command: sh scripts/docker-dev-entrypoint.sh npm run dev:api
+    command: sh scripts/docker-dev-entrypoint.sh npm --workspace @bid/api run start:dev:docker
     env_file:
       - .env.docker.example
     environment:
@@ -74,6 +74,7 @@ services:
     volumes:
       - .:/workspace
       - root_node_modules:/workspace/node_modules
+      - api_build:/workspace/apps/api/.docker
     depends_on:
       postgres:
         condition: service_healthy
@@ -135,6 +136,7 @@ services:
 volumes:
   root_node_modules:
   web_next:
+  api_build:
   email_preview_next:
   postgres_data:
   redis_data:

@@ -6,6 +6,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
+    "start:dev:docker": "nest start --watch --path tsconfig.docker.json",
     "email:dev": "email dev --dir src --port 3001",
     "typecheck": "tsc --noEmit"
   },
