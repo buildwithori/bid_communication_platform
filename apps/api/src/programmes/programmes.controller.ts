@@ -17,6 +17,12 @@ export class ProgrammesController {
   listProgrammes(@CurrentUser() user: User, @Query() query: ProgrammeQueryDto) {
     return this.programmesService.listProgrammes(user, query);
   }
+
+  @Get('summary')
+  @Roles(UserRole.admin)
+  getProgrammeSummary(@CurrentUser() user: User) {
+    return this.programmesService.getProgrammeSummary(user);
+  }
   @Post()
   @Roles(UserRole.admin)
   createProgramme(

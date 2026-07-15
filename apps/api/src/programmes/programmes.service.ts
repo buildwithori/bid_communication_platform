@@ -23,6 +23,23 @@ const deliverableRuleInclude = {
 
 type ProgrammeDeliverableRuleWithInclude = Prisma.ProgrammeDeliverableRuleGetPayload<{ include: typeof deliverableRuleInclude }>;
 
+type ProgrammeListMetrics = {
+  content: { total: number; videos: number; pdfs: number; tools: number };
+  readyModules: number;
+  learnerProgress: { average: number; trackedLearners: number };
+};
+
+type ContentCountRow = {
+  programmeId: string;
+  type: string;
+  count: bigint;
+};
+
+type ReadyModuleCountRow = {
+  programmeId: string;
+  count: bigint;
+};
+
 @Injectable()
 export class ProgrammesService {
   constructor(
@@ -160,45 +177,66 @@ export class ProgrammesService {
     return this.getProgramme(user, id);
   }
 
+  async getProgrammeSummary(user: User) {
+    this.assertAdmin(user);
+    const now = new Date();
+    const [totalProgrammes, activeProgrammes, totalModules, activeEnrollment, progress] = await Promise.all([
+      this.prisma.programme.count(),
+      this.prisma.programme.count({
+        where: {
+          archivedAt: null,
+          publishedAt: { not: null },
+          startDate: { lte: now },
+          endDate: { gte: now },
+        },
+      }),
+      this.prisma.programmeModule.count(),
+      this.prisma.programmeAccessGrant.count({ where: { revokedAt: null } }),
+      this.prisma.learnerProgrammeProgress.aggregate({
+        _avg: { progressPercent: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    return {
+      programmes: { total: totalProgrammes, active: activeProgrammes },
+      modules: { total: totalModules },
+      enrollment: { active: activeEnrollment },
+      learnerProgress: {
+        average: Math.round(progress._avg.progressPercent ?? 0),
+        trackedLearners: progress._count._all,
+      },
+    };
+  }
+
   async listProgrammes(user: User, query: ProgrammeQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildProgrammeWhere(user, query);
 
-    const rows = await this.prisma.programme.findMany({
-      where,
-      orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
-      take: take + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: {
-        _count: {
-          select: {
-            modules: true,
-            accessGrants: { where: { revokedAt: null } },
-          },
-        },
-        progress: {
-          select: { progressPercent: true },
-        },
-        modules: {
-          include: {
-            module: {
-              include: {
-                contentItems: {
-                  include: {
-                    contentItem: true,
-                  },
-                },
-              },
+    const [rows, totalItems] = await Promise.all([
+      this.prisma.programme.findMany({
+        where,
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          _count: {
+            select: {
+              modules: true,
+              accessGrants: { where: { revokedAt: null } },
             },
           },
         },
-      },
-    });
+      }),
+      this.prisma.programme.count({ where }),
+    ]);
 
     const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
-    const items = rows.slice(0, take).map((programme) => this.mapProgrammeListItem(programme));
+    const pageRows = rows.slice(0, take);
+    const metrics = await this.programmeListMetrics(pageRows.map((programme) => programme.id));
+    const items = pageRows.map((programme) => this.mapProgrammeListItem(programme, metrics.get(programme.id)));
 
-    return { items, nextCursor };
+    return { items, nextCursor, totalItems };
   }
 
   async listDeliverableRules(user: User, programmeId: string) {
@@ -637,18 +675,11 @@ export class ProgrammesService {
   private mapProgrammeListItem(
     programme: Programme & {
       _count: { modules: number; accessGrants: number };
-      progress: Array<{ progressPercent: number }>;
-      modules: Array<{
-        module: {
-          contentItems: Array<{ contentItem: { type: string; status: string } }>;
-        };
-      }>;
     },
+    metrics?: ProgrammeListMetrics,
   ) {
-    const contentItems = programme.modules.flatMap((programmeModule) => programmeModule.module.contentItems);
-    const contentCounts = this.contentCounts(contentItems.map((item) => item.contentItem));
     const moduleCount = programme._count.modules;
-    const readyModuleCount = this.readyModuleCount(programme.modules);
+    const readyModuleCount = metrics?.readyModules ?? 0;
 
     return {
       id: programme.id,
@@ -669,10 +700,80 @@ export class ProgrammesService {
         total: moduleCount,
         ready: readyModuleCount,
       },
-      content: contentCounts,
+      content: metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 },
       readiness: moduleCount === 0 ? 0 : Math.round((readyModuleCount / moduleCount) * 100),
-      learnerProgress: this.learnerProgress(programme.progress),
+      learnerProgress: metrics?.learnerProgress ?? { average: 0, trackedLearners: 0 },
     };
+  }
+
+  private async programmeListMetrics(programmeIds: string[]) {
+    const metrics = new Map<string, ProgrammeListMetrics>();
+    for (const programmeId of programmeIds) {
+      metrics.set(programmeId, {
+        content: { total: 0, videos: 0, pdfs: 0, tools: 0 },
+        readyModules: 0,
+        learnerProgress: { average: 0, trackedLearners: 0 },
+      });
+    }
+    if (programmeIds.length === 0) return metrics;
+
+    const [contentRows, readyModuleRows, progressRows] = await Promise.all([
+      this.prisma.$queryRaw<ContentCountRow[]>(Prisma.sql`
+        SELECT pm.programme_id AS "programmeId", ci.type::text AS "type", COUNT(*)::bigint AS "count"
+        FROM programme_modules pm
+        JOIN module_content_items mci ON mci.module_id = pm.module_id
+        JOIN content_items ci ON ci.id = mci.content_item_id
+        WHERE pm.programme_id IN (${Prisma.join(programmeIds)})
+        GROUP BY pm.programme_id, ci.type
+      `),
+      this.prisma.$queryRaw<ReadyModuleCountRow[]>(Prisma.sql`
+        SELECT pm.programme_id AS "programmeId", COUNT(*) FILTER (
+          WHERE EXISTS (
+            SELECT 1 FROM module_content_items mci
+            WHERE mci.module_id = pm.module_id
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM module_content_items mci
+            JOIN content_items ci ON ci.id = mci.content_item_id
+            WHERE mci.module_id = pm.module_id AND ci.status::text <> 'ready'
+          )
+        )::bigint AS "count"
+        FROM programme_modules pm
+        WHERE pm.programme_id IN (${Prisma.join(programmeIds)})
+        GROUP BY pm.programme_id
+      `),
+      this.prisma.learnerProgrammeProgress.groupBy({
+        by: ['programmeId'],
+        where: { programmeId: { in: programmeIds } },
+        _avg: { progressPercent: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    for (const row of contentRows) {
+      const value = metrics.get(row.programmeId);
+      if (!value) continue;
+      const count = Number(row.count);
+      value.content.total += count;
+      if (row.type === 'video') value.content.videos = count;
+      if (row.type === 'pdf') value.content.pdfs = count;
+      if (row.type === 'tool') value.content.tools = count;
+    }
+    for (const row of readyModuleRows) {
+      const value = metrics.get(row.programmeId);
+      if (value) value.readyModules = Number(row.count);
+    }
+    for (const row of progressRows) {
+      const value = metrics.get(row.programmeId);
+      if (!value) continue;
+      value.learnerProgress = {
+        average: Math.round(row._avg.progressPercent ?? 0),
+        trackedLearners: row._count._all,
+      };
+    }
+
+    return metrics;
   }
 
   private mapProgrammeDetail(
@@ -818,16 +919,4 @@ export class ProgrammesService {
     );
   }
 
-  private readyModuleCount(
-    modules: Array<{
-      module: {
-        contentItems: Array<{ contentItem: { status: string } }>;
-      };
-    }>,
-  ) {
-    return modules.filter(({ module }) => {
-      const items = module.contentItems;
-      return items.length > 0 && items.every((item) => item.contentItem.status === 'ready');
-    }).length;
-  }
 }
