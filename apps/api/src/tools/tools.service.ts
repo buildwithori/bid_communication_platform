@@ -7,12 +7,14 @@ import {
   EntrepreneurToolStatus,
   EntrepreneurToolType,
   EntrepreneurToolVisibility,
+  FileAssetUsage,
   Prisma,
   User,
   UserRole,
 } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
+import { FilesService } from "../files/files.service";
 import { StorageService } from "../files/storage.service";
 import { ToolQueryDto } from "./dto/tool-query.dto";
 import { CreateToolDto, UpsertToolDto } from "./dto/upsert-tool.dto";
@@ -50,6 +52,7 @@ export class ToolsService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly audit: AuditService,
+    private readonly files: FilesService,
   ) {}
 
   async listTools(user: User, query: ToolQueryDto) {
@@ -290,6 +293,9 @@ export class ToolsService {
 
   async createTool(user: User, dto: CreateToolDto) {
     await this.validateToolPayload(dto);
+    if (dto.pdfAssetId) {
+      await this.files.markReadyForUser(user, dto.pdfAssetId, FileAssetUsage.tool_pdf);
+    }
 
     const created = await this.prisma.$transaction(async (tx) => {
       const tool = await tx.tool.create({
@@ -325,6 +331,9 @@ export class ToolsService {
     const merged = { ...existing, ...dto };
     await this.validateToolPayload(merged);
 
+    if (dto.pdfAssetId) {
+      await this.files.markReadyForUser(user, dto.pdfAssetId, FileAssetUsage.tool_pdf);
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.tool.update({
         where: { id },

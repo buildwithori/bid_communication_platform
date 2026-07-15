@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, createHash } from 'crypto';
 
 export type SignedUrlInput = {
-  method: 'PUT' | 'GET';
+  method: 'PUT' | 'GET' | 'HEAD';
   storageKey: string;
   mimeType?: string;
   expiresInSeconds?: number;
@@ -13,22 +13,26 @@ export type SignedUrlInput = {
 export class StorageService {
   constructor(private readonly config: ConfigService) {}
 
-  presign(input: SignedUrlInput) {
+  presign(input: SignedUrlInput, options?: { internal?: boolean }) {
     const bucket = this.config.get<string>('DO_SPACES_BUCKET');
-    const endpoint = this.config.get<string>('DO_SPACES_ENDPOINT');
+    const publicEndpoint = this.config.get<string>('DO_SPACES_ENDPOINT');
+    const endpoint = options?.internal
+      ? this.config.get<string>('DO_SPACES_INTERNAL_ENDPOINT') ?? publicEndpoint
+      : publicEndpoint;
     const accessKeyId = this.config.get<string>('DO_SPACES_ACCESS_KEY_ID');
     const secretAccessKey = this.config.get<string>('DO_SPACES_SECRET_ACCESS_KEY');
     const region = this.config.get<string>('DO_SPACES_REGION') ?? 'nyc3';
     const expiresInSeconds = input.expiresInSeconds ?? (input.method === 'PUT' ? 900 : 300);
 
     if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
-      return this.devSignedUrl(input, expiresInSeconds);
+      throw new ServiceUnavailableException('Object storage is not configured.');
     }
 
     const endpointUrl = new URL(endpoint);
-    const host = `${bucket}.${endpointUrl.host}`;
+    const forcePathStyle = this.config.get<boolean>('DO_SPACES_FORCE_PATH_STYLE') ?? false;
+    const host = forcePathStyle ? endpointUrl.host : `${bucket}.${endpointUrl.host}`;
     const encodedKey = input.storageKey.split('/').map((segment) => this.encodeRfc3986(segment)).join('/');
-    const pathname = `/${encodedKey}`;
+    const pathname = forcePathStyle ? `/${this.encodeRfc3986(bucket)}/${encodedKey}` : `/${encodedKey}`;
     const now = new Date();
     const amzDate = this.amzDate(now);
     const dateStamp = amzDate.slice(0, 8);
@@ -72,15 +76,37 @@ export class StorageService {
     };
   }
 
-  private devSignedUrl(input: SignedUrlInput, expiresInSeconds: number) {
-    const publicBase = this.config.get<string>('WEB_ORIGIN') ?? 'http://localhost:3000';
+  async statObject(storageKey: string) {
+    const signed = this.presign(
+      { method: 'HEAD', storageKey, expiresInSeconds: 60 },
+      { internal: true },
+    );
+    const response = await fetch(signed.url, { method: 'HEAD' });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new ServiceUnavailableException('Object storage could not verify the upload.');
+    }
+    const contentLength = Number(response.headers.get('content-length'));
     return {
-      url: `${publicBase}/dev-file-storage/${encodeURIComponent(input.storageKey)}`,
-      method: input.method,
-      headers: input.method === 'PUT' ? { 'content-type': input.mimeType ?? 'application/octet-stream' } : {},
-      expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
-      provider: 'development_placeholder' as const,
+      sizeBytes: Number.isFinite(contentLength) ? contentLength : null,
+      mimeType: response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? null,
+      etag: response.headers.get('etag'),
     };
+  }
+
+  async readObjectPrefix(storageKey: string, maxBytes = 16) {
+    const signed = this.presign(
+      { method: 'GET', storageKey, expiresInSeconds: 60 },
+      { internal: true },
+    );
+    const response = await fetch(signed.url, {
+      method: 'GET',
+      headers: { range: `bytes=0-${Math.max(0, maxBytes - 1)}` },
+    });
+    if (!response.ok) {
+      throw new ServiceUnavailableException('Object storage could not inspect the upload.');
+    }
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   private amzDate(date: Date) {

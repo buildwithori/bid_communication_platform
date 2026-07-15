@@ -19,4 +19,9 @@ export class FilesController {
   getSignedReadUrl(@CurrentUser() user: User, @Param('id') id: string) {
     return this.filesService.getSignedReadUrl(user, id);
   }
+
+  @Post(':id/complete')
+  completeUpload(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.filesService.completeDirectUpload(user, id);
+  }
 }

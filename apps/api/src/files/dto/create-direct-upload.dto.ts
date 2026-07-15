@@ -1,14 +1,9 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsInt, IsMimeType, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { FileAssetUsage } from '@prisma/client';
 
-export const fileUploadUsageValues = [
-  'deliverable_submission',
-  'content_pdf',
-  'tool_pdf',
-  'report_export',
-] as const;
-
-export type FileUploadUsage = (typeof fileUploadUsageValues)[number];
+export const fileUploadUsageValues = Object.values(FileAssetUsage);
+export type FileUploadUsage = FileAssetUsage;
 
 export class CreateDirectUploadDto {
   @IsString()
@@ -27,7 +22,7 @@ export class CreateDirectUploadDto {
   sizeBytes!: number;
 
   @IsIn(fileUploadUsageValues)
-  usage!: FileUploadUsage;
+  usage!: FileAssetUsage;
 
   @IsOptional()
   @IsString()

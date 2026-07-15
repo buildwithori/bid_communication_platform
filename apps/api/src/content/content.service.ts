@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AssetStatus, ContentItemStatus, ContentItemType, ToolLinkSource, User, UserRole } from '@prisma/client';
+import { AssetStatus, ContentItemStatus, ContentItemType, FileAssetUsage, ToolLinkSource, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { UpsertContentRatingDto } from './dto/upsert-content-rating.dto';
 import { CreateContentItemDto } from './dto/create-content-item.dto';
@@ -28,7 +28,7 @@ export class ContentService {
     await this.ensureTrainerExists(input.trainerId);
     if (input.type === ContentItemType.tool) await this.ensureToolSource(input);
     const pdfAsset = input.type === ContentItemType.pdf
-      ? await this.filesService.markReadyForUser(user, input.fileAssetId as string)
+      ? await this.filesService.markReadyForUser(user, input.fileAssetId as string, FileAssetUsage.content_pdf)
       : null;
 
     const created = await this.prisma.$transaction(async (tx) => {

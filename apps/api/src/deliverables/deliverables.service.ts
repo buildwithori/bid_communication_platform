@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AssetStatus, DeliverableInstanceStatus, DeliverableReviewDecision, Prisma, User, UserRole } from '@prisma/client';
+import { AssetStatus, DeliverableInstanceStatus, DeliverableReviewDecision, FileAssetUsage, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { FilesService } from '../files/files.service';
 import { StorageService } from '../files/storage.service';
@@ -249,7 +249,7 @@ export class DeliverablesService {
       throw new BadRequestException('This uploaded file has already been submitted.');
     }
 
-    return this.filesService.markReadyForUser(user, fileAssetId);
+    return this.filesService.markReadyForUser(user, fileAssetId, FileAssetUsage.deliverable_submission);
   }
 
   private async ensureCanActOnInstance(user: User, instanceId: string) {

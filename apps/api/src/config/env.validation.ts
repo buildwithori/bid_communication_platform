@@ -41,9 +41,16 @@ const envSchema = z.object({
   API_PUBLIC_URL: z.string().url().default("http://localhost:4000"),
   DO_SPACES_BUCKET: z.string().min(1).optional(),
   DO_SPACES_ENDPOINT: z.string().url().optional(),
+  DO_SPACES_INTERNAL_ENDPOINT: z.string().url().optional(),
   DO_SPACES_REGION: z.string().min(1).optional(),
   DO_SPACES_ACCESS_KEY_ID: z.string().min(1).optional(),
   DO_SPACES_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  DO_SPACES_FORCE_PATH_STYLE: z
+    .union([
+      z.boolean(),
+      z.enum(["true", "false"]).transform((value) => value === "true"),
+    ])
+    .default(false),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;

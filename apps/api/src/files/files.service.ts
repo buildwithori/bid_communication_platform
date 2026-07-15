@@ -1,9 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { AssetStatus, FileAsset, Prisma, User, UserRole } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { CreateDirectUploadDto, FileUploadUsage } from './dto/create-direct-upload.dto';
+import { matchesFileSignature } from './file-signature';
 import { StorageService } from './storage.service';
 
 const allowedMimeTypesByUsage: Record<FileUploadUsage, string[]> = {
@@ -62,27 +64,31 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async createDirectUpload(user: User, dto: CreateDirectUploadDto) {
     await this.ensureCanCreateUpload(user, dto);
 
+    const storageKey = this.storageKey(user, dto);
+    const upload = this.storage.presign({
+      method: 'PUT',
+      storageKey,
+      mimeType: dto.mimeType,
+      expiresInSeconds: 15 * 60,
+    });
+
     const file = await this.prisma.fileAsset.create({
       data: {
         contentItemId: dto.usage === 'content_pdf' ? dto.contentItemId ?? null : null,
-        storageKey: this.storageKey(user, dto),
+        storageKey,
         originalFilename: dto.originalFilename.trim(),
         mimeType: dto.mimeType,
         sizeBytes: BigInt(dto.sizeBytes),
         status: AssetStatus.pending,
+        usage: dto.usage,
+        uploadedById: user.id,
       },
-    });
-
-    const upload = this.storage.presign({
-      method: 'PUT',
-      storageKey: file.storageKey,
-      mimeType: file.mimeType,
-      expiresInSeconds: 15 * 60,
     });
 
     return { file: this.mapFile(file), upload };
@@ -98,6 +104,9 @@ export class FilesService {
     if (!(await this.canReadFile(user, file))) {
       throw new ForbiddenException('You do not have access to this file.');
     }
+    if (file.status !== AssetStatus.ready) {
+      throw new BadRequestException('File is not ready to download.');
+    }
 
     const download = this.storage.presign({
       method: 'GET',
@@ -108,17 +117,72 @@ export class FilesService {
     return { file: this.mapFile(file), download };
   }
 
-  async markReadyForUser(user: User, fileId: string) {
+  async completeDirectUpload(user: User, fileId: string) {
+    const file = await this.markReadyForUser(user, fileId);
+    return this.mapFile(file);
+  }
+
+  async markReadyForUser(user: User, fileId: string, expectedUsage?: FileUploadUsage) {
     const file = await this.prisma.fileAsset.findUnique({ where: { id: fileId } });
     if (!file) throw new NotFoundException('Uploaded file was not found.');
     if (!this.wasUploadedBy(user, file)) {
       throw new ForbiddenException('Uploaded file is not in your upload scope.');
     }
+    if (expectedUsage && file.usage !== expectedUsage) {
+      throw new BadRequestException('Uploaded file is not valid for this operation.');
+    }
+    if (file.status === AssetStatus.ready) return file;
 
-    return this.prisma.fileAsset.update({
+    await this.prisma.fileAsset.update({
       where: { id: fileId },
-      data: { status: AssetStatus.ready },
+      data: { status: AssetStatus.processing, failureReason: null },
     });
+
+    const stored = await this.storage.statObject(file.storageKey);
+    if (!stored) {
+      return this.failVerification(fileId, 'The uploaded object was not found.');
+    }
+    if (stored.sizeBytes !== Number(file.sizeBytes)) {
+      return this.failVerification(fileId, 'The uploaded file size does not match the request.');
+    }
+    if (stored.mimeType !== file.mimeType.toLowerCase()) {
+      return this.failVerification(fileId, 'The uploaded file type does not match the request.');
+    }
+    const prefix = await this.storage.readObjectPrefix(file.storageKey);
+    if (!matchesFileSignature(file.mimeType, prefix)) {
+      return this.failVerification(fileId, 'The uploaded file content does not match its type.');
+    }
+
+    return this.audit.capture(
+      {
+        action: 'files.upload.completed',
+        entityType: 'fileAsset',
+        entityId: ({ id }) => id,
+        summary: `Verified upload ${file.originalFilename}`,
+        payload: {
+          usage: file.usage,
+          mimeType: file.mimeType,
+          sizeBytes: Number(file.sizeBytes),
+        },
+      },
+      (tx) => tx.fileAsset.update({
+        where: { id: fileId },
+        data: {
+          status: AssetStatus.ready,
+          verifiedAt: new Date(),
+          failureReason: null,
+        },
+      }),
+    );
+  }
+
+
+  private async failVerification(fileId: string, reason: string): Promise<never> {
+    await this.prisma.fileAsset.update({
+      where: { id: fileId },
+      data: { status: AssetStatus.failed, failureReason: reason },
+    });
+    throw new UnprocessableEntityException(reason);
   }
 
   private async ensureCanCreateUpload(user: User, dto: CreateDirectUploadDto) {
@@ -217,7 +281,7 @@ export class FilesService {
   }
 
   private wasUploadedBy(user: User, file: FileAsset) {
-    return file.storageKey.includes(`/${user.id}/`);
+    return file.uploadedById === user.id || (!file.uploadedById && file.storageKey.includes(`/${user.id}/`));
   }
 
   private mapFile(file: FileAsset) {
@@ -227,6 +291,9 @@ export class FilesService {
       mimeType: file.mimeType,
       sizeBytes: Number(file.sizeBytes),
       status: file.status,
+      usage: file.usage,
+      verifiedAt: file.verifiedAt?.toISOString() ?? null,
+      failureReason: file.failureReason,
       createdAt: file.createdAt.toISOString(),
       updatedAt: file.updatedAt.toISOString(),
     };

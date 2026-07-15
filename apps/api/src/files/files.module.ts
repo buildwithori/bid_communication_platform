@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { FilesController } from './files.controller';
@@ -6,7 +7,7 @@ import { FilesService } from './files.service';
 import { StorageService } from './storage.service';
 
 @Module({
-  imports: [AuthModule, DatabaseModule],
+  imports: [AuditModule, AuthModule, DatabaseModule],
   controllers: [FilesController],
   providers: [FilesService, StorageService],
   exports: [FilesService, StorageService],

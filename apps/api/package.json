@@ -9,7 +9,8 @@
     "start:dev:docker": "nest start --watch --path tsconfig.docker.json",
     "email:dev": "email dev --dir src --port 3001",
     "typecheck": "tsc --noEmit",
-    "test:audit": "node --test -r ts-node/register test/audit-redaction.test.ts"
+    "test:audit": "node --test -r ts-node/register test/audit-redaction.test.ts",
+    "test:files": "node --test -r ts-node/register test/file-signature.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",

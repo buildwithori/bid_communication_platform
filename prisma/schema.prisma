@@ -101,6 +101,13 @@ enum AssetStatus {
   archived
 }
 
+enum FileAssetUsage {
+  deliverable_submission
+  content_pdf
+  tool_pdf
+  report_export
+}
+
 enum ToolLinkSource {
   library
   custom
@@ -306,6 +313,7 @@ model User {
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
+  uploadedFiles               FileAsset[]                 @relation("FileAssetUploadedBy")
 
   @@index([role, status])
   @@index([invitedById])
@@ -794,15 +802,21 @@ model FileAsset {
   mimeType         String      @map("mime_type")
   sizeBytes        BigInt      @map("size_bytes")
   status           AssetStatus @default(pending)
+  usage            FileAssetUsage?
+  uploadedById     String?     @map("uploaded_by_id")
+  verifiedAt       DateTime?   @map("verified_at")
+  failureReason    String?     @map("failure_reason")
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
   contentItem            ContentItem?            @relation(fields: [contentItemId], references: [id])
   toolPdfAsset           Tool?                   @relation("ToolPdfAsset")
   deliverableSubmissions DeliverableSubmission[]
+  uploadedBy             User?                   @relation("FileAssetUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([contentItemId])
   @@index([status])
+  @@index([uploadedById, status])
   @@map("file_assets")
 }
 
