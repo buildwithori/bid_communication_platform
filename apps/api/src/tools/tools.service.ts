@@ -66,6 +66,87 @@ export class ToolsService {
     return this.mapTool(tool);
   }
 
+  async listEntrepreneurTools(entrepreneurUserId: string, query: ToolQueryDto) {
+    await this.ensureEntrepreneursExist([entrepreneurUserId]);
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.ToolWhereInput = {
+      AND: [
+        {
+          status: EntrepreneurToolStatus.published,
+          archivedAt: null,
+          hiddenEntrepreneurs: { none: { entrepreneurUserId } },
+          OR: [
+            { visibility: EntrepreneurToolVisibility.all_entrepreneurs },
+            {
+              visibility: EntrepreneurToolVisibility.programmes,
+              programmeAccess: {
+                some: {
+                  programme: {
+                    OR: [
+                      { accessType: 'free' },
+                      {
+                        accessGrants: {
+                          some: { entrepreneurUserId, revokedAt: null },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              visibility: EntrepreneurToolVisibility.entrepreneurs,
+              entrepreneurAccess: { some: { entrepreneurUserId } },
+            },
+          ],
+        },
+        ...(query.search?.trim()
+          ? [{
+              OR: [
+                { name: { contains: query.search.trim(), mode: 'insensitive' as const } },
+                { description: { contains: query.search.trim(), mode: 'insensitive' as const } },
+                { toolArea: { name: { contains: query.search.trim(), mode: 'insensitive' as const } } },
+              ],
+            }]
+          : []),
+        ...(query.type ? [{ type: query.type }] : []),
+        ...(query.toolAreaId ? [{ toolAreaId: query.toolAreaId }] : []),
+      ],
+    };
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.tool.findMany({
+        where,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          type: true,
+          iconKey: true,
+          visibility: true,
+          toolArea: { select: { id: true, name: true, key: true } },
+        },
+      }),
+      this.prisma.tool.count({ where }),
+    ]);
+    const items = rows.slice(0, take);
+    return {
+      items: items.map((tool) => ({
+        ...tool,
+        accessSource:
+          tool.visibility === EntrepreneurToolVisibility.all_entrepreneurs
+            ? 'global'
+            : tool.visibility === EntrepreneurToolVisibility.programmes
+              ? 'programme'
+              : 'individual',
+      })),
+      nextCursor: rows.length > take ? items[items.length - 1]?.id ?? null : null,
+      totalItems,
+    };
+  }
+
   async createTool(user: User, dto: CreateToolDto) {
     await this.validateToolPayload(dto);
 

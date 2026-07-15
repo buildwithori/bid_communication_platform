@@ -17,6 +17,15 @@ export class ToolsController {
     return this.toolsService.listTools(user, query);
   }
 
+  @Get('entrepreneur/:entrepreneurUserId')
+  @Roles(UserRole.admin)
+  listEntrepreneurTools(
+    @Param('entrepreneurUserId') entrepreneurUserId: string,
+    @Query() query: ToolQueryDto,
+  ) {
+    return this.toolsService.listEntrepreneurTools(entrepreneurUserId, query);
+  }
+
   @Get(':id')
   getTool(@CurrentUser() user: User, @Param('id') id: string) {
     return this.toolsService.getTool(user, id);
