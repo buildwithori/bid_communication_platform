@@ -6,6 +6,13 @@ import { StorageService } from '../files/storage.service';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
 import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
+import {
+  CreateProgrammeModuleDto,
+  MoveProgrammeModuleDto,
+  ProgrammeModuleQueryDto,
+  ReuseProgrammeModuleDto,
+  UpdateProgrammeModuleDto,
+} from './dto/programme-module.dto';
 
 const DEFAULT_TAKE = 20;
 
@@ -38,6 +45,18 @@ type ContentCountRow = {
 type ReadyModuleCountRow = {
   programmeId: string;
   count: bigint;
+};
+
+type ModuleContentCountRow = {
+  moduleId: string;
+  type: string;
+  status: string;
+  count: bigint;
+};
+
+type ModuleContentMetrics = {
+  content: { total: number; videos: number; pdfs: number; tools: number };
+  readyItems: number;
 };
 
 @Injectable()
@@ -237,6 +256,307 @@ export class ProgrammesService {
     const items = pageRows.map((programme) => this.mapProgrammeListItem(programme, metrics.get(programme.id)));
 
     return { items, nextCursor, totalItems };
+  }
+
+  async listProgrammeModules(
+    user: User,
+    programmeId: string,
+    query: ProgrammeModuleQueryDto,
+  ) {
+    if (!(await this.canReadProgramme(user, programmeId))) {
+      throw new ForbiddenException('You do not have access to this programme.');
+    }
+
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.ProgrammeModuleWhereInput = {
+      programmeId,
+      ...(query.search?.trim()
+        ? {
+            module: {
+              OR: [
+                {
+                  title: {
+                    contains: query.search.trim(),
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  description: {
+                    contains: query.search.trim(),
+                    mode: 'insensitive' as const,
+                  },
+                },
+              ],
+            },
+          }
+        : {}),
+    };
+    const [rows, totalItems] = await Promise.all([
+      this.prisma.programmeModule.findMany({
+        where,
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          module: {
+            include: {
+              _count: { select: { contentItems: true, programmes: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.programmeModule.count({ where }),
+    ]);
+    const pageRows = rows.slice(0, take);
+    const metrics = await this.moduleContentMetrics(
+      pageRows.map((row) => row.moduleId),
+    );
+
+    return {
+      items: pageRows.map((row) =>
+        this.mapProgrammeModule(row, metrics.get(row.moduleId)),
+      ),
+      nextCursor: rows.length > take ? pageRows.at(-1)?.id ?? null : null,
+      totalItems,
+    };
+  }
+
+  async listReusableModules(
+    user: User,
+    programmeId: string,
+    query: ProgrammeModuleQueryDto,
+  ) {
+    this.assertAdmin(user);
+    await this.assertMutableProgramme(programmeId);
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.LearningModuleWhereInput = {
+      isReusable: true,
+      programmes: { none: { programmeId } },
+      ...(query.search?.trim()
+        ? {
+            OR: [
+              {
+                title: {
+                  contains: query.search.trim(),
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                description: {
+                  contains: query.search.trim(),
+                  mode: 'insensitive' as const,
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const [rows, totalItems] = await Promise.all([
+      this.prisma.learningModule.findMany({
+        where,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          _count: { select: { contentItems: true, programmes: true } },
+        },
+      }),
+      this.prisma.learningModule.count({ where }),
+    ]);
+    const pageRows = rows.slice(0, take);
+
+    return {
+      items: pageRows.map((module) => ({
+        id: module.id,
+        title: module.title,
+        description: module.description,
+        isReusable: module.isReusable,
+        contentItems: module._count.contentItems,
+        programmeUses: module._count.programmes,
+        updatedAt: module.updatedAt.toISOString(),
+      })),
+      nextCursor: rows.length > take ? pageRows.at(-1)?.id ?? null : null,
+      totalItems,
+    };
+  }
+
+  async createProgrammeModule(
+    user: User,
+    programmeId: string,
+    dto: CreateProgrammeModuleDto,
+  ) {
+    this.assertAdmin(user);
+    const created = await this.audit.capture(
+      {
+        action: 'programme_modules.created',
+        entityType: 'learning_module',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Created programme module ${name ?? ''}`.trim(),
+      },
+      async (tx) => {
+        await this.assertMutableProgramme(programmeId, tx);
+        const maxPosition = await tx.programmeModule.aggregate({
+          where: { programmeId },
+          _max: { position: true },
+        });
+        const module = await tx.learningModule.create({
+          data: {
+            title: dto.title.trim(),
+            description: dto.description?.trim() ?? '',
+            isReusable: dto.isReusable ?? true,
+          },
+        });
+        await tx.programmeModule.create({
+          data: {
+            programmeId,
+            moduleId: module.id,
+            position: (maxPosition._max.position ?? 0) + 1,
+          },
+        });
+        return { ...module, name: module.title };
+      },
+    );
+    return this.getProgrammeModuleSummary(programmeId, created.id);
+  }
+
+  async reuseProgrammeModule(
+    user: User,
+    programmeId: string,
+    dto: ReuseProgrammeModuleDto,
+  ) {
+    this.assertAdmin(user);
+    const reused = await this.audit.capture(
+      {
+        action: 'programme_modules.reused',
+        entityType: 'learning_module',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Reused programme module ${name ?? ''}`.trim(),
+      },
+      async (tx) => {
+        await this.assertMutableProgramme(programmeId, tx);
+        const module = await tx.learningModule.findFirst({
+          where: {
+            id: dto.moduleId,
+            isReusable: true,
+            programmes: { none: { programmeId } },
+          },
+        });
+        if (!module) {
+          throw new BadRequestException(
+            'This reusable module is unavailable or already attached.',
+          );
+        }
+        const maxPosition = await tx.programmeModule.aggregate({
+          where: { programmeId },
+          _max: { position: true },
+        });
+        await tx.programmeModule.create({
+          data: {
+            programmeId,
+            moduleId: module.id,
+            position: (maxPosition._max.position ?? 0) + 1,
+          },
+        });
+        return { ...module, name: module.title };
+      },
+    );
+    return this.getProgrammeModuleSummary(programmeId, reused.id);
+  }
+
+  async updateProgrammeModule(
+    user: User,
+    programmeId: string,
+    moduleId: string,
+    dto: UpdateProgrammeModuleDto,
+  ) {
+    this.assertAdmin(user);
+    const updated = await this.audit.capture(
+      {
+        action: 'programme_modules.updated',
+        entityType: 'learning_module',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Updated programme module ${name ?? ''}`.trim(),
+      },
+      async (tx) => {
+        await this.assertMutableProgramme(programmeId, tx);
+        const attached = await tx.programmeModule.count({
+          where: { programmeId, moduleId },
+        });
+        if (!attached) throw new NotFoundException('Programme module was not found.');
+        const module = await tx.learningModule.update({
+          where: { id: moduleId },
+          data: {
+            ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
+            ...(dto.description !== undefined
+              ? { description: dto.description.trim() }
+              : {}),
+            ...(dto.isReusable !== undefined
+              ? { isReusable: dto.isReusable }
+              : {}),
+          },
+        });
+        return { ...module, name: module.title };
+      },
+    );
+    return this.getProgrammeModuleSummary(programmeId, updated.id);
+  }
+
+  async moveProgrammeModule(
+    user: User,
+    programmeId: string,
+    moduleId: string,
+    dto: MoveProgrammeModuleDto,
+  ) {
+    this.assertAdmin(user);
+    await this.audit.capture(
+      {
+        action: 'programme_modules.reordered',
+        entityType: 'learning_module',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Reordered programme module ${name ?? ''}`.trim(),
+        payload: { targetPosition: dto.position },
+      },
+      async (tx) => {
+        await this.assertMutableProgramme(programmeId, tx);
+        const [link, total] = await Promise.all([
+          tx.programmeModule.findUnique({
+            where: {
+              programmeId_moduleId: { programmeId, moduleId },
+            },
+            include: { module: { select: { title: true } } },
+          }),
+          tx.programmeModule.count({ where: { programmeId } }),
+        ]);
+        if (!link) throw new NotFoundException('Programme module was not found.');
+
+        const targetPosition = Math.min(dto.position, total);
+        if (targetPosition !== link.position) {
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE programme_modules
+            SET position = -position
+            WHERE programme_id = ${programmeId}
+          `);
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE programme_modules
+            SET position = CASE
+              WHEN id = ${link.id} THEN ${targetPosition}
+              WHEN ${link.position} < ${targetPosition}
+                AND -position > ${link.position}
+                AND -position <= ${targetPosition}
+                THEN -position - 1
+              WHEN ${link.position} > ${targetPosition}
+                AND -position >= ${targetPosition}
+                AND -position < ${link.position}
+                THEN -position + 1
+              ELSE -position
+            END
+            WHERE programme_id = ${programmeId}
+          `);
+        }
+        return { id: moduleId, name: link.module.title };
+      },
+    );
+    return this.getProgrammeModuleSummary(programmeId, moduleId);
   }
 
   async listDeliverableRules(user: User, programmeId: string) {
@@ -536,6 +856,113 @@ export class ProgrammesService {
       createdAt: rule.createdAt.toISOString(),
       updatedAt: rule.updatedAt.toISOString(),
     };
+  }
+
+  private async getProgrammeModuleSummary(
+    programmeId: string,
+    moduleId: string,
+  ) {
+    const row = await this.prisma.programmeModule.findUnique({
+      where: { programmeId_moduleId: { programmeId, moduleId } },
+      include: {
+        module: {
+          include: {
+            _count: { select: { contentItems: true, programmes: true } },
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException('Programme module was not found.');
+    const metrics = await this.moduleContentMetrics([moduleId]);
+    return this.mapProgrammeModule(row, metrics.get(moduleId));
+  }
+
+  private mapProgrammeModule(
+    row: {
+      id: string;
+      moduleId: string;
+      position: number;
+      module: {
+        id: string;
+        title: string;
+        description: string;
+        isReusable: boolean;
+        updatedAt: Date;
+        _count: { contentItems: number; programmes: number };
+      };
+    },
+    metrics?: ModuleContentMetrics,
+  ) {
+    const content =
+      metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 };
+    const readyItems = metrics?.readyItems ?? 0;
+    return {
+      linkId: row.id,
+      id: row.module.id,
+      title: row.module.title,
+      description: row.module.description,
+      isReusable: row.module.isReusable,
+      position: row.position,
+      programmeUses: row.module._count.programmes,
+      content,
+      readiness:
+        content.total > 0 && readyItems === content.total
+          ? 'ready'
+          : 'needs_content',
+      updatedAt: row.module.updatedAt.toISOString(),
+    };
+  }
+
+  private async moduleContentMetrics(moduleIds: string[]) {
+    const metrics = new Map<string, ModuleContentMetrics>();
+    for (const moduleId of moduleIds) {
+      metrics.set(moduleId, {
+        content: { total: 0, videos: 0, pdfs: 0, tools: 0 },
+        readyItems: 0,
+      });
+    }
+    if (moduleIds.length === 0) return metrics;
+
+    const rows = await this.prisma.$queryRaw<ModuleContentCountRow[]>(Prisma.sql`
+      SELECT
+        mci.module_id AS "moduleId",
+        ci.type::text AS "type",
+        ci.status::text AS "status",
+        COUNT(*)::bigint AS "count"
+      FROM module_content_items mci
+      JOIN content_items ci ON ci.id = mci.content_item_id
+      WHERE mci.module_id IN (${Prisma.join(moduleIds)})
+      GROUP BY mci.module_id, ci.type, ci.status
+    `);
+
+    for (const row of rows) {
+      const value = metrics.get(row.moduleId);
+      if (!value) continue;
+      const count = Number(row.count);
+      value.content.total += count;
+      if (row.type === 'video') value.content.videos += count;
+      if (row.type === 'pdf') value.content.pdfs += count;
+      if (row.type === 'tool') value.content.tools += count;
+      if (row.status === 'ready') value.readyItems += count;
+    }
+    return metrics;
+  }
+
+  private async assertMutableProgramme(
+    programmeId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const programme = await client.programme.findUnique({
+      where: { id: programmeId },
+      select: { id: true, archivedAt: true },
+    });
+    if (!programme) throw new NotFoundException('Programme was not found.');
+    if (programme.archivedAt) {
+      throw new BadRequestException(
+        'Restore this programme before changing its curriculum.',
+      );
+    }
+    return programme;
   }
 
   private async findProgrammeOrThrow(id: string) {

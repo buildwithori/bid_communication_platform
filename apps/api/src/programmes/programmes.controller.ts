@@ -7,6 +7,13 @@ import { ProgrammeQueryDto } from './dto/programme-query.dto';
 import { ProgrammesService } from './programmes.service';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
+import {
+  CreateProgrammeModuleDto,
+  MoveProgrammeModuleDto,
+  ProgrammeModuleQueryDto,
+  ReuseProgrammeModuleDto,
+  UpdateProgrammeModuleDto,
+} from './dto/programme-module.dto';
 
 @ApiTags('programmes')
 @Controller('programmes')
@@ -64,7 +71,76 @@ export class ProgrammesController {
     return this.programmesService.restoreProgramme(user, id);
   }
 
+  @Get(':id/modules')
+  listProgrammeModules(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Query() query: ProgrammeModuleQueryDto,
+  ) {
+    return this.programmesService.listProgrammeModules(user, id, query);
+  }
 
+  @Get(':id/reusable-modules')
+  @Roles(UserRole.admin)
+  listReusableModules(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Query() query: ProgrammeModuleQueryDto,
+  ) {
+    return this.programmesService.listReusableModules(user, id, query);
+  }
+
+  @Post(':id/modules')
+  @Roles(UserRole.admin)
+  createProgrammeModule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: CreateProgrammeModuleDto,
+  ) {
+    return this.programmesService.createProgrammeModule(user, id, dto);
+  }
+
+  @Post(':id/modules/reuse')
+  @Roles(UserRole.admin)
+  reuseProgrammeModule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: ReuseProgrammeModuleDto,
+  ) {
+    return this.programmesService.reuseProgrammeModule(user, id, dto);
+  }
+
+  @Patch(':id/modules/:moduleId')
+  @Roles(UserRole.admin)
+  updateProgrammeModule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('moduleId') moduleId: string,
+    @Body() dto: UpdateProgrammeModuleDto,
+  ) {
+    return this.programmesService.updateProgrammeModule(
+      user,
+      id,
+      moduleId,
+      dto,
+    );
+  }
+
+  @Post(':id/modules/:moduleId/move')
+  @Roles(UserRole.admin)
+  moveProgrammeModule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('moduleId') moduleId: string,
+    @Body() dto: MoveProgrammeModuleDto,
+  ) {
+    return this.programmesService.moveProgrammeModule(
+      user,
+      id,
+      moduleId,
+      dto,
+    );
+  }
 
   @Get(':id/deliverable-rules')
   listDeliverableRules(@CurrentUser() user: User, @Param('id') id: string) {
