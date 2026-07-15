@@ -8,7 +8,6 @@ const rawApiModules = [
   "@/lib/api/deliverables",
   "@/lib/api/files",
   "@/lib/api/learning",
-  "@/lib/api/programmes",
   "@/lib/api/sessions",
   "@/lib/api/tool-requests",
   "@/lib/api/tools",

@@ -86,15 +86,42 @@ export const adminProfileSchema = z.object({
 });
 export type AdminProfileForm = z.infer<typeof adminProfileSchema>;
 
-export const programSchema = z.object({
-  name: z.string().min(1, 'Program name is required'),
-  accessType: z.enum(['assigned', 'free']),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-  maxEntrepreneurs: z.string(),
-  publishState: z.enum(['draft', 'published']),
-  description: z.string().optional(),
-});
+export const programSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, 'Programme name must be at least 2 characters')
+      .max(160, 'Programme name must be 160 characters or fewer'),
+    accessType: z.enum(['assigned', 'free']),
+    startDate: z.string().min(1, 'Start date is required'),
+    endDate: z.string().min(1, 'End date is required'),
+    maxEntrepreneurs: z.string().refine(
+      (value) => {
+        const parsed = Number(value);
+        return Number.isInteger(parsed) && parsed >= 1 && parsed <= 1000000;
+      },
+      'Max entrepreneurs must be a whole number between 1 and 1,000,000',
+    ),
+    publishState: z.enum(['draft', 'published']),
+    description: z
+      .string()
+      .max(2000, 'Description must be 2,000 characters or fewer')
+      .optional(),
+  })
+  .superRefine((values, context) => {
+    if (
+      values.startDate &&
+      values.endDate &&
+      new Date(values.endDate) < new Date(values.startDate)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['endDate'],
+        message: 'End date must be on or after the start date',
+      });
+    }
+  });
 export type ProgramForm = z.infer<typeof programSchema>;
 
 export const moduleSchema = z.object({
