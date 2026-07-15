@@ -1,12 +1,13 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+import { PageHeader, Notice } from "@/components/shared/PageHeader";
+import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
 import {
   DataTable,
   RowActions,
@@ -14,64 +15,128 @@ import {
   TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
-import { Modal } from '@/components/shared/Modal';
-import { FormField, FormInput } from '@/components/shared/FormField';
-import { useAdminStore } from '@/lib/stores/admin-store';
-import { newSectorSchema, type NewSectorForm } from '@/lib/forms/schemas';
-import type { Sector } from '@/types';
+} from "@/components/shared/DataTable";
+import { Modal } from "@/components/shared/Modal";
+import { FormField, FormInput } from "@/components/shared/FormField";
+import {
+  useCreateSectorMutation,
+  useSectorsPage,
+  useUpdateSectorMutation,
+  type LookupRecord,
+} from "@/lib/api/settings";
+import { newSectorSchema, type NewSectorForm } from "@/lib/forms/schemas";
 
 export default function AdminSectorsPage() {
-  const { sectors, addSector, updateSector } = useAdminStore();
-  const [query, setQuery] = React.useState('');
-  const [page, setPage] = React.useState(1);
+  const [query, setQuery] = React.useState("");
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [activeSector, setActiveSector] = React.useState<Sector | null>(null);
+  const [activeSector, setActiveSector] = React.useState<LookupRecord | null>(
+    null,
+  );
+  const sectors = useSectorsPage({ search: query, take: pageSize });
+  const createSector = useCreateSectorMutation({
+    onSuccess: () => {
+      setCreateOpen(false);
+      toast.success("Sector added");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const updateSector = useUpdateSectorMutation({
+    onSuccess: () => {
+      setActiveSector(null);
+      toast.success("Sector updated");
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
-  const filteredSectors = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return sectors;
-    return sectors.filter((sector) =>
-      [sector.label, sector.id].join(' ').toLowerCase().includes(needle),
-    );
-  }, [query, sectors]);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [query, pageSize]);
-
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredSectors.slice(start, start + pageSize);
-  }, [filteredSectors, page, pageSize]);
-
-  const columns: Column<Sector>[] = [
+  const columns: Column<LookupRecord>[] = [
     {
-      key: 'actions',
-      header: 'Action',
+      key: "actions",
+      header: "Action",
       cell: (sector) => (
         <RowActions
           actions={[
-            { label: 'Rename sector', onSelect: () => setActiveSector(sector) },
+            { label: "Rename sector", onSelect: () => setActiveSector(sector) },
+            {
+              label: sector.active ? "Deactivate" : "Activate",
+              onSelect: () =>
+                updateSector.mutate({
+                  id: sector.id,
+                  payload: { active: !sector.active },
+                }),
+              disabled: updateSector.isPending,
+            },
           ]}
         />
       ),
-      className: 'w-[84px]',
+      className: "w-[84px]",
     },
     {
-      key: 'sector',
-      header: 'Sector',
-      cell: (sector) => <Badge tone={sector.color}>{sector.label}</Badge>,
-      className: 'w-[260px]',
+      key: "sector",
+      header: "Sector",
+      cell: (sector) => (
+        <button
+          type="button"
+          onClick={() => setActiveSector(sector)}
+          className="text-left font-medium text-ink transition hover:text-bid"
+        >
+          {sector.name}
+        </button>
+      ),
+      className: "w-[260px]",
     },
     {
-      key: 'key',
-      header: 'Key',
-      cell: (sector) => <span className="font-mono text-xs text-ink-muted">{sector.id}</span>,
-      className: 'w-[220px]',
+      key: "key",
+      header: "Key",
+      cell: (sector) => (
+        <span className="font-mono text-xs text-ink-muted">{sector.key}</span>
+      ),
+      className: "w-[220px]",
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (sector) => (
+        <Badge tone={sector.active ? "green" : "neutral"}>
+          {sector.active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+      className: "w-[140px]",
     },
   ];
+
+  if (sectors.isLoading) {
+    return (
+      <>
+        <PageHeader
+          title="Sectors"
+          description="Manage the sector list used for entrepreneur profiles, trainer matching, and reporting filters."
+        />
+        <TableSkeleton columns={4} rows={8} />
+      </>
+    );
+  }
+
+  if (sectors.isError) {
+    return (
+      <>
+        <PageHeader
+          title="Sectors"
+          description="Manage the platform sector list."
+        />
+        <Card>
+          <Notice>Sectors could not be loaded. {sectors.error.message}</Notice>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => void sectors.refetch()}
+          >
+            Try again
+          </Button>
+        </Card>
+      </>
+    );
+  }
 
   return (
     <>
@@ -83,8 +148,10 @@ export default function AdminSectorsPage() {
       <Card>
         <CardHeader
           title="Sector list"
-          description={`${filteredSectors.length} sector${filteredSectors.length === 1 ? '' : 's'} in this view`}
-          actions={<Button onClick={() => setCreateOpen(true)}>+ Add sector</Button>}
+          description={`${sectors.totalItems} sector${sectors.totalItems === 1 ? "" : "s"} in this view`}
+          actions={
+            <Button onClick={() => setCreateOpen(true)}>+ Add sector</Button>
+          }
         />
         <TableToolbar>
           <div>
@@ -98,23 +165,26 @@ export default function AdminSectorsPage() {
             className="w-full sm:w-[320px]"
             placeholder="Search sectors..."
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              sectors.resetPagination();
+              setQuery(event.target.value);
+            }}
           />
         </TableToolbar>
         <DataTable
           columns={columns}
-          rows={pageRows}
+          rows={sectors.rows}
           rowKey={(sector) => sector.id}
           emptyMessage="No sectors match this search."
         />
         <TablePagination
-          page={page}
+          page={sectors.page}
           pageSize={pageSize}
-          totalItems={filteredSectors.length}
-          onPageChange={setPage}
+          totalItems={sectors.totalItems}
+          onPageChange={sectors.setPage}
           onPageSizeChange={(next) => {
+            sectors.resetPagination();
             setPageSize(next);
-            setPage(1);
           }}
         />
       </Card>
@@ -123,20 +193,23 @@ export default function AdminSectorsPage() {
         title="Add sector"
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onSubmit={(values) => {
-          addSector(values.label.trim());
-          setCreateOpen(false);
-        }}
+        isPending={createSector.isPending}
+        onSubmit={(values) =>
+          createSector.mutate({ name: values.label.trim() })
+        }
       />
       <SectorFormModal
-        title={activeSector ? `Rename ${activeSector.label}` : 'Rename sector'}
+        title={activeSector ? `Rename ${activeSector.name}` : "Rename sector"}
         open={!!activeSector}
-        initialValue={activeSector?.label}
+        initialValue={activeSector?.name}
         onOpenChange={(open) => !open && setActiveSector(null)}
+        isPending={updateSector.isPending}
         onSubmit={(values) => {
           if (!activeSector) return;
-          updateSector(activeSector.id, values.label.trim());
-          setActiveSector(null);
+          updateSector.mutate({
+            id: activeSector.id,
+            payload: { name: values.label.trim() },
+          });
         }}
       />
     </>
@@ -146,13 +219,15 @@ export default function AdminSectorsPage() {
 function SectorFormModal({
   title,
   open,
-  initialValue = '',
+  initialValue = "",
+  isPending,
   onOpenChange,
   onSubmit,
 }: {
   title: string;
   open: boolean;
   initialValue?: string;
+  isPending: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: NewSectorForm) => void;
 }) {
@@ -168,14 +243,30 @@ function SectorFormModal({
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={title}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <FormField label="Sector name" error={form.formState.errors.label?.message}>
-          <FormInput placeholder="e.g. Renewable Energy" {...form.register('label')} />
+        <FormField
+          label="Sector name"
+          error={form.formState.errors.label?.message}
+        >
+          <FormInput
+            placeholder="e.g. Renewable Energy"
+            {...form.register("label")}
+          />
         </FormField>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button type="submit">Save sector</Button>
+          <Button
+            type="submit"
+            isLoading={isPending}
+            loadingLabel="Saving sector"
+          >
+            Save sector
+          </Button>
         </div>
       </form>
     </Modal>

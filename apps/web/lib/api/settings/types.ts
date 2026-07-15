@@ -55,6 +55,12 @@ export type ProgrammeGoalTypeRecord = LookupRecord & {
   requiresTargetAmount: boolean;
 };
 
+export type LookupPage<TRecord> = {
+  items: TRecord[];
+  nextCursor: string | null;
+  totalItems: number;
+};
+
 export type LookupQuery = {
   search?: string;
   active?: boolean;

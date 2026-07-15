@@ -1,4 +1,3 @@
-import type { CursorPage } from "@bid/shared";
 import { apiRequest } from "../client";
 import type {
   BusinessStagePayload,
@@ -7,6 +6,7 @@ import type {
   CompanyConfig,
   CompanyConfigPatch,
   CompanySettingsResponse,
+  LookupPage,
   LookupPayload,
   LookupQuery,
   LookupRecord,
@@ -97,7 +97,7 @@ export async function updateCompanySettingsRequest(patch: CompanyConfigPatch) {
 }
 
 export function listSectorsRequest(query?: LookupQuery) {
-  return apiRequest<CursorPage<LookupRecord>>(
+  return apiRequest<LookupPage<LookupRecord>>(
     `/lookups/sectors${toQueryString(query)}`,
   );
 }
@@ -123,7 +123,7 @@ export function updateSectorRequest({
 }
 
 export function listBusinessStagesRequest(query?: LookupQuery) {
-  return apiRequest<CursorPage<BusinessStageRecord>>(
+  return apiRequest<LookupPage<BusinessStageRecord>>(
     `/lookups/business-stages${toQueryString(query)}`,
   );
 }
@@ -149,7 +149,7 @@ export function updateBusinessStageRequest({
 }
 
 export function listProgrammeGoalTypesRequest(query?: LookupQuery) {
-  return apiRequest<CursorPage<ProgrammeGoalTypeRecord>>(
+  return apiRequest<LookupPage<ProgrammeGoalTypeRecord>>(
     `/lookups/programme-goal-types${toQueryString(query)}`,
   );
 }
@@ -180,7 +180,7 @@ export function updateProgrammeGoalTypeRequest({
 }
 
 export function listToolAreasRequest(query?: LookupQuery) {
-  return apiRequest<CursorPage<LookupRecord>>(
+  return apiRequest<LookupPage<LookupRecord>>(
     `/lookups/tool-areas${toQueryString(query)}`,
   );
 }

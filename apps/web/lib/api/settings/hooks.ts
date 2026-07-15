@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -28,6 +29,7 @@ import type {
   BusinessStageRecord,
   BusinessStageUpdatePayload,
   CompanyConfig,
+  LookupPage,
   LookupPayload,
   LookupQuery,
   LookupRecord,
@@ -66,6 +68,85 @@ export function useUpdateCompanySettingsMutation(
     },
     onError: handlers?.onError,
   });
+}
+
+type LookupPageQuery = Omit<LookupQuery, "cursor">;
+
+function useLookupPage<TRecord>(
+  query: LookupPageQuery,
+  queryKey: (query: LookupQuery) => readonly unknown[],
+  request: (query: LookupQuery) => Promise<LookupPage<TRecord>>,
+) {
+  const [page, setCurrentPage] = useState(1);
+  const [cursors, setCursors] = useState<Array<string | undefined>>([
+    undefined,
+  ]);
+  const cursor = cursors[page - 1];
+  const result = useQuery({
+    queryKey: queryKey({ ...query, cursor }),
+    queryFn: () => request({ ...query, cursor }),
+  });
+
+  const resetPagination = useCallback(() => {
+    setCurrentPage(1);
+    setCursors([undefined]);
+  }, []);
+
+  const setPage = useCallback(
+    (nextPage: number) => {
+      if (nextPage < 1 || nextPage === page) return;
+      if (
+        (nextPage < page && cursors[nextPage - 1] !== undefined) ||
+        nextPage === 1
+      ) {
+        setCurrentPage(nextPage);
+        return;
+      }
+      if (nextPage === page + 1 && result.data?.nextCursor) {
+        setCursors((current) => {
+          const next = [...current];
+          next[nextPage - 1] = result.data?.nextCursor ?? undefined;
+          return next;
+        });
+        setCurrentPage(nextPage);
+      }
+    },
+    [cursors, page, result.data?.nextCursor],
+  );
+
+  return {
+    ...result,
+    page,
+    pageSize: query.take ?? 10,
+    totalItems: result.data?.totalItems ?? 0,
+    rows: result.data?.items ?? [],
+    setPage,
+    resetPagination,
+  };
+}
+
+export function useSectorsPage(query: LookupPageQuery) {
+  return useLookupPage(query, settingsKeys.sectorList, listSectorsRequest);
+}
+
+export function useBusinessStagesPage(query: LookupPageQuery) {
+  return useLookupPage(
+    query,
+    settingsKeys.businessStageList,
+    listBusinessStagesRequest,
+  );
+}
+
+export function useProgrammeGoalTypesPage(query: LookupPageQuery) {
+  return useLookupPage(
+    query,
+    settingsKeys.programmeGoalTypeList,
+    listProgrammeGoalTypesRequest,
+  );
+}
+
+export function useToolAreasPage(query: LookupPageQuery) {
+  return useLookupPage(query, settingsKeys.toolAreaList, listToolAreasRequest);
 }
 
 export function useSectorsQuery(query?: LookupQuery) {
