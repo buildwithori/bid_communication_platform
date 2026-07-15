@@ -191,6 +191,8 @@ Done when:
 - Filters are autocomplete where data can grow.
 - Profile dashboard/detail metrics are returned by aggregate endpoints where needed.
 
+Implementation status (2026-07-15): Complete. The admin directory and entrepreneur self-profile are backed by authenticated APIs with backend search, filters, cursor pagination, summary metrics, multiple-programme access, and lazy taxonomy/programme lookups. Admin invitation, status, profile, programme access, tool access, programme goals, fundraising rounds, and periodic updates use guarded mutations with transactional audit events. Tool access resolves global rules, programme inheritance, direct grants, and hidden overrides on the backend; the admin management modal searches and paginates the full published catalogue while showing each effective state. The self-profile keeps business details and all programme-linked records in paginated views with page-specific loading states and no primary-programme assumption.
+
 ### 7. File, Video, And Asset Infrastructure
 
 Scope:
