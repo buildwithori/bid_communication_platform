@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
-import { AuthModule } from '../auth/auth.module';
-import { SettingsController } from './settings.controller';
-import { SettingsService } from './settings.service';
+import { Module } from "@nestjs/common";
+import { AuditModule } from "../audit/audit.module";
+import { AuthModule } from "../auth/auth.module";
+import { SettingsController } from "./settings.controller";
+import { SettingsService } from "./settings.service";
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, AuditModule],
   controllers: [SettingsController],
   providers: [SettingsService],
 })
