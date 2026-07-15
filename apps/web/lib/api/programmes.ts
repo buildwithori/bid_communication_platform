@@ -124,6 +124,7 @@ export type ProgrammeQuery = {
   accessType?: ProgrammeAccessType;
   lifecycle?: ProgrammeLifecycle;
   includeArchived?: boolean;
+  grantableOnly?: boolean;
   take?: number;
   cursor?: string;
 };
@@ -134,6 +135,7 @@ function toQueryString(query?: ProgrammeQuery) {
   if (query?.accessType) params.set('accessType', query.accessType);
   if (query?.lifecycle) params.set('lifecycle', query.lifecycle);
   if (typeof query?.includeArchived === 'boolean') params.set('includeArchived', String(query.includeArchived));
+  if (typeof query?.grantableOnly === 'boolean') params.set('grantableOnly', String(query.grantableOnly));
   if (query?.take) params.set('take', String(query.take));
   if (query?.cursor) params.set('cursor', query.cursor);
   const value = params.toString();

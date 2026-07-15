@@ -7,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { listProgrammes } from "../programmes";
 import { entrepreneurKeys } from "./keys";
 import {
   acceptEntrepreneurInvitationRequest,
@@ -59,6 +60,35 @@ type MutationHandlers<TData> = {
 };
 
 type PageQuery = Omit<EntrepreneurQuery, "cursor">;
+
+export function useLazyGrantableProgrammesQuery({
+  enabled,
+  search,
+  take = 20,
+}: {
+  enabled: boolean;
+  search?: string;
+  take?: number;
+}) {
+  const result = useInfiniteQuery({
+    queryKey: [...entrepreneurKeys.all, "grantable-programmes", { search, take }],
+    queryFn: ({ pageParam }) =>
+      listProgrammes({
+        search,
+        accessType: "assigned",
+        grantableOnly: true,
+        take,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return {
+    ...result,
+    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+  };
+}
 
 export function useEntrepreneursPage(query: PageQuery) {
   const [page, setCurrentPage] = useState(1);

@@ -394,6 +394,10 @@ export class ProgrammesService {
       filters.push({ accessType: query.accessType });
     }
 
+    if (query.grantableOnly) {
+      filters.push({ publishedAt: { not: null }, archivedAt: null });
+    }
+
     const lifecycleWhere = this.lifecycleWhere(query.lifecycle);
     if (lifecycleWhere) {
       filters.push(lifecycleWhere);
