@@ -1,16 +1,16 @@
-export type EntrepreneurStatus = 'active' | 'inactive' | 'archived';
-export type EntrepreneurSource = 'self_registered' | 'admin_invited';
+export type EntrepreneurStatus = "active" | "inactive" | "archived";
+export type EntrepreneurSource = "self_registered" | "admin_invited";
 
 export type EntrepreneurProgrammeAccess = {
   grantId: string;
   id: string;
   name: string;
-  accessType: 'free' | 'assigned';
+  accessType: "free" | "assigned";
   grantedAt: string;
   startDate: string;
   endDate: string;
   progress: {
-    status: 'not_started' | 'in_progress' | 'completed';
+    status: "not_started" | "in_progress" | "completed";
     percent: number;
     completedModules: number;
     totalModules: number;
@@ -31,7 +31,7 @@ export type EntrepreneurRecord = {
   country: string;
   status: EntrepreneurStatus;
   source: EntrepreneurSource;
-  userStatus: 'pending' | 'active' | 'inactive';
+  userStatus: "pending" | "active" | "inactive";
   joinedAt: string;
   onboardingCompletedAt: string | null;
   sector: { id: string; name: string; key: string } | null;
@@ -109,19 +109,28 @@ export type EffectiveToolAccess = {
   id: string;
   name: string;
   description: string;
-  type: 'pdf' | 'embedded_tool';
+  type: "pdf" | "embedded_tool";
   iconKey: string;
-  visibility: 'all_entrepreneurs' | 'programmes' | 'entrepreneurs';
-  accessSource: 'global' | 'programme' | 'individual';
+  visibility: "all_entrepreneurs" | "programmes" | "entrepreneurs";
+  accessSource: "global" | "programme" | "individual" | "none";
+  directGranted: boolean;
+  hidden: boolean;
+  visible: boolean;
   toolArea: { id: string; name: string; key: string };
 };
 
 export type EffectiveToolQuery = {
   search?: string;
-  type?: EffectiveToolAccess['type'];
+  type?: EffectiveToolAccess["type"];
   toolAreaId?: string;
+  includeUnavailable?: boolean;
   take?: number;
   cursor?: string;
+};
+
+export type ToolAccessVariables = {
+  entrepreneurId: string;
+  toolId: string;
 };
 
 export type ProfileRecordQuery = {
@@ -141,7 +150,12 @@ export type ProgrammeGoalRecord = {
   id: string;
   entrepreneurUserId: string;
   programme: { id: string; name: string } | null;
-  goalType: { id: string; name: string; key: string; requiresTargetAmount: boolean };
+  goalType: {
+    id: string;
+    name: string;
+    key: string;
+    requiresTargetAmount: boolean;
+  };
   targetAmountCents: number | null;
   description: string | null;
   evidence: string | null;
