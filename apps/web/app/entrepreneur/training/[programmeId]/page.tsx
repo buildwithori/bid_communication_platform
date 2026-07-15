@@ -65,10 +65,10 @@ export default function ProgrammeModulesPage({
   const router = useRouter();
   const { deliverables } = useEntrepreneurStore();
   const program = programById(params.programmeId);
-  if (!program) return notFound();
+  const programId = program?.id ?? params.programmeId;
 
   const moduleSummaries = React.useMemo<ModuleSummary[]>(() => {
-    return modulesForProgram(program.id).map((module) => {
+    return modulesForProgram(programId).map((module) => {
       const moduleItems = contentForModule(module.id);
       return {
         ...moduleWithProgress(module),
@@ -83,11 +83,11 @@ export default function ProgrammeModulesPage({
         ].join(' '),
       };
     });
-  }, [program.id]);
+  }, [programId]);
 
   const programmeDeliverables = React.useMemo(
-    () => deliverables.filter((deliverable) => deliverable.programmeId === program.id),
-    [deliverables, program.id],
+    () => deliverables.filter((deliverable) => deliverable.programmeId === programId),
+    [deliverables, programId],
   );
   const contentPlaylist = React.useMemo(
     () => moduleSummaries.flatMap((module) => module.items),
@@ -100,7 +100,7 @@ export default function ProgrammeModulesPage({
     moduleSummaries.find((module) => module.status !== 'completed') ?? moduleSummaries[0];
   const nextContent =
     contentPlaylist.find((item) => item.progress !== 'completed') ?? contentPlaylist[0] ?? null;
-  const deliverableGroup = deliverableGroups.find((group) => group.programmeId === program.id);
+  const deliverableGroup = deliverableGroups.find((group) => group.programmeId === programId);
 
   const [query, setQuery] = React.useState('');
   const [filter, setFilter] = React.useState<ModuleFilter>(ALL);
@@ -131,6 +131,8 @@ export default function ProgrammeModulesPage({
     const start = (page - 1) * pageSize;
     return filteredModules.slice(start, start + pageSize);
   }, [filteredModules, page, pageSize]);
+
+  if (!program) return notFound();
 
   function toggleModule(moduleId: string) {
     setExpandedModuleIds((current) =>

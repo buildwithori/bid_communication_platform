@@ -303,7 +303,7 @@ export const TableFilterSelect = React.forwardRef<
       value={currentValue}
       disabled={disabled}
       name={name}
-      onValueChange={(nextValue) => {
+      onValueChange={(nextValue: string) => {
         onChange?.({
           target: { value: nextValue, name },
           currentTarget: { value: nextValue, name },

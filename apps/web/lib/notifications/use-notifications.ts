@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -61,7 +62,7 @@ export function useNotifications() {
         markReadMutation.mutate(notification.id);
       }
       if (notification.actionUrl) {
-        router.push(notification.actionUrl);
+        router.push(notification.actionUrl as Route);
       }
     },
     [markReadMutation, router],

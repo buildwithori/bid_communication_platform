@@ -206,7 +206,7 @@ export function FormAutocomplete({
   };
 
   return (
-    <Popover open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); onOpenChange?.(nextOpen); }}>
+    <Popover open={open} onOpenChange={(nextOpen: boolean) => { setOpen(nextOpen); onOpenChange?.(nextOpen); }}>
       <PopoverTrigger asChild>
         <button
           type="button"

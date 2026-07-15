@@ -77,15 +77,15 @@ export default function DeliverableListPage({
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
   const group = deliverableGroups.find((item) => item.id === params.groupId);
-  if (!group) return notFound();
-  if (group.programmeId && !entrepreneurHasProgramme(entrepreneur, group.programmeId)) return notFound();
+  const groupId = group?.id ?? params.groupId;
+  const programmeId = group?.programmeId;
 
   const groupItems = React.useMemo(() => {
-    if (group.id === 'g-general') {
+    if (groupId === 'g-general') {
       return deliverables.filter((item) => item.group === 'general');
     }
-    return deliverables.filter((item) => item.programmeId === group.programmeId);
-  }, [deliverables, group.id, group.programmeId]);
+    return deliverables.filter((item) => item.programmeId === programmeId);
+  }, [deliverables, groupId, programmeId]);
 
   const filteredItems = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -114,6 +114,9 @@ export default function DeliverableListPage({
     const start = (page - 1) * pageSize;
     return filteredItems.slice(start, start + pageSize);
   }, [filteredItems, page, pageSize]);
+
+  if (!group) return notFound();
+  if (programmeId && !entrepreneurHasProgramme(entrepreneur, programmeId)) return notFound();
 
   const requiredCount = groupItems.length;
   const approvedCount = groupItems.filter((item) => item.status === 'reviewed').length;

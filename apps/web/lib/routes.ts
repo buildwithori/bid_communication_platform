@@ -1,3 +1,5 @@
+import type { Route } from 'next';
+
 export const routes = {
   home: '/',
   auth: {
@@ -11,12 +13,12 @@ export const routes = {
   entrepreneur: {
     dashboard: '/entrepreneur/dashboard',
     training: '/entrepreneur/training',
-    trainingProgram: (programmeId: string) => `/entrepreneur/training/${programmeId}`,
-    trainingModule: (programmeId: string, moduleId: string) =>
-      `/entrepreneur/training/${programmeId}/${moduleId}`,
+    trainingProgram: (programmeId: string): Route => `/entrepreneur/training/${programmeId}` as Route,
+    trainingModule: (programmeId: string, moduleId: string): Route =>
+      `/entrepreneur/training/${programmeId}/${moduleId}` as Route,
     profile: '/entrepreneur/profile',
     deliverables: '/entrepreneur/deliverables',
-    deliverableGroup: (groupId: string) => `/entrepreneur/deliverables/${groupId}`,
+    deliverableGroup: (groupId: string): Route => `/entrepreneur/deliverables/${groupId}` as Route,
     schedule: '/entrepreneur/schedule',
     tools: '/entrepreneur/tools',
   },
@@ -24,7 +26,7 @@ export const routes = {
     dashboard: '/trainer/dashboard',
     entrepreneurs: '/trainer/entrepreneurs',
     programmes: '/trainer/programmes',
-    programme: (programId: string) => `/trainer/programmes/${programId}`,
+    programme: (programId: string): Route => `/trainer/programmes/${programId}` as Route,
     deliverableReviews: '/trainer/deliverable-reviews',
     sessions: '/trainer/sessions',
     settings: '/trainer/settings',
@@ -35,7 +37,7 @@ export const routes = {
     entrepreneurs: '/admin/entrepreneurs',
     trainers: '/admin/trainers',
     programs: '/admin/programs',
-    program: (programId: string) => `/admin/programs/${programId}`,
+    program: (programId: string): Route => `/admin/programs/${programId}` as Route,
     content: '/admin/content',
     entrepreneurTools: '/admin/entrepreneur-tools',
     deliverableReviews: '/admin/deliverable-reviews',

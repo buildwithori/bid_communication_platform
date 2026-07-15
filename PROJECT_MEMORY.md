@@ -188,3 +188,11 @@ Session workflow rules:
 
 - README may lag behind current product decisions. Prefer this memory file when there is a conflict, then update README when doing documentation work.
 - Data is still mocked/in-memory under `lib/mock-data` and `lib/stores`.
+
+## Next.js 16 Foundation (2026-07-15)
+
+- The web app runs Next.js 16.2 with React 19.2. Turbopack is the default development/build engine and its root is pinned to the repository so unrelated lockfiles outside the project are ignored.
+- Use `apps/web/proxy.ts`, not the legacy `middleware.ts` convention. Proxy performs only an optimistic `bid_session` cookie-presence redirect for protected workspace routes; the NestJS session guard and client `WorkspaceGuard` remain authoritative for identity and role authorization.
+- Typed routes and React Compiler are enabled. Shared navigation accepts Next's `Route` type, and dynamic URL construction stays centralized in `lib/routes.ts`.
+- ESLint uses the Next 16 flat configuration. React Compiler migration diagnostics remain visible as warnings so older UI can be improved incrementally without flattening or removing flows.
+- Client pages that read `useSearchParams()` must render beneath a page-specific Suspense fallback so static generation remains valid.

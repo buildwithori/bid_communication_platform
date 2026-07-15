@@ -119,7 +119,7 @@ export default function TrainerSessionsPage() {
   const createSession = (values: SessionEditorValues) => {
     const entrepreneur = entrepreneurs.find((item) => item.id === values.entrepreneurId);
     const newSession: AdminSession = {
-      id: `s-trainer-${Date.now()}`,
+      id: `s-trainer-${values.entrepreneurId}-${values.date}-${values.startTime}`,
       entrepreneurId: values.entrepreneurId,
       trainerId: currentTrainerId,
       entrepreneurName: entrepreneur?.representative ?? entrepreneur?.businessName ?? 'Entrepreneur',

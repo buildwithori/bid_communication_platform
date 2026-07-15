@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
+const path = require("node:path");
+
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  turbopack: {
+    root: path.join(__dirname, "../.."),
   },
-  images: { unoptimized: true },
+  reactCompiler: true,
+  typedRoutes: true,
 };
 
 module.exports = nextConfig;

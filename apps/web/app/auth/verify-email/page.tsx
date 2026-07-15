@@ -13,7 +13,7 @@ import { resendVerification, verifyEmail } from '@/lib/api/auth';
 import { routes } from '@/lib/routes';
 
 export default function VerifyEmailPage() {
-  return <AuthShell title="Verify your email" description="Check your email for the verification link to continue." className="max-w-[460px]" footer={<AuthBackToLoginLink />}><VerifyEmailPanel /></AuthShell>;
+  return <AuthShell title="Verify your email" description="Check your email for the verification link to continue." className="max-w-[460px]" footer={<AuthBackToLoginLink />}><React.Suspense fallback={<div aria-label="Loading email verification" aria-busy="true" className="space-y-4"><Skeleton className="h-24 w-full" /><Skeleton className="h-11 w-full" /></div>}><VerifyEmailPanel /></React.Suspense></AuthShell>;
 }
 
 function VerifyEmailPanel() {

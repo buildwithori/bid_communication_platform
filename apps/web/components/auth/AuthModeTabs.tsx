@@ -1,6 +1,7 @@
 'use client';
 
 import type * as React from 'react';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -24,7 +25,7 @@ function TabLink({
   children,
 }: {
   active: boolean;
-  href: string;
+  href: Route;
   children: React.ReactNode;
 }) {
   return (

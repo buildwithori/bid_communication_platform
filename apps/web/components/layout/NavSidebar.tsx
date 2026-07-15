@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,7 +12,7 @@ import { Badge } from '@/components/shared/Badge';
 import { routes } from '@/lib/routes';
 
 export interface NavItem {
-  href: string;
+  href: Route;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }
