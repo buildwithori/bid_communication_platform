@@ -277,6 +277,17 @@ export class SettingsService {
   async listBusinessStages(query: LookupQueryDto) {
     const take = pageSize(query);
     const where = this.buildLookupWhere<Prisma.BusinessStageWhereInput>(query);
+    if (query.search?.trim()) {
+      where.OR = [
+        ...(where.OR ?? []),
+        {
+          definition: {
+            contains: query.search.trim(),
+            mode: Prisma.QueryMode.insensitive,
+          },
+        },
+      ];
+    }
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.businessStage.findMany({
         where,
@@ -293,6 +304,17 @@ export class SettingsService {
     const take = pageSize(query);
     const where =
       this.buildLookupWhere<Prisma.ProgrammeGoalTypeWhereInput>(query);
+    if (query.search?.trim()) {
+      where.OR = [
+        ...(where.OR ?? []),
+        {
+          description: {
+            contains: query.search.trim(),
+            mode: Prisma.QueryMode.insensitive,
+          },
+        },
+      ];
+    }
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.programmeGoalType.findMany({
         where,
