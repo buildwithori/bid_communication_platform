@@ -21,6 +21,7 @@ This document is the working plan for backend and frontend integration. The goal
 
 - Frontend pages and components must never import TanStack Query, `apiRequest`, raw request modules, or query keys. They consume feature integration hooks from `apps/web/lib/api/<feature>/index.ts`; the feature hook layer owns queries, mutations, pagination, invalidation, and cache behavior.
 - API payload, response, and shared domain types belong in the feature integration `types.ts`. Types may stay in a page or component only when they are private presentation types used solely by that page or component.
+- Every UI form input must reconcile with `docs/backend-design.md` as persisted, derived, or documented request-only data. Remove clearly unsupported inputs; flag ambiguous properties to the user before changing the backend contract or product flow.
 
 ## Seed Policy
 

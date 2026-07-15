@@ -1,0 +1,87 @@
+export interface CompanyConfig {
+  reporting: {
+    periodicUpdateOverdueAfterDays: number;
+  };
+  deliverables: {
+    moduleCompletionDeliverableDueDays: number | null;
+  };
+  defaults: {
+    currency: string;
+    timezone: string;
+    sessionProvider: string;
+  };
+  notifications: {
+    inAppNotifications: boolean;
+    emailNotifications: boolean;
+    reminderNotifications: boolean;
+    weeklyDigest: boolean;
+  };
+}
+
+export type CompanyConfigPatch = {
+  reporting?: Partial<CompanyConfig["reporting"]>;
+  deliverables?: Partial<CompanyConfig["deliverables"]>;
+  defaults?: Partial<CompanyConfig["defaults"]>;
+  notifications?: Partial<CompanyConfig["notifications"]>;
+};
+
+export type CompanySettingsResponse = {
+  periodicUpdateOverdueAfterDays: number;
+  moduleCompletionDeliverableDueDays: number | null;
+  defaultCurrency: string;
+  defaultTimezone: string;
+  defaultSessionProvider: string;
+  inAppNotificationsEnabledByDefault: boolean;
+  emailNotificationsEnabledByDefault: boolean;
+  reminderNotificationsEnabledByDefault: boolean;
+  weeklyDigestEnabledByDefault: boolean;
+};
+
+export type LookupRecord = {
+  id: string;
+  name: string;
+  key: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BusinessStageRecord = LookupRecord & {
+  definition: string;
+};
+
+export type ProgrammeGoalTypeRecord = LookupRecord & {
+  description: string | null;
+  requiresTargetAmount: boolean;
+};
+
+export type LookupQuery = {
+  search?: string;
+  active?: boolean;
+  take?: number;
+  cursor?: string;
+};
+
+export type LookupPayload = {
+  name: string;
+  key?: string;
+  active?: boolean;
+};
+
+export type BusinessStagePayload = LookupPayload & {
+  definition: string;
+};
+
+export type ProgrammeGoalTypePayload = LookupPayload & {
+  description?: string;
+  requiresTargetAmount?: boolean;
+};
+
+export type LookupUpdatePayload = Partial<LookupPayload>;
+export type BusinessStageUpdatePayload = Partial<BusinessStagePayload>;
+export type ProgrammeGoalTypeUpdatePayload = Partial<ProgrammeGoalTypePayload>;
+
+export type UpdateLookupVariables<TPayload> = {
+  id: string;
+  payload: TPayload;
+};

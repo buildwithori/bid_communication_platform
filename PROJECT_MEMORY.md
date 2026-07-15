@@ -212,3 +212,10 @@ Session workflow rules:
 - Feature hooks own server-state behavior: queries, mutations, lazy enablement, cursor/infinite pagination, invalidation, optimistic updates, and cache cleanup. Pages/components own rendering, local UI state, form-to-payload mapping, navigation, and user feedback.
 - API payload, response, and shared domain types must live in feature `types.ts` files, not pages. A page/component may define a type locally only when it is private presentation state for that file, such as its tab union, modal draft, or table-only view row.
 - ESLint enforces the page/component import boundary. See `docs/frontend-api-integration.md` for the canonical structure.
+
+## UI Form And Backend Design Reconciliation (2026-07-15)
+
+- Every form input exposed in the UI must map to the backend design specification as a persisted field, derived value, or documented request-only field.
+- When integrating a feature, compare its live forms with `docs/backend-design.md`. Remove inputs that are clearly outside the approved design instead of silently creating unsupported payload properties.
+- If a UI property is missing from or ambiguous in the backend design and removing it could change the intended product flow, stop and flag the exact property to the user for a product decision before changing the backend contract.
+- Shared API/domain types belong in the feature integration `types.ts`; only private presentation-state types may remain local to a page or component.
