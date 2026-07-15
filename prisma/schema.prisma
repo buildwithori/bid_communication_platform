@@ -31,6 +31,16 @@ enum InvitationStatus {
   expired
 }
 
+enum CalendarProvider {
+  google
+}
+
+enum CalendarConnectionStatus {
+  connected
+  error
+  revoked
+}
+
 enum BusinessStatus {
   active
   inactive
@@ -254,6 +264,7 @@ model User {
   invitedBy                   User?                      @relation("UserInvitations", fields: [invitedById], references: [id])
   invitedUsers                User[]                     @relation("UserInvitations")
   sentInvitations             Invitation[]               @relation("InvitationInvitedBy")
+  calendarConnections         CalendarConnection[]
   oauthAccounts               OAuthAccount[]
   refreshTokens               RefreshToken[]
   emailVerificationTokens     EmailVerificationToken[]
@@ -377,7 +388,6 @@ model Invitation {
   expiresAt   DateTime         @map("expires_at")
   acceptedAt  DateTime?        @map("accepted_at")
   revokedAt   DateTime?        @map("revoked_at")
-  note        String?
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
@@ -387,6 +397,26 @@ model Invitation {
   @@index([role, status])
   @@index([invitedById])
   @@map("invitations")
+}
+
+model CalendarConnection {
+  id                    String                   @id @default(cuid())
+  userId                String                   @map("user_id")
+  provider              CalendarProvider
+  providerAccountEmail  String                   @map("provider_account_email")
+  encryptedAccessToken  String                   @map("encrypted_access_token")
+  encryptedRefreshToken String                   @map("encrypted_refresh_token")
+  scopes                String[]
+  status                CalendarConnectionStatus @default(connected)
+  lastSyncedAt          DateTime?                @map("last_synced_at")
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([provider, status])
+  @@map("calendar_connections")
 }
 
 model CompanySettings {

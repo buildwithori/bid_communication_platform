@@ -10,6 +10,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ProgrammesModule } from './programmes/programmes.module';
 import { EntrepreneursModule } from './entrepreneurs/entrepreneurs.module';
 import { TrainersModule } from './trainers/trainers.module';
+import { AdminsModule } from './admins/admins.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { LearningModule } from './learning/learning.module';
 import { ContentModule } from './content/content.module';
@@ -41,6 +42,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     ProgrammesModule,
     EntrepreneursModule,
     TrainersModule,
+    AdminsModule,
     SessionsModule,
     LearningModule,
     ContentModule,
