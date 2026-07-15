@@ -6,6 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ProgrammeQueryDto } from './dto/programme-query.dto';
 import { ProgrammesService } from './programmes.service';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
+import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
 
 @ApiTags('programmes')
 @Controller('programmes')
@@ -16,6 +17,47 @@ export class ProgrammesController {
   listProgrammes(@CurrentUser() user: User, @Query() query: ProgrammeQueryDto) {
     return this.programmesService.listProgrammes(user, query);
   }
+  @Post()
+  @Roles(UserRole.admin)
+  createProgramme(
+    @CurrentUser() user: User,
+    @Body() dto: CreateProgrammeDto,
+  ) {
+    return this.programmesService.createProgramme(user, dto);
+  }
+
+  @Patch(':id')
+  @Roles(UserRole.admin)
+  updateProgramme(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateProgrammeDto,
+  ) {
+    return this.programmesService.updateProgramme(user, id, dto);
+  }
+
+  @Post(':id/publish')
+  @Roles(UserRole.admin)
+  publishProgramme(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.programmesService.publishProgramme(user, id);
+  }
+
+  @Post(':id/archive')
+  @Roles(UserRole.admin)
+  archiveProgramme(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: ArchiveProgrammeDto,
+  ) {
+    return this.programmesService.archiveProgramme(user, id, dto);
+  }
+
+  @Post(':id/restore')
+  @Roles(UserRole.admin)
+  restoreProgramme(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.programmesService.restoreProgramme(user, id);
+  }
+
 
 
   @Get(':id/deliverable-rules')

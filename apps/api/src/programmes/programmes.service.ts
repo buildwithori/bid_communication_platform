@@ -1,8 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../files/storage.service';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
+import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 
 const DEFAULT_TAKE = 20;
@@ -26,7 +28,137 @@ export class ProgrammesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly audit: AuditService,
   ) {}
+  async createProgramme(user: User, dto: CreateProgrammeDto) {
+    this.assertAdmin(user);
+    const dates = this.programmeDates(dto.startDate, dto.endDate);
+    const created = await this.audit.capture(
+      {
+        action: 'programmes.created',
+        entityType: 'programme',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Created programme ${name ?? ''}`.trim(),
+      },
+      (tx) => tx.programme.create({
+        data: {
+          name: dto.name.trim(),
+          description: dto.description?.trim() ?? '',
+          accessType: dto.accessType,
+          startDate: dates.startDate,
+          endDate: dates.endDate,
+          maxEntrepreneurs: dto.maxEntrepreneurs,
+          ...(dto.publishState === 'published'
+            ? { publishedAt: new Date(), publishedById: user.id }
+            : {}),
+        },
+      }),
+    );
+    return this.getProgramme(user, created.id);
+  }
+
+  async updateProgramme(user: User, id: string, dto: UpdateProgrammeDto) {
+    this.assertAdmin(user);
+    const existing = await this.findProgrammeOrThrow(id);
+    if (existing.archivedAt) {
+      throw new BadRequestException('Restore this programme before editing it.');
+    }
+    const dates = this.programmeDates(
+      dto.startDate ?? existing.startDate.toISOString(),
+      dto.endDate ?? existing.endDate.toISOString(),
+    );
+    await this.audit.capture(
+      {
+        action: 'programmes.updated',
+        entityType: 'programme',
+        entityId: ({ id: entityId }) => entityId,
+        summary: ({ name }) => `Updated programme ${name ?? ''}`.trim(),
+      },
+      (tx) => tx.programme.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.description !== undefined ? { description: dto.description.trim() } : {}),
+          ...(dto.accessType !== undefined ? { accessType: dto.accessType } : {}),
+          ...(dto.startDate !== undefined ? { startDate: dates.startDate } : {}),
+          ...(dto.endDate !== undefined ? { endDate: dates.endDate } : {}),
+          ...(dto.maxEntrepreneurs !== undefined ? { maxEntrepreneurs: dto.maxEntrepreneurs } : {}),
+        },
+      }),
+    );
+    return this.getProgramme(user, id);
+  }
+
+  async publishProgramme(user: User, id: string) {
+    this.assertAdmin(user);
+    const programme = await this.findProgrammeOrThrow(id);
+    if (programme.archivedAt) {
+      throw new BadRequestException('Archived programmes cannot be published.');
+    }
+    if (!programme.publishedAt) {
+      await this.audit.capture(
+        {
+          action: 'programmes.published',
+          entityType: 'programme',
+          entityId: ({ id: entityId }) => entityId,
+          summary: ({ name }) => `Published programme ${name ?? ''}`.trim(),
+        },
+        (tx) => tx.programme.update({
+          where: { id },
+          data: { publishedAt: new Date(), publishedById: user.id },
+        }),
+      );
+    }
+    return this.getProgramme(user, id);
+  }
+
+  async archiveProgramme(user: User, id: string, dto: ArchiveProgrammeDto) {
+    this.assertAdmin(user);
+    const programme = await this.findProgrammeOrThrow(id);
+    if (programme.archivedAt) return this.getProgramme(user, id);
+    if (!programme.publishedAt || programme.endDate >= new Date()) {
+      throw new BadRequestException(
+        'A programme can be archived only after its timeline is completed.',
+      );
+    }
+    await this.audit.capture(
+      {
+        action: 'programmes.archived',
+        entityType: 'programme',
+        entityId: ({ id: entityId }) => entityId,
+        summary: ({ name }) => `Archived programme ${name ?? ''}`.trim(),
+      },
+      (tx) => tx.programme.update({
+        where: { id },
+        data: {
+          archivedAt: new Date(),
+          archivedById: user.id,
+          archiveReason: dto.reason.trim(),
+        },
+      }),
+    );
+    return this.getProgramme(user, id);
+  }
+
+  async restoreProgramme(user: User, id: string) {
+    this.assertAdmin(user);
+    const programme = await this.findProgrammeOrThrow(id);
+    if (programme.archivedAt) {
+      await this.audit.capture(
+        {
+          action: 'programmes.restored',
+          entityType: 'programme',
+          entityId: ({ id: entityId }) => entityId,
+          summary: ({ name }) => `Restored programme ${name ?? ''}`.trim(),
+        },
+        (tx) => tx.programme.update({
+          where: { id },
+          data: { archivedAt: null, archivedById: null, archiveReason: null },
+        }),
+      );
+    }
+    return this.getProgramme(user, id);
+  }
 
   async listProgrammes(user: User, query: ProgrammeQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
@@ -366,6 +498,33 @@ export class ProgrammesService {
       createdAt: rule.createdAt.toISOString(),
       updatedAt: rule.updatedAt.toISOString(),
     };
+  }
+
+  private async findProgrammeOrThrow(id: string) {
+    const programme = await this.prisma.programme.findUnique({ where: { id } });
+    if (!programme) throw new NotFoundException('Programme was not found.');
+    return programme;
+  }
+
+  private assertAdmin(user: User) {
+    if (user.role !== UserRole.admin) {
+      throw new ForbiddenException('Only admins can manage programmes.');
+    }
+  }
+
+  private programmeDates(startValue: string, endValue: string) {
+    const startDate = new Date(startValue);
+    const endDate = new Date(endValue);
+    if (
+      Number.isNaN(startDate.getTime()) ||
+      Number.isNaN(endDate.getTime()) ||
+      endDate < startDate
+    ) {
+      throw new BadRequestException(
+        'Programme end date must be on or after its start date.',
+      );
+    }
+    return { startDate, endDate };
   }
 
   private async ensureProgrammeExists(programmeId: string) {
