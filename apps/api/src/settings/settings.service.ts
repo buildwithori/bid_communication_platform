@@ -296,46 +296,63 @@ export class SettingsService {
 
   async listSectors(query: LookupQueryDto) {
     const take = pageSize(query);
-    const rows = await this.prisma.sector.findMany({
-      where: this.buildLookupWhere<Prisma.SectorWhereInput>(query),
-      orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
-      take: take + 1,
-      ...cursorArgs(query.cursor),
-    });
-    return toCursorPage(rows, take, (row) => row.id);
+    const where = this.buildLookupWhere<Prisma.SectorWhereInput>(query);
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.sector.findMany({
+        where,
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+      }),
+      this.prisma.sector.count({ where }),
+    ]);
+    return { ...toCursorPage(rows, take, (row) => row.id), totalItems };
   }
 
   async listBusinessStages(query: LookupQueryDto) {
     const take = pageSize(query);
-    const rows = await this.prisma.businessStage.findMany({
-      where: this.buildLookupWhere<Prisma.BusinessStageWhereInput>(query),
-      orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
-      take: take + 1,
-      ...cursorArgs(query.cursor),
-    });
-    return toCursorPage(rows, take, (row) => row.id);
+    const where = this.buildLookupWhere<Prisma.BusinessStageWhereInput>(query);
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.businessStage.findMany({
+        where,
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+      }),
+      this.prisma.businessStage.count({ where }),
+    ]);
+    return { ...toCursorPage(rows, take, (row) => row.id), totalItems };
   }
 
   async listProgrammeGoalTypes(query: LookupQueryDto) {
     const take = pageSize(query);
-    const rows = await this.prisma.programmeGoalType.findMany({
-      where: this.buildLookupWhere<Prisma.ProgrammeGoalTypeWhereInput>(query),
-      orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
-      take: take + 1,
-      ...cursorArgs(query.cursor),
-    });
-    return toCursorPage(rows, take, (row) => row.id);
+    const where =
+      this.buildLookupWhere<Prisma.ProgrammeGoalTypeWhereInput>(query);
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.programmeGoalType.findMany({
+        where,
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+      }),
+      this.prisma.programmeGoalType.count({ where }),
+    ]);
+    return { ...toCursorPage(rows, take, (row) => row.id), totalItems };
   }
 
   async listToolAreas(query: LookupQueryDto) {
     const take = pageSize(query);
-    const rows = await this.prisma.toolArea.findMany({
-      where: this.buildLookupWhere<Prisma.ToolAreaWhereInput>(query),
-      orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
-      take: take + 1,
-      ...cursorArgs(query.cursor),
-    });
-    return toCursorPage(rows, take, (row) => row.id);
+    const where = this.buildLookupWhere<Prisma.ToolAreaWhereInput>(query);
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.toolArea.findMany({
+        where,
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+      }),
+      this.prisma.toolArea.count({ where }),
+    ]);
+    return { ...toCursorPage(rows, take, (row) => row.id), totalItems };
   }
 
   private normalizeKey(value: string) {
