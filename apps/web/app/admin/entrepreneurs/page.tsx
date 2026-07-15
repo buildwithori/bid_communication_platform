@@ -1,500 +1,193 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { ChevronUp, ChevronDown, ChevronsUpDown, Search, X } from 'lucide-react';
-import { PageHeader, Notice } from '@/components/shared/PageHeader';
-import { StatCard } from '@/components/shared/StatCard';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Modal } from '@/components/shared/Modal';
-import { ProgrammeAccessList } from '@/components/shared/ProgrammeAccessList';
-import { Button } from '@/components/shared/Button';
+import * as React from "react";
+import { toast } from "sonner";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { EntrepreneurFormModal } from "@/components/admin/entrepreneurs/EntrepreneurFormModal";
+import { Avatar } from "@/components/shared/Avatar";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import {
-  TableEmptyState,
+  DataTable,
+  RowActions,
   TableFilterAutocomplete,
   TableFilterInput,
+  TableFilterSelect,
   TablePagination,
   TableToolbar,
-  RowActions,
-} from '@/components/shared/DataTable';
-import { EntrepreneurModal } from '@/components/admin/EntrepreneurModal';
-import { AssignEntrepreneurModal } from '@/components/admin/AssignEntrepreneurModal';
-import { ViewEntrepreneurModal } from '@/components/admin/ViewEntrepreneurModal';
-import { ManageEntrepreneurToolsModal } from '@/components/admin/ManageEntrepreneurToolsModal';
-import { useAdminStore } from '@/lib/stores/admin-store';
-import { tools } from '@/lib/mock-data';
-import { programmeGoalTypes, sectorById, stageById } from '@/lib/mock-data/definitions';
-import { formatProgrammeAccess, getEntrepreneurAssignedProgrammes } from '@/lib/programme-access';
-import { getEntrepreneurToolAccessSource, type EntrepreneurToolAccessSource } from '@/lib/tool-access';
-import type { BadgeTone, Entrepreneur } from '@/types';
+  type Column,
+} from "@/components/shared/DataTable";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { Modal } from "@/components/shared/Modal";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { StatCard } from "@/components/shared/StatCard";
+import {
+  useEffectiveToolsQuery,
+  useEntrepreneurDetailQuery,
+  useEntrepreneursPage,
+  useGrantProgrammeAccessMutation,
+  useInviteEntrepreneurMutation,
+  useLazyGrantableProgrammesQuery,
+  useProgrammeAccessQuery,
+  useResendEntrepreneurInvitationMutation,
+  useRevokeProgrammeAccessMutation,
+  useUpdateEntrepreneurMutation,
+  useUpdateEntrepreneurStatusMutation,
+  type EffectiveToolAccess,
+  type EntrepreneurRecord,
+  type EntrepreneurSource,
+  type EntrepreneurStatus,
+} from "@/lib/api/entrepreneurs";
+import { useLazyBusinessStagesQuery, useLazySectorsQuery } from "@/lib/api/settings";
+import type { EntrepreneurProfileForm } from "@/lib/forms/schemas";
 
-type SortDir = 'asc' | 'desc' | null;
-type ColKey = 'business' | 'rep' | 'sector' | 'country' | 'stage' | 'programme' | 'tools' | 'source' | 'goal' | 'status';
+type AllOr<T extends string> = "all" | T;
 
-function getColValue(e: Entrepreneur, col: ColKey): string {
-  switch (col) {
-    case 'business': return e.businessName;
-    case 'rep': return e.representative;
-    case 'sector': return sectorById[e.sector]?.label ?? e.sector;
-    case 'country': return e.country;
-    case 'stage': return stageById[e.stage]?.label ?? e.stage;
-    case 'programme': return formatProgrammeAccess(e);
-    case 'tools': return getEntrepreneurVisibleTools(e).map((tool) => tool.name).join(' ');
-    case 'source': return e.source === 'invited' ? 'Invited' : 'Self-registered';
-    case 'goal': return goalLabel(e);
-    case 'status': return statusLabel(e);
-  }
+function initials(record: EntrepreneurRecord) {
+  return [record.firstName, record.lastName].filter(Boolean).map((part) => part[0]?.toUpperCase()).join("").slice(0, 2) || record.email.slice(0, 2).toUpperCase();
 }
 
-function statusLabel(e: Entrepreneur) {
-  if (e.status === 'active') return 'Active';
-  if (e.status === 'unassigned') return 'Unassigned';
-  if (e.status === 'graduated') return 'Graduated';
-  return 'Inactive';
+function StatusBadge({ record }: { record: EntrepreneurRecord }) {
+  if (record.userStatus === "pending") return <Badge tone="amber">Invitation pending</Badge>;
+  if (record.status === "active") return <Badge tone="green">Active</Badge>;
+  if (record.status === "archived") return <Badge tone="neutral">Archived</Badge>;
+  return <Badge tone="amber">Inactive</Badge>;
 }
-
-function goalTypeMeta(type: string) {
-  return programmeGoalTypes.find((goalType) => goalType.id === type);
-}
-
-function goalLabel(e: Entrepreneur) {
-  const meta = goalTypeMeta(e.goal.type);
-  if (meta?.requiresTargetAmount && e.goal.amountUsd) {
-    return `${meta.label} $${(e.goal.amountUsd / 1000).toFixed(0)}k`;
-  }
-  return meta?.label ?? e.goal.type;
-}
-
-function ProgrammeAccessCell({ entrepreneur }: { entrepreneur: Entrepreneur }) {
-  const programmeAccess = getEntrepreneurAssignedProgrammes(entrepreneur);
-  return (
-    <ProgrammeAccessList
-      programmes={programmeAccess}
-      maxVisible={2}
-      modalTitle={`${entrepreneur.businessName} programme access`}
-      className="min-w-[240px] max-w-[320px]"
-    />
-  );
-}
-
-const toolSourceMeta: Record<Exclude<EntrepreneurToolAccessSource, 'none'>, { label: string; tone: BadgeTone }> = {
-  global: { label: 'Global', tone: 'green' },
-  programme: { label: 'Programme', tone: 'blue' },
-  individual: { label: 'Individual', tone: 'brand' },
-};
-
-function getEntrepreneurVisibleTools(entrepreneur: Entrepreneur) {
-  return tools.filter((tool) => getEntrepreneurToolAccessSource(tool, entrepreneur) !== 'none');
-}
-
-function ToolAccessCell({ entrepreneur }: { entrepreneur: Entrepreneur }) {
-  const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState('');
-  const visibleTools = React.useMemo(() => getEntrepreneurVisibleTools(entrepreneur), [entrepreneur]);
-  const visible = visibleTools.slice(0, 2);
-  const hiddenCount = Math.max(visibleTools.length - visible.length, 0);
-  const filteredTools = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return visibleTools;
-    return visibleTools.filter((tool) =>
-      [tool.name, tool.description, tool.type, getEntrepreneurToolAccessSource(tool, entrepreneur)]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [entrepreneur, query, visibleTools]);
-
-  return (
-    <>
-      <div className="flex min-w-[260px] max-w-[340px] flex-wrap items-center gap-1.5">
-        {visible.map((tool) => (
-          <Badge
-            key={tool.id}
-            tone={tool.type === 'pdf' ? 'blue' : 'green'}
-            className="max-w-[170px] truncate"
-            title={tool.name}
-          >
-            {tool.name}
-          </Badge>
-        ))}
-        {hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setOpen(true);
-            }}
-            className="inline-flex items-center rounded-full bg-surface-subtle px-2.5 py-1 text-xs font-semibold leading-tight text-bid transition hover:bg-bid-light focus:outline-none focus-visible:ring-2 focus-visible:ring-bid/30"
-          >
-            +{hiddenCount} more
-          </button>
-        )}
-        {visibleTools.length === 0 && <span className="text-sm text-ink-faint">No tools</span>}
-      </div>
-
-      <Modal open={open} onOpenChange={setOpen} title={`${entrepreneur.businessName} tool access`} width="wide">
-        <div className="space-y-4">
-          <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
-            <div className="text-sm font-semibold text-ink">
-              {visibleTools.length} tool{visibleTools.length === 1 ? '' : 's'} visible
-            </div>
-            <div className="mt-1 text-sm text-ink-muted">
-              This includes global, programme-based, and individually added tools after any hidden-tool overrides.
-            </div>
-          </div>
-
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search tools..."
-              className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm text-ink outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/15"
-            />
-          </label>
-
-          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-            {filteredTools.map((tool) => {
-              const source = getEntrepreneurToolAccessSource(tool, entrepreneur) as Exclude<EntrepreneurToolAccessSource, 'none'>;
-              const meta = toolSourceMeta[source];
-              return (
-                <div key={tool.id} className="rounded-xl border border-line bg-white px-4 py-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-ink">{tool.name}</div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">{tool.description}</div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <Badge tone={tool.type === 'pdf' ? 'blue' : 'green'}>{tool.type === 'pdf' ? 'PDF resource' : 'Online tool'}</Badge>
-                        <Badge tone={meta.tone}>{meta.label}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredTools.length === 0 && (
-              <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-                No tool matches this search.
-              </div>
-            )}
-          </div>
-        </div>
-      </Modal>
-    </>
-  );
-}
-
-function SortIcon({ dir }: { dir: SortDir }) {
-  if (dir === 'asc') return <ChevronUp className="h-3 w-3 text-bid" />;
-  if (dir === 'desc') return <ChevronDown className="h-3 w-3 text-bid" />;
-  return <ChevronsUpDown className="h-3 w-3 opacity-30" />;
-}
-
-type ColDef = { key: ColKey; label: string; isSelect?: boolean; isText?: boolean };
-const cols: ColDef[] = [
-  { key: 'business', label: 'Business', isText: true },
-  { key: 'rep', label: 'Representative', isText: true },
-  { key: 'sector', label: 'Sector', isSelect: true },
-  { key: 'country', label: 'Country', isSelect: true },
-  { key: 'stage', label: 'Stage', isSelect: true },
-  { key: 'programme', label: 'Programme access', isSelect: true },
-  { key: 'tools', label: 'Tools access', isText: true },
-  { key: 'source', label: 'Source', isSelect: true },
-  { key: 'goal', label: 'Goal', isText: true },
-  { key: 'status', label: 'Status', isSelect: true },
-];
-const selectCols: ColKey[] = ['sector', 'country', 'stage', 'programme', 'source', 'status'];
 
 export default function AdminEntrepreneursPage() {
-  const { entrepreneurs, programs } = useAdminStore();
   const [addOpen, setAddOpen] = React.useState(false);
-  const [editTarget, setEditTarget] = React.useState<Entrepreneur | null>(null);
-  const [viewTarget, setViewTarget] = React.useState<Entrepreneur | null>(null);
-  const [assignTarget, setAssignTarget] = React.useState<Entrepreneur | null>(null);
-  const [toolsTarget, setToolsTarget] = React.useState<Entrepreneur | null>(null);
-
-  const [sortCol, setSortCol] = React.useState<ColKey | null>(null);
-  const [sortDir, setSortDir] = React.useState<SortDir>(null);
-  const [textFilters, setTextFilters] = React.useState<Partial<Record<ColKey, string>>>({});
-  const [selectFilters, setSelectFilters] = React.useState<Partial<Record<ColKey, string>>>({});
-  const [page, setPage] = React.useState(1);
+  const [editTarget, setEditTarget] = React.useState<EntrepreneurRecord>();
+  const [detailId, setDetailId] = React.useState<string | null>(null);
+  const [programmeId, setProgrammeId] = React.useState<string | null>(null);
+  const [toolId, setToolId] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [status, setStatus] = React.useState<AllOr<EntrepreneurStatus>>("all");
+  const [source, setSource] = React.useState<AllOr<EntrepreneurSource>>("all");
+  const [sectorId, setSectorId] = React.useState("all");
+  const [stageId, setStageId] = React.useState("all");
+  const [sectorLookup, setSectorLookup] = React.useState({ open: false, search: "" });
+  const [stageLookup, setStageLookup] = React.useState({ open: false, search: "" });
   const [pageSize, setPageSize] = React.useState(10);
+  const deferredSearch = React.useDeferredValue(search);
+  const directory = useEntrepreneursPage({
+    search: deferredSearch.trim() || undefined,
+    status: status === "all" ? undefined : status,
+    source: source === "all" ? undefined : source,
+    sectorId: sectorId === "all" ? undefined : sectorId,
+    stageId: stageId === "all" ? undefined : stageId,
+    take: pageSize,
+  });
+  const sectors = useLazySectorsQuery({ enabled: sectorLookup.open, search: React.useDeferredValue(sectorLookup.search) || undefined, active: true, take: 20 });
+  const stages = useLazyBusinessStagesQuery({ enabled: stageLookup.open, search: React.useDeferredValue(stageLookup.search) || undefined, active: true, take: 20 });
+  const detail = useEntrepreneurDetailQuery(detailId);
+  const resetPagination = directory.resetPagination;
 
-  const selectOptions = React.useMemo<Partial<Record<ColKey, string[]>>>(() => {
-    const opts: Partial<Record<ColKey, string[]>> = {};
-    for (const col of selectCols) {
-      const seen: Record<string, boolean> = {};
-      const vals: string[] = [];
-      for (const e of entrepreneurs) {
-        const v = getColValue(e, col);
-        if (v && v !== '—' && !seen[v]) { seen[v] = true; vals.push(v); }
-      }
-      opts[col] = vals.sort();
-    }
-    return opts;
-  }, [entrepreneurs]);
+  React.useEffect(() => resetPagination(), [deferredSearch, pageSize, resetPagination, sectorId, source, stageId, status]);
 
-  const hasFilters = Object.values(textFilters).some(Boolean) || Object.values(selectFilters).some(Boolean);
-  const clearFilters = () => { setTextFilters({}); setSelectFilters({}); };
+  const invite = useInviteEntrepreneurMutation({ onSuccess: () => { toast.success("Entrepreneur invitation sent"); setAddOpen(false); }, onError: (error) => toast.error(error.message) });
+  const update = useUpdateEntrepreneurMutation({ onSuccess: () => { toast.success("Entrepreneur updated"); setEditTarget(undefined); }, onError: (error) => toast.error(error.message) });
+  const updateStatus = useUpdateEntrepreneurStatusMutation({ onSuccess: (record) => toast.success(record.status === "active" ? "Entrepreneur activated" : "Entrepreneur deactivated"), onError: (error) => toast.error(error.message) });
+  const resend = useResendEntrepreneurInvitationMutation({ onSuccess: () => toast.success("Invitation resent"), onError: (error) => toast.error(error.message) });
 
-  const filtered = React.useMemo(() => {
-    let rows = entrepreneurs.slice();
-    for (const [col, val] of Object.entries(textFilters) as [ColKey, string][]) {
-      if (!val) continue;
-      const q = val.toLowerCase();
-      rows = rows.filter((e) => getColValue(e, col).toLowerCase().includes(q));
-    }
-    for (const [col, val] of Object.entries(selectFilters) as [ColKey, string][]) {
-      if (!val) continue;
-      rows = rows.filter((e) => getColValue(e, col) === val);
-    }
-    if (sortCol && sortDir) {
-      rows.sort((a, b) => {
-        const av = getColValue(a, sortCol);
-        const bv = getColValue(b, sortCol);
-        if (av === '—') return 1;
-        if (bv === '—') return -1;
-        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-      });
-    }
-    return rows;
-  }, [entrepreneurs, textFilters, selectFilters, sortCol, sortDir]);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [textFilters, selectFilters, sortCol, sortDir, pageSize]);
-
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
-
-  const toggleSort = (col: ColKey) => {
-    if (sortCol !== col) { setSortCol(col); setSortDir('asc'); return; }
-    if (sortDir === 'asc') { setSortDir('desc'); return; }
-    setSortCol(null); setSortDir(null);
+  const submitInvite = (values: EntrepreneurProfileForm) => invite.mutate({ ...profilePayload(values), email: values.email, programmeIds: values.programmeIds });
+  const submitEdit = (values: EntrepreneurProfileForm) => editTarget && update.mutate({ id: editTarget.entrepreneurUserId, payload: profilePayload(values) });
+  const actionsFor = (record: EntrepreneurRecord): Parameters<typeof RowActions>[0]["actions"] => {
+    const actions: Parameters<typeof RowActions>[0]["actions"] = [
+      { label: "View profile", onSelect: () => setDetailId(record.entrepreneurUserId) },
+      { label: "Edit profile", onSelect: () => setEditTarget(record) },
+      { label: "Manage programmes", onSelect: () => setProgrammeId(record.entrepreneurUserId) },
+      { label: "View tool access", onSelect: () => setToolId(record.entrepreneurUserId) },
+    ];
+    if (record.userStatus === "pending") actions.push("separator", { label: "Resend invitation", onSelect: () => resend.mutate(record.entrepreneurUserId), disabled: resend.isPending });
+    else actions.push("separator", { label: record.status === "active" ? "Deactivate entrepreneur" : "Activate entrepreneur", onSelect: () => updateStatus.mutate({ id: record.entrepreneurUserId, status: record.status === "active" ? "inactive" : "active" }), disabled: updateStatus.isPending, destructive: record.status === "active" });
+    return actions;
   };
 
-  const active = entrepreneurs.filter((e) => e.status === 'active').length;
-  const unassigned = entrepreneurs.filter((e) => e.status === 'unassigned').length;
-  const withProgrammes = entrepreneurs.filter((e) => getEntrepreneurAssignedProgrammes(e, programs).length > 0).length;
+  const columns: Column<EntrepreneurRecord>[] = [
+    { key: "action", header: "Action", className: "w-[84px]", cell: (record) => <RowActions actions={actionsFor(record)} /> },
+    { key: "business", header: "Business", cell: (record) => <button type="button" onClick={() => setDetailId(record.entrepreneurUserId)} className="min-w-[180px] text-left font-semibold text-ink hover:text-bid">{record.businessName}<span className="mt-0.5 block font-normal text-ink-muted">{record.email}</span></button> },
+    { key: "representative", header: "Representative", cell: (record) => record.representativeName },
+    { key: "sector", header: "Sector", cell: (record) => record.sector ? <Badge tone="blue">{record.sector.name}</Badge> : <span className="text-ink-faint">Not set</span> },
+    { key: "country", header: "Country", cell: (record) => record.country },
+    { key: "stage", header: "Stage", cell: (record) => record.stage ? <Badge tone="neutral">{record.stage.name}</Badge> : <span className="text-ink-faint">Not set</span> },
+    { key: "programmes", header: "Programme access", cell: (record) => <button type="button" onClick={() => setProgrammeId(record.entrepreneurUserId)} className="min-w-[190px] text-left"><span className="font-medium text-ink">{record.programmeAccess.assignedProgrammeCount} assigned</span><span className="mt-0.5 block text-ink-muted">{record.programmeAccess.assignedProgrammes.slice(0, 2).map((item) => item.name).join(" · ") || "Free resources only"}</span></button> },
+    { key: "tools", header: "Tool access", cell: (record) => <Button size="sm" variant="outline" onClick={() => setToolId(record.entrepreneurUserId)}>View tools</Button> },
+    { key: "source", header: "Source", cell: (record) => <Badge tone={record.source === "admin_invited" ? "brand" : "neutral"}>{record.source === "admin_invited" ? "Admin-invited" : "Self-registered"}</Badge> },
+    { key: "status", header: "Status", cell: (record) => <StatusBadge record={record} /> },
+  ];
 
-  return (
-    <>
-      <PageHeader
-        title="Entrepreneurs"
-        description="Manage entrepreneurs, both admin-invited and self-registered"
-        actions={
-          <>
-            <Button variant="outline" onClick={() => import('sonner').then(({ toast }) => toast.success('Exporting CSV…'))}>
-              Export CSV
-            </Button>
-            <Button onClick={() => setAddOpen(true)}>+ Add entrepreneur</Button>
-          </>
-        }
-      />
-      <Notice>
-        Entrepreneurs can join two ways: you invite them directly with an initial programme if needed, or they self-register from the website and arrive{' '}
-        <strong>without a programme</strong> until you grant one.
-      </Notice>
-      <MetricGrid>
-        <StatCard label="Total" value={entrepreneurs.length} />
-        <StatCard label="Active" value={active} />
-        <StatCard label="Unassigned" value={unassigned} valueClassName="text-bid" />
-        <StatCard label="With programmes" value={withProgrammes} subline="Has at least one programme" dotColor="info" />
-      </MetricGrid>
+  if (directory.isLoading && !directory.data) return <EntrepreneursSkeleton />;
+  const sectorOptions = [{ value: "all", label: "All sectors" }, ...(sectors.data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({ value: item.id, label: item.name }))];
+  const stageOptions = [{ value: "all", label: "All stages" }, ...(stages.data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({ value: item.id, label: item.name, description: item.definition }))];
 
-      <Card className="mt-3">
-        <CardHeader
-          title="All entrepreneurs"
-          description={`${filtered.length} of ${entrepreneurs.length} entrepreneurs shown`}
-          actions={
-            hasFilters ? (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-bid transition-colors hover:bg-bid-light"
-              >
-                <X className="h-4 w-4" /> Clear filters
-              </button>
-            ) : undefined
-          }
-        />
-        <TableToolbar>
-          <div>
-            <div className="text-sm font-medium text-ink">Filter and sort the entrepreneur pipeline</div>
-            <div className="mt-0.5 text-sm text-ink-muted">
-              Use column filters for quick operational slicing.
-            </div>
-          </div>
-          <div className="text-sm text-ink-muted">
-            {hasFilters ? 'Filtered view active' : 'No filters applied'}
-          </div>
-        </TableToolbar>
-        <div className="overflow-hidden rounded-xl border border-black/[0.08] bg-white">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[1460px] border-separate border-spacing-0 text-sm">
-            <thead>
-              <tr className="bg-surface-subtle/80">
-                <th className="whitespace-nowrap border-b border-line px-4 py-3 text-left text-xs font-medium uppercase tracking-[0.04em] text-ink-muted first:pl-5">
-                  Action
-                </th>
-                {cols.map((c) => (
-                  <th
-                    key={c.key}
-                    onClick={() => toggleSort(c.key)}
-                    className="cursor-pointer select-none whitespace-nowrap border-b border-line px-4 py-3 text-left text-xs font-medium uppercase tracking-[0.04em] text-ink-muted transition-colors first:pl-5 hover:bg-surface-subtle"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {c.label}
-                      <SortIcon dir={sortCol === c.key ? sortDir : null} />
-                    </span>
-                  </th>
-                ))}
-              </tr>
-              <tr className="bg-white">
-                <th className="border-b border-line px-2 py-2 first:pl-5" />
-                {cols.map((c) => (
-                  <th key={c.key} className="border-b border-line px-2 py-2 first:pl-5">
-                    {c.isSelect ? (
-                      <TableFilterAutocomplete
-                        value={selectFilters[c.key] ?? ''}
-                        onValueChange={(value) => setSelectFilters((f) => ({ ...f, [c.key]: value }))}
-                        options={[
-                          { value: '', label: 'All' },
-                          ...(selectOptions[c.key] ?? []).map((value) => ({ value, label: value })),
-                        ]}
-                        placeholder="All"
-                        searchPlaceholder={`Search ${c.label.toLowerCase()}...`}
-                        emptyMessage={`No ${c.label.toLowerCase()} found.`}
-                      />
-                    ) : (
-                      <TableFilterInput
-                        type="text"
-                        placeholder="Filter…"
-                        value={textFilters[c.key] ?? ''}
-                        onChange={(e) => setTextFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                      />
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((e) => (
-                <tr key={e.id} className="group transition-colors hover:bg-surface-subtle/70">
-                  <td className="border-b border-line/80 px-4 py-4 first:pl-5">
-                    <RowActions
-                      actions={[
-                        { label: 'View profile', onSelect: () => setViewTarget(e) },
-                        { label: 'Edit entrepreneur', onSelect: () => setEditTarget(e) },
-                        { label: 'Manage programmes', onSelect: () => setAssignTarget(e) },
-                        { label: 'Manage tools', onSelect: () => setToolsTarget(e) },
-                      ]}
-                    />
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() => setViewTarget(e)}
-                      className="rounded-lg text-left font-medium text-ink outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
-                    >
-                      {e.businessName}
-                    </button>
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">{e.representative}</td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    <Badge tone={sectorById[e.sector]?.color ?? 'neutral'}>{sectorById[e.sector]?.label ?? e.sector}</Badge>
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">{e.country}</td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    <Badge tone={stageById[e.stage]?.color ?? 'neutral'}>{stageById[e.stage]?.label ?? e.stage}</Badge>
-                  </td>
-                  <td className="whitespace-nowrap border-b border-line/80 px-4 py-4">
-                    <ProgrammeAccessCell entrepreneur={e} />
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    <ToolAccessCell entrepreneur={e} />
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    <Badge tone={e.source === 'invited' ? 'brand' : 'neutral'}>
-                      {e.source === 'invited' ? 'Invited' : 'Self-registered'}
-                    </Badge>
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    {goalLabel(e)}
-                  </td>
-                  <td className="border-b border-line/80 px-4 py-4">
-                    <Badge tone={e.status === 'active' ? 'green' : e.status === 'unassigned' ? 'red' : 'neutral'}>
-                      {statusLabel(e)}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="px-5 py-8">
-                    <TableEmptyState
-                      title="No entrepreneurs match these filters"
-                      description="Clear the active filters or adjust the column search."
-                      action={
-                        <Button variant="outline" size="sm" onClick={clearFilters}>
-                          Clear filters
-                        </Button>
-                      }
-                    />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
+  return <>
+    <PageHeader title="Entrepreneurs" description="Manage entrepreneur profiles, business details, programme access, and invitations" actions={<Button onClick={() => setAddOpen(true)}>+ Invite entrepreneur</Button>} />
+    <Notice>Self-registered entrepreneurs start with free resources. Grant published assigned programmes when they are ready to join structured delivery.</Notice>
+    <MetricGrid className="mb-4">
+      <StatCard label="Total entrepreneurs" value={directory.summary.totalEntrepreneurs} accent="bid" dotColor="bid" />
+      <StatCard label="Active" value={directory.summary.activeEntrepreneurs} accent="success" dotColor="success" />
+      <StatCard label="Unassigned" value={directory.summary.unassignedEntrepreneurs} accent="warning" dotColor="warning" />
+      <StatCard label="With programmes" value={directory.summary.withProgrammes} accent="info" dotColor="info" />
+    </MetricGrid>
+    <Card>
+      <CardHeader title="Entrepreneur directory" description={`${directory.totalItems} entrepreneur${directory.totalItems === 1 ? "" : "s"} in this view`} />
+      <TableToolbar>
+        <div><div className="text-sm font-medium text-ink">Filter entrepreneurs</div><div className="mt-0.5 text-sm text-ink-muted">Search and filter against the full directory.</div></div>
+        <div className="grid w-full gap-2">
+          <TableFilterInput icon value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search business, representative, email, phone, or country..." />
+          <TableFilterAutocomplete value={sectorId} onValueChange={setSectorId} options={sectorOptions} placeholder="All sectors" searchPlaceholder="Search sectors..." emptyMessage="No active sector found." isLoading={sectors.isFetching} onOpenChange={(open) => setSectorLookup((state) => ({ ...state, open }))} onSearchChange={(search) => setSectorLookup((state) => ({ ...state, search }))} hasMore={Boolean(sectors.hasNextPage)} onLoadMore={() => void sectors.fetchNextPage()} />
+          <TableFilterAutocomplete value={stageId} onValueChange={setStageId} options={stageOptions} placeholder="All stages" searchPlaceholder="Search stages..." emptyMessage="No active stage found." isLoading={stages.isFetching} onOpenChange={(open) => setStageLookup((state) => ({ ...state, open }))} onSearchChange={(search) => setStageLookup((state) => ({ ...state, search }))} hasMore={Boolean(stages.hasNextPage)} onLoadMore={() => void stages.fetchNextPage()} />
+          <TableFilterSelect value={source} onChange={(event) => setSource(event.target.value as typeof source)}><option value="all">All sources</option><option value="admin_invited">Admin-invited</option><option value="self_registered">Self-registered</option></TableFilterSelect>
+          <TableFilterSelect value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></TableFilterSelect>
         </div>
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filtered.length}
-          onPageChange={setPage}
-          onPageSizeChange={(nextPageSize) => {
-            setPageSize(nextPageSize);
-            setPage(1);
-          }}
-        />
-      </Card>
-
-      <EntrepreneurModal open={addOpen} onOpenChange={setAddOpen} mode="add" />
-      {editTarget && (
-        <EntrepreneurModal
-          open={!!editTarget}
-          onOpenChange={(o) => !o && setEditTarget(null)}
-          mode="edit"
-          entrepreneur={editTarget}
-        />
-      )}
-      {viewTarget && (
-        <ViewEntrepreneurModal
-          open={!!viewTarget}
-          onOpenChange={(o) => !o && setViewTarget(null)}
-          entrepreneur={viewTarget}
-          onEdit={(e) => { setViewTarget(null); setEditTarget(e); }}
-          onAssign={(e) => { setViewTarget(null); setAssignTarget(e); }}
-          onManageTools={(e) => { setViewTarget(null); setToolsTarget(e); }}
-        />
-      )}
-      {assignTarget && (
-        <AssignEntrepreneurModal
-          open={!!assignTarget}
-          onOpenChange={(o) => !o && setAssignTarget(null)}
-          entrepreneur={assignTarget}
-        />
-      )}
-      {toolsTarget && (
-        <ManageEntrepreneurToolsModal
-          open={!!toolsTarget}
-          onOpenChange={(o) => !o && setToolsTarget(null)}
-          entrepreneur={toolsTarget}
-        />
-      )}
-    </>
-  );
+      </TableToolbar>
+      {directory.isError ? <Notice>Entrepreneurs could not be loaded. {directory.error.message} <Button variant="outline" className="ml-3" onClick={() => void directory.refetch()}>Try again</Button></Notice> : <><DataTable columns={columns} rows={directory.rows} rowKey={(record) => record.entrepreneurUserId} emptyMessage="No entrepreneurs match these filters." tableClassName="min-w-[1320px]" /><TablePagination page={directory.page} pageSize={pageSize} totalItems={directory.totalItems} onPageChange={directory.setPage} onPageSizeChange={setPageSize} /></>}
+    </Card>
+    <EntrepreneurFormModal open={addOpen} onOpenChange={setAddOpen} isPending={invite.isPending} onSubmit={submitInvite} />
+    {editTarget ? <EntrepreneurFormModal open onOpenChange={(open) => !open && setEditTarget(undefined)} entrepreneur={editTarget} isPending={update.isPending} onSubmit={submitEdit} /> : null}
+    <EntrepreneurDetailModal open={Boolean(detailId)} onOpenChange={(open) => !open && setDetailId(null)} record={detail.data} isLoading={detail.isLoading} error={detail.error} onEdit={setEditTarget} onProgrammes={(record) => setProgrammeId(record.entrepreneurUserId)} onTools={(record) => setToolId(record.entrepreneurUserId)} />
+    <ProgrammeAccessModal entrepreneurId={programmeId} onOpenChange={(open) => !open && setProgrammeId(null)} />
+    <ToolAccessModal entrepreneurId={toolId} onOpenChange={(open) => !open && setToolId(null)} />
+  </>;
 }
+
+function profilePayload(values: EntrepreneurProfileForm) {
+  return { firstName: values.firstName, lastName: values.lastName, phone: values.phone || undefined, businessName: values.businessName, country: values.country, sectorId: values.sectorId || null, stageId: values.stageId || null };
+}
+
+function ProgrammeAccessModal({ entrepreneurId, onOpenChange }: { entrepreneurId: string | null; onOpenChange: (open: boolean) => void }) {
+  const [lookup, setLookup] = React.useState({ open: false, search: "" });
+  const [selected, setSelected] = React.useState("");
+  const access = useProgrammeAccessQuery(entrepreneurId, { take: 10 });
+  const programmes = useLazyGrantableProgrammesQuery({ enabled: Boolean(entrepreneurId && lookup.open), search: React.useDeferredValue(lookup.search) || undefined });
+  const grant = useGrantProgrammeAccessMutation({ onSuccess: () => { toast.success("Programme access granted"); setSelected(""); }, onError: (error) => toast.error(error.message) });
+  const revoke = useRevokeProgrammeAccessMutation({ onSuccess: () => toast.success("Programme access revoked"), onError: (error) => toast.error(error.message) });
+  const existingIds = new Set(access.rows.map((item) => item.id));
+  const options = programmes.rows.filter((item) => !existingIds.has(item.id)).map((item) => ({ value: item.id, label: item.name }));
+  return <Modal open={Boolean(entrepreneurId)} onOpenChange={onOpenChange} title="Programme access" width="wide"><div className="space-y-4">
+    <div className="rounded-xl border border-line bg-surface-subtle p-4"><div className="font-semibold text-ink">{access.totalItems} assigned programme{access.totalItems === 1 ? "" : "s"}</div><div className="mt-1 text-sm text-ink-muted">The list loads in pages as access grows.</div></div>
+    <div className="space-y-2">{access.rows.map((item) => <div key={item.grantId} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white p-3"><div><div className="font-medium text-ink">{item.name}</div><div className="mt-0.5 text-sm text-ink-muted">{item.progress ? `${item.progress.percent}% progress` : "Not started"}</div></div><Button size="sm" variant="outline" isLoading={revoke.isPending && revoke.variables?.programmeId === item.id} onClick={() => entrepreneurId && revoke.mutate({ id: entrepreneurId, programmeId: item.id })}>Revoke</Button></div>)}</div>
+    {access.hasNextPage ? <Button variant="outline" className="w-full" isLoading={access.isFetchingNextPage} onClick={() => void access.fetchNextPage()}>Load more programmes</Button> : null}
+    <div className="grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto]"><TableFilterAutocomplete value={selected} onValueChange={setSelected} options={options} placeholder="Add published programme" searchPlaceholder="Search programmes..." emptyMessage="No additional programme found." isLoading={programmes.isFetching} onOpenChange={(open) => setLookup((state) => ({ ...state, open }))} onSearchChange={(search) => setLookup((state) => ({ ...state, search }))} hasMore={Boolean(programmes.hasNextPage)} onLoadMore={() => void programmes.fetchNextPage()} /><Button disabled={!selected || !entrepreneurId} isLoading={grant.isPending} onClick={() => entrepreneurId && selected && grant.mutate({ id: entrepreneurId, programmeId: selected })}>Grant access</Button></div>
+  </div></Modal>;
+}
+
+function ToolAccessModal({ entrepreneurId, onOpenChange }: { entrepreneurId: string | null; onOpenChange: (open: boolean) => void }) {
+  const [search, setSearch] = React.useState("");
+  const tools = useEffectiveToolsQuery(entrepreneurId, { search: React.useDeferredValue(search) || undefined, take: 10 });
+  return <Modal open={Boolean(entrepreneurId)} onOpenChange={onOpenChange} title="Effective tool access" width="wide"><div className="space-y-4"><TableFilterInput icon value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visible tools..." /><div className="space-y-2">{tools.rows.map((tool) => <ToolRow key={tool.id} tool={tool} />)}{!tools.isLoading && tools.rows.length === 0 ? <div className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-ink-muted">No effective tool access.</div> : null}</div>{tools.hasNextPage ? <Button variant="outline" className="w-full" isLoading={tools.isFetchingNextPage} onClick={() => void tools.fetchNextPage()}>Load more tools</Button> : null}</div></Modal>;
+}
+
+function ToolRow({ tool }: { tool: EffectiveToolAccess }) {
+  const source = tool.accessSource === "global" ? "Global" : tool.accessSource === "programme" ? "Programme" : "Individual";
+  return <div className="rounded-xl border border-line bg-white p-3"><div className="flex items-start justify-between gap-3"><div><div className="font-medium text-ink">{tool.name}</div><div className="mt-1 line-clamp-2 text-sm text-ink-muted">{tool.description}</div></div><Badge tone={tool.accessSource === "global" ? "green" : tool.accessSource === "programme" ? "blue" : "brand"}>{source}</Badge></div></div>;
+}
+
+function EntrepreneurDetailModal({ open, onOpenChange, record, isLoading, error, onEdit, onProgrammes, onTools }: { open: boolean; onOpenChange: (open: boolean) => void; record?: EntrepreneurRecord; isLoading: boolean; error: Error | null; onEdit: (record: EntrepreneurRecord) => void; onProgrammes: (record: EntrepreneurRecord) => void; onTools: (record: EntrepreneurRecord) => void }) {
+  return <Modal open={open} onOpenChange={onOpenChange} title="Entrepreneur profile" width="xl">{isLoading ? <ProfileSkeleton /> : error || !record ? <Notice>Profile could not be loaded. {error?.message}</Notice> : <div className="space-y-5"><section className="rounded-2xl border border-bid/15 bg-gradient-to-br from-bid-light via-white to-info-light/40 p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center"><Avatar initials={initials(record)} size={72} tone="brand" className="ring-4 ring-white" /><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-2xl font-semibold text-ink">{record.businessName}</h2><StatusBadge record={record} /></div><div className="mt-2 text-ink-muted">{record.representativeName}</div><div className="mt-3 flex flex-wrap gap-2">{record.sector ? <Badge tone="blue">{record.sector.name}</Badge> : null}{record.stage ? <Badge tone="neutral">{record.stage.name}</Badge> : null}<Badge tone="brand">{record.source === "admin_invited" ? "Admin-invited" : "Self-registered"}</Badge></div></div></div></section><div className="grid gap-4 lg:grid-cols-3"><ProfileCard icon={<Mail className="h-4 w-4" />} label="Email" value={record.email} /><ProfileCard icon={<Phone className="h-4 w-4" />} label="Phone" value={record.phone || "Not provided"} /><ProfileCard icon={<MapPin className="h-4 w-4" />} label="Country" value={record.country} /></div><div className="grid gap-4 sm:grid-cols-2"><StatCard label="Assigned programmes" value={record.programmeAccess.assignedProgrammeCount} subline="Plus free resources" accent="bid" /><StatCard label="Average learning progress" value={`${record.learnerProgress.average}%`} subline={`${record.learnerProgress.trackedProgrammes} tracked programmes`} accent="info" /></div><div className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => onEdit(record)}>Edit profile</Button><Button variant="outline" onClick={() => onTools(record)}>View tools</Button><Button onClick={() => onProgrammes(record)}>Manage programmes</Button></div></div>}</Modal>;
+}
+
+function ProfileCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <div className="rounded-xl border border-line bg-white p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">{icon}{label}</div><div className="mt-2 truncate font-medium text-ink">{value}</div></div>; }
+function ProfileSkeleton() { return <div className="space-y-4"><Skeleton className="h-32 rounded-2xl" /><div className="grid gap-4 sm:grid-cols-3"><Skeleton className="h-24" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div></div>; }
+function EntrepreneursSkeleton() { return <div className="space-y-4"><Skeleton className="h-16" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-[460px] rounded-xl" /></div>; }

@@ -26,6 +26,19 @@ export const entrepreneurSchema = z.object({
 });
 export type EntrepreneurForm = z.infer<typeof entrepreneurSchema>;
 
+export const entrepreneurProfileSchema = z.object({
+  businessName: z.string().min(1, 'Business name is required'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Enter a valid email'),
+  phone: z.string().optional(),
+  country: z.enum(countries),
+  sectorId: z.string().optional(),
+  stageId: z.string().optional(),
+  programmeIds: z.array(z.string()),
+});
+export type EntrepreneurProfileForm = z.infer<typeof entrepreneurProfileSchema>;
+
 export const trainerSchema = z
   .object({
     firstName: z.string().min(1, 'First name is required'),
