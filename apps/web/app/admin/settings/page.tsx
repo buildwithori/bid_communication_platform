@@ -8,14 +8,13 @@ import { Card, CardHeader } from '@/components/shared/Card';
 import { MetricGrid } from '@/components/shared/MetricGrid';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/shared/Button';
-import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
+import { FormField, FormInput } from '@/components/shared/FormField';
 import { CalendarConnectionCard } from '@/components/settings/CalendarConnectionCard';
 
 export default function AdminSettingsPage() {
   const [fullName, setFullName] = React.useState('Ama Darko');
   const [email, setEmail] = React.useState('ama.darko@bid.org');
   const [phone, setPhone] = React.useState('+233 24 555 0120');
-  const [bio, setBio] = React.useState('Programme lead responsible for entrepreneur operations, sessions, and reporting oversight.');
   const [calendarConnected, setCalendarConnected] = React.useState(true);
   const isCalendarConnected = calendarConnected && email.trim().length > 0;
 
@@ -83,15 +82,6 @@ export default function AdminSettingsPage() {
                 <FormInput value={phone} onChange={(event) => setPhone(event.target.value)} />
               </FormField>
             </div>
-
-            <FormField label="Admin bio" optional>
-              <FormTextarea
-                rows={4}
-                value={bio}
-                onChange={(event) => setBio(event.target.value)}
-                placeholder="Briefly describe your operational responsibility."
-              />
-            </FormField>
 
             <div className="flex justify-end border-t border-line pt-4">
               <Button type="submit">Save profile</Button>
