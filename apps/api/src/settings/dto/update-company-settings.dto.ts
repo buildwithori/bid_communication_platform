@@ -1,4 +1,16 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsISO4217CurrencyCode,
+  IsOptional,
+  IsString,
+  IsTimeZone,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateCompanySettingsDto {
   @IsOptional()
@@ -14,18 +26,28 @@ export class UpdateCompanySettingsDto {
   moduleCompletionDeliverableDueDays?: number;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
   @IsString()
-  @MaxLength(3)
+  @IsISO4217CurrencyCode()
   defaultCurrency?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @IsTimeZone()
   @MaxLength(80)
   defaultTimezone?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
-  @MaxLength(80)
+  @IsIn(['google_meet'])
   defaultSessionProvider?: string;
 
   @IsOptional()

@@ -25,6 +25,9 @@ function toApiSessionProvider(provider: string | undefined) {
 }
 
 function mapCompanySettings(settings: CompanySettingsResponse): CompanyConfig {
+  const currency = settings.defaultCurrency.trim().toUpperCase() || "USD";
+  const timezone = settings.defaultTimezone.trim() || "UTC";
+
   return {
     reporting: {
       periodicUpdateOverdueAfterDays: settings.periodicUpdateOverdueAfterDays,
@@ -34,8 +37,8 @@ function mapCompanySettings(settings: CompanySettingsResponse): CompanyConfig {
         settings.moduleCompletionDeliverableDueDays,
     },
     defaults: {
-      currency: settings.defaultCurrency,
-      timezone: settings.defaultTimezone,
+      currency,
+      timezone,
       sessionProvider: toClientSessionProvider(settings.defaultSessionProvider),
     },
     notifications: {
