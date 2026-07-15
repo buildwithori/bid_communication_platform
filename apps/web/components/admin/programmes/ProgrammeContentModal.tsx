@@ -103,7 +103,7 @@ export function ProgrammeContentModal({
         onOpenChange={(nextOpen) => {
           if (!move.isPending) onOpenChange(nextOpen);
         }}
-        title={`Manage content  ${module.title}`}
+        title={`Manage content: ${module.title}`}
         width="xl"
       >
         <div className="space-y-4">
@@ -134,7 +134,7 @@ export function ProgrammeContentModal({
               <FormInput
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search this modules content..."
+                placeholder="Search module content..."
                 aria-label="Search module content"
               />
               {search ? (
@@ -294,7 +294,7 @@ function ContentSequenceItem({
           <GripVertical className="h-4 w-4" />
         </button>
         <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-bid-light px-2 text-xs font-semibold text-bid">
-          {item.usage.position ?? ''}
+          {item.usage.position ?? '-'}
         </span>
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-subtle">
           <Icon className="h-5 w-5 text-bid" />
@@ -307,7 +307,7 @@ function ContentSequenceItem({
           </div>
           <div className="mt-1 text-sm text-ink-muted">
             {item.trainer?.name ?? 'No trainer owner'}
-            {item.durationLabel ? ` � ${item.durationLabel}` : ''}
+            {item.durationLabel ? ` - ${item.durationLabel}` : ''}
           </div>
           <div className="mt-1 text-xs text-ink-faint">
             Used in {item.usage.modules} module{item.usage.modules === 1 ? '' : 's'} across {item.usage.programmes} programme{item.usage.programmes === 1 ? '' : 's'}
@@ -394,7 +394,7 @@ function ReuseModuleContentModal({
             options={reusable.rows.map((item) => ({
               value: item.id,
               label: item.title,
-              description: `${typeMeta[item.type].label} � used in ${item.usage.modules} module${item.usage.modules === 1 ? '' : 's'}`,
+              description: `${typeMeta[item.type].label} - used in ${item.usage.modules} module${item.usage.modules === 1 ? '' : 's'}`,
             }))}
             placeholder="Search content library"
             searchPlaceholder="Search content..."
