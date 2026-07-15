@@ -1,11 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
+import { useSearchParams } from 'next/navigation';
+import { FileText, PlayCircle, Wrench } from 'lucide-react';
+import {
+  AttachContentItemModal,
+  CreateContentItemModal,
+  EditContentItemModal,
+} from '@/components/admin/content/ContentItemModals';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
-import { Tabs } from '@/components/shared/Tabs';
+import { Card, CardHeader, TableSkeleton } from '@/components/shared/Card';
 import {
   DataTable,
   RowActions,
@@ -14,142 +19,211 @@ import {
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { Modal } from '@/components/shared/Modal';
-import { FormAutocomplete, FormField } from '@/components/shared/FormField';
-import { Notice } from '@/components/shared/PageHeader';
-import { AddContentItemModal } from '@/components/admin/ManageContentModal';
-import { useAdminStore } from '@/lib/stores/admin-store';
-import { programs, modules as seedModules } from '@/lib/mock-data/programs';
-import type { ContentItem } from '@/types';
-import { toast } from 'sonner';
+import { Notice, PageHeader } from '@/components/shared/PageHeader';
+import { Tabs } from '@/components/shared/Tabs';
+import {
+  useContentItemsPage,
+  type ContentItemRecord,
+  type ContentItemStatus,
+  type ContentItemType,
+} from '@/lib/api/content';
 
-type Tab = ContentItem['type'];
+const typeMeta = {
+  video: {
+    label: 'Video',
+    plural: 'Videos',
+    icon: PlayCircle,
+    tone: 'blue',
+  },
+  pdf: {
+    label: 'PDF',
+    plural: 'PDFs',
+    icon: FileText,
+    tone: 'neutral',
+  },
+  tool: {
+    label: 'Tool',
+    plural: 'Tools',
+    icon: Wrench,
+    tone: 'brand',
+  },
+} as const;
 
 export default function AdminContentPage() {
-  const { contentItems } = useAdminStore();
-  const [tab, setTab] = React.useState<Tab>('video');
-  const [query, setQuery] = React.useState('');
-  const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(10);
-  const [reuseOpen, setReuseOpen] = React.useState(false);
-  const [reuseTarget, setReuseTarget] = React.useState<ContentItem | null>(null);
-  const [uploadOpen, setUploadOpen] = React.useState(false);
-  const [editTarget, setEditTarget] = React.useState<ContentItem | null>(null);
-  const [targetProgramme, setTargetProgramme] = React.useState('p-wee');
-  const [targetModule, setTargetModule] = React.useState('new');
+  return (
+    <React.Suspense fallback={<ContentLibrarySkeleton />}>
+      <ContentLibrary />
+    </React.Suspense>
+  );
+}
 
-  const filtered = React.useMemo(() => {
-    const rows = contentItems.filter((c) => c.type === tab);
-    const needle = query.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((item) =>
-      [item.title, item.chapter, item.type, item.durationLabel ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [contentItems, query, tab]);
+function ContentLibrary() {
+  const searchParams = useSearchParams();
+  const moduleId = searchParams.get('moduleId') ?? undefined;
+  const [tab, setTab] = React.useState<ContentItemType>('video');
+  const [query, setQuery] = React.useState('');
+  const deferredQuery = React.useDeferredValue(query);
+  const [pageSize, setPageSize] = React.useState(10);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [editTarget, setEditTarget] =
+    React.useState<ContentItemRecord | null>(null);
+  const [attachTarget, setAttachTarget] =
+    React.useState<ContentItemRecord | null>(null);
+
+  const content = useContentItemsPage({
+    type: tab,
+    search: deferredQuery.trim() || undefined,
+    moduleId,
+    take: pageSize,
+  });
+  const resetPagination = content.resetPagination;
 
   React.useEffect(() => {
-    setPage(1);
-  }, [query, tab, pageSize]);
+    resetPagination();
+  }, [deferredQuery, moduleId, pageSize, resetPagination, tab]);
 
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
-
-  const columns: Column<ContentItem>[] = [
-    {
-      key: 'actions',
-      header: 'Action',
-      cell: (c) => (
-        <RowActions
-          actions={[
-            { label: 'Edit content', onSelect: () => setEditTarget(c) },
-            {
-              label: 'Add to programme',
-              onSelect: () => {
-                setReuseTarget(c);
-                setReuseOpen(true);
+  const columns = React.useMemo<Column<ContentItemRecord>[]>(
+    () => [
+      {
+        key: 'actions',
+        header: 'Action',
+        cell: (item) => (
+          <RowActions
+            actions={[
+              {
+                label: 'Edit content',
+                onSelect: () => setEditTarget(item),
               },
-            },
-          ]}
-        />
-      ),
-      className: 'w-[84px]',
-    },
-    { key: 'title', header: 'Title', cell: (c) => `${c.chapter}: ${c.title}` },
-    {
-      key: 'used',
-      header: 'Used in (programme → module)',
-      cell: (c) => {
-        const contentModule = seedModules.find((m) => m.id === c.moduleId);
-        const usedIn = programs.filter((p) => contentModule && p.moduleIds.includes(contentModule.id));
-        return (
-          <>
-            {usedIn.length > 0 ? (
-              usedIn.map((p) => (
-                <span
-                  key={p.id}
-                  className="mr-1 mb-1 inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2 py-0.5 text-[9px] text-ink-muted"
-                >
-                  {p.name.split('–')[0].trim()} → {contentModule?.title}
-                </span>
-              ))
-            ) : (
-              <span className="text-[10px] text-ink-faint">Not used yet</span>
-            )}
-          </>
-        );
+              {
+                label: 'Add to another module',
+                onSelect: () => setAttachTarget(item),
+              },
+            ]}
+          />
+        ),
+        className: 'w-[84px]',
       },
-    },
-    { key: 'duration', header: 'Duration', cell: (c) => c.durationLabel ?? '—' },
-    {
-      key: 'views',
-      header: 'Views',
-      cell: () => '—',
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      cell: () => <Badge tone="green">Published</Badge>,
-    },
-  ];
+      {
+        key: 'title',
+        header: 'Content',
+        cell: (item) => {
+          const meta = typeMeta[item.type];
+          const Icon = meta.icon;
+          return (
+            <div className="flex min-w-[280px] items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-subtle text-bid">
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="font-semibold text-ink">{item.title}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <Badge tone={meta.tone}>{meta.label}</Badge>
+                  <StatusBadge status={item.status} />
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: 'owner',
+        header: 'Trainer owner',
+        cell: (item) =>
+          item.trainer ? (
+            <div className="min-w-[190px]">
+              <div className="font-medium text-ink">{item.trainer.name}</div>
+              <div className="mt-0.5 text-xs text-ink-muted">
+                {item.trainer.email}
+              </div>
+            </div>
+          ) : (
+            <span className="text-sm text-ink-muted">Not assigned</span>
+          ),
+      },
+      {
+        key: 'source',
+        header: 'Asset',
+        cell: (item) => (
+          <div className="min-w-[180px] text-sm">
+            <div className="font-medium text-ink">{sourceLabel(item)}</div>
+            <div className="mt-1 text-xs text-ink-muted">
+              {item.durationLabel ?? updatedLabel(item.updatedAt)}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'usage',
+        header: 'Used in',
+        cell: (item) => (
+          <div className="min-w-[180px]">
+            <div className="font-medium text-ink">
+              {item.usage.modules} module
+              {item.usage.modules === 1 ? '' : 's'}
+            </div>
+            <div className="mt-1 text-xs text-ink-muted">
+              Across {item.usage.programmes} programme
+              {item.usage.programmes === 1 ? '' : 's'}
+            </div>
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <>
       <PageHeader
         title="Content library"
-        description="Upload once, assign to multiple programmes and modules"
+        description="Upload once, reuse across programme modules, and keep trainer attribution in one place."
         actions={
-          <Button onClick={() => setUploadOpen(true)}>
-            + Upload content
-          </Button>
+          <Button onClick={() => setCreateOpen(true)}>+ Upload content</Button>
         }
       />
+
+      {moduleId ? (
+        <Notice className="mb-4">
+          Showing content attached to the selected module. Uploading from this
+          view adds the new item directly to that module.
+        </Notice>
+      ) : null}
+
       <Tabs
         value={tab}
         onChange={setTab}
         tabs={[
-          { value: 'video', label: 'Videos' },
-          { value: 'pdf', label: 'PDFs' },
-          { value: 'tool', label: 'Tools' },
+          {
+            value: 'video',
+            label: `Videos (${content.summary.video})`,
+          },
+          {
+            value: 'pdf',
+            label: `PDFs (${content.summary.pdf})`,
+          },
+          {
+            value: 'tool',
+            label: `Tools (${content.summary.tool})`,
+          },
         ]}
       />
+
       <Card>
         <CardHeader
-          title={`${tab[0].toUpperCase() + tab.slice(1)} content`}
-          description={`${filtered.length} reusable asset${filtered.length === 1 ? '' : 's'} found`}
+          title={`${typeMeta[tab].plural} content`}
+          description={`${content.totalItems} reusable asset${content.totalItems === 1 ? '' : 's'} found`}
         />
         <TableToolbar>
           <div>
-            <div className="text-sm font-medium text-ink">Find content quickly</div>
+            <div className="text-sm font-medium text-ink">
+              Find content quickly
+            </div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search by title, chapter, type, or duration.
+              Search by title or trainer. Filtering and counts run on the
+              backend.
             </div>
           </div>
-          <div className="w-full sm:w-[320px]">
+          <div className="w-full sm:w-[340px]">
             <TableFilterInput
               icon
               placeholder="Search content..."
@@ -158,92 +232,102 @@ export default function AdminContentPage() {
             />
           </div>
         </TableToolbar>
-        <DataTable columns={columns} rows={pageRows} rowKey={(c) => c.id} emptyMessage="No content in this tab yet." />
+
+        {content.isLoading && !content.data ? (
+          <TableSkeleton columns={5} rows={pageSize} />
+        ) : content.isError ? (
+          <Notice>
+            Content could not be loaded. {content.error.message}
+          </Notice>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={content.rows}
+            rowKey={(item) => item.id}
+            emptyMessage={
+              query
+                ? 'No content matches this search.'
+                : `No ${typeMeta[tab].plural.toLowerCase()} have been added yet.`
+            }
+            tableClassName="min-w-[1040px]"
+          />
+        )}
+
         <TablePagination
-          page={page}
+          page={content.page}
           pageSize={pageSize}
-          totalItems={filtered.length}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
+          totalItems={content.totalItems}
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={content.setPage}
+          onPageSizeChange={setPageSize}
         />
       </Card>
 
-      <Modal open={reuseOpen} onOpenChange={setReuseOpen} title="Add content to another programme">
-        <FormField label="Target programme">
-          <FormAutocomplete
-            value={targetProgramme}
-            onValueChange={setTargetProgramme}
-            options={programs.map((program) => ({ value: program.id, label: program.name }))}
-            placeholder="Search programme"
-            searchPlaceholder="Search programmes..."
-          />
-        </FormField>
-        <FormField label="Target module">
-          <FormAutocomplete
-            value={targetModule}
-            onValueChange={setTargetModule}
-            options={[
-              { value: 'new', label: 'Create new module' },
-              ...seedModules.map((module) => ({
-                value: module.id,
-                label: module.title,
-                description: module.reuseCount ? `Used in ${module.reuseCount} programmes` : undefined,
-              })),
-            ]}
-            placeholder="Search module"
-            searchPlaceholder="Search modules..."
-          />
-        </FormField>
-        <Notice>
-          The same content will now appear in both places. Editing it once updates it
-          everywhere it&apos;s used.
-        </Notice>
-        <Button className="w-full" onClick={() => { setReuseOpen(false); toast.success('Content added to programme!'); }}>
-          Add content
-        </Button>
-      </Modal>
-      <AddContentItemModal
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        module={seedModules[0]}
+      <CreateContentItemModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        initialModuleId={moduleId}
       />
-      <Modal
-        open={!!editTarget}
-        onOpenChange={(open) => !open && setEditTarget(null)}
-        title={editTarget ? `Edit content — ${editTarget.title}` : 'Edit content'}
-      >
-        {editTarget && (
-          <div>
-            <FormField label="Title">
-              <div className="rounded-lg border border-black/[0.08] bg-surface-subtle px-3 py-2 text-sm text-ink">
-                {editTarget.title}
-              </div>
-            </FormField>
-            <FormField label="Chapter">
-              <div className="rounded-lg border border-black/[0.08] bg-surface-subtle px-3 py-2 text-sm text-ink">
-                {editTarget.chapter}
-              </div>
-            </FormField>
-            <FormField label="Type">
-              <div className="rounded-lg border border-black/[0.08] bg-surface-subtle px-3 py-2 text-sm capitalize text-ink">
-                {editTarget.type}
-              </div>
-            </FormField>
-            <Button
-              className="w-full"
-              onClick={() => {
-                setEditTarget(null);
-                toast.success('Content changes saved');
-              }}
-            >
-              Save content
-            </Button>
-          </div>
-        )}
-      </Modal>
+      <EditContentItemModal
+        item={editTarget}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+      />
+      <AttachContentItemModal
+        item={attachTarget}
+        onOpenChange={(open) => {
+          if (!open) setAttachTarget(null);
+        }}
+      />
+    </>
+  );
+}
+
+function StatusBadge({ status }: { status: ContentItemStatus }) {
+  const tones = {
+    draft: 'neutral',
+    processing: 'amber',
+    ready: 'green',
+    failed: 'red',
+    archived: 'red',
+  } as const;
+  return (
+    <Badge tone={tones[status]}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  );
+}
+
+function sourceLabel(item: ContentItemRecord) {
+  if (item.type === 'video') {
+    return item.video?.status === 'ready' ? 'Video ready' : 'Video processing';
+  }
+  if (item.type === 'pdf') {
+    return item.file?.originalFilename ?? 'PDF asset';
+  }
+  return item.toolLink?.toolName ?? item.toolLink?.url ?? 'Embedded tool';
+}
+
+function updatedLabel(value: string) {
+  return `Updated ${new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })}`;
+}
+
+function ContentLibrarySkeleton() {
+  return (
+    <>
+      <PageHeader
+        title="Content library"
+        description="Upload once, reuse across programme modules, and keep trainer attribution in one place."
+      />
+      <div className="mb-4 h-10 w-full max-w-md animate-pulse rounded-xl bg-surface-subtle" />
+      <Card>
+        <TableSkeleton columns={5} rows={10} />
+      </Card>
     </>
   );
 }

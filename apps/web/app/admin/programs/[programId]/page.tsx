@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
   closestCenter,
   DndContext,
@@ -50,6 +50,7 @@ import { ProgramModal } from '@/components/admin/ProgramModal';
 import { ModuleModal } from '@/components/admin/ModuleModal';
 import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
 import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
+import { ProgrammeContentModal } from '@/components/admin/programmes/ProgrammeContentModal';
 import { RequiredDeliverablesSection } from '@/components/admin/programmes/RequiredDeliverablesSection';
 import {
   useArchiveProgrammeMutation,
@@ -71,10 +72,11 @@ type WorkspaceTab = 'curriculum' | 'deliverables' | 'readiness';
 
 export default function AdminProgrammeWorkspacePage() {
   const params = useParams<{ programId: string }>();
-  const router = useRouter();
   const programmeId = params.programId;
   const [tab, setTab] = React.useState<WorkspaceTab>('curriculum');
   const [moduleOpen, setModuleOpen] = React.useState(false);
+  const [contentModule, setContentModule] =
+    React.useState<ProgrammeModuleRecord | null>(null);
   const [editProgrammeOpen, setEditProgrammeOpen] = React.useState(false);
   const [editModule, setEditModule] =
     React.useState<ProgrammeModuleRecord | null>(null);
@@ -156,7 +158,7 @@ export default function AdminProgrammeWorkspacePage() {
               {
                 label: 'Manage content',
                 disabled: isArchived,
-                onSelect: () => router.push(routes.admin.contentModule(module.id)),
+                onSelect: () => setContentModule(module),
               },
               {
                 label: 'Edit module',
@@ -224,7 +226,7 @@ export default function AdminProgrammeWorkspacePage() {
         ),
       },
     ],
-    [canReorder, isArchived, router],
+    [canReorder, isArchived, setContentModule],
   );
 
   if (detail.isLoading && !detail.data) {
@@ -415,6 +417,14 @@ export default function AdminProgrammeWorkspacePage() {
         open={moduleOpen}
         onOpenChange={setModuleOpen}
         programId={programme.id}
+      />
+      <ProgrammeContentModal
+        open={Boolean(contentModule)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setContentModule(null);
+        }}
+        module={contentModule}
+        readOnly={isArchived}
       />
       {editProgrammeOpen ? (
         <ProgramModal
