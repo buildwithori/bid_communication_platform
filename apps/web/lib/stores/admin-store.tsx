@@ -21,7 +21,6 @@ import { toolById } from '@/lib/mock-data';
 import { programmeGoalTypes, sectors as seedSectors, stages as seedStages } from '@/lib/mock-data/definitions';
 import type {
   EntrepreneurForm,
-  TrainerForm,
   ProgramForm,
   AssignToProgramForm,
   ContentItemForm,
@@ -46,7 +45,6 @@ interface AdminStore {
   updateEntrepreneur: (id: string, patch: Partial<Entrepreneur>) => void;
   assignEntrepreneur: (input: AssignToProgramForm) => void;
   removeProgrammeEnrollment: (entrepreneurId: string, programmeId: string) => void;
-  addTrainer: (input: TrainerForm) => void;
   updateTrainer: (id: string, patch: Partial<Trainer>) => void;
   addProgram: (input: ProgramForm) => void;
   updateProgram: (id: string, patch: Partial<Program>) => void;
@@ -196,36 +194,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     );
     toast.success('Programme removed');
   }, [contentItems, programs]);
-
-  const addTrainer: AdminStore['addTrainer'] = React.useCallback((input) => {
-    const id = makeId('t');
-    const fullName = `${input.firstName} ${input.lastName}`;
-    const newTrainer: Trainer = {
-      id,
-      fullName,
-      initials: initialsFrom(fullName),
-      email: input.email,
-      role: input.role,
-      accessLevel: input.accessLevel,
-      specialisms: (input.specialisms ?? '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((label) => sectorByLabel(label, seedSectors))
-        .filter(Boolean) as SectorId[],
-      maxEntrepreneurs: input.maxEntrepreneurs ? Number(input.maxEntrepreneurs) : 10,
-      accessExpiresOn: input.accessLevel === 'guest' ? input.accessExpiresOn : undefined,
-      metrics: {
-        entrepreneursCount: 0,
-        sessionsThisMonth: 0,
-        satisfactionAvg: 0,
-        satisfactionRatingsCount: 0,
-        status: 'active',
-      },
-    };
-    setTrainers((curr) => [newTrainer, ...curr]);
-    toast.success('Trainer added!');
-  }, []);
 
   const updateTrainer: AdminStore['updateTrainer'] = React.useCallback((id, patch) => {
     setTrainers((curr) =>
@@ -451,7 +419,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       updateEntrepreneur,
       assignEntrepreneur,
       removeProgrammeEnrollment,
-      addTrainer,
       updateTrainer,
       addProgram,
       updateProgram,
@@ -468,7 +435,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       addStage,
       updateStage,
     }),
-    [entrepreneurs, trainers, programs, modules, contentItems, sectors, stages, addEntrepreneur, updateEntrepreneur, assignEntrepreneur, removeProgrammeEnrollment, addTrainer, updateTrainer, addProgram, updateProgram, addModule, addExistingModuleToProgram, reorderProgramModule, moveProgramModule, moveProgramModuleToPosition, reorderModuleContent, addContentItem, addSector, updateSector, removeSector, addStage, updateStage],
+    [entrepreneurs, trainers, programs, modules, contentItems, sectors, stages, addEntrepreneur, updateEntrepreneur, assignEntrepreneur, removeProgrammeEnrollment, updateTrainer, addProgram, updateProgram, addModule, addExistingModuleToProgram, reorderProgramModule, moveProgramModule, moveProgramModuleToPosition, reorderModuleContent, addContentItem, addSector, updateSector, removeSector, addStage, updateStage],
   );
 
   return (

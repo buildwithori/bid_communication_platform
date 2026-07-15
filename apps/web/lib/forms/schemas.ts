@@ -26,16 +26,30 @@ export const entrepreneurSchema = z.object({
 });
 export type EntrepreneurForm = z.infer<typeof entrepreneurSchema>;
 
-export const trainerSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Enter a valid email'),
-  role: z.enum(['Mentor', 'Trainer', 'Guest Expert', 'Investment Analyst']),
-  accessLevel: z.enum(['full', 'guest']),
-  accessExpiresOn: z.string().optional(),
-  specialisms: z.string().optional(), // comma-separated in the form
-  maxEntrepreneurs: z.string().optional(),
-});
+export const trainerSchema = z
+  .object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    email: z.string().email('Enter a valid email'),
+    roleLabel: z.enum([
+      'mentor',
+      'trainer',
+      'guest_expert',
+      'investment_analyst',
+    ]),
+    accessLevel: z.enum(['full', 'guest']),
+    accessExpiresOn: z.string().optional(),
+    sectorIds: z.array(z.string()),
+  })
+  .superRefine((value, context) => {
+    if (value.accessLevel === 'guest' && !value.accessExpiresOn) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['accessExpiresOn'],
+        message: 'Choose when guest access expires',
+      });
+    }
+  });
 export type TrainerForm = z.infer<typeof trainerSchema>;
 
 export const adminInviteSchema = z.object({
@@ -44,6 +58,13 @@ export const adminInviteSchema = z.object({
   email: z.string().email('Enter a valid email'),
 });
 export type AdminInviteForm = z.infer<typeof adminInviteSchema>;
+
+export const trainerProfileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
+});
+export type TrainerProfileForm = z.infer<typeof trainerProfileSchema>;
 
 export const adminProfileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -243,6 +264,19 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   });
 export type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
+
+export const acceptTrainerInvitationSchema = z
+  .object({
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match',
+  });
+export type AcceptTrainerInvitationForm = z.infer<
+  typeof acceptTrainerInvitationSchema
+>;
 
 export const acceptAdminInvitationSchema = resetPasswordSchema;
 export type AcceptAdminInvitationForm = z.infer<typeof acceptAdminInvitationSchema>;

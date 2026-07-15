@@ -13,7 +13,6 @@ const rawApiModules = [
   "@/lib/api/sessions",
   "@/lib/api/tool-requests",
   "@/lib/api/tools",
-  "@/lib/api/trainers",
 ];
 
 export default defineConfig([

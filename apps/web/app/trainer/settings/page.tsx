@@ -1,48 +1,100 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { UserRound } from 'lucide-react';
-import { toast } from 'sonner';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { StatCard } from '@/components/shared/StatCard';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
-import { CalendarConnectionCard } from '@/components/settings/CalendarConnectionCard';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { trainerById } from '@/lib/mock-data/trainers';
-import { trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { UserRound } from "lucide-react";
+import { toast } from "sonner";
+import { PageHeader, Notice } from "@/components/shared/PageHeader";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { StatCard } from "@/components/shared/StatCard";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { FormField, FormInput } from "@/components/shared/FormField";
+import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
+import {
+  useTrainerProfileQuery,
+  useUpdateTrainerProfileMutation,
+  type TrainerRecord,
+} from "@/lib/api/trainers";
+import {
+  useCalendarAuthorizationMutation,
+  useCalendarConnectionQuery,
+  useDisconnectCalendarMutation,
+} from "@/lib/api/calendar";
+import {
+  trainerProfileSchema,
+  type TrainerProfileForm,
+} from "@/lib/forms/schemas";
 
-const currentTrainerId = 't-kofi';
+const roleLabels = {
+  mentor: "Mentor",
+  trainer: "Trainer",
+  guest_expert: "Guest Expert",
+  investment_analyst: "Investment Analyst",
+} as const;
 
 export default function TrainerSettingsPage() {
-  const trainer = trainerById(currentTrainerId);
-  const [fullName, setFullName] = React.useState(trainer?.fullName ?? '');
-  const [email, setEmail] = React.useState(trainer?.email ?? '');
-  const [bio, setBio] = React.useState('I support entrepreneurs with fundraising readiness, pricing strategy, and investor communication.');
-  const [calendarConnected, setCalendarConnected] = React.useState(trainer?.calendarProvider === 'google');
-  const [calendarAccount, setCalendarAccount] = React.useState(trainer?.calendarLink ?? trainer?.email ?? '');
+  const profile = useTrainerProfileQuery();
+  const calendar = useCalendarConnectionQuery();
+  const form = useForm<TrainerProfileForm>({
+    resolver: zodResolver(trainerProfileSchema),
+    defaultValues: { firstName: "", lastName: "", phone: "" },
+  });
+  const updateProfile = useUpdateTrainerProfileMutation({
+    onSuccess: () => toast.success("Profile settings saved"),
+    onError: (error) => toast.error(error.message),
+  });
+  const authorizeCalendar = useCalendarAuthorizationMutation({
+    onSuccess: ({ url }) => window.location.assign(url),
+    onError: (error) => toast.error(error.message),
+  });
+  const disconnectCalendar = useDisconnectCalendarMutation({
+    onSuccess: () => toast.success("Google Calendar disconnected"),
+    onError: (error) => toast.error(error.message),
+  });
 
-  const isCalendarConnected = calendarConnected && calendarAccount.trim().length > 0;
-  const learnerCount = entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)).length;
+  React.useEffect(() => {
+    if (!profile.data) return;
+    form.reset({
+      firstName: profile.data.firstName ?? "",
+      lastName: profile.data.lastName ?? "",
+      phone: profile.data.phone ?? "",
+    });
+  }, [form, profile.data]);
 
-  const saveProfile = (event: React.FormEvent) => {
-    event.preventDefault();
-    toast.success('Profile settings saved');
-  };
+  if (profile.isLoading || calendar.isLoading) {
+    return <TrainerSettingsSkeleton />;
+  }
 
-  const connectGoogleCalendar = () => {
-    setCalendarConnected(true);
-    setCalendarAccount(calendarAccount || email);
-    toast.success('Google Calendar connection started');
-  };
+  if (profile.isError || calendar.isError || !profile.data) {
+    const error = profile.error ?? calendar.error;
+    return (
+      <>
+        <PageHeader
+          title="Settings"
+          description="Manage the profile and calendar details used across your trainer workspace."
+        />
+        <Card>
+          <Notice>Trainer settings could not be loaded. {error?.message}</Notice>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => {
+              void profile.refetch();
+              void calendar.refetch();
+            }}
+          >
+            Try again
+          </Button>
+        </Card>
+      </>
+    );
+  }
 
-  const disconnectGoogleCalendar = () => {
-    setCalendarConnected(false);
-    toast.success('Google Calendar disconnected');
-  };
+  const trainer = profile.data as TrainerRecord;
+  const connected = Boolean(calendar.data?.connected);
 
   return (
     <>
@@ -54,21 +106,21 @@ export default function TrainerSettingsPage() {
       <MetricGrid columns={3}>
         <StatCard
           label="Profile"
-          value="Active"
-          subline={trainer?.role ?? 'Trainer'}
-          dotColor="success"
-          accent="success"
+          value={trainer.directoryStatus === "active" ? "Active" : "Inactive"}
+          subline={roleLabels[trainer.roleLabel]}
+          dotColor={trainer.directoryStatus === "active" ? "success" : "warning"}
+          accent={trainer.directoryStatus === "active" ? "success" : "warning"}
         />
         <StatCard
           label="Calendar"
-          value={isCalendarConnected ? 'Connected' : 'Not connected'}
+          value={connected ? "Connected" : "Not connected"}
           subline="Google Meet sessions"
-          dotColor={isCalendarConnected ? 'success' : 'warning'}
-          accent={isCalendarConnected ? 'success' : 'warning'}
+          dotColor={connected ? "success" : "warning"}
+          accent={connected ? "success" : "warning"}
         />
         <StatCard
           label="My entrepreneurs"
-          value={learnerCount}
+          value={trainer.portfolio.inferredEntrepreneurs}
           subline="Entrepreneurs you support"
           dotColor="info"
           accent="info"
@@ -82,51 +134,89 @@ export default function TrainerSettingsPage() {
             description="These details appear in trainer lists, session ownership, and entrepreneur-facing booking flows."
             actions={<UserRound className="h-5 w-5 text-ink-faint" />}
           />
-          <form onSubmit={saveProfile} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit((values) => updateProfile.mutate(values))}
+            className="space-y-4"
+          >
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Full name">
-                <FormInput value={fullName} onChange={(event) => setFullName(event.target.value)} />
+              <FormField
+                label="First name"
+                error={form.formState.errors.firstName?.message}
+              >
+                <FormInput {...form.register("firstName")} />
               </FormField>
+              <FormField
+                label="Last name"
+                error={form.formState.errors.lastName?.message}
+              >
+                <FormInput {...form.register("lastName")} />
+              </FormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Email">
-                <FormInput type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+                <FormInput type="email" value={trainer.email} disabled />
+              </FormField>
+              <FormField label="Phone" error={form.formState.errors.phone?.message} optional>
+                <FormInput type="tel" {...form.register("phone")} />
               </FormField>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Role">
-                <FormInput value={trainer?.role ?? 'Trainer'} disabled />
+                <FormInput value={roleLabels[trainer.roleLabel]} disabled />
               </FormField>
               <FormField label="Specialisms">
                 <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-black/[0.1] bg-surface-subtle px-3 py-2">
-                  {trainer?.specialisms.map((specialism) => (
-                    <Badge key={specialism} tone="blue">{specialism}</Badge>
-                  ))}
+                  {trainer.specialisms.length ? (
+                    trainer.specialisms.map((specialism) => (
+                      <Badge key={specialism.id} tone="blue">{specialism.name}</Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-ink-muted">No specialisms assigned</span>
+                  )}
                 </div>
               </FormField>
             </div>
 
-            <FormField label="Trainer bio" optional>
-              <FormTextarea
-                rows={4}
-                value={bio}
-                onChange={(event) => setBio(event.target.value)}
-                placeholder="Briefly describe the kind of support you provide."
-              />
-            </FormField>
-
             <div className="flex justify-end border-t border-line pt-4">
-              <Button type="submit">Save profile</Button>
+              <Button
+                type="submit"
+                isLoading={updateProfile.isPending}
+                loadingLabel="Saving profile"
+              >
+                Save profile
+              </Button>
             </div>
           </form>
         </Card>
 
         <CalendarConnectionCard
-          connected={isCalendarConnected}
-          accountEmail={calendarAccount}
-          onConnect={connectGoogleCalendar}
-          onDisconnect={disconnectGoogleCalendar}
+          connected={connected}
+          accountEmail={calendar.data?.accountEmail ?? trainer.email}
+          isConnecting={authorizeCalendar.isPending}
+          isDisconnecting={disconnectCalendar.isPending}
+          onConnect={() => authorizeCalendar.mutate()}
+          onDisconnect={() => disconnectCalendar.mutate()}
         />
       </div>
     </>
+  );
+}
+
+function TrainerSettingsSkeleton() {
+  return (
+    <div aria-label="Loading trainer settings" aria-busy="true">
+      <Skeleton className="h-16 w-full" />
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Skeleton key={index} className="h-28 w-full" />
+        ))}
+      </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Skeleton className="h-[420px] w-full" />
+        <Skeleton className="h-[300px] w-full" />
+      </div>
+    </div>
   );
 }

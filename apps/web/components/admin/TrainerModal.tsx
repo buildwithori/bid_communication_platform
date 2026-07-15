@@ -1,140 +1,162 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Modal } from '@/components/shared/Modal';
+import * as React from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Modal } from "@/components/shared/Modal";
 import {
-  FormField,
   FormAutocomplete,
+  FormField,
   FormInput,
-  FormSelect,
   FormRow2,
-} from '@/components/shared/FormField';
-import { Button } from '@/components/shared/Button';
-import { Badge } from '@/components/shared/Badge';
-import { DatePicker } from '@/components/shared/DatePicker';
-import { trainerSchema, type TrainerForm } from '@/lib/forms/schemas';
-import { useAdminStore } from '@/lib/stores/admin-store';
-import { sectors } from '@/lib/mock-data/definitions';
-import type { SectorId, Trainer } from '@/types';
+  FormSelect,
+} from "@/components/shared/FormField";
+import { Button } from "@/components/shared/Button";
+import { Badge } from "@/components/shared/Badge";
+import { DatePicker } from "@/components/shared/DatePicker";
+import { trainerSchema, type TrainerForm } from "@/lib/forms/schemas";
+import { useLazySectorsQuery } from "@/lib/api/settings";
+import type { TrainerRecord } from "@/lib/api/trainers";
 
-function parseSectorSpecialisms(value?: string): SectorId[] {
-  const validSectorIds = new Set<string>(sectors.map((sector) => sector.id));
-  return (value ?? '')
-    .split(',')
-    .map((specialism) => specialism.trim())
-    .filter((specialism): specialism is SectorId => validSectorIds.has(specialism));
-}
-
-function isSectorId(value: string): value is SectorId {
-  return sectors.some((sector) => sector.id === value);
-}
+const roleOptions = [
+  { value: "mentor", label: "Mentor" },
+  { value: "trainer", label: "Trainer" },
+  { value: "guest_expert", label: "Guest Expert" },
+  { value: "investment_analyst", label: "Investment Analyst" },
+] as const;
 
 export function TrainerModal({
   open,
   onOpenChange,
-  mode = 'add',
+  mode = "add",
   trainer,
+  isPending,
+  onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode?: 'add' | 'edit';
-  trainer?: Trainer;
+  mode?: "add" | "edit";
+  trainer?: TrainerRecord;
+  isPending: boolean;
+  onSubmit: (values: TrainerForm) => void;
 }) {
-  const { addTrainer, updateTrainer } = useAdminStore();
-  const isEdit = mode === 'edit' && trainer;
-
+  const isEdit = mode === "edit" && Boolean(trainer);
+  const [specialismOpen, setSpecialismOpen] = React.useState(false);
+  const [specialismSearch, setSpecialismSearch] = React.useState("");
+  const deferredSearch = React.useDeferredValue(specialismSearch);
+  const sectors = useLazySectorsQuery({
+    enabled: open && specialismOpen,
+    search: deferredSearch || undefined,
+    active: true,
+    take: 20,
+  });
   const form = useForm<TrainerForm>({
     resolver: zodResolver(trainerSchema),
-    defaultValues: {
-      firstName: trainer ? trainer.fullName.split(' ')[0] : '',
-      lastName: trainer ? trainer.fullName.split(' ').slice(1).join(' ') : '',
-      email: trainer?.email ?? '',
-      role: trainer?.role ?? 'Mentor',
-      accessLevel: trainer?.accessLevel ?? 'full',
-      accessExpiresOn: trainer?.accessExpiresOn ?? '',
-      specialisms: trainer?.specialisms.join(', ') ?? '',
-      maxEntrepreneurs: trainer ? String(trainer.maxEntrepreneurs) : '10',
-    },
+    defaultValues: defaults(trainer),
   });
+  const accessLevel = form.watch("accessLevel");
+  const selectedSectorIds = form.watch("sectorIds");
+  const loadedSectors =
+    sectors.data?.pages.flatMap((page) => page.items) ?? [];
+  const sectorOptions = uniqueOptions([
+    ...(trainer?.specialisms ?? []).map((sector) => ({
+      value: sector.id,
+      label: sector.name,
+    })),
+    ...loadedSectors.map((sector) => ({
+      value: sector.id,
+      label: sector.name,
+    })),
+  ]);
 
-  const accessLevel = form.watch('accessLevel');
-  const selectedSpecialisms = parseSectorSpecialisms(form.watch('specialisms'));
+  React.useEffect(() => {
+    if (!open) return;
+    form.reset(defaults(trainer));
+    setSpecialismSearch("");
+  }, [form, open, trainer]);
 
-  const setSpecialisms = (nextSpecialisms: string[]) => {
-    form.setValue('specialisms', nextSpecialisms.join(', '), { shouldValidate: true });
-  };
-
-  const addSpecialism = (value: string) => {
-    if (!isSectorId(value) || selectedSpecialisms.includes(value)) return;
-    setSpecialisms([...selectedSpecialisms, value]);
-  };
-
-  const removeSpecialism = (value: string) => {
-    setSpecialisms(selectedSpecialisms.filter((specialism) => specialism !== value));
-  };
-
-  const onSubmit = (values: TrainerForm) => {
-    if (isEdit && trainer) {
-      updateTrainer(trainer.id, {
-        fullName: `${values.firstName} ${values.lastName}`,
-        email: values.email,
-        role: values.role,
-        accessLevel: values.accessLevel,
-        accessExpiresOn: values.accessLevel === 'guest' ? values.accessExpiresOn : undefined,
-        specialisms: parseSectorSpecialisms(values.specialisms),
-      });
-    } else {
-      addTrainer(values);
-    }
-    onOpenChange(false);
-    form.reset();
-  };
+  const selectedOptions = selectedSectorIds.map((sectorId) =>
+    sectorOptions.find((option) => option.value === sectorId) ?? {
+      value: sectorId,
+      label: "Selected sector",
+    },
+  );
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={mode === 'edit' ? `Edit trainer${trainer ? ` – ${trainer.fullName}` : ''}` : 'Add trainer'}
+      title={isEdit ? `Edit trainer – ${trainer?.name}` : "Invite trainer"}
       width="wide"
     >
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormRow2>
-          <FormField label="First name" error={form.formState.errors.firstName?.message}>
-            <FormInput placeholder="First name" {...form.register('firstName')} />
+          <FormField
+            label="First name"
+            error={form.formState.errors.firstName?.message}
+            className="mb-0"
+          >
+            <FormInput {...form.register("firstName")} />
           </FormField>
-          <FormField label="Last name" error={form.formState.errors.lastName?.message}>
-            <FormInput placeholder="Last name" {...form.register('lastName')} />
+          <FormField
+            label="Last name"
+            error={form.formState.errors.lastName?.message}
+            className="mb-0"
+          >
+            <FormInput {...form.register("lastName")} />
           </FormField>
         </FormRow2>
-        <FormField label="Email" error={form.formState.errors.email?.message}>
-          <FormInput type="email" placeholder="trainer@example.com" {...form.register('email')} />
-        </FormField>
-        <FormField label="Role">
-          <FormSelect
-            value={form.watch('role')}
-            onValueChange={(v) => form.setValue('role', v as TrainerForm['role'])}
-            options={[
-              { value: 'Mentor', label: 'Mentor' },
-              { value: 'Trainer', label: 'Trainer' },
-              { value: 'Guest Expert', label: 'Guest Expert' },
-              { value: 'Investment Analyst', label: 'Investment Analyst' },
-            ]}
+
+        <FormField
+          label="Email"
+          error={form.formState.errors.email?.message}
+          className="mb-0"
+        >
+          <FormInput
+            type="email"
+            disabled={isEdit}
+            {...form.register("email")}
           />
         </FormField>
-        <FormField label="Access level">
-          <FormSelect
-            value={form.watch('accessLevel')}
-            onValueChange={(v) => form.setValue('accessLevel', v as 'full' | 'guest')}
-            options={[
-              { value: 'full', label: 'Full access' },
-              { value: 'guest', label: 'Guest — temporary access' },
-            ]}
-          />
-        </FormField>
-        {accessLevel === 'guest' && (
-          <FormField label="Access expires">
+
+        <FormRow2>
+          <FormField label="Role label" className="mb-0">
+            <FormSelect
+              value={form.watch("roleLabel")}
+              onValueChange={(value) =>
+                form.setValue(
+                  "roleLabel",
+                  value as TrainerForm["roleLabel"],
+                  { shouldDirty: true },
+                )
+              }
+              options={roleOptions}
+            />
+          </FormField>
+          <FormField label="Access level" className="mb-0">
+            <FormSelect
+              value={accessLevel}
+              onValueChange={(value) =>
+                form.setValue(
+                  "accessLevel",
+                  value as TrainerForm["accessLevel"],
+                  { shouldDirty: true, shouldValidate: true },
+                )
+              }
+              options={[
+                { value: "full", label: "Full access" },
+                { value: "guest", label: "Guest — temporary access" },
+              ]}
+            />
+          </FormField>
+        </FormRow2>
+
+        {accessLevel === "guest" ? (
+          <FormField
+            label="Access expires"
+            error={form.formState.errors.accessExpiresOn?.message}
+            className="mb-0"
+          >
             <Controller
               control={form.control}
               name="accessExpiresOn"
@@ -147,45 +169,88 @@ export function TrainerModal({
               )}
             />
           </FormField>
-        )}
-        <FormField label="Specialisms">
+        ) : null}
+
+        <FormField label="Sector specialisms" className="mb-0">
           <FormAutocomplete
             value=""
-            onValueChange={addSpecialism}
-            options={sectors
-              .filter((sector) => !selectedSpecialisms.includes(sector.id))
-              .map((sector) => ({ value: sector.id, label: sector.label }))}
+            onValueChange={(sectorId) => {
+              if (selectedSectorIds.includes(sectorId)) return;
+              form.setValue("sectorIds", [...selectedSectorIds, sectorId], {
+                shouldDirty: true,
+              });
+            }}
+            options={sectorOptions.filter(
+              (option) => !selectedSectorIds.includes(option.value),
+            )}
             placeholder="Add sector specialism"
             searchPlaceholder="Search sectors..."
-            emptyMessage="No sector found."
+            emptyMessage="No active sector found."
+            isLoading={sectors.isFetching}
+            onOpenChange={setSpecialismOpen}
+            onSearchChange={setSpecialismSearch}
+            hasMore={Boolean(sectors.hasNextPage)}
+            onLoadMore={() => void sectors.fetchNextPage()}
           />
-          {selectedSpecialisms.length > 0 && (
+          {selectedOptions.length ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {selectedSpecialisms.map((specialism) => {
-                const sector = sectors.find((item) => item.id === specialism);
-                return (
-                  <button
-                    key={specialism}
-                    type="button"
-                    onClick={() => removeSpecialism(specialism)}
-                    className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
-                    aria-label={`Remove ${sector?.label ?? specialism}`}
-                  >
-                    <Badge tone={sector?.color ?? 'neutral'}>{sector?.label ?? specialism} ×</Badge>
-                  </button>
-                );
-              })}
+              {selectedOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    form.setValue(
+                      "sectorIds",
+                      selectedSectorIds.filter((id) => id !== option.value),
+                      { shouldDirty: true },
+                    )
+                  }
+                  aria-label={`Remove ${option.label}`}
+                >
+                  <Badge tone="blue">{option.label} ×</Badge>
+                </button>
+              ))}
             </div>
-          )}
-        </FormField>
-        <FormField label="Max entrepreneurs">
-          <FormInput type="number" {...form.register('maxEntrepreneurs')} />
+          ) : null}
         </FormField>
 
-        <Button type="submit" className="w-full">
-          {mode === 'edit' ? 'Save changes' : 'Add trainer'}
-        </Button>
+        <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            isLoading={isPending}
+            loadingLabel={isEdit ? "Saving trainer" : "Sending invite"}
+          >
+            {isEdit ? "Save changes" : "Send invitation"}
+          </Button>
+        </div>
       </form>
     </Modal>
+  );
+}
+
+function defaults(trainer?: TrainerRecord): TrainerForm {
+  return {
+    firstName: trainer?.firstName ?? "",
+    lastName: trainer?.lastName ?? "",
+    email: trainer?.email ?? "",
+    roleLabel: trainer?.roleLabel ?? "trainer",
+    accessLevel: trainer?.accessLevel ?? "full",
+    accessExpiresOn: trainer?.accessExpiresOn?.slice(0, 10) ?? "",
+    sectorIds: trainer?.specialisms.map((sector) => sector.id) ?? [],
+  };
+}
+
+function uniqueOptions(
+  options: Array<{ value: string; label: string }>,
+) {
+  return Array.from(
+    new Map(options.map((option) => [option.value, option])).values(),
   );
 }

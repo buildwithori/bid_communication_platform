@@ -1,15 +1,14 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { Search } from 'lucide-react';
-import { PageHeader, Notice } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { StatCard } from '@/components/shared/StatCard';
-import { Badge } from '@/components/shared/Badge';
-import { ProgrammeAccessList } from '@/components/shared/ProgrammeAccessList';
-import { Button } from '@/components/shared/Button';
-import { Avatar } from '@/components/shared/Avatar';
+import * as React from "react";
+import { toast } from "sonner";
+import { PageHeader, Notice } from "@/components/shared/PageHeader";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { StatCard } from "@/components/shared/StatCard";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Avatar } from "@/components/shared/Avatar";
 import {
   DataTable,
   RowActions,
@@ -19,312 +18,246 @@ import {
   TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
-import { Tabs } from '@/components/shared/Tabs';
-import { Modal } from '@/components/shared/Modal';
-import { TrainerModal } from '@/components/admin/TrainerModal';
-import { useAdminStore } from '@/lib/stores/admin-store';
-import { adminSessions, deliverableReviews } from '@/lib/mock-data/admin-workflows';
-import { tools } from '@/lib/mock-data';
-import { sectorById, sectors, stageById, stages } from '@/lib/mock-data/definitions';
-import { programs } from '@/lib/mock-data/programs';
-import { entrepreneurHasProgramme, getEntrepreneurProgrammes } from '@/lib/programme-access';
-import { getTrainerContentItems, getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
-import { getEntrepreneurToolAccessSource, type EntrepreneurToolAccessSource } from '@/lib/tool-access';
-import type { BadgeTone, Entrepreneur, SectorId, Trainer, Tool } from '@/types';
+} from "@/components/shared/DataTable";
+import { Tabs } from "@/components/shared/Tabs";
+import { Modal } from "@/components/shared/Modal";
+import { TrainerModal } from "@/components/admin/TrainerModal";
+import {
+  useInviteTrainerMutation,
+  useResendTrainerInvitationMutation,
+  useTrainerDetailQuery,
+  useTrainersPage,
+  useUpdateTrainerMutation,
+  useUpdateTrainerStatusMutation,
+  type TrainerAccessLevel,
+  type TrainerCalendarFilter,
+  type TrainerDirectoryStatus,
+  type TrainerRecord,
+  type TrainerRoleLabel,
+} from "@/lib/api/trainers";
+import { useLazySectorsQuery } from "@/lib/api/settings";
+import type { TrainerForm } from "@/lib/forms/schemas";
 
-type TrainerTab = 'directory' | 'workload';
+type TrainerTab = "directory" | "workload";
+type AllOr<T extends string> = "all" | T;
 
-const trainerTabs: { value: TrainerTab; label: string }[] = [
-  { value: 'directory', label: 'Trainer directory' },
-  { value: 'workload', label: 'Workload overview' },
+const trainerTabs: Array<{ value: TrainerTab; label: string }> = [
+  { value: "directory", label: "Trainer directory" },
+  { value: "workload", label: "Workload overview" },
 ];
 
-function CalendarStatusBadge({ provider }: { provider?: 'google' | 'calendly' | 'none' }) {
-  if (provider === 'google') {
-    return <Badge tone="green">Google Calendar connected</Badge>;
-  }
-  if (provider === 'calendly') {
-    return <Badge tone="amber">Google Calendar not connected</Badge>;
-  }
-  return <Badge tone="red">No calendar connected</Badge>;
+const roleLabels: Record<TrainerRoleLabel, string> = {
+  mentor: "Mentor",
+  trainer: "Trainer",
+  guest_expert: "Guest Expert",
+  investment_analyst: "Investment Analyst",
+};
+
+function initials(trainer: TrainerRecord) {
+  return [trainer.firstName, trainer.lastName]
+    .filter(Boolean)
+    .map((part) => part?.[0]?.toUpperCase())
+    .join("")
+    .slice(0, 2) || trainer.email.slice(0, 2).toUpperCase();
 }
 
-function TrainerStatusBadge({ trainer }: { trainer: Trainer }) {
-  if (trainer.metrics.status === 'active') {
-    return <Badge tone="green">Active</Badge>;
-  }
+function CalendarBadge({ connected }: { connected: boolean }) {
+  return connected ? (
+    <Badge tone="green">Google Calendar connected</Badge>
+  ) : (
+    <Badge tone="amber">Google Calendar not connected</Badge>
+  );
+}
 
-  if (trainer.metrics.status === 'expires-soon') {
+function StatusBadge({ trainer }: { trainer: TrainerRecord }) {
+  if (trainer.directoryStatus === "invited") {
+    return <Badge tone="amber">Invitation pending</Badge>;
+  }
+  if (trainer.directoryStatus === "inactive") {
+    return <Badge tone="neutral">Inactive</Badge>;
+  }
+  if (
+    trainer.accessLevel === "guest" &&
+    trainer.accessExpiresOn
+  ) {
     return (
       <Badge tone="amber">
-        Expires{' '}
-        {trainer.accessExpiresOn
-          ? new Date(trainer.accessExpiresOn).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            })
-          : 'soon'}
+        Expires {new Date(trainer.accessExpiresOn).toLocaleDateString()}
       </Badge>
     );
   }
-
-  return <Badge tone="neutral">Inactive</Badge>;
+  return <Badge tone="green">Active</Badge>;
 }
 
-function TrainerPortfolioCell({ trainer, entrepreneurs }: { trainer: Trainer; entrepreneurs: Entrepreneur[] }) {
-  const entrepreneurCount = entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(trainer.id, entrepreneur)).length;
-  const learningAssetCount = getTrainerContentItems(trainer.id).length;
-
+function PortfolioCell({ trainer }: { trainer: TrainerRecord }) {
   return (
     <div className="min-w-[160px] text-sm">
-      <div className="font-medium text-ink">{entrepreneurCount} entrepreneur{entrepreneurCount === 1 ? '' : 's'}</div>
-      <div className="mt-0.5 text-ink-muted">{learningAssetCount} learning asset{learningAssetCount === 1 ? '' : 's'}</div>
+      <div className="font-medium text-ink">
+        {trainer.portfolio.inferredEntrepreneurs} entrepreneur
+        {trainer.portfolio.inferredEntrepreneurs === 1 ? "" : "s"}
+      </div>
+      <div className="mt-0.5 text-ink-muted">
+        {trainer.portfolio.contentItems} learning asset
+        {trainer.portfolio.contentItems === 1 ? "" : "s"}
+      </div>
     </div>
   );
 }
 
-const toolAccessSourceMeta: Record<Exclude<EntrepreneurToolAccessSource, 'none'>, { label: string; tone: BadgeTone }> = {
-  global: { label: 'Global', tone: 'green' },
-  programme: { label: 'Programme', tone: 'blue' },
-  individual: { label: 'Individual', tone: 'brand' },
-};
-
-function getVisibleToolsForEntrepreneur(entrepreneur: Entrepreneur) {
-  return tools.filter((tool) => getEntrepreneurToolAccessSource(tool, entrepreneur) !== 'none');
-}
-
-function EntrepreneurToolAccessList({ entrepreneur }: { entrepreneur: Entrepreneur }) {
-  const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState('');
-  const visibleTools = React.useMemo(() => getVisibleToolsForEntrepreneur(entrepreneur), [entrepreneur]);
-  const visible = visibleTools.slice(0, 2);
-  const hiddenCount = Math.max(visibleTools.length - visible.length, 0);
-  const filteredTools = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return visibleTools;
-    return visibleTools.filter((tool) =>
-      [tool.name, tool.description, tool.type, getEntrepreneurToolAccessSource(tool, entrepreneur)]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [entrepreneur, query, visibleTools]);
-
-  return (
-    <>
-      <div className="flex min-w-[230px] max-w-[320px] flex-wrap items-center gap-1.5">
-        {visible.map((tool) => (
-          <Badge
-            key={tool.id}
-            tone={tool.type === 'pdf' ? 'blue' : 'green'}
-            className="max-w-[155px] truncate"
-            title={tool.name}
-          >
-            {tool.name}
-          </Badge>
-        ))}
-        {hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setOpen(true);
-            }}
-            className="inline-flex items-center rounded-full bg-surface-subtle px-2.5 py-1 text-xs font-semibold leading-tight text-bid transition hover:bg-bid-light focus:outline-none focus-visible:ring-2 focus-visible:ring-bid/30"
-          >
-            +{hiddenCount} more
-          </button>
-        )}
-        {visibleTools.length === 0 && <span className="text-sm text-ink-faint">No tools</span>}
-      </div>
-
-      <Modal open={open} onOpenChange={setOpen} title={`${entrepreneur.businessName} tool access`} width="wide">
-        <div className="space-y-4">
-          <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
-            <div className="text-sm font-semibold text-ink">
-              {visibleTools.length} tool{visibleTools.length === 1 ? '' : 's'} visible
-            </div>
-            <div className="mt-1 text-sm text-ink-muted">
-              These are the tools this entrepreneur can open from their workspace.
-            </div>
-          </div>
-
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search tools..."
-              className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm text-ink outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/15"
-            />
-          </label>
-
-          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-            {filteredTools.map((tool: Tool) => {
-              const source = getEntrepreneurToolAccessSource(tool, entrepreneur) as Exclude<EntrepreneurToolAccessSource, 'none'>;
-              const meta = toolAccessSourceMeta[source];
-              return (
-                <div key={tool.id} className="rounded-xl border border-line bg-white px-4 py-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-ink">{tool.name}</div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">{tool.description}</div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <Badge tone={tool.type === 'pdf' ? 'blue' : 'green'}>{tool.type === 'pdf' ? 'PDF resource' : 'Online tool'}</Badge>
-                        <Badge tone={meta.tone}>{meta.label}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredTools.length === 0 && (
-              <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-                No tool matches this search.
-              </div>
-            )}
-          </div>
-        </div>
-      </Modal>
-    </>
-  );
-}
-
-function formatSessionDate(date: string, startTime?: string) {
-  const label = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-  return startTime ? `${label}, ${startTime}` : label;
-}
-
-function getTrainerWorkload(trainer: Trainer, entrepreneurs: Entrepreneur[]) {
-  const assignedEntrepreneurs = entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(trainer.id, entrepreneur));
-  const assignedIds = new Set(assignedEntrepreneurs.map((entrepreneur) => entrepreneur.id));
-  const trainerSessions = adminSessions.filter((session) => session.trainerId === trainer.id);
-  const pendingSessions = trainerSessions.filter((session) => session.status === 'awaiting-trainer').length;
-  const confirmedSessions = trainerSessions.filter((session) => session.status === 'confirmed').length;
-  const pendingDeliverableReviews = deliverableReviews.filter(
-    (review) =>
-      assignedIds.has(review.entrepreneurId) &&
-      review.status === 'pending-review',
-  ).length;
-  const changesRequestedFollowUps = deliverableReviews.filter(
-    (review) =>
-      assignedIds.has(review.entrepreneurId) &&
-      review.status === 'changes-requested',
-  ).length;
-  const totalProgress = assignedEntrepreneurs.reduce(
-    (sum, entrepreneur) => sum + entrepreneur.metrics.trainingProgress,
-    0,
-  );
-  const averageProgress =
-    assignedEntrepreneurs.length > 0 ? Math.round(totalProgress / assignedEntrepreneurs.length) : 0;
-  const nextSession = trainerSessions
-    .filter((session) => session.status === 'confirmed' || session.status === 'awaiting-trainer')
-    .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`))[0];
-
-  return {
-    averageProgress,
-    changesRequestedFollowUps,
-    confirmedSessions,
-    nextSession,
-    pendingDeliverableReviews,
-    pendingSessions,
-  };
-}
-
 export default function AdminTrainersPage() {
-  const { entrepreneurs, trainers } = useAdminStore();
-  const [activeTab, setActiveTab] = React.useState<TrainerTab>('directory');
+  const [activeTab, setActiveTab] = React.useState<TrainerTab>("directory");
   const [addOpen, setAddOpen] = React.useState(false);
-  const [editTarget, setEditTarget] = React.useState<Trainer | null>(null);
-  const [manageTarget, setManageTarget] = React.useState<Trainer | null>(null);
-  const [query, setQuery] = React.useState('');
-  const [accessFilter, setAccessFilter] = React.useState<'all' | Trainer['accessLevel']>('all');
-  const [statusFilter, setStatusFilter] = React.useState<'all' | Trainer['metrics']['status']>('all');
-  const [specialismFilter, setSpecialismFilter] = React.useState('all');
-  const [calendarFilter, setCalendarFilter] = React.useState<'all' | 'google' | 'none'>('all');
-  const [page, setPage] = React.useState(1);
+  const [editTarget, setEditTarget] = React.useState<TrainerRecord | null>(null);
+  const [detailId, setDetailId] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const deferredSearch = React.useDeferredValue(search);
+  const [access, setAccess] = React.useState<AllOr<TrainerAccessLevel>>("all");
+  const [status, setStatus] = React.useState<AllOr<TrainerDirectoryStatus>>("all");
+  const [calendar, setCalendar] = React.useState<AllOr<TrainerCalendarFilter>>("all");
+  const [sectorId, setSectorId] = React.useState("all");
+  const [sectorOpen, setSectorOpen] = React.useState(false);
+  const [sectorSearch, setSectorSearch] = React.useState("");
+  const deferredSectorSearch = React.useDeferredValue(sectorSearch);
   const [pageSize, setPageSize] = React.useState(10);
 
-  const filteredTrainers = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return trainers.filter((trainer) => {
-      const specialisms = trainer.specialisms.map((specialism) => sectorById[specialism]?.label ?? specialism).join(' ');
-      const matchesQuery =
-        !needle ||
-        [trainer.fullName, trainer.email, trainer.role, specialisms, trainer.calendarProvider ?? 'none']
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-      const matchesAccess = accessFilter === 'all' || trainer.accessLevel === accessFilter;
-      const matchesStatus = statusFilter === 'all' || trainer.metrics.status === statusFilter;
-      const matchesSpecialism =
-        specialismFilter === 'all' || trainer.specialisms.includes(specialismFilter as SectorId);
-      const matchesCalendar =
-        calendarFilter === 'all' ||
-        (calendarFilter === 'google' && trainer.calendarProvider === 'google') ||
-        (calendarFilter === 'none' && (!trainer.calendarProvider || trainer.calendarProvider === 'none'));
-      return matchesQuery && matchesAccess && matchesStatus && matchesSpecialism && matchesCalendar;
-    });
-  }, [accessFilter, calendarFilter, query, specialismFilter, statusFilter, trainers]);
+  const trainers = useTrainersPage({
+    search: deferredSearch.trim() || undefined,
+    accessLevel: access === "all" ? undefined : access,
+    status: status === "all" ? undefined : status,
+    calendarStatus: calendar === "all" ? undefined : calendar,
+    sectorId: sectorId === "all" ? undefined : sectorId,
+    take: pageSize,
+  });
+  const sectors = useLazySectorsQuery({
+    enabled: sectorOpen,
+    search: deferredSectorSearch.trim() || undefined,
+    active: true,
+    take: 20,
+  });
+  const detail = useTrainerDetailQuery(detailId);
+
+  const resetPagination = trainers.resetPagination;
 
   React.useEffect(() => {
-    setPage(1);
-  }, [accessFilter, activeTab, calendarFilter, query, specialismFilter, statusFilter, pageSize]);
+    resetPagination();
+  }, [
+    access,
+    calendar,
+    deferredSearch,
+    pageSize,
+    sectorId,
+    status,
+    resetPagination,
+  ]);
 
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredTrainers.slice(start, start + pageSize);
-  }, [filteredTrainers, page, pageSize]);
-
-  const activeTrainerCount = trainers.filter((trainer) => trainer.metrics.status === 'active').length;
-  const googleReadyCount = trainers.filter((trainer) => trainer.calendarProvider === 'google').length;
-  const supportedEntrepreneurCount = entrepreneurs.filter((entrepreneur) =>
-    trainers.some((trainer) => trainerSupportsEntrepreneur(trainer.id, entrepreneur)),
-  ).length;
-  const trainerLearningAssetCount = trainers.reduce(
-    (total, trainer) => total + getTrainerContentItems(trainer.id).length,
-    0,
-  );
-  const pendingTrainerWork = trainers.reduce((total, trainer) => {
-    const workload = getTrainerWorkload(trainer, entrepreneurs);
-    return total + workload.pendingSessions + workload.pendingDeliverableReviews + workload.changesRequestedFollowUps;
-  }, 0);
-
-  const directoryColumns: Column<Trainer>[] = [
-    {
-      key: 'action',
-      header: 'Action',
-      cell: (trainer) => (
-        <RowActions
-          actions={[
-            { label: 'View entrepreneurs', onSelect: () => setManageTarget(trainer) },
-            { label: 'Edit profile', onSelect: () => setEditTarget(trainer) },
-          ]}
-        />
+  const invite = useInviteTrainerMutation({
+    onSuccess: () => {
+      toast.success("Trainer invitation sent");
+      setAddOpen(false);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const update = useUpdateTrainerMutation({
+    onSuccess: () => {
+      toast.success("Trainer updated");
+      setEditTarget(null);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const updateStatus = useUpdateTrainerStatusMutation({
+    onSuccess: (trainer) =>
+      toast.success(
+        trainer.directoryStatus === "active"
+          ? "Trainer activated"
+          : "Trainer deactivated",
       ),
-      className: 'w-[84px]',
+    onError: (error) => toast.error(error.message),
+  });
+  const resend = useResendTrainerInvitationMutation({
+    onSuccess: () => toast.success("Trainer invitation resent"),
+    onError: (error) => toast.error(error.message),
+  });
+
+  const submitInvite = (values: TrainerForm) => {
+    invite.mutate({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email,
+      roleLabel: values.roleLabel,
+      accessLevel: values.accessLevel,
+      accessExpiresOn:
+        values.accessLevel === "guest" ? values.accessExpiresOn : undefined,
+      sectorIds: values.sectorIds,
+    });
+  };
+
+  const submitEdit = (values: TrainerForm) => {
+    if (!editTarget) return;
+    update.mutate({
+      id: editTarget.trainerUserId,
+      payload: {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: editTarget.phone ?? undefined,
+        roleLabel: values.roleLabel,
+        accessLevel: values.accessLevel,
+        accessExpiresOn:
+          values.accessLevel === "guest" ? values.accessExpiresOn : undefined,
+        sectorIds: values.sectorIds,
+      },
+    });
+  };
+
+  const actionsFor = (trainer: TrainerRecord) => {
+    const actions: Parameters<typeof RowActions>[0]["actions"] = [
+      { label: "View profile", onSelect: () => setDetailId(trainer.trainerUserId) },
+      { label: "Edit profile", onSelect: () => setEditTarget(trainer) },
+    ];
+    if (trainer.directoryStatus === "invited") {
+      actions.push({
+        label: "Resend invitation",
+        onSelect: () => resend.mutate(trainer.trainerUserId),
+        disabled: resend.isPending,
+      });
+    } else {
+      actions.push("separator", {
+        label: trainer.directoryStatus === "inactive" ? "Activate trainer" : "Deactivate trainer",
+        onSelect: () =>
+          updateStatus.mutate({
+            id: trainer.trainerUserId,
+            status: trainer.directoryStatus === "inactive" ? "active" : "inactive",
+          }),
+        disabled: updateStatus.isPending,
+        destructive: trainer.directoryStatus !== "inactive",
+      });
+    }
+    return actions;
+  };
+
+  const directoryColumns: Column<TrainerRecord>[] = [
+    {
+      key: "action",
+      header: "Action",
+      className: "w-[84px]",
+      cell: (trainer) => <RowActions actions={actionsFor(trainer)} />,
     },
     {
-      key: 'name',
-      header: 'Trainer',
+      key: "trainer",
+      header: "Trainer",
       cell: (trainer) => (
         <div className="flex min-w-[220px] items-center gap-3">
           <Avatar
-            initials={trainer.initials}
+            initials={initials(trainer)}
             size={34}
-            tone={trainer.accessLevel === 'guest' ? 'amber' : 'brand'}
+            tone={trainer.accessLevel === "guest" ? "amber" : "brand"}
           />
           <div className="min-w-0">
             <button
               type="button"
-              onClick={() => setManageTarget(trainer)}
-              className="block max-w-[220px] truncate text-left font-semibold text-ink transition hover:text-bid"
+              onClick={() => setDetailId(trainer.trainerUserId)}
+              className="block max-w-[220px] truncate text-left font-semibold text-ink hover:text-bid"
             >
-              {trainer.fullName}
+              {trainer.name}
             </button>
             <div className="mt-0.5 max-w-[240px] truncate text-sm text-ink-muted">
               {trainer.email}
@@ -333,17 +266,15 @@ export default function AdminTrainersPage() {
         </div>
       ),
     },
-    { key: 'role', header: 'Role', cell: (trainer) => trainer.role },
+    { key: "role", header: "Role", cell: (trainer) => roleLabels[trainer.roleLabel] },
     {
-      key: 'specialisms',
-      header: 'Specialisms',
+      key: "specialisms",
+      header: "Specialisms",
       cell: (trainer) => (
-        <div className="flex max-w-[260px] flex-wrap gap-1.5">
-          {trainer.specialisms.length > 0 ? (
-            trainer.specialisms.map((specialism) => (
-              <Badge key={specialism} tone={sectorById[specialism]?.color ?? 'neutral'}>
-                {sectorById[specialism]?.label ?? specialism}
-              </Badge>
+        <div className="flex max-w-[280px] flex-wrap gap-1.5">
+          {trainer.specialisms.length ? (
+            trainer.specialisms.map((sector) => (
+              <Badge key={sector.id} tone="blue">{sector.name}</Badge>
             ))
           ) : (
             <span className="text-ink-faint">No specialism set</span>
@@ -351,411 +282,239 @@ export default function AdminTrainersPage() {
         </div>
       ),
     },
-    { key: 'reach', header: 'Entrepreneurs', cell: (trainer) => <TrainerPortfolioCell trainer={trainer} entrepreneurs={entrepreneurs} /> },
-    { key: 'calendar', header: 'Calendar support', cell: (trainer) => <CalendarStatusBadge provider={trainer.calendarProvider} /> },
+    { key: "portfolio", header: "Portfolio", cell: (trainer) => <PortfolioCell trainer={trainer} /> },
+    { key: "calendar", header: "Calendar", cell: (trainer) => <CalendarBadge connected={trainer.calendar.connected} /> },
     {
-      key: 'access',
-      header: 'Access level',
-      cell: (t) => (
-        <Badge tone={t.accessLevel === 'guest' ? 'amber' : 'green'}>
-          {t.accessLevel === 'guest' ? 'Guest · temporary' : 'Full access'}
+      key: "access",
+      header: "Access",
+      cell: (trainer) => (
+        <Badge tone={trainer.accessLevel === "guest" ? "amber" : "green"}>
+          {trainer.accessLevel === "guest" ? "Guest · temporary" : "Full access"}
         </Badge>
       ),
     },
-    { key: 'status', header: 'Status', cell: (trainer) => <TrainerStatusBadge trainer={trainer} /> },
+    { key: "status", header: "Status", cell: (trainer) => <StatusBadge trainer={trainer} /> },
   ];
 
-  const workloadColumns: Column<Trainer>[] = [
+  const workloadColumns: Column<TrainerRecord>[] = [
+    directoryColumns[1],
+    { key: "portfolio", header: "Coverage", cell: (trainer) => <PortfolioCell trainer={trainer} /> },
     {
-      key: 'trainer',
-      header: 'Trainer',
-      className: 'min-w-[190px]',
-      headerClassName: 'min-w-[190px]',
-      cell: (t) => (
-        <div className="flex min-w-[170px] items-center gap-3">
-          <Avatar initials={t.initials} size={24} />
-          <button
-            type="button"
-            onClick={() => setManageTarget(t)}
-            className="max-w-[150px] truncate text-left font-medium text-ink transition hover:text-bid"
-            title={t.fullName}
-          >
-            {t.fullName}
-          </button>
+      key: "programmes",
+      header: "Programmes",
+      cell: (trainer) => (
+        <div className="min-w-[180px] text-sm">
+          <div className="font-medium text-ink">{trainer.portfolio.programmes.length} programme{trainer.portfolio.programmes.length === 1 ? "" : "s"}</div>
+          <div className="mt-0.5 text-ink-muted">{trainer.portfolio.contentItems} supported assets</div>
         </div>
       ),
     },
     {
-      key: 'reach',
-      header: 'Entrepreneurs',
-      cell: (trainer) => <TrainerPortfolioCell trainer={trainer} entrepreneurs={entrepreneurs} />,
+      key: "progress",
+      header: "Avg. learner progress",
+      cell: (trainer) => `${trainer.portfolio.averageLearnerProgress}%`,
     },
     {
-      key: 'sessions',
-      header: 'Session queue',
-      cell: (trainer) => {
-        const workload = getTrainerWorkload(trainer, entrepreneurs);
-        return (
-          <div className="min-w-[150px] text-sm">
-            <div className="font-medium text-ink">{workload.pendingSessions} awaiting response</div>
-            <div className="mt-0.5 text-ink-muted">{workload.confirmedSessions} confirmed</div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'reviews',
-      header: 'Deliverable feedback',
-      cell: (trainer) => {
-        const workload = getTrainerWorkload(trainer, entrepreneurs);
-        const totalFeedbackWork = workload.pendingDeliverableReviews + workload.changesRequestedFollowUps;
-        return totalFeedbackWork > 0 ? (
-          <div className="min-w-[170px] text-sm">
-            <div className="font-medium text-ink">
-              {workload.pendingDeliverableReviews} pending review
-            </div>
-            <div className="mt-0.5 text-ink-muted">
-              {workload.changesRequestedFollowUps} changes follow-up
-            </div>
-          </div>
+      key: "rating",
+      header: "Rating",
+      cell: (trainer) =>
+        trainer.ratings.average == null ? (
+          <span className="text-ink-faint">No ratings</span>
         ) : (
-          <Badge tone="green">Clear</Badge>
-        );
-      },
-    },
-    {
-      key: 'progress',
-      header: 'Avg. training progress',
-      cell: (trainer) => {
-        const workload = getTrainerWorkload(trainer, entrepreneurs);
-        return `${workload.averageProgress}%`;
-      },
-    },
-    {
-      key: 'next',
-      header: 'Next session',
-      cell: (trainer) => {
-        const workload = getTrainerWorkload(trainer, entrepreneurs);
-        if (!workload.nextSession) return <span className="text-ink-faint">No upcoming session</span>;
-        return (
-          <div className="min-w-[180px] text-sm">
-            <div className="font-medium text-ink">{workload.nextSession.topic}</div>
-            <div className="mt-0.5 text-ink-muted">
-              {formatSessionDate(workload.nextSession.date, workload.nextSession.startTime)}
-            </div>
+          <div>
+            <span className="font-medium">{trainer.ratings.average.toFixed(1)}/5</span>
+            <span className="ml-1 text-ink-muted">({trainer.ratings.count})</span>
           </div>
-        );
-      },
+        ),
     },
+    { key: "calendar", header: "Calendar", cell: (trainer) => <CalendarBadge connected={trainer.calendar.connected} /> },
   ];
+
+  const sectorOptions = [
+    { value: "all", label: "All specialisms" },
+    ...(sectors.data?.pages.flatMap((page) => page.items) ?? []).map((sector) => ({
+      value: sector.id,
+      label: sector.name,
+    })),
+  ];
+
+  if (trainers.isLoading && !trainers.data) {
+    return <TrainersSkeleton />;
+  }
 
   return (
     <>
       <PageHeader
         title="Trainers"
         description="Manage trainer profiles, programme coverage, calendar readiness, and workload"
-        actions={<Button onClick={() => setAddOpen(true)}>+ Add trainer</Button>}
+        actions={<Button onClick={() => setAddOpen(true)}>+ Invite trainer</Button>}
       />
       <Notice>
         Trainers see the entrepreneurs, programmes, sessions, and review work connected to the learning assets they support.
       </Notice>
       <MetricGrid className="mb-4">
-        <StatCard
-          label="Active trainers"
-          value={`${activeTrainerCount}/${trainers.length}`}
-          subline="Can support programme delivery"
-          dotColor="success"
-          accent="success"
-        />
-        <StatCard
-          label="Calendar ready"
-          value={googleReadyCount}
-          subline="Can accept Google Meet sessions"
-          dotColor="info"
-          accent="info"
-        />
-        <StatCard
-          label="Entrepreneurs covered"
-          value={`${supportedEntrepreneurCount}/${entrepreneurs.length}`}
-          subline={`${trainerLearningAssetCount} learning assets supported`}
-          dotColor="bid"
-          accent="bid"
-        />
-        <StatCard
-          label="Open trainer work"
-          value={pendingTrainerWork}
-          subline="Sessions and feedback needing action"
-          dotColor={pendingTrainerWork > 0 ? 'warning' : 'success'}
-          accent={pendingTrainerWork > 0 ? 'warning' : 'success'}
-        />
+        <StatCard label="Total trainers" value={trainers.summary.totalTrainers} subline="Across every status" dotColor="bid" accent="bid" />
+        <StatCard label="Active trainers" value={trainers.summary.activeTrainers} subline="Can support delivery" dotColor="success" accent="success" />
+        <StatCard label="Pending invites" value={trainers.summary.pendingInvites} subline="Awaiting activation" dotColor="warning" accent="warning" />
+        <StatCard label="Calendar ready" value={trainers.summary.calendarReady} subline="Google Calendar connected" dotColor="info" accent="info" />
       </MetricGrid>
       <Tabs value={activeTab} onChange={setActiveTab} tabs={trainerTabs} />
       <Card>
         <CardHeader
-          title={activeTab === 'directory' ? 'Trainer directory' : 'Trainer workload overview'}
-          description={`${filteredTrainers.length} trainer${filteredTrainers.length === 1 ? '' : 's'} in this view`}
+          title={activeTab === "directory" ? "Trainer directory" : "Trainer workload overview"}
+          description={`${trainers.totalItems} trainer${trainers.totalItems === 1 ? "" : "s"} in this view`}
         />
         <TableToolbar>
           <div>
             <div className="text-sm font-medium text-ink">Filter trainers</div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search by name, role, specialism, email, or calendar provider.
+              Search and filter against the full trainer directory.
             </div>
           </div>
           <div className="grid w-full gap-2">
-            <TableFilterInput
-              icon
-              placeholder="Search trainers..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <TableFilterInput icon placeholder="Search trainers..." value={search} onChange={(event) => setSearch(event.target.value)} />
             <TableFilterAutocomplete
-              value={specialismFilter}
-              onValueChange={setSpecialismFilter}
-              options={[
-                { value: 'all', label: 'All specialisms' },
-                ...sectors.map((sector) => ({ value: sector.id, label: sector.label })),
-              ]}
+              value={sectorId}
+              onValueChange={setSectorId}
+              options={sectorOptions}
               placeholder="All specialisms"
               searchPlaceholder="Search specialisms..."
-              emptyMessage="No specialism found."
+              emptyMessage="No active specialism found."
+              isLoading={sectors.isFetching}
+              onOpenChange={setSectorOpen}
+              onSearchChange={setSectorSearch}
+              hasMore={Boolean(sectors.hasNextPage)}
+              onLoadMore={() => void sectors.fetchNextPage()}
             />
-            <TableFilterSelect value={accessFilter} onChange={(event) => setAccessFilter(event.target.value as typeof accessFilter)}>
+            <TableFilterSelect value={access} onChange={(event) => setAccess(event.target.value as typeof access)}>
               <option value="all">All access</option>
               <option value="full">Full access</option>
               <option value="guest">Guest access</option>
             </TableFilterSelect>
-            <TableFilterSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
+            <TableFilterSelect value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
               <option value="all">All statuses</option>
               <option value="active">Active</option>
-              <option value="expires-soon">Expires soon</option>
+              <option value="invited">Invited</option>
               <option value="inactive">Inactive</option>
             </TableFilterSelect>
-            <TableFilterSelect value={calendarFilter} onChange={(event) => setCalendarFilter(event.target.value as typeof calendarFilter)}>
+            <TableFilterSelect value={calendar} onChange={(event) => setCalendar(event.target.value as typeof calendar)}>
               <option value="all">All calendars</option>
-              <option value="google">Google connected</option>
-              <option value="none">No calendar</option>
+              <option value="connected">Google connected</option>
+              <option value="not_connected">Not connected</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        <DataTable
-          columns={activeTab === 'directory' ? directoryColumns : workloadColumns}
-          rows={pageRows}
-          rowKey={(t) => t.id}
-          emptyMessage="No trainers match these filters."
-          tableClassName={activeTab === 'directory' ? 'min-w-[1120px]' : 'min-w-[1080px]'}
-        />
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filteredTrainers.length}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
-        />
+        {trainers.isError ? (
+          <Notice>
+            Trainers could not be loaded. {trainers.error.message}
+            <Button className="ml-3" variant="outline" onClick={() => void trainers.refetch()}>
+              Try again
+            </Button>
+          </Notice>
+        ) : (
+          <>
+            <DataTable
+              columns={activeTab === "directory" ? directoryColumns : workloadColumns}
+              rows={trainers.rows}
+              rowKey={(trainer) => trainer.trainerUserId}
+              emptyMessage="No trainers match these filters."
+              tableClassName={activeTab === "directory" ? "min-w-[1120px]" : "min-w-[980px]"}
+            />
+            <TablePagination
+              page={trainers.page}
+              pageSize={pageSize}
+              totalItems={trainers.totalItems}
+              onPageChange={trainers.setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </>
+        )}
       </Card>
 
-      <TrainerModal open={addOpen} onOpenChange={setAddOpen} mode="add" />
-      {editTarget && (
+      <TrainerModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        mode="add"
+        isPending={invite.isPending}
+        onSubmit={submitInvite}
+      />
+      {editTarget ? (
         <TrainerModal
-          open={!!editTarget}
-          onOpenChange={(o) => !o && setEditTarget(null)}
+          open
+          onOpenChange={(open) => !open && setEditTarget(null)}
           mode="edit"
           trainer={editTarget}
+          isPending={update.isPending}
+          onSubmit={submitEdit}
         />
-      )}
-      {manageTarget && (
-        <Modal
-          open={!!manageTarget}
-          onOpenChange={(o) => !o && setManageTarget(null)}
-          title={`${manageTarget.fullName} - entrepreneurs`}
-          width="xl"
-        >
-          <div className="mb-4 rounded-xl bg-surface-subtle px-4 py-3 text-sm leading-6 text-ink-muted">
-            These entrepreneurs are currently in {manageTarget.fullName}'s training portfolio.
-          </div>
-          <AssignedTable trainer={manageTarget} entrepreneurs={entrepreneurs} />
-        </Modal>
-      )}
+      ) : null}
+      <TrainerDetailModal
+        open={Boolean(detailId)}
+        onOpenChange={(open) => !open && setDetailId(null)}
+        trainer={detail.data}
+        isLoading={detail.isLoading}
+        error={detail.error}
+      />
     </>
   );
 }
 
-function AssignedTable({ trainer, entrepreneurs }: { trainer: Trainer; entrepreneurs: Entrepreneur[] }) {
-  const [query, setQuery] = React.useState('');
-  const [programmeFilter, setProgrammeFilter] = React.useState('all');
-  const [sectorFilter, setSectorFilter] = React.useState('all');
-  const [stageFilter, setStageFilter] = React.useState('all');
-  const [statusFilter, setStatusFilter] = React.useState('all');
-  const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(5);
-  const assigned = entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(trainer.id, entrepreneur));
-  const trainerProgrammes = getTrainerProgrammes(trainer.id);
-  const filteredAssigned = assigned.filter((e) => {
-    const needle = query.trim().toLowerCase();
-    const programmeNames = getEntrepreneurProgrammes(e, programs)
-      .map((programme) => programme.name)
-      .join(' ');
-    const toolNames = getVisibleToolsForEntrepreneur(e)
-      .map((tool) => tool.name)
-      .join(' ');
-    const matchesQuery = !needle || [e.representative, e.businessName, e.email, e.stage, e.country, programmeNames, toolNames]
-      .join(' ')
-      .toLowerCase()
-      .includes(needle);
-    const matchesProgramme = programmeFilter === 'all' || entrepreneurHasProgramme(e, programmeFilter);
-    const matchesSector = sectorFilter === 'all' || e.sector === sectorFilter;
-    const matchesStage = stageFilter === 'all' || e.stage === stageFilter;
-    const matchesStatus = statusFilter === 'all' || e.status === statusFilter;
-
-    return matchesQuery && matchesProgramme && matchesSector && matchesStage && matchesStatus;
-  });
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [programmeFilter, query, sectorFilter, stageFilter, statusFilter, pageSize]);
-
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAssigned.slice(start, start + pageSize);
-  }, [filteredAssigned, page, pageSize]);
-
+function TrainerDetailModal({
+  open,
+  onOpenChange,
+  trainer,
+  isLoading,
+  error,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trainer?: TrainerRecord;
+  isLoading: boolean;
+  error: Error | null;
+}) {
   return (
-    <>
-      <TableToolbar className="mb-3">
-        <div>
-          <div className="text-sm font-medium text-ink">My entrepreneurs</div>
-          <div className="mt-0.5 text-sm text-ink-muted">
-            Filter this trainer's entrepreneurs by programme, sector, stage, or status.
+    <Modal open={open} onOpenChange={onOpenChange} title={trainer ? `${trainer.name} – profile` : "Trainer profile"} width="xl">
+      {isLoading ? (
+        <div className="space-y-3" aria-busy="true">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-28 w-full" />
+        </div>
+      ) : error || !trainer ? (
+        <Notice>Trainer profile could not be loaded. {error?.message}</Notice>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatCard label="Entrepreneurs" value={trainer.portfolio.inferredEntrepreneurs} subline="Inferred from supported content" dotColor="bid" accent="bid" />
+            <StatCard label="Learning assets" value={trainer.portfolio.contentItems} subline="Supported content" dotColor="info" accent="info" />
+            <StatCard label="Average progress" value={`${trainer.portfolio.averageLearnerProgress}%`} subline="Across supported learners" dotColor="success" accent="success" />
+          </div>
+          <div className="rounded-xl border border-line p-4">
+            <div className="font-semibold text-ink">Programme coverage</div>
+            <div className="mt-3 space-y-2">
+              {trainer.portfolio.programmes.length ? trainer.portfolio.programmes.map((programme) => (
+                <div key={programme.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-subtle px-3 py-2">
+                  <span className="font-medium text-ink">{programme.name}</span>
+                  <Badge tone={programme.accessType === "free" ? "green" : "blue"}>
+                    {programme.accessType === "free" ? "Free access" : "Assigned"}
+                  </Badge>
+                </div>
+              )) : <span className="text-sm text-ink-muted">No programme coverage yet.</span>}
+            </div>
           </div>
         </div>
-        <div className="grid w-full gap-2">
-          <TableFilterInput
-            icon
-            placeholder="Search assignments..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <TableFilterAutocomplete
-            value={programmeFilter}
-            onValueChange={setProgrammeFilter}
-            options={[
-              { value: 'all', label: 'All programmes' },
-              ...trainerProgrammes.map((programme) => ({ value: programme.id, label: programme.name })),
-            ]}
-            placeholder="All programmes"
-            searchPlaceholder="Search programmes..."
-            emptyMessage="No programme found."
-          />
-          <TableFilterAutocomplete
-            value={sectorFilter}
-            onValueChange={setSectorFilter}
-            options={[
-              { value: 'all', label: 'All sectors' },
-              ...sectors.map((sector) => ({ value: sector.id, label: sector.label })),
-            ]}
-            placeholder="All sectors"
-            searchPlaceholder="Search sectors..."
-            emptyMessage="No sector found."
-          />
-          <TableFilterAutocomplete
-            value={stageFilter}
-            onValueChange={setStageFilter}
-            options={[
-              { value: 'all', label: 'All stages' },
-              ...stages.map((stage) => ({ value: stage.id, label: stage.label })),
-            ]}
-            placeholder="All stages"
-            searchPlaceholder="Search stages..."
-            emptyMessage="No stage found."
-          />
-          <TableFilterSelect
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="unassigned">Unassigned</option>
-            <option value="inactive">Inactive</option>
-          </TableFilterSelect>
-        </div>
-      </TableToolbar>
-      <DataTable
-        columns={[
-          {
-            key: 'name',
-            header: 'Entrepreneur',
-            cell: (e) => (
-              <div className="flex items-center gap-2">
-                <Avatar initials={e.initials} size={24} />
-                <span>{e.representative}</span>
-              </div>
-            ),
-          },
-          { key: 'biz', header: 'Business', cell: (e) => e.businessName },
-          {
-            key: 'programme',
-            header: 'Programmes',
-            cell: (e) => (
-              <ProgrammeAccessList
-                programmes={getEntrepreneurProgrammes(e, programs)}
-                maxVisible={2}
-                modalTitle={`${e.businessName} programme access`}
-                className="max-w-[300px]"
-              />
-            ),
-          },
-          {
-            key: 'tools',
-            header: 'Tools',
-            cell: (e) => <EntrepreneurToolAccessList entrepreneur={e} />,
-          },
-          {
-            key: 'sector',
-            header: 'Sector',
-            cell: (e) => (
-              <Badge tone={sectorById[e.sector]?.color ?? 'neutral'}>
-                {sectorById[e.sector]?.label ?? e.sector}
-              </Badge>
-            ),
-          },
-          {
-            key: 'stage',
-            header: 'Stage',
-            cell: (e) => (
-              <Badge tone={stageById[e.stage]?.color ?? 'brand'}>
-                {stageById[e.stage]?.label ?? e.stage}
-              </Badge>
-            ),
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            cell: (e) => (
-              <Badge tone={e.status === 'active' ? 'green' : e.status === 'unassigned' ? 'red' : 'neutral'}>
-                {e.status.charAt(0).toUpperCase() + e.status.slice(1)}
-              </Badge>
-            ),
-          },
-        ]}
-        rows={pageRows}
-        rowKey={(e) => e.id}
-        emptyMessage="No entrepreneurs match this search."
-        tableClassName="min-w-[1220px]"
-      />
-      <TablePagination
-        page={page}
-        pageSize={pageSize}
-        totalItems={filteredAssigned.length}
-        pageSizeOptions={[5, 10, 25]}
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
-        }}
-      />
-    </>
+      )}
+    </Modal>
+  );
+}
+
+function TrainersSkeleton() {
+  return (
+    <div aria-label="Loading trainers" aria-busy="true">
+      <Skeleton className="h-16 w-full" />
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-28 w-full" />)}
+      </div>
+      <Skeleton className="mt-4 h-[440px] w-full" />
+    </div>
   );
 }

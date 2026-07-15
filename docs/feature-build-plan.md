@@ -159,6 +159,8 @@ Done when:
 - Trainer actions are limited to sessions and deliverable reviews.
 - Trainer lookup/autocomplete endpoints are lazy, searchable, and paginated.
 
+Implementation status (2026-07-15): Complete. The authenticated trainer directory uses backend search, filters, cursor pagination, totals, summary metrics, content-derived portfolio and workload aggregates, lazy specialism lookup, detail, invitation/resend/acceptance, status, and capability editing. Trainer self-settings use the shared profile identity fields and reusable encrypted Google Calendar OAuth connection; the unsupported bio and maximum-entrepreneur inputs were removed. Trainer invitations and lifecycle changes are audited and use module-owned branded email templates. The shared trainer notification entry point remains in the trainer shell. Google Meet session acceptance now requires a connected Google Calendar; full calendar event creation, availability, rescheduling, and the cross-role session state machine remain scoped to Feature 12.
+
 ### 6. Entrepreneur Profile And Access
 
 Scope:
