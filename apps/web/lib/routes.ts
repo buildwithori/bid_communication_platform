@@ -40,6 +40,7 @@ export const routes = {
     programs: '/admin/programs',
     program: (programId: string): Route => `/admin/programs/${programId}` as Route,
     content: '/admin/content',
+    contentModule: (moduleId: string): Route => `/admin/content?moduleId=${moduleId}` as Route,
     entrepreneurTools: '/admin/entrepreneur-tools',
     deliverableReviews: '/admin/deliverable-reviews',
     sessions: '/admin/sessions',

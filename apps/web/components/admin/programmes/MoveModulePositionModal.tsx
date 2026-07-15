@@ -4,7 +4,9 @@ import * as React from 'react';
 import { Button } from '@/components/shared/Button';
 import { FormField, FormInput } from '@/components/shared/FormField';
 import { Modal } from '@/components/shared/Modal';
-import type { Module, Program } from '@/types';
+
+type MoveModule = { id: string; title: string };
+type MoveProgramme = { name: string };
 
 export function MoveModulePositionModal({
   open,
@@ -14,42 +16,58 @@ export function MoveModulePositionModal({
   currentPosition,
   totalModules,
   onMove,
+  isPending = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  module: Module | null;
-  program: Program | null;
+  module: MoveModule | null;
+  program: MoveProgramme | null;
   currentPosition: number;
   totalModules: number;
-  onMove: (position: number) => void;
+  onMove: (position: number) => void | Promise<void>;
+  isPending?: boolean;
 }) {
-  const [position, setPosition] = React.useState('');
+  const [position, setPosition] = React.useState(() =>
+    currentPosition ? String(currentPosition) : '',
+  );
   const [error, setError] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const busy = isPending || submitting;
 
-  React.useEffect(() => {
-    if (open) {
-      setPosition(currentPosition ? String(currentPosition) : '');
-      setError('');
-    }
-  }, [currentPosition, open]);
 
   if (!module || !program) return null;
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextPosition = Number(position);
 
-    if (!Number.isInteger(nextPosition) || nextPosition < 1 || nextPosition > totalModules) {
+    if (
+      !Number.isInteger(nextPosition) ||
+      nextPosition < 1 ||
+      nextPosition > totalModules
+    ) {
       setError(`Enter a number from 1 to ${totalModules}.`);
       return;
     }
 
-    onMove(nextPosition);
-    onOpenChange(false);
+    setSubmitting(true);
+    try {
+      await onMove(nextPosition);
+      onOpenChange(false);
+    } catch {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Move module" width="md">
+    <Modal
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!busy) onOpenChange(nextOpen);
+      }}
+      title="Move module"
+      width="md"
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
           <div className="text-sm font-semibold text-ink">{module.title}</div>
@@ -64,6 +82,7 @@ export function MoveModulePositionModal({
             min={1}
             max={totalModules}
             value={position}
+            disabled={busy}
             onChange={(event) => {
               setPosition(event.target.value);
               setError('');
@@ -74,10 +93,21 @@ export function MoveModulePositionModal({
         </FormField>
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button type="submit">Move module</Button>
+          <Button
+            type="submit"
+            isLoading={busy}
+            loadingLabel="Moving module..."
+          >
+            Move module
+          </Button>
         </div>
       </form>
     </Modal>

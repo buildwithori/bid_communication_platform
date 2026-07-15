@@ -147,6 +147,7 @@ export function useProgrammeModulesPage(
       listProgrammeModulesRequest(programmeId, { ...query, cursor }),
     enabled: Boolean(programmeId),
   });
+  const rows: ProgrammeModuleRecord[] = result.data?.items ?? [];
 
   const resetPagination = useCallback(() => {
     setCurrentPage(1);
@@ -178,7 +179,7 @@ export function useProgrammeModulesPage(
   return {
     ...result,
     page,
-    rows: result.data?.items ?? [],
+    rows,
     totalItems: result.data?.totalItems ?? 0,
     setPage,
     resetPagination,

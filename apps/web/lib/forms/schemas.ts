@@ -125,8 +125,15 @@ export const programSchema = z
 export type ProgramForm = z.infer<typeof programSchema>;
 
 export const moduleSchema = z.object({
-  title: z.string().min(1, 'Module title is required'),
-  description: z.string().optional(),
+  title: z
+    .string()
+    .trim()
+    .min(2, 'Module title must be at least 2 characters')
+    .max(160, 'Module title must be 160 characters or fewer'),
+  description: z
+    .string()
+    .max(2000, 'Description must be 2,000 characters or fewer')
+    .optional(),
 });
 export type ModuleForm = z.infer<typeof moduleSchema>;
 

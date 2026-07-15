@@ -570,6 +570,7 @@ export function ProgrammeWorkspaceView({
       />
 
       <MoveModulePositionModal
+        key={movePositionModule?.id ?? 'closed'}
         open={!!movePositionModule}
         onOpenChange={(open) => !open && setMovePositionModule(null)}
         module={movePositionModule}
