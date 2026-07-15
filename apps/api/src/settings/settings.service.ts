@@ -42,256 +42,221 @@ export class SettingsService {
   }
 
   updateCompanySettings(dto: UpdateCompanySettingsDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const settings = await tx.companySettings.upsert({
-        where: { singletonKey: COMPANY_SETTINGS_KEY },
-        update: dto,
-        create: { singletonKey: COMPANY_SETTINGS_KEY, ...dto },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.company.updated",
-          entityType: "companySettings",
-          entityId: settings.id,
-          summary: "Company settings updated",
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return settings;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.company.updated",
+        entityType: "companySettings",
+        entityId: (settings) => settings.id,
+        summary: "Company settings updated",
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.companySettings.upsert({
+          where: { singletonKey: COMPANY_SETTINGS_KEY },
+          update: dto,
+          create: { singletonKey: COMPANY_SETTINGS_KEY, ...dto },
+        }),
+    );
   }
 
   async createSector(dto: CreateSectorDto) {
     const key = this.normalizeKey(dto.key ?? dto.name);
     await this.ensureUniqueKey("sector", key);
 
-    return this.prisma.$transaction(async (tx) => {
-      const sector = await tx.sector.create({
-        data: { name: dto.name.trim(), key, active: dto.active ?? true },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.sector.created",
-          entityType: "sector",
-          entityId: sector.id,
-          summary: `Sector ${sector.name} created`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return sector;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.sector.created",
+        entityType: "sector",
+        entityId: (sector) => sector.id,
+        summary: (sector) => `Sector ${sector.name} created`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.sector.create({
+          data: { name: dto.name.trim(), key, active: dto.active ?? true },
+        }),
+    );
   }
 
   async updateSector(id: string, dto: UpdateSectorDto) {
     await this.ensureSectorExists(id);
     const key = dto.key ? this.normalizeKey(dto.key) : undefined;
-    if (key) {
-      await this.ensureUniqueKey("sector", key, id);
-    }
+    if (key) await this.ensureUniqueKey("sector", key, id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const sector = await tx.sector.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(key !== undefined ? { key } : {}),
-          ...(dto.active !== undefined ? { active: dto.active } : {}),
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.sector.updated",
-          entityType: "sector",
-          entityId: sector.id,
-          summary: `Sector ${sector.name} updated`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return sector;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.sector.updated",
+        entityType: "sector",
+        entityId: (sector) => sector.id,
+        summary: (sector) => `Sector ${sector.name} updated`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.sector.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(key !== undefined ? { key } : {}),
+            ...(dto.active !== undefined ? { active: dto.active } : {}),
+          },
+        }),
+    );
   }
 
   async createBusinessStage(dto: CreateBusinessStageDto) {
     const key = this.normalizeKey(dto.key ?? dto.name);
     await this.ensureUniqueKey("businessStage", key);
 
-    return this.prisma.$transaction(async (tx) => {
-      const stage = await tx.businessStage.create({
-        data: {
-          name: dto.name.trim(),
-          key,
-          definition: dto.definition.trim(),
-          active: dto.active ?? true,
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.business-stage.created",
-          entityType: "businessStage",
-          entityId: stage.id,
-          summary: `Business stage ${stage.name} created`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return stage;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.business-stage.created",
+        entityType: "businessStage",
+        entityId: (stage) => stage.id,
+        summary: (stage) => `Business stage ${stage.name} created`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.businessStage.create({
+          data: {
+            name: dto.name.trim(),
+            key,
+            definition: dto.definition.trim(),
+            active: dto.active ?? true,
+          },
+        }),
+    );
   }
 
   async updateBusinessStage(id: string, dto: UpdateBusinessStageDto) {
     await this.ensureBusinessStageExists(id);
     const key = dto.key ? this.normalizeKey(dto.key) : undefined;
-    if (key) {
-      await this.ensureUniqueKey("businessStage", key, id);
-    }
+    if (key) await this.ensureUniqueKey("businessStage", key, id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const stage = await tx.businessStage.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(key !== undefined ? { key } : {}),
-          ...(dto.definition !== undefined
-            ? { definition: dto.definition.trim() }
-            : {}),
-          ...(dto.active !== undefined ? { active: dto.active } : {}),
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.business-stage.updated",
-          entityType: "businessStage",
-          entityId: stage.id,
-          summary: `Business stage ${stage.name} updated`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return stage;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.business-stage.updated",
+        entityType: "businessStage",
+        entityId: (stage) => stage.id,
+        summary: (stage) => `Business stage ${stage.name} updated`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.businessStage.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(key !== undefined ? { key } : {}),
+            ...(dto.definition !== undefined
+              ? { definition: dto.definition.trim() }
+              : {}),
+            ...(dto.active !== undefined ? { active: dto.active } : {}),
+          },
+        }),
+    );
   }
 
   async createProgrammeGoalType(dto: CreateProgrammeGoalTypeDto) {
     const key = this.normalizeKey(dto.key ?? dto.name);
     await this.ensureUniqueKey("programmeGoalType", key);
 
-    return this.prisma.$transaction(async (tx) => {
-      const goalType = await tx.programmeGoalType.create({
-        data: {
-          name: dto.name.trim(),
-          key,
-          description: dto.description?.trim() || null,
-          requiresTargetAmount: dto.requiresTargetAmount ?? false,
-          active: dto.active ?? true,
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.programme-goal-type.created",
-          entityType: "programmeGoalType",
-          entityId: goalType.id,
-          summary: `Programme goal type ${goalType.name} created`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return goalType;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.programme-goal-type.created",
+        entityType: "programmeGoalType",
+        entityId: (goalType) => goalType.id,
+        summary: (goalType) => `Programme goal type ${goalType.name} created`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.programmeGoalType.create({
+          data: {
+            name: dto.name.trim(),
+            key,
+            description: dto.description?.trim() || null,
+            requiresTargetAmount: dto.requiresTargetAmount ?? false,
+            active: dto.active ?? true,
+          },
+        }),
+    );
   }
 
   async updateProgrammeGoalType(id: string, dto: UpdateProgrammeGoalTypeDto) {
     await this.ensureProgrammeGoalTypeExists(id);
     const key = dto.key ? this.normalizeKey(dto.key) : undefined;
-    if (key) {
-      await this.ensureUniqueKey("programmeGoalType", key, id);
-    }
+    if (key) await this.ensureUniqueKey("programmeGoalType", key, id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const goalType = await tx.programmeGoalType.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(key !== undefined ? { key } : {}),
-          ...(dto.description !== undefined
-            ? { description: dto.description.trim() || null }
-            : {}),
-          ...(dto.requiresTargetAmount !== undefined
-            ? { requiresTargetAmount: dto.requiresTargetAmount }
-            : {}),
-          ...(dto.active !== undefined ? { active: dto.active } : {}),
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.programme-goal-type.updated",
-          entityType: "programmeGoalType",
-          entityId: goalType.id,
-          summary: `Programme goal type ${goalType.name} updated`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return goalType;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.programme-goal-type.updated",
+        entityType: "programmeGoalType",
+        entityId: (goalType) => goalType.id,
+        summary: (goalType) => `Programme goal type ${goalType.name} updated`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.programmeGoalType.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(key !== undefined ? { key } : {}),
+            ...(dto.description !== undefined
+              ? { description: dto.description.trim() || null }
+              : {}),
+            ...(dto.requiresTargetAmount !== undefined
+              ? { requiresTargetAmount: dto.requiresTargetAmount }
+              : {}),
+            ...(dto.active !== undefined ? { active: dto.active } : {}),
+          },
+        }),
+    );
   }
 
   async createToolArea(dto: CreateToolAreaDto) {
     const key = this.normalizeKey(dto.key ?? dto.name);
     await this.ensureUniqueKey("toolArea", key);
 
-    return this.prisma.$transaction(async (tx) => {
-      const toolArea = await tx.toolArea.create({
-        data: {
-          name: dto.name.trim(),
-          key,
-          active: dto.active ?? true,
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.tool-area.created",
-          entityType: "toolArea",
-          entityId: toolArea.id,
-          summary: `Tool area ${toolArea.name} created`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return toolArea;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.tool-area.created",
+        entityType: "toolArea",
+        entityId: (toolArea) => toolArea.id,
+        summary: (toolArea) => `Tool area ${toolArea.name} created`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.toolArea.create({
+          data: {
+            name: dto.name.trim(),
+            key,
+            active: dto.active ?? true,
+          },
+        }),
+    );
   }
 
   async updateToolArea(id: string, dto: UpdateToolAreaDto) {
     await this.ensureToolAreaExists(id);
     const key = dto.key ? this.normalizeKey(dto.key) : undefined;
-    if (key) {
-      await this.ensureUniqueKey("toolArea", key, id);
-    }
+    if (key) await this.ensureUniqueKey("toolArea", key, id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const toolArea = await tx.toolArea.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(key !== undefined ? { key } : {}),
-          ...(dto.active !== undefined ? { active: dto.active } : {}),
-        },
-      });
-      await this.audit.enqueue(
-        {
-          action: "settings.tool-area.updated",
-          entityType: "toolArea",
-          entityId: toolArea.id,
-          summary: `Tool area ${toolArea.name} updated`,
-          payload: { ...dto },
-        },
-        tx,
-      );
-      return toolArea;
-    });
+    return this.audit.capture(
+      {
+        action: "settings.tool-area.updated",
+        entityType: "toolArea",
+        entityId: (toolArea) => toolArea.id,
+        summary: (toolArea) => `Tool area ${toolArea.name} updated`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.toolArea.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(key !== undefined ? { key } : {}),
+            ...(dto.active !== undefined ? { active: dto.active } : {}),
+          },
+        }),
+    );
   }
 
   async listSectors(query: LookupQueryDto) {

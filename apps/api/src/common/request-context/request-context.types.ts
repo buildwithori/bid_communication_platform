@@ -1,4 +1,4 @@
-import type { User } from '@prisma/client';
+import type { User } from "@prisma/client";
 
 export type RequestWithContext = {
   headers: Record<string, string | string[] | undefined>;
@@ -9,6 +9,7 @@ export type RequestWithContext = {
 
 export type RequestContext = {
   requestId: string;
+  correlationId: string;
   actorUserId: string | null;
   ipAddress: string | null;
   userAgent: string | null;

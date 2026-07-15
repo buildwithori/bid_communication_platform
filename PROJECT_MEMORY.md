@@ -219,3 +219,13 @@ Session workflow rules:
 - When integrating a feature, compare its live forms with `docs/backend-design.md`. Remove inputs that are clearly outside the approved design instead of silently creating unsupported payload properties.
 - If a UI property is missing from or ambiguous in the backend design and removing it could change the intended product flow, stop and flag the exact property to the user for a product decision before changing the backend contract.
 - Shared API/domain types belong in the feature integration `types.ts`; only private presentation-state types may remain local to a page or component.
+
+## Audit Lifecycle Foundation Completion (2026-07-15)
+
+- Business auditing is lifecycle-based, not a generic after-query side effect. Raw Prisma hooks cannot reliably express business intent or guarantee that an outbox insert shares the business transaction.
+- Use `AuditService.capture(definition, mutation)` from workflow/lifecycle helpers. It owns the transaction and writes the business change plus the audit outbox event atomically while attaching request actor, request ID, correlation ID, IP address, and user agent.
+- Feature code declares the meaningful action, entity mapping, summary, and safe metadata. It must not call `auditLog.create` or repeat transaction/outbox plumbing.
+- Audit payload redaction is centralized and strips passwords, tokens, secrets, cookies, authorization values, signed URLs, signatures, and private keys recursively.
+- The audit worker processes pending/failed outbox rows automatically, prevents overlapping local runs, caps retries at ten attempts, and creates logs idempotently.
+- `audit_logs` are append-only at the database layer. The processor uses insert-only idempotency through the unique outbox relationship.
+- Generic Prisma/repository hooks may be added later only as a selected-model safety net. They must not replace named business lifecycle events or duplicate them.

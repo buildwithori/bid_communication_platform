@@ -56,6 +56,8 @@ Done when:
 - A feature can use shared API pagination and loading primitives without inventing one-off patterns.
 - Default guards make product endpoints authenticated unless explicitly marked public.
 
+Implementation status (2026-07-15): Complete. Audit request and correlation context, atomic lifecycle capture, durable outbox writes, automatic background processing with bounded retries, centralized sensitive-value redaction, idempotent log creation, and database-enforced append-only audit logs are implemented. Named workflow/lifecycle helpers remain responsible for business intent; raw Prisma hooks are only a future safety net for selected models. See `docs/audit-lifecycle.md` for the feature implementation contract.
+
 ### 2. Auth And Account Entry
 
 Scope:

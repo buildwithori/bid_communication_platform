@@ -1,23 +1,36 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z
-    .enum(['development', 'test', 'production'])
-    .default('development'),
+    .enum(["development", "test", "production"])
+    .default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
-  WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
-  APP_WEB_URL: z.string().url().default('http://localhost:3000'),
+  WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  APP_WEB_URL: z.string().url().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1).optional(),
   REDIS_URL: z.string().min(1).optional(),
-  EMAIL_TRANSPORT: z.enum(['smtp', 'resend']).default('smtp'),
-  MAIL_FROM: z.string().min(1).default('BID Hub <no-reply@bid.local>'),
-  SMTP_HOST: z.string().min(1).default('localhost'),
+  AUDIT_PROCESS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(5_000),
+  EMAIL_TRANSPORT: z.enum(["smtp", "resend"]).default("smtp"),
+  MAIL_FROM: z.string().min(1).default("BID Hub <no-reply@bid.local>"),
+  SMTP_HOST: z.string().min(1).default("localhost"),
   SMTP_PORT: z.coerce.number().int().positive().default(1025),
-  RESEND_API_KEY: z.string().optional().transform((value) => value || undefined),
-  GOOGLE_CLIENT_ID: z.string().optional().transform((value) => value || undefined),
-  GOOGLE_CLIENT_SECRET: z.string().optional().transform((value) => value || undefined),
-  GOOGLE_REDIRECT_URI: z.union([z.literal(''), z.string().url()]).optional().transform((value) => value || undefined),
-  API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
+  RESEND_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
+  GOOGLE_CLIENT_ID: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
+  GOOGLE_CLIENT_SECRET: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
+  GOOGLE_REDIRECT_URI: z
+    .union([z.literal(""), z.string().url()])
+    .optional()
+    .transform((value) => value || undefined),
+  API_PUBLIC_URL: z.string().url().default("http://localhost:4000"),
   DO_SPACES_BUCKET: z.string().min(1).optional(),
   DO_SPACES_ENDPOINT: z.string().url().optional(),
   DO_SPACES_REGION: z.string().min(1).optional(),
@@ -32,8 +45,8 @@ export function validateEnv(config: Record<string, unknown>): ApiEnv {
 
   if (!parsed.success) {
     const issues = parsed.error.issues
-      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-      .join(', ');
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join(", ");
     throw new Error(`Invalid API environment: ${issues}`);
   }
 
