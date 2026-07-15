@@ -7,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { listProgrammes } from "../programmes";
+import { listProgrammesRequest } from "../programmes/requests";
 import { entrepreneurKeys } from "./keys";
 import {
   acceptEntrepreneurInvitationRequest,
@@ -82,7 +82,7 @@ export function useLazyGrantableProgrammesQuery({
       { search, take },
     ],
     queryFn: ({ pageParam }) =>
-      listProgrammes({
+      listProgrammesRequest({
         search,
         accessType: "assigned",
         grantableOnly: true,
