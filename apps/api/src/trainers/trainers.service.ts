@@ -1,5 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, ProgrammeAccessType, TrainerAccessLevel, TrainerCapabilityStatus, User, UserRole } from '@prisma/client';
+import {
+  CalendarConnectionStatus,
+  CalendarProvider,
+  Prisma,
+  ProgrammeAccessType,
+  TrainerAccessLevel,
+  TrainerCapabilityStatus,
+  User,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TrainerQueryDto } from './dto/trainer-query.dto';
 
@@ -7,6 +17,14 @@ const DEFAULT_TAKE = 20;
 
 const trainerInclude = Prisma.validator<Prisma.UserInclude>()({
   trainerCapability: true,
+  calendarConnections: {
+    where: {
+      provider: CalendarProvider.google,
+      status: CalendarConnectionStatus.connected,
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 1,
+  },
   trainerSpecialisms: {
     include: {
       sector: {
@@ -52,20 +70,68 @@ export class TrainersService {
 
   async listTrainers(user: User, query: TrainerQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
-    const rows = await this.prisma.user.findMany({
-      where: this.buildTrainerWhere(user, query),
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
-      take: take + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: trainerInclude,
-    });
+    const where = this.buildTrainerWhere(user, query);
+    const baseWhere = this.buildTrainerWhere(user, {});
+    const [
+      rows,
+      totalItems,
+      totalTrainers,
+      activeTrainers,
+      pendingInvites,
+      calendarReady,
+    ] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: trainerInclude,
+      }),
+      this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: baseWhere }),
+      this.prisma.user.count({
+        where: { AND: [baseWhere, { status: UserStatus.active }] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [baseWhere, { status: UserStatus.pending }] },
+      }),
+      this.prisma.user.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              calendarConnections: {
+                some: {
+                  provider: CalendarProvider.google,
+                  status: CalendarConnectionStatus.connected,
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ]);
 
     const visibleRows = rows.slice(0, take);
-    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
-    const context = await this.trainerContext(visibleRows.map((row) => row.id));
-    const items = visibleRows.map((row) => this.mapTrainer(row, context, user));
-
-    return { items, nextCursor };
+    const context = await this.trainerContext(
+      visibleRows.map((row) => row.id),
+    );
+    return {
+      items: visibleRows.map((row) =>
+        this.mapTrainer(row, context, user),
+      ),
+      nextCursor:
+        rows.length > take
+          ? visibleRows[visibleRows.length - 1]?.id ?? null
+          : null,
+      totalItems,
+      summary: {
+        totalTrainers,
+        activeTrainers,
+        pendingInvites,
+        calendarReady,
+      },
+    };
   }
 
   async getTrainer(user: User, trainerUserId: string) {
@@ -126,8 +192,44 @@ export class TrainersService {
       filters.push({ trainerCapability: { accessLevel: query.accessLevel } });
     }
 
-    if (query.status) {
-      filters.push({ trainerCapability: { status: query.status } });
+    if (query.status === 'active') {
+      filters.push({
+        status: UserStatus.active,
+        trainerCapability: { status: TrainerCapabilityStatus.active },
+      });
+    } else if (query.status === 'invited') {
+      filters.push({ status: UserStatus.pending });
+    } else if (query.status === 'inactive') {
+      filters.push({
+        OR: [
+          { status: UserStatus.inactive },
+          {
+            trainerCapability: {
+              status: TrainerCapabilityStatus.inactive,
+            },
+          },
+        ],
+      });
+    }
+
+    if (query.calendarStatus === 'connected') {
+      filters.push({
+        calendarConnections: {
+          some: {
+            provider: CalendarProvider.google,
+            status: CalendarConnectionStatus.connected,
+          },
+        },
+      });
+    } else if (query.calendarStatus === 'not_connected') {
+      filters.push({
+        calendarConnections: {
+          none: {
+            provider: CalendarProvider.google,
+            status: CalendarConnectionStatus.connected,
+          },
+        },
+      });
     }
 
     const scopeWhere = this.scopeWhere(user);
@@ -219,6 +321,15 @@ export class TrainersService {
 
     return {
       trainerUserId: trainer.id,
+      firstName: trainer.firstName,
+      lastName: trainer.lastName,
+      avatarUrl: trainer.avatarUrl,
+      directoryStatus:
+        trainer.status === UserStatus.pending
+          ? 'invited'
+          : trainer.status === UserStatus.inactive
+            ? 'inactive'
+            : 'active',
       name: [trainer.firstName, trainer.lastName].filter(Boolean).join(' ') || trainer.email,
       email: trainer.email,
       phone: trainer.phone,
@@ -227,6 +338,14 @@ export class TrainersService {
       accessLevel: trainer.trainerCapability?.accessLevel ?? TrainerAccessLevel.full,
       capabilityStatus: trainer.trainerCapability?.status ?? TrainerCapabilityStatus.active,
       accessExpiresOn: trainer.trainerCapability?.accessExpiresOn?.toISOString() ?? null,
+      calendar: {
+        connected: trainer.calendarConnections.length > 0,
+        provider: CalendarProvider.google,
+        accountEmail:
+          trainer.calendarConnections[0]?.providerAccountEmail ?? null,
+        lastSyncedAt:
+          trainer.calendarConnections[0]?.lastSyncedAt?.toISOString() ?? null,
+      },
       specialisms: trainer.trainerSpecialisms.map(({ sector }) => sector),
       portfolio,
       ratings,

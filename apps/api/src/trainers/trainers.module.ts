@@ -1,12 +1,20 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
-import { TrainersController } from './trainers.controller';
+import { EmailModule } from '../email/email.module';
+import {
+  TrainerInvitationsController,
+  TrainersController,
+} from './trainers.controller';
+import { TrainersEmailService } from './trainers-email.service';
+import { TrainerManagementService } from './trainer-management.service';
 import { TrainersService } from './trainers.service';
 
 @Module({
-  imports: [AuthModule, DatabaseModule],
-  controllers: [TrainersController],
-  providers: [TrainersService],
+  imports: [AuthModule, DatabaseModule, EmailModule, AuditModule],
+  controllers: [TrainersController, TrainerInvitationsController],
+  providers: [TrainersService, TrainerManagementService, TrainersEmailService],
+  exports: [TrainersService],
 })
 export class TrainersModule {}
