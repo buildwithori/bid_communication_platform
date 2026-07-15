@@ -133,8 +133,15 @@ export function FormSelect({
   id,
   className,
 }: FormSelectProps) {
+  const selectedOption = options.find((option) => option.value === value);
+
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select
+      value={value}
+      onValueChange={(nextValue: string) => {
+        if (nextValue) onValueChange(nextValue);
+      }}
+    >
       <SelectTrigger
         id={id}
         className={cn(
@@ -143,7 +150,9 @@ export function FormSelect({
           className,
         )}
       >
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>
+          {selectedOption?.label}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent className="text-sm">
         {options.map((o) => (
