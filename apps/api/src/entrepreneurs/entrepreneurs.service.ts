@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BusinessMembership, Prisma, User, UserRole } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
 import { ProfileRecordQueryDto } from './dto/profile-record-query.dto';
@@ -51,7 +52,10 @@ type EntrepreneurMembership = BusinessMembership & {
 
 @Injectable()
 export class EntrepreneursService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async listEntrepreneurs(user: User, query: EntrepreneurQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
@@ -238,20 +242,28 @@ export class EntrepreneursService {
   async createProgrammeGoal(user: User, entrepreneurUserId: string, dto: UpsertProgrammeGoalDto) {
     await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
     await this.validateProgrammeGoal(entrepreneurUserId, dto);
-
-    const goal = await this.prisma.programmeGoal.create({
-      data: {
-        entrepreneurUserId,
-        programmeId: dto.programmeId || null,
-        goalTypeId: dto.goalTypeId,
-        targetAmountCents: dto.targetAmountCents ?? null,
-        description: this.optionalText(dto.description),
-        evidence: this.optionalText(dto.evidence),
-        milestoneAchieved: dto.milestoneAchieved ?? false,
+    const goal = await this.audit.capture(
+      {
+        action: 'entrepreneurs.programme-goal.created',
+        entityType: 'programmeGoal',
+        entityId: (result) => result.id,
+        summary: 'Created entrepreneur programme goal',
+        payload: { entrepreneurUserId, programmeId: dto.programmeId ?? null },
       },
-      include: this.programmeGoalInclude(),
-    });
-
+      (tx) =>
+        tx.programmeGoal.create({
+          data: {
+            entrepreneurUserId,
+            programmeId: dto.programmeId || null,
+            goalTypeId: dto.goalTypeId,
+            targetAmountCents: dto.targetAmountCents ?? null,
+            description: this.optionalText(dto.description),
+            evidence: this.optionalText(dto.evidence),
+            milestoneAchieved: dto.milestoneAchieved ?? false,
+          },
+          include: this.programmeGoalInclude(),
+        }),
+    );
     return this.mapProgrammeGoal(goal);
   }
 
@@ -259,41 +271,57 @@ export class EntrepreneursService {
     await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
     await this.ensureProgrammeGoalBelongsToEntrepreneur(goalId, entrepreneurUserId);
     await this.validateProgrammeGoal(entrepreneurUserId, dto);
-
-    const goal = await this.prisma.programmeGoal.update({
-      where: { id: goalId },
-      data: {
-        programmeId: dto.programmeId || null,
-        goalTypeId: dto.goalTypeId,
-        targetAmountCents: dto.targetAmountCents ?? null,
-        description: this.optionalText(dto.description),
-        evidence: this.optionalText(dto.evidence),
-        milestoneAchieved: dto.milestoneAchieved ?? false,
+    const goal = await this.audit.capture(
+      {
+        action: 'entrepreneurs.programme-goal.updated',
+        entityType: 'programmeGoal',
+        entityId: (result) => result.id,
+        summary: 'Updated entrepreneur programme goal',
+        payload: { entrepreneurUserId, programmeId: dto.programmeId ?? null },
       },
-      include: this.programmeGoalInclude(),
-    });
-
+      (tx) =>
+        tx.programmeGoal.update({
+          where: { id: goalId },
+          data: {
+            programmeId: dto.programmeId || null,
+            goalTypeId: dto.goalTypeId,
+            targetAmountCents: dto.targetAmountCents ?? null,
+            description: this.optionalText(dto.description),
+            evidence: this.optionalText(dto.evidence),
+            milestoneAchieved: dto.milestoneAchieved ?? false,
+          },
+          include: this.programmeGoalInclude(),
+        }),
+    );
     return this.mapProgrammeGoal(goal);
   }
 
   async createFundraisingRound(user: User, entrepreneurUserId: string, dto: UpsertFundraisingRoundDto) {
     await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
     await this.validateFundraisingRound(entrepreneurUserId, dto);
-
-    const round = await this.prisma.fundraisingRound.create({
-      data: {
-        entrepreneurUserId,
-        programmeId: dto.programmeId || null,
-        programmeGoalId: dto.programmeGoalId || null,
-        name: dto.name.trim(),
-        amountCents: dto.amountCents,
-        currency: (dto.currency || 'USD').trim().toUpperCase(),
-        source: this.optionalText(dto.source),
-        date: new Date(dto.date),
+    const round = await this.audit.capture(
+      {
+        action: 'entrepreneurs.fundraising-round.created',
+        entityType: 'fundraisingRound',
+        entityId: (result) => result.id,
+        summary: (result) => `Created fundraising round ${result.name ?? ''}`.trim(),
+        payload: { entrepreneurUserId, programmeId: dto.programmeId ?? null },
       },
-      include: this.fundraisingRoundInclude(),
-    });
-
+      (tx) =>
+        tx.fundraisingRound.create({
+          data: {
+            entrepreneurUserId,
+            programmeId: dto.programmeId || null,
+            programmeGoalId: dto.programmeGoalId || null,
+            name: dto.name.trim(),
+            amountCents: dto.amountCents,
+            currency: (dto.currency || 'USD').trim().toUpperCase(),
+            source: this.optionalText(dto.source),
+            date: new Date(dto.date),
+          },
+          include: this.fundraisingRoundInclude(),
+        }),
+    );
     return this.mapFundraisingRound(round);
   }
 
@@ -301,42 +329,58 @@ export class EntrepreneursService {
     await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
     await this.ensureFundraisingRoundBelongsToEntrepreneur(roundId, entrepreneurUserId);
     await this.validateFundraisingRound(entrepreneurUserId, dto);
-
-    const round = await this.prisma.fundraisingRound.update({
-      where: { id: roundId },
-      data: {
-        programmeId: dto.programmeId || null,
-        programmeGoalId: dto.programmeGoalId || null,
-        name: dto.name.trim(),
-        amountCents: dto.amountCents,
-        currency: (dto.currency || 'USD').trim().toUpperCase(),
-        source: this.optionalText(dto.source),
-        date: new Date(dto.date),
+    const round = await this.audit.capture(
+      {
+        action: 'entrepreneurs.fundraising-round.updated',
+        entityType: 'fundraisingRound',
+        entityId: (result) => result.id,
+        summary: (result) => `Updated fundraising round ${result.name ?? ''}`.trim(),
+        payload: { entrepreneurUserId, programmeId: dto.programmeId ?? null },
       },
-      include: this.fundraisingRoundInclude(),
-    });
-
+      (tx) =>
+        tx.fundraisingRound.update({
+          where: { id: roundId },
+          data: {
+            programmeId: dto.programmeId || null,
+            programmeGoalId: dto.programmeGoalId || null,
+            name: dto.name.trim(),
+            amountCents: dto.amountCents,
+            currency: (dto.currency || 'USD').trim().toUpperCase(),
+            source: this.optionalText(dto.source),
+            date: new Date(dto.date),
+          },
+          include: this.fundraisingRoundInclude(),
+        }),
+    );
     return this.mapFundraisingRound(round);
   }
 
   async createPeriodicUpdate(user: User, entrepreneurUserId: string, dto: UpsertPeriodicUpdateDto) {
     await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
     await this.validatePeriodicUpdate(entrepreneurUserId, dto);
-
-    const update = await this.prisma.periodicUpdate.create({
-      data: {
-        entrepreneurUserId,
-        programmeId: dto.programmeId || null,
-        periodStart: new Date(dto.periodStart),
-        periodEnd: new Date(dto.periodEnd),
-        jobsCreated: dto.jobsCreated,
-        jobsWomen: dto.jobsWomen,
-        jobsMen: dto.jobsMen,
-        notes: this.optionalText(dto.notes),
+    const update = await this.audit.capture(
+      {
+        action: 'entrepreneurs.periodic-update.created',
+        entityType: 'periodicUpdate',
+        entityId: (result) => result.id,
+        summary: 'Created entrepreneur periodic update',
+        payload: { entrepreneurUserId, programmeId: dto.programmeId ?? null },
       },
-      include: this.periodicUpdateInclude(),
-    });
-
+      (tx) =>
+        tx.periodicUpdate.create({
+          data: {
+            entrepreneurUserId,
+            programmeId: dto.programmeId || null,
+            periodStart: new Date(dto.periodStart),
+            periodEnd: new Date(dto.periodEnd),
+            jobsCreated: dto.jobsCreated,
+            jobsWomen: dto.jobsWomen,
+            jobsMen: dto.jobsMen,
+            notes: this.optionalText(dto.notes),
+          },
+          include: this.periodicUpdateInclude(),
+        }),
+    );
     return this.mapPeriodicUpdate(update);
   }
 
@@ -344,21 +388,29 @@ export class EntrepreneursService {
     await this.assertCanWriteEntrepreneur(user, entrepreneurUserId);
     await this.ensurePeriodicUpdateBelongsToEntrepreneur(updateId, entrepreneurUserId);
     await this.validatePeriodicUpdate(entrepreneurUserId, dto);
-
-    const update = await this.prisma.periodicUpdate.update({
-      where: { id: updateId },
-      data: {
-        programmeId: dto.programmeId || null,
-        periodStart: new Date(dto.periodStart),
-        periodEnd: new Date(dto.periodEnd),
-        jobsCreated: dto.jobsCreated,
-        jobsWomen: dto.jobsWomen,
-        jobsMen: dto.jobsMen,
-        notes: this.optionalText(dto.notes),
+    const update = await this.audit.capture(
+      {
+        action: 'entrepreneurs.periodic-update.updated',
+        entityType: 'periodicUpdate',
+        entityId: (result) => result.id,
+        summary: 'Updated entrepreneur periodic update',
+        payload: { entrepreneurUserId, programmeId: dto.programmeId ?? null },
       },
-      include: this.periodicUpdateInclude(),
-    });
-
+      (tx) =>
+        tx.periodicUpdate.update({
+          where: { id: updateId },
+          data: {
+            programmeId: dto.programmeId || null,
+            periodStart: new Date(dto.periodStart),
+            periodEnd: new Date(dto.periodEnd),
+            jobsCreated: dto.jobsCreated,
+            jobsWomen: dto.jobsWomen,
+            jobsMen: dto.jobsMen,
+            notes: this.optionalText(dto.notes),
+          },
+          include: this.periodicUpdateInclude(),
+        }),
+    );
     return this.mapPeriodicUpdate(update);
   }
 
