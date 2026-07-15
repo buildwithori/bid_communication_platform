@@ -334,5 +334,5 @@ Before merging backend work, ask:
 - Feature modules own their email templates; shared email infrastructure only renders and delivers the supplied React element.
 - Auth email templates share `email/components/bid-action-email.tsx`, using the canonical web palette (`#842751`, `#5c1a38`, `#f5e8ef`, `#f7f6f3`, `#f1efe8`) and the public `/bid-logo.png` asset.
 - `AuthEmailService` builds an absolute logo URL from `APP_WEB_URL`, which is required because email clients cannot resolve application-relative image URLs.
-- Keep the API/email workspace on React 18 while React Email 6.8's renderer is React 18-based. The Next.js web workspace independently uses React 19.
+- Keep the API/email runtime on React 18 while the React Email 6.8 renderer is React 18-based. The Next.js web runtime independently uses React 19; TypeScript packages use React 19 definitions consistently across the monorepo to avoid duplicate ReactNode identities.
 - Docker email preview remains available at `http://localhost:3001`; Mailpit remains at `http://localhost:8025`. Every template must include complete default preview props so preview/export output never contains missing names, actions, or logo URLs.
