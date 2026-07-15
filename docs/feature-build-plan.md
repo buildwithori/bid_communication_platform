@@ -102,6 +102,7 @@ Frontend routes:
 - `/admin/settings/sectors`
 - `/admin/settings/stages`
 - `/admin/settings/goal-types`
+- `/admin/settings/tool-areas`
 - Any legacy settings route should redirect or be intentionally removed when this slice is touched.
 
 Done when:

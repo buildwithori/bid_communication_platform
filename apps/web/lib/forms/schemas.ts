@@ -139,6 +139,13 @@ export const newSectorSchema = z.object({
 });
 export type NewSectorForm = z.infer<typeof newSectorSchema>;
 
+export const toolAreaSchema = z.object({
+  name: z.string()
+    .min(2, 'Tool area name must be at least 2 characters')
+    .max(80, 'Tool area name must be 80 characters or fewer'),
+});
+export type ToolAreaForm = z.infer<typeof toolAreaSchema>;
+
 export const businessStageSchema = z.object({
   label: z.string().min(1, 'Stage name is required'),
   definition: z.string().min(1, 'Definition is required'),

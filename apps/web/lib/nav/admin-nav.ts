@@ -66,6 +66,7 @@ export const adminNav: NavSection[] = [
       { href: routes.admin.settingsStages, label: 'Business Stages', icon: Star },
       { href: routes.admin.settingsSectors, label: 'Sectors', icon: Tags },
       { href: routes.admin.settingsGoalTypes, label: 'Goal Types', icon: Target },
+      { href: routes.admin.settingsToolAreas, label: 'Tool Areas', icon: Wrench },
       { href: routes.admin.settingsCompany, label: 'Company Settings', icon: Settings },
     ],
   },

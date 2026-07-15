@@ -48,6 +48,7 @@ export const routes = {
     settingsStages: '/admin/settings/stages',
     settingsSectors: '/admin/settings/sectors',
     settingsGoalTypes: '/admin/settings/goal-types',
+    settingsToolAreas: '/admin/settings/tool-areas',
     settingsCompany: '/admin/settings/company',
     reporting: '/admin/reporting',
   },
