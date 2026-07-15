@@ -178,13 +178,14 @@ function useInfiniteResource<T>(
   query: Omit<ProfileRecordQuery, "cursor">,
   key: (id: string, query?: ProfileRecordQuery) => readonly unknown[],
   request: (id: string, query?: ProfileRecordQuery) => Promise<CursorPage<T>>,
+  enabled = true,
 ) {
   const result = useInfiniteQuery({
     queryKey: key(id ?? "none", query),
     queryFn: ({ pageParam }) => request(id as string, { ...query, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: Boolean(id),
+    enabled: Boolean(id) && enabled,
   });
   return {
     ...result,
@@ -193,21 +194,22 @@ function useInfiniteResource<T>(
   };
 }
 
-export function useProgrammeGoalsQuery(id: string | null, query: Omit<ProfileRecordQuery, "cursor"> = {}) {
-  return useInfiniteResource(id, query, entrepreneurKeys.goals, listProgrammeGoalsRequest);
+export function useProgrammeGoalsQuery(id: string | null, query: Omit<ProfileRecordQuery, "cursor"> = {}, enabled = true) {
+  return useInfiniteResource(id, query, entrepreneurKeys.goals, listProgrammeGoalsRequest, enabled);
 }
 
-export function useFundraisingRoundsQuery(id: string | null, query: Omit<ProfileRecordQuery, "cursor"> = {}) {
-  return useInfiniteResource(id, query, entrepreneurKeys.rounds, listFundraisingRoundsRequest);
+export function useFundraisingRoundsQuery(id: string | null, query: Omit<ProfileRecordQuery, "cursor"> = {}, enabled = true) {
+  return useInfiniteResource(id, query, entrepreneurKeys.rounds, listFundraisingRoundsRequest, enabled);
 }
 
-export function usePeriodicUpdatesQuery(id: string | null, query: Omit<ProfileRecordQuery, "cursor"> = {}) {
-  return useInfiniteResource(id, query, entrepreneurKeys.updates, listPeriodicUpdatesRequest);
+export function usePeriodicUpdatesQuery(id: string | null, query: Omit<ProfileRecordQuery, "cursor"> = {}, enabled = true) {
+  return useInfiniteResource(id, query, entrepreneurKeys.updates, listPeriodicUpdatesRequest, enabled);
 }
 
 export function useProgrammeAccessQuery(
   id: string | null,
   query: Omit<ProgrammeAccessQuery, "cursor"> = {},
+  enabled = true,
 ) {
   const result = useInfiniteQuery({
     queryKey: entrepreneurKeys.access(id ?? "none", query),
@@ -215,7 +217,7 @@ export function useProgrammeAccessQuery(
       listProgrammeAccessRequest(id as string, { ...query, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: Boolean(id),
+    enabled: Boolean(id) && enabled,
   });
   return {
     ...result,

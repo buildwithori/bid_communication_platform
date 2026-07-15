@@ -167,7 +167,7 @@ export function FormSelect({
 export interface FormAutocompleteProps {
   value: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: string; description?: string }[];
+  options: { value: string; label: string; description?: string | null }[];
   placeholder?: string;
   searchPlaceholder?: string;
   emptyMessage?: string;

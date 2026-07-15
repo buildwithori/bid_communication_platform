@@ -1,628 +1,362 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Tabs } from '@/components/shared/Tabs';
-import { Modal } from '@/components/shared/Modal';
+import * as React from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import { Mail } from "lucide-react";
+import {
+  FundraisingRoundRecordModal,
+  PeriodicUpdateRecordModal,
+  ProgrammeGoalRecordModal,
+} from "@/components/entrepreneur/profile/ProfileRecordModals";
+import { Avatar } from "@/components/shared/Avatar";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
-  TableFilterAutocomplete,
   TableFilterInput,
-  TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
+} from "@/components/shared/DataTable";
 import {
-  FormField,
   FormAutocomplete,
+  FormField,
   FormInput,
-  FormTextarea,
-} from '@/components/shared/FormField';
-import { FundingRoundModal } from '@/components/entrepreneur/FundingRoundModal';
-import { PeriodicUpdateModal } from '@/components/entrepreneur/PeriodicUpdateModal';
-import { DateRangePicker } from '@/components/shared/DatePicker';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { programById, programs } from '@/lib/mock-data/programs';
+  FormRow2,
+} from "@/components/shared/FormField";
+import { Notice } from "@/components/shared/PageHeader";
+import { Tabs } from "@/components/shared/Tabs";
+import { Modal } from "@/components/shared/Modal";
 import {
-  businessProfileSchema,
-  programmeGoalSchema,
-  type BusinessProfileForm,
-  type ProgrammeGoalForm,
-} from '@/lib/forms/schemas';
-import { countries, programmeGoalTypes, sectors, stages } from '@/lib/mock-data/definitions';
-import type { FundingRound, PeriodicUpdate } from '@/types';
+  useEntrepreneurProfileQuery,
+  useFundraisingRoundsQuery,
+  usePeriodicUpdatesQuery,
+  useProgrammeAccessQuery,
+  useProgrammeGoalsQuery,
+  useSaveFundraisingRoundMutation,
+  useSavePeriodicUpdateMutation,
+  useSaveProgrammeGoalMutation,
+  useUpdateEntrepreneurProfileMutation,
+  type FundraisingRoundPayload,
+  type FundraisingRoundRecord,
+  type PeriodicUpdatePayload,
+  type PeriodicUpdateRecord,
+  type ProgrammeGoalPayload,
+  type ProgrammeGoalRecord,
+} from "@/lib/api/entrepreneurs";
+import {
+  useLazyBusinessStagesQuery,
+  useLazySectorsQuery,
+} from "@/lib/api/settings";
+import { countries } from "@/lib/mock-data/definitions";
 
-type ProfileTab = 'biz' | 'goal' | 'fund' | 'update';
-type ProgrammeGoalRow = ProgrammeGoalForm & {
-  id: string;
-  milestoneAchieved?: boolean;
-  evidence?: string;
-};
-type ProgrammeGoalStatus = 'not-started' | 'active' | 'achieved';
+type ProfileTab = "business" | "goals" | "funding" | "updates";
 
-const activeGoalTypes = programmeGoalTypes.filter((goalType) => goalType.active);
-const PROGRAMME_COMPLETION_GOAL_TYPE = 'programme-completion';
-const MILESTONE_GOAL_TYPE = 'milestone';
-const ALL_FILTER = 'all';
+const profileSchema = z.object({
+  businessName: z.string().min(1, "Business name is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  phone: z.string().optional(),
+  country: z.enum(countries),
+  sectorId: z.string().optional(),
+  stageId: z.string().optional(),
+});
+type ProfileForm = z.infer<typeof profileSchema>;
 
-function goalTypeLabel(value: string) {
-  return programmeGoalTypes.find((goalType) => goalType.id === value)?.label ?? value;
-}
+const tabs = [
+  { value: "business" as const, label: "Business details" },
+  { value: "goals" as const, label: "Programme goals" },
+  { value: "funding" as const, label: "Fundraising history" },
+  { value: "updates" as const, label: "Periodic updates" },
+];
 
-function goalTypeRequiresTarget(value: string) {
-  return programmeGoalTypes.find((goalType) => goalType.id === value)?.requiresTargetAmount ?? false;
-}
-
-function goalTypeRequiresProgramme(value: string) {
-  return value === PROGRAMME_COMPLETION_GOAL_TYPE || value === MILESTONE_GOAL_TYPE;
-}
-
-function getGoalTargetAmount(goal: ProgrammeGoalRow) {
-  return Number((goal.targetAmountUsd ?? '').replace(/[^0-9]/g, '')) || 0;
-}
-
-function getProgrammeGoalStatus(
-  goal: ProgrammeGoalRow,
-  context: {
-    linkedFundingTotal: number;
-    primaryProgrammeId?: string;
-    trainingProgress: number;
-  },
-): ProgrammeGoalStatus {
-  if (goal.goalType === 'fundraising') {
-    const targetAmount = getGoalTargetAmount(goal);
-    if (targetAmount > 0 && context.linkedFundingTotal >= targetAmount) return 'achieved';
-    return context.linkedFundingTotal > 0 ? 'active' : 'not-started';
-  }
-
-  if (goal.goalType === PROGRAMME_COMPLETION_GOAL_TYPE) {
-    return goal.programmeId && goal.programmeId === context.primaryProgrammeId && context.trainingProgress >= 100
-      ? 'achieved'
-      : 'active';
-  }
-
-  if (goal.goalType === 'milestone') {
-    return goal.milestoneAchieved ? 'achieved' : 'active';
-  }
-
-  return 'active';
-}
-
-function getGoalStatusMeta(status: ProgrammeGoalStatus) {
-  if (status === 'achieved') return { label: 'Achieved', tone: 'green' as const };
-  if (status === 'not-started') return { label: 'Not started', tone: 'neutral' as const };
-  return { label: 'Active', tone: 'blue' as const };
-}
-
-function getGoalStatusSource(goal: ProgrammeGoalRow, linkedFundingTotal: number) {
-  if (goal.goalType === 'fundraising') {
-    return `${formatCurrency(linkedFundingTotal)} linked from fundraising history`;
-  }
-
-  if (goal.goalType === PROGRAMME_COMPLETION_GOAL_TYPE) {
-    return goal.evidence || 'Calculated from training progress and required deliverables.';
-  }
-
-  if (goal.goalType === MILESTONE_GOAL_TYPE) {
-    const programmeName = goal.programmeId
-      ? programById(goal.programmeId)?.name ?? 'selected programme'
-      : 'a programme';
-    if (goal.milestoneAchieved) {
-      return goal.evidence
-        ? `Achieved from ${programmeName} milestone evidence: ${goal.evidence}`
-        : `Achieved from ${programmeName} milestone evidence.`;
-    }
-    return goal.evidence
-      ? `Active until ${programmeName} milestone evidence is reviewed: ${goal.evidence}`
-      : `Active until ${programmeName} milestone evidence is recorded and reviewed.`;
-  }
-
-  return goal.evidence || 'No status source recorded yet.';
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDateRange(start: string, end: string) {
-  return `${formatDate(start)} - ${formatDate(end)}`;
-}
-
-export default function ProfilePage() {
-  const { entrepreneur, updateProfile } = useEntrepreneurStore();
-  const [tab, setTab] = React.useState<ProfileTab>('biz');
+export default function EntrepreneurProfilePage() {
+  const [tab, setTab] = React.useState<ProfileTab>("business");
+  const [goalSearch, setGoalSearch] = React.useState("");
+  const [fundingSearch, setFundingSearch] = React.useState("");
+  const [updateSearch, setUpdateSearch] = React.useState("");
+  const [goalOpen, setGoalOpen] = React.useState(false);
   const [fundingOpen, setFundingOpen] = React.useState(false);
-  const [activeFundingRound, setActiveFundingRound] = React.useState<FundingRound | null>(null);
   const [updateOpen, setUpdateOpen] = React.useState(false);
-  const [fundingQuery, setFundingQuery] = React.useState('');
-  const [fundingDateStart, setFundingDateStart] = React.useState('');
-  const [fundingDateEnd, setFundingDateEnd] = React.useState('');
-  const [fundingGoalFilter, setFundingGoalFilter] = React.useState(ALL_FILTER);
-  const [fundingProgrammeFilter, setFundingProgrammeFilter] = React.useState(ALL_FILTER);
-  const [fundingPage, setFundingPage] = React.useState(1);
-  const [fundingPageSize, setFundingPageSize] = React.useState(5);
-  const [goalQuery, setGoalQuery] = React.useState('');
-  const [goalTypeFilter, setGoalTypeFilter] = React.useState(ALL_FILTER);
-  const [goalProgrammeFilter, setGoalProgrammeFilter] = React.useState(ALL_FILTER);
-  const [goalStatusFilter, setGoalStatusFilter] = React.useState(ALL_FILTER);
-  const [goalPage, setGoalPage] = React.useState(1);
-  const [goalPageSize, setGoalPageSize] = React.useState(5);
-  const [goalModalOpen, setGoalModalOpen] = React.useState(false);
-  const [activeGoal, setActiveGoal] = React.useState<ProgrammeGoalRow | null>(null);
-  const [updateQuery, setUpdateQuery] = React.useState('');
-  const [updatePeriodFilter, setUpdatePeriodFilter] = React.useState(ALL_FILTER);
-  const [updateJobsFilter, setUpdateJobsFilter] = React.useState(ALL_FILTER);
-  const [updateScopeFilter, setUpdateScopeFilter] = React.useState(ALL_FILTER);
-  const [updatePage, setUpdatePage] = React.useState(1);
-  const [updatePageSize, setUpdatePageSize] = React.useState(5);
-  const [activeUpdate, setActiveUpdate] = React.useState<PeriodicUpdate | null>(null);
-
-  const profileForm = useForm<BusinessProfileForm>({
-    resolver: zodResolver(businessProfileSchema),
-    defaultValues: {
-      businessName: entrepreneur.businessName,
-      sector: entrepreneur.sector,
-      stage: entrepreneur.stage,
-      country: entrepreneur.country,
-      representative: entrepreneur.representative,
-      email: entrepreneur.email,
-      phone: entrepreneur.phone,
-    },
-  });
-
-  const [programmeGoals, setProgrammeGoals] = React.useState<ProgrammeGoalRow[]>(() => [
-    {
-      id: 'goal-fundraising-series-a',
-      programmeId: '',
-      goalType: 'fundraising',
-      targetAmountUsd: '500000',
-      description: 'Raise Series A capital to expand into two new markets and strengthen the sales team.',
-      evidence: 'Calculated from fundraising history linked to this business.',
-    },
-    {
-      id: 'goal-programme-completion',
-      programmeId: entrepreneur.programmeId ?? programs[0]?.id ?? '',
-      goalType: PROGRAMME_COMPLETION_GOAL_TYPE,
-      targetAmountUsd: '',
-      description: 'Complete required training modules and submit all core deliverables for the accelerator.',
-      evidence: 'Calculated from training progress and required deliverables.',
-    },
-    {
-      id: 'goal-merchant-onboarding',
-      programmeId: entrepreneur.programmeId ?? programs[0]?.id ?? '',
-      goalType: MILESTONE_GOAL_TYPE,
-      targetAmountUsd: '',
-      description: 'Launch the merchant onboarding workflow and activate the first 50 pilot businesses.',
-      milestoneAchieved: true,
-      evidence: 'Pilot launched with 50 merchants activated in Q4 2024.',
-    },
-    {
-      id: 'goal-enterprise-pipeline',
-      programmeId: entrepreneur.programmeIds?.[1] ?? entrepreneur.programmeId ?? programs[0]?.id ?? '',
-      goalType: MILESTONE_GOAL_TYPE,
-      targetAmountUsd: '',
-      description: 'Secure signed LOIs from three enterprise payment partners.',
-      milestoneAchieved: false,
-      evidence: 'Two LOIs received; one partner negotiation still in progress.',
-    },
-  ]);
-  const formalProgrammeOptions = programs
-    .filter((program) => entrepreneur.programmeIds?.includes(program.id))
-    .map((program) => ({
-      value: program.id,
-      label: program.name,
-      description: `${formatDate(program.startDate)} - ${formatDate(program.endDate)}`,
-    }));
-  const defaultPeriodicUpdateScope =
-    formalProgrammeOptions.length === 1 ? formalProgrammeOptions[0].value : 'company-wide';
-  const fundraisingGoalOptions = programmeGoals
-    .filter((goal) => goal.goalType === 'fundraising')
-    .map((goal) => ({
-      value: goal.id,
-      label: goal.description || goalTypeLabel(goal.goalType),
-      description: goal.targetAmountUsd
-        ? `Target ${formatCurrency(getGoalTargetAmount(goal))}`
-        : 'No target amount set',
-    }));
-  const linkedFundingTotalForGoal = React.useCallback(
-    (goalId: string) =>
-      entrepreneur.fundingRounds
-        .filter((round) => round.goalId === goalId)
-        .reduce((sum, round) => sum + round.amountUsd, 0),
-    [entrepreneur.fundingRounds],
+  const [activeGoal, setActiveGoal] = React.useState<ProgrammeGoalRecord>();
+  const [activeRound, setActiveRound] =
+    React.useState<FundraisingRoundRecord>();
+  const [activeUpdate, setActiveUpdate] =
+    React.useState<PeriodicUpdateRecord>();
+  const [viewUpdate, setViewUpdate] = React.useState<PeriodicUpdateRecord>();
+  const profile = useEntrepreneurProfileQuery();
+  const entrepreneurId = profile.data?.entrepreneurUserId ?? null;
+  const programmes = useProgrammeAccessQuery(
+    entrepreneurId,
+    { take: 10 },
+    Boolean(entrepreneurId),
+  );
+  const goals = useProgrammeGoalsQuery(
+    entrepreneurId,
+    { search: React.useDeferredValue(goalSearch) || undefined, take: 10 },
+    tab === "goals",
+  );
+  const funding = useFundraisingRoundsQuery(
+    entrepreneurId,
+    { search: React.useDeferredValue(fundingSearch) || undefined, take: 10 },
+    tab === "funding",
+  );
+  const updates = usePeriodicUpdatesQuery(
+    entrepreneurId,
+    { search: React.useDeferredValue(updateSearch) || undefined, take: 10 },
+    tab === "updates",
   );
 
-  const onProfileSubmit = (values: BusinessProfileForm) => {
-    updateProfile({
-      businessName: values.businessName,
-      sector: values.sector as typeof entrepreneur.sector,
-      stage: values.stage,
-      country: values.country,
-      representative: values.representative,
-      email: values.email,
-      phone: values.phone ?? '',
-    });
-  };
-
-  const saveProgrammeGoal = (values: ProgrammeGoalForm) => {
-    const nextGoal: ProgrammeGoalRow = {
-      id: activeGoal?.id ?? `goal-${Date.now()}`,
-      ...values,
-      milestoneAchieved: activeGoal?.milestoneAchieved,
-      evidence: activeGoal?.evidence,
-    };
-
-    setProgrammeGoals((current) =>
-      activeGoal
-        ? current.map((goal) => (goal.id === activeGoal.id ? nextGoal : goal))
-        : [nextGoal, ...current],
-    );
-
-    updateProfile({
-      goal: {
-        type: values.goalType,
-        amountUsd: values.targetAmountUsd
-          ? Number(values.targetAmountUsd.replace(/[^0-9]/g, '')) || undefined
-          : undefined,
-        description: values.description ?? '',
-      },
-    });
-    setGoalModalOpen(false);
-    setActiveGoal(null);
-  };
-
-  const filteredFundingRounds = entrepreneur.fundingRounds.filter((round) => {
-    const needle = fundingQuery.trim().toLowerCase();
-    const linkedGoal = programmeGoals.find((goal) => goal.id === round.goalId);
-    const roundTime = new Date(round.date).getTime();
-    const startTime = fundingDateStart ? new Date(fundingDateStart).getTime() : null;
-    const endTime = fundingDateEnd ? new Date(fundingDateEnd).getTime() : null;
-    const matchesSearch =
-      !needle ||
-      [
-        round.name,
-        round.source ?? '',
-        round.date,
-        String(round.amountUsd),
-        linkedGoal?.description ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle);
-    const matchesDate =
-      (!startTime || roundTime >= startTime) &&
-      (!endTime || roundTime <= endTime);
-    const matchesGoal =
-      fundingGoalFilter === ALL_FILTER ||
-      (fundingGoalFilter === 'not-linked' && !round.goalId) ||
-      round.goalId === fundingGoalFilter;
-    const matchesProgramme =
-      fundingProgrammeFilter === ALL_FILTER ||
-      (fundingProgrammeFilter === 'unattributed' && !round.programmeId) ||
-      round.programmeId === fundingProgrammeFilter;
-
-    return matchesSearch && matchesDate && matchesGoal && matchesProgramme;
+  const updateProfile = useUpdateEntrepreneurProfileMutation({
+    onSuccess: () => toast.success("Business profile updated"),
+    onError: (error) => toast.error(error.message),
   });
-  React.useEffect(() => {
-    setFundingPage(1);
-  }, [fundingDateEnd, fundingDateStart, fundingGoalFilter, fundingPageSize, fundingProgrammeFilter, fundingQuery]);
-  const fundingPageRows = React.useMemo(() => {
-    const start = (fundingPage - 1) * fundingPageSize;
-    return filteredFundingRounds.slice(start, start + fundingPageSize);
-  }, [filteredFundingRounds, fundingPage, fundingPageSize]);
-  const fundingColumns: Column<FundingRound>[] = [
+  const saveGoal = useSaveProgrammeGoalMutation({
+    onSuccess: () => {
+      toast.success(activeGoal ? "Goal updated" : "Goal added");
+      setGoalOpen(false);
+      setActiveGoal(undefined);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const saveFunding = useSaveFundraisingRoundMutation({
+    onSuccess: () => {
+      toast.success(
+        activeRound ? "Fundraising round updated" : "Fundraising round added",
+      );
+      setFundingOpen(false);
+      setActiveRound(undefined);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const saveUpdate = useSavePeriodicUpdateMutation({
+    onSuccess: () => {
+      toast.success(
+        activeUpdate ? "Periodic update updated" : "Periodic update submitted",
+      );
+      setUpdateOpen(false);
+      setActiveUpdate(undefined);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  if (profile.isLoading) return <ProfilePageSkeleton />;
+  if (profile.isError || !profile.data)
+    return (
+      <Notice>
+        Your profile could not be loaded. {profile.error?.message}
+        <Button
+          className="ml-3"
+          variant="outline"
+          onClick={() => void profile.refetch()}
+        >
+          Try again
+        </Button>
+      </Notice>
+    );
+  const record = profile.data;
+
+  const goalColumns: Column<ProgrammeGoalRecord>[] = [
     {
-      key: 'action',
-      header: 'Action',
+      key: "action",
+      header: "Action",
+      className: "w-[84px]",
+      cell: (goal) => (
+        <RowActions
+          actions={[
+            {
+              label: "Edit goal",
+              onSelect: () => {
+                setActiveGoal(goal);
+                setGoalOpen(true);
+              },
+            },
+          ]}
+        />
+      ),
+    },
+    {
+      key: "scope",
+      header: "Scope",
+      cell: (goal) =>
+        goal.programme ? (
+          <Badge tone="blue">{goal.programme.name}</Badge>
+        ) : (
+          <span className="text-ink-muted">Business-level</span>
+        ),
+    },
+    { key: "type", header: "Goal type", cell: (goal) => goal.goalType.name },
+    {
+      key: "target",
+      header: "Target",
+      cell: (goal) =>
+        goal.targetAmountCents == null ? (
+          <span className="text-ink-faint">Not monetary</span>
+        ) : (
+          formatMoney(goal.targetAmountCents)
+        ),
+    },
+    {
+      key: "description",
+      header: "Description",
+      cell: (goal) => (
+        <div className="max-w-[360px] truncate text-ink-muted">
+          {goal.description || "No description"}
+        </div>
+      ),
+    },
+    {
+      key: "evidence",
+      header: "Evidence",
+      cell: (goal) => (
+        <div className="max-w-[320px] truncate text-ink-muted">
+          {goal.evidence || "No evidence recorded"}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (goal) => (
+        <Badge tone={goal.milestoneAchieved ? "green" : "blue"}>
+          {goal.milestoneAchieved ? "Achieved" : "In progress"}
+        </Badge>
+      ),
+    },
+  ];
+  const fundingColumns: Column<FundraisingRoundRecord>[] = [
+    {
+      key: "action",
+      header: "Action",
+      className: "w-[84px]",
       cell: (round) => (
         <RowActions
           actions={[
             {
-              label: 'Edit round',
+              label: "Edit round",
               onSelect: () => {
-                setActiveFundingRound(round);
+                setActiveRound(round);
                 setFundingOpen(true);
               },
             },
           ]}
         />
       ),
-      className: 'w-[84px]',
     },
     {
-      key: 'round',
-      header: 'Round',
+      key: "round",
+      header: "Round",
       cell: (round) => (
         <button
           type="button"
+          className="font-semibold text-ink hover:text-bid"
           onClick={() => {
-            setActiveFundingRound(round);
+            setActiveRound(round);
             setFundingOpen(true);
           }}
-          className="text-left font-medium text-ink transition hover:text-bid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
         >
           {round.name}
         </button>
       ),
     },
-    { key: 'amount', header: 'Amount', cell: (round) => `$${(round.amountUsd / 1000).toFixed(0)}k` },
     {
-      key: 'date',
-      header: 'Date',
-      cell: (round) => new Date(round.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      key: "amount",
+      header: "Amount",
+      cell: (round) => formatMoney(round.amountCents, round.currency),
     },
-    { key: 'source', header: 'Source', cell: (round) => round.source ?? 'Not recorded' },
+    { key: "date", header: "Date", cell: (round) => formatDate(round.date) },
     {
-      key: 'programme',
-      header: 'Programme attribution',
+      key: "source",
+      header: "Source",
       cell: (round) =>
-        round.programmeId ? (
-          <span className="text-sm text-ink">{programById(round.programmeId)?.name ?? 'Programme not found'}</span>
-        ) : (
-          <span className="text-sm text-ink-faint">Company-wide</span>
+        round.source || <span className="text-ink-faint">Not recorded</span>,
+    },
+    {
+      key: "programme",
+      header: "Programme",
+      cell: (round) =>
+        round.programme?.name ?? (
+          <span className="text-ink-muted">Company-wide</span>
         ),
     },
     {
-      key: 'goal',
-      header: 'Linked goal',
-      cell: (round) => {
-        const goal = programmeGoals.find((item) => item.id === round.goalId);
-        return goal ? (
-          <span className="text-sm text-ink">{goal.description || goalTypeLabel(goal.goalType)}</span>
-        ) : (
-          <span className="text-sm text-ink-faint">Not linked</span>
-        );
-      },
+      key: "goal",
+      header: "Linked goal",
+      cell: (round) =>
+        round.programmeGoal?.description ||
+        round.programmeGoal?.goalType.name || (
+          <span className="text-ink-faint">Not linked</span>
+        ),
     },
   ];
-  const baseGoalStatusContext = {
-    primaryProgrammeId: entrepreneur.programmeId,
-    trainingProgress: entrepreneur.metrics.trainingProgress,
-  };
-  const filteredProgrammeGoals = programmeGoals.filter((goal) => {
-    const needle = goalQuery.trim().toLowerCase();
-    const programme = programById(goal.programmeId);
-    const status = getProgrammeGoalStatus(goal, {
-      ...baseGoalStatusContext,
-      linkedFundingTotal: linkedFundingTotalForGoal(goal.id),
-    });
-    const statusMeta = getGoalStatusMeta(status);
-    const statusSource = getGoalStatusSource(goal, linkedFundingTotalForGoal(goal.id));
-    const matchesSearch =
-      !needle ||
-      [
-        programme?.name ?? '',
-        goalTypeLabel(goal.goalType),
-        goal.targetAmountUsd ?? '',
-        goal.description ?? '',
-        statusSource,
-        statusMeta.label,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle);
-    const matchesGoalType = goalTypeFilter === ALL_FILTER || goal.goalType === goalTypeFilter;
-    const matchesProgramme =
-      goalProgrammeFilter === ALL_FILTER ||
-      (goalProgrammeFilter === 'business-level' && !goal.programmeId) ||
-      goal.programmeId === goalProgrammeFilter;
-    const matchesStatus = goalStatusFilter === ALL_FILTER || status === goalStatusFilter;
-
-    return matchesSearch && matchesGoalType && matchesProgramme && matchesStatus;
-  });
-  React.useEffect(() => {
-    setGoalPage(1);
-  }, [goalProgrammeFilter, goalQuery, goalPageSize, goalStatusFilter, goalTypeFilter]);
-  const goalPageRows = React.useMemo(() => {
-    const start = (goalPage - 1) * goalPageSize;
-    return filteredProgrammeGoals.slice(start, start + goalPageSize);
-  }, [filteredProgrammeGoals, goalPage, goalPageSize]);
-  const goalColumns: Column<ProgrammeGoalRow>[] = [
+  const updateColumns: Column<PeriodicUpdateRecord>[] = [
     {
-      key: 'action',
-      header: 'Action',
-      cell: (goal) => (
+      key: "action",
+      header: "Action",
+      className: "w-[84px]",
+      cell: (update) => (
         <RowActions
           actions={[
+            { label: "View update", onSelect: () => setViewUpdate(update) },
             {
-              label: 'Edit goal',
+              label: "Edit update",
               onSelect: () => {
-                setActiveGoal(goal);
-                setGoalModalOpen(true);
+                setActiveUpdate(update);
+                setUpdateOpen(true);
               },
             },
           ]}
         />
       ),
-      className: 'w-[84px]',
     },
     {
-      key: 'programme',
-      header: 'Scope',
-      headerClassName: 'min-w-[240px]',
-      className: 'min-w-[240px]',
-      cell: (goal) => (
+      key: "period",
+      header: "Reporting period",
+      cell: (update) => (
         <button
           type="button"
-          onClick={() => {
-            setActiveGoal(goal);
-            setGoalModalOpen(true);
-          }}
-          className="max-w-[460px] text-left font-medium leading-5 text-ink transition hover:text-bid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+          className="font-semibold text-ink hover:text-bid"
+          onClick={() => setViewUpdate(update)}
         >
-          {goal.programmeId ? programById(goal.programmeId)?.name ?? 'Programme not found' : 'Business-level fundraising goal'}
+          {formatDate(update.periodStart)} – {formatDate(update.periodEnd)}
         </button>
       ),
     },
     {
-      key: 'goal',
-      header: 'Goal type',
-      cell: (goal) => goalTypeLabel(goal.goalType),
-    },
-    {
-      key: 'target',
-      header: 'Target',
-      cell: (goal) =>
-        goalTypeRequiresTarget(goal.goalType) && goal.targetAmountUsd
-          ? formatCurrency(Number(goal.targetAmountUsd.replace(/[^0-9]/g, '')) || 0)
-          : 'Not monetary',
-    },
-    {
-      key: 'description',
-      header: 'Description',
-      cell: (goal) => (
-        <div className="max-w-[420px] truncate text-sm text-ink-muted">
-          {goal.description || 'No description added'}
-        </div>
-      ),
-    },
-    {
-      key: 'evidence',
-      header: 'Status source',
-      cell: (goal) => {
-        const linkedFundingTotal = linkedFundingTotalForGoal(goal.id);
-        return (
-          <div className="max-w-[360px] truncate text-sm text-ink-muted">
-            {getGoalStatusSource(goal, linkedFundingTotal)}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      cell: (goal) => {
-        const statusMeta = getGoalStatusMeta(getProgrammeGoalStatus(goal, {
-          ...baseGoalStatusContext,
-          linkedFundingTotal: linkedFundingTotalForGoal(goal.id),
-        }));
-        return <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>;
-      },
-    },
-  ];
-  const periodicUpdates = entrepreneur.periodicUpdates ?? [];
-  const updatePeriodOptions = periodicUpdates.map((update) => ({
-    value: update.id,
-    label: formatDateRange(update.periodStart, update.periodEnd),
-    description: `Submitted ${formatDate(update.submittedAt)}`,
-  }));
-  const filteredPeriodicUpdates = periodicUpdates.filter((update) => {
-    const needle = updateQuery.trim().toLowerCase();
-    const matchesSearch =
-      !needle ||
-      [
-        update.period,
-        update.periodStart,
-        update.periodEnd,
-        update.submittedAt,
-        update.programmeId ? programById(update.programmeId)?.name ?? '' : 'company-wide',
-        String(update.jobsCreated),
-        String(update.jobsWomen),
-        String(update.jobsMen),
-        update.notes ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle);
-    const matchesPeriod = updatePeriodFilter === ALL_FILTER || update.id === updatePeriodFilter;
-    const matchesJobs =
-      updateJobsFilter === ALL_FILTER ||
-      (updateJobsFilter === 'jobs-created' && update.jobsCreated > 0) ||
-      (updateJobsFilter === 'no-jobs' && update.jobsCreated === 0);
-    const matchesScope =
-      updateScopeFilter === ALL_FILTER ||
-      (updateScopeFilter === 'company-wide' && !update.programmeId) ||
-      update.programmeId === updateScopeFilter;
-
-    return matchesSearch && matchesPeriod && matchesJobs && matchesScope;
-  });
-  React.useEffect(() => {
-    setUpdatePage(1);
-  }, [updateJobsFilter, updatePageSize, updatePeriodFilter, updateQuery, updateScopeFilter]);
-  const updatePageRows = React.useMemo(() => {
-    const start = (updatePage - 1) * updatePageSize;
-    return filteredPeriodicUpdates.slice(start, start + updatePageSize);
-  }, [filteredPeriodicUpdates, updatePage, updatePageSize]);
-  const updateColumns: Column<PeriodicUpdate>[] = [
-    {
-      key: 'action',
-      header: 'Action',
-      cell: (update) => (
-        <RowActions
-          actions={[
-            {
-              label: 'View update',
-              onSelect: () => setActiveUpdate(update),
-            },
-          ]}
-        />
-      ),
-      className: 'w-[84px]',
-    },
-    {
-      key: 'period',
-      header: 'Reporting period',
-      cell: (update) => (
-        <button
-          type="button"
-          onClick={() => setActiveUpdate(update)}
-          className="text-left font-medium text-ink transition hover:text-bid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
-        >
-          {formatDateRange(update.periodStart, update.periodEnd)}
-        </button>
-      ),
-    },
-    {
-      key: 'submitted',
-      header: 'Submitted',
+      key: "submitted",
+      header: "Submitted",
       cell: (update) => formatDate(update.submittedAt),
     },
     {
-      key: 'scope',
-      header: 'Scope',
+      key: "scope",
+      header: "Scope",
       cell: (update) =>
-        update.programmeId ? (
-          <span className="text-sm text-ink">{programById(update.programmeId)?.name ?? 'Programme not found'}</span>
-        ) : (
-          <span className="text-sm text-ink-muted">Company-wide</span>
+        update.programme?.name ?? (
+          <span className="text-ink-muted">Company-wide</span>
         ),
     },
     {
-      key: 'jobs',
-      header: 'Jobs created',
+      key: "jobs",
+      header: "Jobs created",
       cell: (update) => (
-        <div className="min-w-[150px]">
-          <div className="font-medium text-ink">{update.jobsCreated}</div>
-          <div className="mt-1 text-sm text-ink-muted">
-            {update.jobsWomen} women, {update.jobsMen} men
+        <div>
+          <strong>{update.jobsCreated}</strong>
+          <div className="mt-0.5 text-sm text-ink-muted">
+            {update.jobsWomen} women · {update.jobsMen} men
           </div>
         </div>
       ),
     },
     {
-      key: 'notes',
-      header: 'Notes',
+      key: "notes",
+      header: "Notes",
       cell: (update) => (
-        <div className="max-w-[360px] truncate text-sm text-ink-muted">
-          {update.notes || 'No notes added'}
+        <div className="max-w-[360px] truncate text-ink-muted">
+          {update.notes || "No notes"}
         </div>
       ),
     },
@@ -630,570 +364,612 @@ export default function ProfilePage() {
 
   return (
     <>
-      {/* Banner */}
-      <div className="mb-4 flex flex-col gap-4 rounded-bid bg-bid p-4 text-white sm:flex-row sm:items-center lg:p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-base font-semibold">
-            {entrepreneur.initials}
-          </div>
-          <div>
-            <div className="text-base font-semibold">{entrepreneur.businessName}</div>
-            <div className="text-[11px] opacity-80 capitalize">
-              {entrepreneur.stage} stage · {entrepreneur.sector} · {entrepreneur.country}
+      <section className="mb-4 overflow-hidden rounded-2xl border border-bid/15 bg-gradient-to-r from-bid via-bid-dark to-bid p-5 text-white shadow-sm">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <Avatar
+            initials={initials(record.firstName, record.lastName, record.email)}
+            size={68}
+            tone="brand"
+            className="border-2 border-white/40 bg-white/20 text-white"
+          />
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold">
+              {record.businessName}
+            </h1>
+            <div className="mt-1 text-sm text-white/75">
+              {record.representativeName} · {record.country}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {record.sector ? (
+                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs">
+                  {record.sector.name}
+                </span>
+              ) : null}
+              {record.stage ? (
+                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs">
+                  {record.stage.name}
+                </span>
+              ) : null}
             </div>
           </div>
-        </div>
-        <div className="flex gap-5 sm:ml-auto">
-          <div className="text-center">
-            <div className="text-lg font-semibold">{entrepreneur.metrics.trainingProgress}%</div>
-            <div className="text-[9px] opacity-70">Training</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold">
-              {entrepreneur.metrics.deliverablesDone}/{entrepreneur.metrics.deliverablesTotal}
-            </div>
-            <div className="text-[9px] opacity-70">Delivered</div>
+          <div className="grid grid-cols-2 gap-3 sm:ml-auto">
+            <HeaderMetric
+              label="Learning progress"
+              value={`${record.learnerProgress.average}%`}
+            />
+            <HeaderMetric
+              label="Programmes"
+              value={String(record.programmeAccess.assignedProgrammeCount)}
+            />
           </div>
         </div>
-      </div>
-
-      <Tabs
-        value={tab}
-        onChange={(v) => setTab(v as ProfileTab)}
-        tabs={[
-          { value: 'biz', label: 'Business details' },
-          { value: 'goal', label: 'Programme goal' },
-          { value: 'fund', label: 'Fundraising history' },
-          { value: 'update', label: 'Periodic updates' },
-        ]}
+      </section>
+      <Tabs value={tab} onChange={setTab} tabs={tabs} />
+      {tab === "business" ? (
+        <BusinessTab
+          record={record}
+          programmes={programmes}
+          isPending={updateProfile.isPending}
+          onSubmit={(values) => updateProfile.mutate(values)}
+        />
+      ) : null}
+      {tab === "goals" ? (
+        <RecordsCard
+          title="Programme goals"
+          description="Track business-level and programme-linked outcomes."
+          actionLabel="+ Add goal"
+          onAction={() => {
+            setActiveGoal(undefined);
+            setGoalOpen(true);
+          }}
+          search={goalSearch}
+          onSearch={setGoalSearch}
+          isLoading={goals.isLoading}
+          error={goals.error}
+          rows={
+            <DataTable
+              columns={goalColumns}
+              rows={goals.rows}
+              rowKey={(goal) => goal.id}
+              emptyMessage="No programme goals match this search."
+              tableClassName="min-w-[1040px]"
+            />
+          }
+          hasMore={Boolean(goals.hasNextPage)}
+          isLoadingMore={goals.isFetchingNextPage}
+          onLoadMore={() => void goals.fetchNextPage()}
+        />
+      ) : null}
+      {tab === "funding" ? (
+        <RecordsCard
+          title="Fundraising history"
+          description="Capital reported by your business, optionally attributed to a programme goal."
+          actionLabel="+ Add round"
+          onAction={() => {
+            setActiveRound(undefined);
+            setFundingOpen(true);
+          }}
+          search={fundingSearch}
+          onSearch={setFundingSearch}
+          isLoading={funding.isLoading}
+          error={funding.error}
+          rows={
+            <DataTable
+              columns={fundingColumns}
+              rows={funding.rows}
+              rowKey={(round) => round.id}
+              emptyMessage="No fundraising rounds match this search."
+              tableClassName="min-w-[980px]"
+            />
+          }
+          hasMore={Boolean(funding.hasNextPage)}
+          isLoadingMore={funding.isFetchingNextPage}
+          onLoadMore={() => void funding.fetchNextPage()}
+        />
+      ) : null}
+      {tab === "updates" ? (
+        <RecordsCard
+          title="Periodic updates"
+          description="Job-impact reports used for BID programme reporting."
+          actionLabel="+ Submit update"
+          onAction={() => {
+            setActiveUpdate(undefined);
+            setUpdateOpen(true);
+          }}
+          search={updateSearch}
+          onSearch={setUpdateSearch}
+          isLoading={updates.isLoading}
+          error={updates.error}
+          rows={
+            <DataTable
+              columns={updateColumns}
+              rows={updates.rows}
+              rowKey={(update) => update.id}
+              emptyMessage="No periodic updates match this search."
+              tableClassName="min-w-[920px]"
+            />
+          }
+          hasMore={Boolean(updates.hasNextPage)}
+          isLoadingMore={updates.isFetchingNextPage}
+          onLoadMore={() => void updates.fetchNextPage()}
+        />
+      ) : null}
+      <ProgrammeGoalRecordModal
+        open={goalOpen}
+        onOpenChange={(open) => {
+          setGoalOpen(open);
+          if (!open) setActiveGoal(undefined);
+        }}
+        entrepreneurId={entrepreneurId}
+        goal={activeGoal}
+        isPending={saveGoal.isPending}
+        onSubmit={(payload: ProgrammeGoalPayload) =>
+          entrepreneurId &&
+          saveGoal.mutate({ entrepreneurId, recordId: activeGoal?.id, payload })
+        }
       />
+      <FundraisingRoundRecordModal
+        open={fundingOpen}
+        onOpenChange={(open) => {
+          setFundingOpen(open);
+          if (!open) setActiveRound(undefined);
+        }}
+        entrepreneurId={entrepreneurId}
+        round={activeRound}
+        isPending={saveFunding.isPending}
+        onSubmit={(payload: FundraisingRoundPayload) =>
+          entrepreneurId &&
+          saveFunding.mutate({
+            entrepreneurId,
+            recordId: activeRound?.id,
+            payload,
+          })
+        }
+      />
+      <PeriodicUpdateRecordModal
+        open={updateOpen}
+        onOpenChange={(open) => {
+          setUpdateOpen(open);
+          if (!open) setActiveUpdate(undefined);
+        }}
+        entrepreneurId={entrepreneurId}
+        update={activeUpdate}
+        isPending={saveUpdate.isPending}
+        onSubmit={(payload: PeriodicUpdatePayload) =>
+          entrepreneurId &&
+          saveUpdate.mutate({
+            entrepreneurId,
+            recordId: activeUpdate?.id,
+            payload,
+          })
+        }
+      />
+      <PeriodicUpdateDetails
+        update={viewUpdate}
+        onClose={() => setViewUpdate(undefined)}
+      />
+    </>
+  );
+}
 
-      {tab === 'biz' && (
-        <Card>
-          <CardHeader title="Business details" />
-          <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="max-w-[760px]">
-            <FormField label="Business name" error={profileForm.formState.errors.businessName?.message}>
-              <FormInput {...profileForm.register('businessName')} />
+function BusinessTab({
+  record,
+  programmes,
+  isPending,
+  onSubmit,
+}: {
+  record: NonNullable<ReturnType<typeof useEntrepreneurProfileQuery>["data"]>;
+  programmes: ReturnType<typeof useProgrammeAccessQuery>;
+  isPending: boolean;
+  onSubmit: (values: ProfileForm) => void;
+}) {
+  const [sectorLookup, setSectorLookup] = React.useState({
+    open: false,
+    search: "",
+  });
+  const [stageLookup, setStageLookup] = React.useState({
+    open: false,
+    search: "",
+  });
+  const sectors = useLazySectorsQuery({
+    enabled: sectorLookup.open,
+    search: React.useDeferredValue(sectorLookup.search) || undefined,
+    active: true,
+    take: 20,
+  });
+  const stages = useLazyBusinessStagesQuery({
+    enabled: stageLookup.open,
+    search: React.useDeferredValue(stageLookup.search) || undefined,
+    active: true,
+    take: 20,
+  });
+  const form = useForm<ProfileForm>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: profileDefaults(record),
+  });
+  const country = useWatch({ control: form.control, name: "country" });
+  const sectorId = useWatch({ control: form.control, name: "sectorId" });
+  const stageId = useWatch({ control: form.control, name: "stageId" });
+  React.useEffect(() => form.reset(profileDefaults(record)), [form, record]);
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Card>
+        <CardHeader
+          title="Business details"
+          description="Keep your business identity and representative contact accurate."
+        />
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="max-w-[780px] space-y-4"
+        >
+          <FormField
+            label="Business name"
+            error={form.formState.errors.businessName?.message}
+            className="mb-0"
+          >
+            <FormInput {...form.register("businessName")} />
+          </FormField>
+          <FormRow2>
+            <FormField
+              label="First name"
+              error={form.formState.errors.firstName?.message}
+              className="mb-0"
+            >
+              <FormInput {...form.register("firstName")} />
             </FormField>
-            <FormField label="Sector">
-              <FormAutocomplete
-                value={profileForm.watch('sector')}
-                onValueChange={(v) => profileForm.setValue('sector', v)}
-                options={sectors.map((s) => ({ value: s.id, label: s.label }))}
-                placeholder="Select sector"
-                searchPlaceholder="Search sectors..."
-                emptyMessage="No sector found."
-              />
+            <FormField
+              label="Last name"
+              error={form.formState.errors.lastName?.message}
+              className="mb-0"
+            >
+              <FormInput {...form.register("lastName")} />
             </FormField>
-            <FormField label="Business stage">
+          </FormRow2>
+          <FormRow2>
+            <FormField label="Phone" className="mb-0">
+              <FormInput {...form.register("phone")} />
+            </FormField>
+            <FormField label="Country" className="mb-0">
               <FormAutocomplete
-                value={profileForm.watch('stage')}
-                onValueChange={(v) => profileForm.setValue('stage', v)}
-                options={stages.map((s) => ({
-                  value: s.id,
-                  label: s.label,
-                  description: s.definition,
+                value={country}
+                onValueChange={(value) =>
+                  form.setValue("country", value as ProfileForm["country"])
+                }
+                options={countries.map((item) => ({
+                  value: item,
+                  label: item,
                 }))}
-                placeholder="Select business stage"
-                searchPlaceholder="Search stages..."
-                emptyMessage="No stage found."
-              />
-            </FormField>
-            <FormField label="Country">
-              <FormAutocomplete
-                value={profileForm.watch('country')}
-                onValueChange={(v) => profileForm.setValue('country', v as BusinessProfileForm['country'])}
-                options={countries.map((country) => ({ value: country, label: country }))}
                 placeholder="Select country"
                 searchPlaceholder="Search countries..."
                 emptyMessage="No country found."
               />
             </FormField>
-            <div className="my-3 h-px bg-line" />
-            <CardHeader title="Representative contact" className="mb-2" />
-            <FormField label="Representative name" error={profileForm.formState.errors.representative?.message}>
-              <FormInput {...profileForm.register('representative')} />
-            </FormField>
-            <FormField label="Email" error={profileForm.formState.errors.email?.message}>
-              <FormInput type="email" {...profileForm.register('email')} />
-            </FormField>
-            <FormField label="Phone number">
-              <FormInput {...profileForm.register('phone')} />
-            </FormField>
-            <Button type="submit">Save changes</Button>
-          </form>
-        </Card>
-      )}
-
-      {tab === 'goal' && (
-        <Card>
-          <CardHeader
-            title="Programme goals"
-            description="Track fundraising goals, programme completion, and programme-specific milestones."
-            actions={
-              <Button
-                size="sm"
-                onClick={() => {
-                  setActiveGoal(null);
-                  setGoalModalOpen(true);
-                }}
-              >
-                + Add goal
-              </Button>
-            }
-          />
-          <TableToolbar>
-            <div>
-              <div className="text-sm font-medium text-ink">Search programme goals</div>
-              <div className="mt-0.5 text-sm text-ink-muted">
-                Find goals by programme scope, goal type, target, status, or description.
-              </div>
-            </div>
-            <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[260px_210px_220px_170px]">
-              <TableFilterInput
-                icon
-                placeholder="Search goals..."
-                value={goalQuery}
-                onChange={(event) => setGoalQuery(event.target.value)}
+          </FormRow2>
+          <FormRow2>
+            <FormField label="Sector" optional className="mb-0">
+              <FormAutocomplete
+                value={sectorId ?? ""}
+                onValueChange={(value) => form.setValue("sectorId", value)}
+                options={unique([
+                  { value: "", label: "Not set" },
+                  ...(record.sector
+                    ? [{ value: record.sector.id, label: record.sector.name }]
+                    : []),
+                  ...(
+                    sectors.data?.pages.flatMap((page) => page.items) ?? []
+                  ).map((item) => ({ value: item.id, label: item.name })),
+                ])}
+                placeholder="Select sector"
+                searchPlaceholder="Search sectors..."
+                emptyMessage="No active sector found."
+                isLoading={sectors.isFetching}
+                onOpenChange={(open) =>
+                  setSectorLookup((state) => ({ ...state, open }))
+                }
+                onSearchChange={(search) =>
+                  setSectorLookup((state) => ({ ...state, search }))
+                }
+                hasMore={Boolean(sectors.hasNextPage)}
+                onLoadMore={() => void sectors.fetchNextPage()}
               />
-              <TableFilterAutocomplete
-                value={goalTypeFilter}
-                onValueChange={setGoalTypeFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All goal types' },
-                  ...activeGoalTypes.map((goalType) => ({
-                    value: goalType.id,
-                    label: goalType.label,
-                    description: goalType.description,
+            </FormField>
+            <FormField label="Business stage" optional className="mb-0">
+              <FormAutocomplete
+                value={stageId ?? ""}
+                onValueChange={(value) => form.setValue("stageId", value)}
+                options={unique([
+                  { value: "", label: "Not set" },
+                  ...(record.stage
+                    ? [
+                        {
+                          value: record.stage.id,
+                          label: record.stage.name,
+                          description: record.stage.definition,
+                        },
+                      ]
+                    : []),
+                  ...(
+                    stages.data?.pages.flatMap((page) => page.items) ?? []
+                  ).map((item) => ({
+                    value: item.id,
+                    label: item.name,
+                    description: item.definition,
                   })),
-                ]}
-                placeholder="All goal types"
-                searchPlaceholder="Search goal types..."
-                emptyMessage="No goal type found."
+                ])}
+                placeholder="Select stage"
+                searchPlaceholder="Search stages..."
+                emptyMessage="No active stage found."
+                isLoading={stages.isFetching}
+                onOpenChange={(open) =>
+                  setStageLookup((state) => ({ ...state, open }))
+                }
+                onSearchChange={(search) =>
+                  setStageLookup((state) => ({ ...state, search }))
+                }
+                hasMore={Boolean(stages.hasNextPage)}
+                onLoadMore={() => void stages.fetchNextPage()}
               />
-              <TableFilterAutocomplete
-                value={goalProgrammeFilter}
-                onValueChange={setGoalProgrammeFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All programme scopes' },
-                  { value: 'business-level', label: 'Business-level fundraising goals' },
-                  ...programs.filter((program) => program.accessType !== 'free').map((program) => ({
-                    value: program.id,
-                    label: program.name,
-                    description: `${formatDate(program.startDate)} - ${formatDate(program.endDate)}`,
-                  })),
-                ]}
-                placeholder="All programme scopes"
-                searchPlaceholder="Search programmes..."
-                emptyMessage="No programme found."
-              />
-              <TableFilterAutocomplete
-                value={goalStatusFilter}
-                onValueChange={setGoalStatusFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All statuses' },
-                  { value: 'not-started', label: 'Not started' },
-                  { value: 'active', label: 'Active' },
-                  { value: 'achieved', label: 'Achieved' },
-                ]}
-                placeholder="All statuses"
-                searchPlaceholder="Search statuses..."
-                emptyMessage="No status found."
-              />
+            </FormField>
+          </FormRow2>
+          <div className="rounded-xl border border-line bg-surface-subtle p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              <Mail className="h-4 w-4" />
+              Login email
             </div>
-          </TableToolbar>
-          <DataTable
-            columns={goalColumns}
-            rows={goalPageRows}
-            rowKey={(goal) => goal.id}
-            emptyMessage="No programme goals match this search."
-            tableClassName="min-w-[920px]"
-          />
-          <TablePagination
-            page={goalPage}
-            pageSize={goalPageSize}
-            totalItems={filteredProgrammeGoals.length}
-            pageSizeOptions={[5, 10, 25]}
-            onPageChange={setGoalPage}
-            onPageSizeChange={(next) => {
-              setGoalPageSize(next);
-              setGoalPage(1);
-            }}
-          />
-        </Card>
-      )}
-
-      {tab === 'fund' && (
-        <Card>
-          <CardHeader
-            title="Fundraising history"
-            actions={
-              <Button
-                size="sm"
-                onClick={() => {
-                  setActiveFundingRound(null);
-                  setFundingOpen(true);
-                }}
-              >
-                + Add round
-              </Button>
-            }
-          />
-          <TableToolbar>
-            <div>
-              <div className="text-sm font-medium text-ink">Search fundraising records</div>
-              <div className="mt-0.5 text-sm text-ink-muted">
-                Track rounds by name, source, date, or amount.
+            <div className="mt-1 font-medium text-ink">{record.email}</div>
+            <div className="mt-1 text-xs text-ink-muted">
+              Contact an administrator to change your login email.
+            </div>
+          </div>
+          <Button
+            type="submit"
+            isLoading={isPending}
+            loadingLabel="Saving changes..."
+          >
+            Save changes
+          </Button>
+        </form>
+      </Card>
+      <Card>
+        <CardHeader
+          title="Programme access"
+          description={`${programmes.totalItems} assigned programme${programmes.totalItems === 1 ? "" : "s"}, plus free resources`}
+        />
+        <div className="space-y-2">
+          {programmes.rows.map((item) => (
+            <div
+              key={item.grantId}
+              className="rounded-xl border border-line bg-surface-subtle p-3"
+            >
+              <div className="font-semibold text-ink">{item.name}</div>
+              <div className="mt-1 text-sm text-ink-muted">
+                {formatDate(item.startDate)} – {formatDate(item.endDate)}
               </div>
+              {item.progress ? (
+                <div className="mt-2 text-sm font-medium text-bid">
+                  {item.progress.percent}% complete
+                </div>
+              ) : (
+                <div className="mt-2 text-sm text-ink-faint">Not started</div>
+              )}
             </div>
-            <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[240px_280px_240px_240px]">
-              <TableFilterInput
-                icon
-                placeholder="Search funding rounds..."
-                value={fundingQuery}
-                onChange={(event) => setFundingQuery(event.target.value)}
-              />
-              <div className="flex min-w-0 gap-2">
-                <DateRangePicker
-                  startValue={fundingDateStart}
-                  endValue={fundingDateEnd}
-                  onChange={(value) => {
-                    setFundingDateStart(value.start);
-                    setFundingDateEnd(value.end);
-                  }}
-                  placeholder="Filter by date range"
-                  className="h-9 bg-white"
-                />
-                {(fundingDateStart || fundingDateEnd) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setFundingDateStart('');
-                      setFundingDateEnd('');
-                    }}
-                    className="shrink-0"
-                  >
-                    Clear
-                  </Button>
-                )}
-              </div>
-              <TableFilterAutocomplete
-                value={fundingGoalFilter}
-                onValueChange={setFundingGoalFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All linked goals' },
-                  { value: 'not-linked', label: 'Not linked to a goal' },
-                  ...fundraisingGoalOptions,
-                ]}
-                placeholder="All linked goals"
-                searchPlaceholder="Search goals..."
-                emptyMessage="No goal found."
-              />
-              <TableFilterAutocomplete
-                value={fundingProgrammeFilter}
-                onValueChange={setFundingProgrammeFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All programme attribution' },
-                  { value: 'unattributed', label: 'Company-wide / unattributed' },
-                  ...formalProgrammeOptions,
-                ]}
-                placeholder="All programme attribution"
-                searchPlaceholder="Search programmes..."
-                emptyMessage="No programme found."
-              />
+          ))}
+          {!programmes.isLoading && programmes.rows.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-ink-muted">
+              You currently have free resources only.
             </div>
-          </TableToolbar>
-          <DataTable
-            columns={fundingColumns}
-            rows={fundingPageRows}
-            rowKey={(round) => round.id}
-            emptyMessage="No funding rounds match this search."
-          />
-          <TablePagination
-            page={fundingPage}
-            pageSize={fundingPageSize}
-            totalItems={filteredFundingRounds.length}
-            pageSizeOptions={[5, 10, 25]}
-            onPageChange={setFundingPage}
-            onPageSizeChange={(next) => {
-              setFundingPageSize(next);
-              setFundingPage(1);
-            }}
-          />
-        </Card>
-      )}
-
-      {tab === 'update' && (
-        <Card>
-          <CardHeader
-            title="Periodic updates (jobs)"
-            description="Submitted job-impact reports used for BID programme reporting."
-            actions={
-              <Button size="sm" onClick={() => setUpdateOpen(true)}>
-                + Submit update
-              </Button>
-            }
-          />
-          <TableToolbar>
-            <div>
-              <div className="text-sm font-medium text-ink">Search update history</div>
-              <div className="mt-0.5 text-sm text-ink-muted">
-                Track submitted jobs, reporting scope, notes, and reporting periods.
-              </div>
-            </div>
-            <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[260px_230px_170px_190px]">
-              <TableFilterInput
-                icon
-                placeholder="Search updates..."
-                value={updateQuery}
-                onChange={(event) => setUpdateQuery(event.target.value)}
-              />
-              <TableFilterAutocomplete
-                value={updatePeriodFilter}
-                onValueChange={setUpdatePeriodFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All reporting periods' },
-                  ...updatePeriodOptions,
-                ]}
-                placeholder="All reporting periods"
-                searchPlaceholder="Search periods..."
-                emptyMessage="No reporting period found."
-              />
-              <TableFilterAutocomplete
-                value={updateJobsFilter}
-                onValueChange={setUpdateJobsFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All job activity' },
-                  { value: 'jobs-created', label: 'Jobs created' },
-                  { value: 'no-jobs', label: 'No jobs created' },
-                ]}
-                placeholder="All job activity"
-                searchPlaceholder="Search job filters..."
-                emptyMessage="No job filter found."
-              />
-              <TableFilterAutocomplete
-                value={updateScopeFilter}
-                onValueChange={setUpdateScopeFilter}
-                options={[
-                  { value: ALL_FILTER, label: 'All reporting scopes' },
-                  { value: 'company-wide', label: 'Company-wide' },
-                  ...formalProgrammeOptions,
-                ]}
-                placeholder="All reporting scopes"
-                searchPlaceholder="Search scopes..."
-                emptyMessage="No scope found."
-              />
-            </div>
-          </TableToolbar>
-          <DataTable
-            columns={updateColumns}
-            rows={updatePageRows}
-            rowKey={(update) => update.id}
-            emptyMessage="No periodic updates match this search."
-            tableClassName="min-w-[920px]"
-          />
-          <TablePagination
-            page={updatePage}
-            pageSize={updatePageSize}
-            totalItems={filteredPeriodicUpdates.length}
-            pageSizeOptions={[5, 10, 25]}
-            onPageChange={setUpdatePage}
-            onPageSizeChange={(next) => {
-              setUpdatePageSize(next);
-              setUpdatePage(1);
-            }}
-          />
-        </Card>
-      )}
-
-      <FundingRoundModal
-        open={fundingOpen}
-        round={activeFundingRound}
-        goalOptions={fundraisingGoalOptions}
-        programmeOptions={formalProgrammeOptions}
-        onOpenChange={(open) => {
-          setFundingOpen(open);
-          if (!open) setActiveFundingRound(null);
-        }}
-      />
-      <ProgrammeGoalModal
-        open={goalModalOpen}
-        goal={activeGoal}
-        onOpenChange={(open) => {
-          setGoalModalOpen(open);
-          if (!open) setActiveGoal(null);
-        }}
-        onSave={saveProgrammeGoal}
-      />
-      <PeriodicUpdateModal
-        open={updateOpen}
-        onOpenChange={setUpdateOpen}
-        defaultProgrammeId={defaultPeriodicUpdateScope}
-        programmeOptions={formalProgrammeOptions}
-      />
-      <PeriodicUpdateDetailsModal update={activeUpdate} onClose={() => setActiveUpdate(null)} />
-    </>
+          ) : null}
+        </div>
+        {programmes.hasNextPage ? (
+          <Button
+            className="mt-3 w-full"
+            variant="outline"
+            isLoading={programmes.isFetchingNextPage}
+            onClick={() => void programmes.fetchNextPage()}
+          >
+            Load more programmes
+          </Button>
+        ) : null}
+      </Card>
+    </div>
   );
 }
 
-function PeriodicUpdateDetailsModal({
+function RecordsCard({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  search,
+  onSearch,
+  isLoading,
+  error,
+  rows,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+  search: string;
+  onSearch: (value: string) => void;
+  isLoading: boolean;
+  error: Error | null;
+  rows: React.ReactNode;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader
+        title={title}
+        description={description}
+        actions={
+          <Button size="sm" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        }
+      />
+      <TableToolbar>
+        <div>
+          <div className="text-sm font-medium text-ink">Search records</div>
+          <div className="mt-0.5 text-sm text-ink-muted">
+            Search is handled across the complete record history.
+          </div>
+        </div>
+        <TableFilterInput
+          icon
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          placeholder={`Search ${title.toLowerCase()}...`}
+        />
+      </TableToolbar>
+      {isLoading ? (
+        <RecordsSkeleton />
+      ) : error ? (
+        <Notice>Records could not be loaded. {error.message}</Notice>
+      ) : (
+        rows
+      )}
+      {hasMore ? (
+        <div className="mt-4 flex justify-center">
+          <Button
+            variant="outline"
+            isLoading={isLoadingMore}
+            onClick={onLoadMore}
+          >
+            Load more
+          </Button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+function PeriodicUpdateDetails({
   update,
   onClose,
 }: {
-  update: PeriodicUpdate | null;
+  update?: PeriodicUpdateRecord;
   onClose: () => void;
 }) {
   return (
     <Modal
-      open={!!update}
+      open={Boolean(update)}
       onOpenChange={(open) => !open && onClose()}
-      title={update ? `${formatDateRange(update.periodStart, update.periodEnd)} impact update` : 'Impact update'}
+      title="Periodic update"
       width="wide"
     >
-      {update && (
-        <div>
+      {update ? (
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <UpdateInfoBlock label="Submitted" value={formatDate(update.submittedAt)} />
-            <UpdateInfoBlock
-              label="Reporting scope"
-              value={update.programmeId ? programById(update.programmeId)?.name ?? 'Programme not found' : 'Company-wide'}
+            <Info
+              label="Period"
+              value={`${formatDate(update.periodStart)} – ${formatDate(update.periodEnd)}`}
             />
-            <UpdateInfoBlock label="Period start" value={formatDate(update.periodStart)} />
-            <UpdateInfoBlock label="Period end" value={formatDate(update.periodEnd)} />
-            <UpdateInfoBlock label="Jobs created" value={String(update.jobsCreated)} />
-            <UpdateInfoBlock label="Breakdown" value={`${update.jobsWomen} women, ${update.jobsMen} men`} />
+            <Info label="Submitted" value={formatDate(update.submittedAt)} />
+            <Info
+              label="Scope"
+              value={update.programme?.name ?? "Company-wide"}
+            />
+            <Info label="Jobs created" value={String(update.jobsCreated)} />
+            <Info label="Women" value={String(update.jobsWomen)} />
+            <Info label="Men" value={String(update.jobsMen)} />
           </div>
-          <div className="mt-4 rounded-xl border border-line bg-white px-4 py-3">
+          <div className="rounded-xl border border-line bg-surface-subtle p-4">
             <div className="text-sm font-semibold text-ink">Notes</div>
             <p className="mt-2 text-sm leading-6 text-ink-muted">
-              {update.notes || 'No notes were added for this period.'}
+              {update.notes || "No notes were added."}
             </p>
           </div>
-          <div className="mt-5 flex justify-end">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={onClose}>
               Close
             </Button>
           </div>
         </div>
-      )}
+      ) : null}
     </Modal>
   );
 }
-
-function ProgrammeGoalModal({
-  open,
-  goal,
-  onOpenChange,
-  onSave,
-}: {
-  open: boolean;
-  goal: ProgrammeGoalRow | null;
-  onOpenChange: (open: boolean) => void;
-  onSave: (values: ProgrammeGoalForm) => void;
-}) {
-  const form = useForm<ProgrammeGoalForm>({
-    resolver: zodResolver(programmeGoalSchema),
-    defaultValues: {
-      programmeId: goalTypeRequiresProgramme(goal?.goalType ?? '')
-        ? goal?.programmeId ?? programs[0]?.id ?? ''
-        : '',
-      goalType: goal?.goalType ?? activeGoalTypes[0]?.id ?? '',
-      targetAmountUsd: goal?.targetAmountUsd ?? '',
-      description: goal?.description ?? '',
-    },
-  });
-  const goalType = form.watch('goalType');
-  const needsProgramme = goalTypeRequiresProgramme(goalType);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const nextGoalType = goal?.goalType ?? activeGoalTypes[0]?.id ?? '';
-    form.reset({
-      programmeId: goalTypeRequiresProgramme(nextGoalType)
-        ? goal?.programmeId ?? programs[0]?.id ?? ''
-        : '',
-      goalType: nextGoalType,
-      targetAmountUsd: goal?.targetAmountUsd ?? '',
-      description: goal?.description ?? '',
-    });
-  }, [form, goal, open]);
-
-  React.useEffect(() => {
-    if (!needsProgramme && form.watch('programmeId')) {
-      form.setValue('programmeId', '', { shouldValidate: true });
-    }
-  }, [form, needsProgramme]);
-
+function Info({ label, value }: { label: string; value: string }) {
   return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={goal ? 'Edit programme goal' : 'Add programme goal'}
-      width="wide"
-    >
-      <form onSubmit={form.handleSubmit(onSave)}>
-        <FormField label="Goal type">
-          <FormAutocomplete
-            value={form.watch('goalType')}
-            onValueChange={(v) => form.setValue('goalType', v, { shouldValidate: true })}
-            options={activeGoalTypes.map((goalTypeOption) => ({
-              value: goalTypeOption.id,
-              label: goalTypeOption.label,
-              description: goalTypeOption.description,
-            }))}
-            placeholder="Select goal type"
-            searchPlaceholder="Search goal types..."
-            emptyMessage="No goal type found."
-          />
-        </FormField>
-        {needsProgramme && (
-          <FormField label="Programme" error={form.formState.errors.programmeId?.message}>
-            <FormAutocomplete
-              value={form.watch('programmeId') ?? ''}
-              onValueChange={(value) => form.setValue('programmeId', value, { shouldValidate: true })}
-              options={programs.filter((program) => program.accessType !== 'free').map((program) => ({
-                value: program.id,
-                label: program.name,
-                description: `${formatDate(program.startDate)} - ${formatDate(program.endDate)}`,
-              }))}
-              placeholder="Select programme"
-              searchPlaceholder="Search programmes..."
-              emptyMessage="No programme found."
-            />
-          </FormField>
-        )}
-        {goalTypeRequiresTarget(goalType) && (
-          <FormField label="Target amount (USD)" optional>
-            <FormInput {...form.register('targetAmountUsd')} placeholder="e.g. 500000" />
-          </FormField>
-        )}
-        <FormField label="Goal description" optional>
-          <FormTextarea
-            rows={3}
-            {...form.register('description')}
-            placeholder="Describe the outcome this programme goal is tracking."
-          />
-        </FormField>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit">
-            Save goal
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function UpdateInfoBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2">
-      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">{label}</div>
-      <div className="mt-1 text-sm font-medium text-ink">{value}</div>
+    <div className="rounded-xl border border-line bg-white p-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+        {label}
+      </div>
+      <div className="mt-1 font-medium text-ink">{value}</div>
     </div>
+  );
+}
+function HeaderMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-[120px] rounded-xl bg-white/10 px-4 py-3 text-center backdrop-blur">
+      <div className="text-xl font-semibold">{value}</div>
+      <div className="mt-0.5 text-xs text-white/70">{label}</div>
+    </div>
+  );
+}
+function RecordsSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-14" />
+      <Skeleton className="h-14" />
+      <Skeleton className="h-14" />
+      <Skeleton className="h-14" />
+    </div>
+  );
+}
+function ProfilePageSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-36 rounded-2xl" />
+      <Skeleton className="h-10 w-[620px] max-w-full" />
+      <Skeleton className="h-[480px] rounded-xl" />
+    </div>
+  );
+}
+function profileDefaults(
+  record: NonNullable<ReturnType<typeof useEntrepreneurProfileQuery>["data"]>,
+): ProfileForm {
+  return {
+    businessName: record.businessName,
+    firstName: record.firstName,
+    lastName: record.lastName,
+    phone: record.phone ?? "",
+    country: record.country as ProfileForm["country"],
+    sectorId: record.sector?.id ?? "",
+    stageId: record.stage?.id ?? "",
+  };
+}
+function initials(firstName: string, lastName: string, email: string) {
+  return (
+    [firstName, lastName]
+      .filter(Boolean)
+      .map((part) => part[0]?.toUpperCase())
+      .join("")
+      .slice(0, 2) || email.slice(0, 2).toUpperCase()
+  );
+}
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+function formatMoney(cents: number, currency = "USD") {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+function unique<T extends { value: string }>(items: T[]) {
+  return items.filter(
+    (item, index) =>
+      items.findIndex((candidate) => candidate.value === item.value) === index,
   );
 }
