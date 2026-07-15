@@ -18,6 +18,14 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value || undefined),
+  GOOGLE_CALENDAR_REDIRECT_URI: z
+    .union([z.literal(""), z.string().url()])
+    .optional()
+    .transform((value) => value || undefined),
+  CALENDAR_TOKEN_ENCRYPTION_KEY: z
+    .union([z.literal(""), z.string().min(32)])
+    .optional()
+    .transform((value) => value || undefined),
   GOOGLE_CLIENT_ID: z
     .string()
     .optional()

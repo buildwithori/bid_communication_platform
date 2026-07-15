@@ -11,6 +11,7 @@ import { ProgrammesModule } from './programmes/programmes.module';
 import { EntrepreneursModule } from './entrepreneurs/entrepreneurs.module';
 import { TrainersModule } from './trainers/trainers.module';
 import { AdminsModule } from './admins/admins.module';
+import { CalendarModule } from './calendar/calendar.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { LearningModule } from './learning/learning.module';
 import { ContentModule } from './content/content.module';
@@ -43,6 +44,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     EntrepreneursModule,
     TrainersModule,
     AdminsModule,
+    CalendarModule,
     SessionsModule,
     LearningModule,
     ContentModule,
