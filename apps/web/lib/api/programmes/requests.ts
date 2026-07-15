@@ -2,13 +2,21 @@ import { apiRequest } from "../client";
 import type {
   ArchiveProgrammeVariables,
   CreateProgrammeDeliverableRuleVariables,
+  CreateProgrammeModuleVariables,
   CreateProgrammePayload,
+  MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
   ProgrammeDetail,
+  ProgrammeModulePage,
+  ProgrammeModuleQuery,
+  ProgrammeModuleRecord,
   ProgrammePage,
   ProgrammeQuery,
   ProgrammeSummary,
+  ReusableProgrammeModulePage,
+  ReuseProgrammeModuleVariables,
   UpdateProgrammeDeliverableRuleVariables,
+  UpdateProgrammeModuleVariables,
   UpdateProgrammeVariables,
 } from "./types";
 
@@ -71,6 +79,78 @@ export const restoreProgrammeRequest = (id: string) =>
   apiRequest<ProgrammeDetail>(`/programmes/${id}/restore`, {
     method: "POST",
   });
+
+function toModuleQueryString(query?: ProgrammeModuleQuery) {
+  const params = new URLSearchParams();
+  if (query?.search) params.set("search", query.search);
+  if (query?.take) params.set("take", String(query.take));
+  if (query?.cursor) params.set("cursor", query.cursor);
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
+export const listProgrammeModulesRequest = (
+  programmeId: string,
+  query?: ProgrammeModuleQuery,
+) =>
+  apiRequest<ProgrammeModulePage>(
+    `/programmes/${programmeId}/modules${toModuleQueryString(query)}`,
+  );
+
+export const listReusableProgrammeModulesRequest = (
+  programmeId: string,
+  query?: ProgrammeModuleQuery,
+) =>
+  apiRequest<ReusableProgrammeModulePage>(
+    `/programmes/${programmeId}/reusable-modules${toModuleQueryString(query)}`,
+  );
+
+export const createProgrammeModuleRequest = ({
+  programmeId,
+  payload,
+}: CreateProgrammeModuleVariables) =>
+  apiRequest<ProgrammeModuleRecord>(`/programmes/${programmeId}/modules`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateProgrammeModuleRequest = ({
+  programmeId,
+  moduleId,
+  payload,
+}: UpdateProgrammeModuleVariables) =>
+  apiRequest<ProgrammeModuleRecord>(
+    `/programmes/${programmeId}/modules/${moduleId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const reuseProgrammeModuleRequest = ({
+  programmeId,
+  moduleId,
+}: ReuseProgrammeModuleVariables) =>
+  apiRequest<ProgrammeModuleRecord>(
+    `/programmes/${programmeId}/modules/reuse`,
+    {
+      method: "POST",
+      body: JSON.stringify({ moduleId }),
+    },
+  );
+
+export const moveProgrammeModuleRequest = ({
+  programmeId,
+  moduleId,
+  position,
+}: MoveProgrammeModuleVariables) =>
+  apiRequest<ProgrammeModuleRecord>(
+    `/programmes/${programmeId}/modules/${moduleId}/move`,
+    {
+      method: "POST",
+      body: JSON.stringify({ position }),
+    },
+  );
 
 export const listProgrammeDeliverableRulesRequest = (programmeId: string) =>
   apiRequest<{ items: ProgrammeDeliverableRule[] }>(

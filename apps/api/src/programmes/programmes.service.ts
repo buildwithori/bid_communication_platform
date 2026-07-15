@@ -2,7 +2,6 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { StorageService } from '../files/storage.service';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
 import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
@@ -63,7 +62,6 @@ type ModuleContentMetrics = {
 export class ProgrammesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
     private readonly audit: AuditService,
   ) {}
   async createProgramme(user: User, dto: CreateProgrammeDto) {
@@ -631,39 +629,8 @@ export class ProgrammesService {
       include: {
         _count: {
           select: {
+            modules: true,
             accessGrants: { where: { revokedAt: null } },
-          },
-        },
-        progress: {
-          select: { progressPercent: true },
-        },
-        modules: {
-          orderBy: { position: 'asc' },
-          include: {
-            module: {
-              include: {
-                contentItems: {
-                  orderBy: { position: 'asc' },
-                  include: {
-                    contentItem: {
-                      include: {
-                        trainer: {
-                          select: {
-                            id: true,
-                            firstName: true,
-                            lastName: true,
-                            email: true,
-                          },
-                        },
-                        videoAsset: true,
-                        fileAssets: true,
-                        toolLink: { include: { tool: { select: { id: true, name: true, embeddedUrl: true } } } },
-                      },
-                    },
-                  },
-                },
-              },
-            },
           },
         },
       },
@@ -672,12 +639,12 @@ export class ProgrammesService {
     if (!programme) {
       throw new NotFoundException('Programme was not found.');
     }
-
     if (!(await this.canReadProgramme(user, id))) {
       throw new ForbiddenException('You do not have access to this programme.');
     }
 
-    return this.mapProgrammeDetail(programme);
+    const metrics = await this.programmeListMetrics([id]);
+    return this.mapProgrammeDetailSummary(programme, metrics.get(id));
   }
 
   private deliverableRuleInclude() {
@@ -1203,92 +1170,14 @@ export class ProgrammesService {
     return metrics;
   }
 
-  private mapProgrammeDetail(
+  private mapProgrammeDetailSummary(
     programme: Programme & {
-      _count: { accessGrants: number };
-      progress: Array<{ progressPercent: number }>;
-      modules: Array<{
-        position: number;
-        module: {
-          id: string;
-          title: string;
-          description: string;
-          isReusable: boolean;
-          contentItems: Array<{
-            position: number;
-            contentItem: {
-              id: string;
-              title: string;
-              type: string;
-              durationSeconds: number | null;
-              status: string;
-              trainer: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
-              videoAsset: { playbackId: string | null; muxAssetId: string | null; status: string } | null;
-              fileAssets: Array<{ id: string; originalFilename: string; mimeType: string; sizeBytes: bigint; status: string; storageKey: string }>;
-              toolLink: { source: string; toolId: string | null; externalUrl: string | null; tool: { id: string; name: string; embeddedUrl: string | null } | null } | null;
-            };
-          }>;
-        };
-      }>;
+      _count: { modules: number; accessGrants: number };
     },
+    metrics?: ProgrammeListMetrics,
   ) {
-    const modules = programme.modules.map((programmeModule) => {
-      const items = programmeModule.module.contentItems.map(({ position, contentItem }) => ({
-        id: contentItem.id,
-        title: contentItem.title,
-        type: contentItem.type,
-        position,
-        status: contentItem.status,
-        durationSeconds: contentItem.durationSeconds,
-        trainer: contentItem.trainer
-          ? {
-              id: contentItem.trainer.id,
-              name: [contentItem.trainer.firstName, contentItem.trainer.lastName].filter(Boolean).join(' ') || contentItem.trainer.email,
-              email: contentItem.trainer.email,
-            }
-          : null,
-        video: contentItem.videoAsset
-          ? {
-              muxAssetId: contentItem.videoAsset.muxAssetId,
-              playbackId: contentItem.videoAsset.playbackId,
-              status: contentItem.videoAsset.status,
-            }
-          : null,
-        files: contentItem.fileAssets.map((file) => ({
-          id: file.id,
-          originalFilename: file.originalFilename,
-          mimeType: file.mimeType,
-          sizeBytes: file.sizeBytes.toString(),
-          status: file.status,
-          downloadUrl: file.status === 'ready'
-            ? this.storage.presign({ method: 'GET', storageKey: file.storageKey, expiresInSeconds: 5 * 60 }).url
-            : null,
-        })),
-        tool: contentItem.toolLink
-          ? {
-              source: contentItem.toolLink.source,
-              toolId: contentItem.toolLink.toolId,
-              toolName: contentItem.toolLink.tool?.name ?? null,
-              externalUrl: contentItem.toolLink.externalUrl,
-              url: contentItem.toolLink.tool?.embeddedUrl ?? contentItem.toolLink.externalUrl,
-            }
-          : null,
-      }));
-
-      return {
-        id: programmeModule.module.id,
-        title: programmeModule.module.title,
-        description: programmeModule.module.description,
-        position: programmeModule.position,
-        isReusable: programmeModule.module.isReusable,
-        contentItems: items,
-        readiness: items.length > 0 && items.every((item) => item.status === 'ready') ? 'ready' : 'needs_content',
-      };
-    });
-
-    const contentCounts = this.contentCounts(modules.flatMap((module) => module.contentItems));
-    const readyModuleCount = modules.filter((module) => module.readiness === 'ready').length;
-
+    const moduleCount = programme._count.modules;
+    const readyModuleCount = metrics?.readyModules ?? 0;
     return {
       id: programme.id,
       name: programme.name,
@@ -1305,24 +1194,21 @@ export class ProgrammesService {
         active: programme._count.accessGrants,
         capacity: programme.maxEntrepreneurs,
       },
-      readiness: modules.length === 0 ? 0 : Math.round((readyModuleCount / modules.length) * 100),
-      learnerProgress: this.learnerProgress(programme.progress),
-      content: contentCounts,
-      modules,
+      modules: {
+        total: moduleCount,
+        ready: readyModuleCount,
+      },
+      content:
+        metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 },
+      readiness:
+        moduleCount === 0
+          ? 0
+          : Math.round((readyModuleCount / moduleCount) * 100),
+      learnerProgress:
+        metrics?.learnerProgress ?? { average: 0, trackedLearners: 0 },
     };
   }
 
-  private learnerProgress(progressRows: Array<{ progressPercent: number }>) {
-    if (progressRows.length === 0) {
-      return { average: 0, trackedLearners: 0 };
-    }
-
-    const average = Math.round(
-      progressRows.reduce((sum, row) => sum + row.progressPercent, 0) / progressRows.length,
-    );
-
-    return { average, trackedLearners: progressRows.length };
-  }
 
   private lifecycle(programme: Pick<Programme, 'publishedAt' | 'archivedAt' | 'startDate' | 'endDate'>) {
     if (programme.archivedAt) return 'archived';
@@ -1333,17 +1219,5 @@ export class ProgrammesService {
     return 'active';
   }
 
-  private contentCounts(items: Array<{ type: string }>) {
-    return items.reduce(
-      (counts, item) => {
-        if (item.type === 'video') counts.videos += 1;
-        if (item.type === 'pdf') counts.pdfs += 1;
-        if (item.type === 'tool') counts.tools += 1;
-        counts.total += 1;
-        return counts;
-      },
-      { total: 0, videos: 0, pdfs: 0, tools: 0 },
-    );
-  }
 
 }

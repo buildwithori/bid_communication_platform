@@ -66,51 +66,89 @@ export type ProgrammeSummary = {
   };
 };
 
-export type ProgrammeContentItem = {
-  id: string;
-  title: string;
-  type: ProgrammeContentType;
-  position: number;
-  status: string;
-  durationSeconds: number | null;
-  trainer: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-  video: {
-    muxAssetId: string | null;
-    playbackId: string | null;
-    status: string;
-  } | null;
-  files: Array<{
-    id: string;
-    originalFilename: string;
-    mimeType: string;
-    sizeBytes: string;
-    status: string;
-    downloadUrl: string | null;
-  }>;
-  tool: {
-    source: string;
-    toolId: string | null;
-    toolName: string | null;
-    externalUrl: string | null;
-    url: string | null;
-  } | null;
-};
-
 export type ProgrammeDetail = ProgrammeBase & {
   archiveReason: string | null;
-  modules: Array<{
-    id: string;
-    title: string;
-    description: string;
-    position: number;
-    isReusable: boolean;
-    readiness: "ready" | "needs_content";
-    contentItems: ProgrammeContentItem[];
-  }>;
+  modules: {
+    total: number;
+    ready: number;
+  };
+};
+
+export type ProgrammeModuleRecord = {
+  linkId: string;
+  id: string;
+  title: string;
+  description: string;
+  isReusable: boolean;
+  position: number;
+  programmeUses: number;
+  content: {
+    total: number;
+    videos: number;
+    pdfs: number;
+    tools: number;
+  };
+  readiness: "ready" | "needs_content";
+  updatedAt: string;
+};
+
+export type ProgrammeModulePage = {
+  items: ProgrammeModuleRecord[];
+  nextCursor: string | null;
+  totalItems: number;
+};
+
+export type ReusableProgrammeModule = {
+  id: string;
+  title: string;
+  description: string;
+  isReusable: boolean;
+  contentItems: number;
+  programmeUses: number;
+  updatedAt: string;
+};
+
+export type ReusableProgrammeModulePage = {
+  items: ReusableProgrammeModule[];
+  nextCursor: string | null;
+  totalItems: number;
+};
+
+export type ProgrammeModuleQuery = {
+  search?: string;
+  take?: number;
+  cursor?: string;
+};
+
+export type CreateProgrammeModulePayload = {
+  title: string;
+  description?: string;
+  isReusable?: boolean;
+};
+
+export type CreateProgrammeModuleVariables = {
+  programmeId: string;
+  payload: CreateProgrammeModulePayload;
+};
+
+export type UpdateProgrammeModulePayload =
+  Partial<CreateProgrammeModulePayload>;
+
+export type UpdateProgrammeModuleVariables = {
+  programmeId: string;
+  moduleId: string;
+  payload: UpdateProgrammeModulePayload;
+};
+
+export type ReuseProgrammeModuleVariables = {
+  programmeId: string;
+  moduleId: string;
+};
+
+export type MoveProgrammeModuleVariables = {
+  programmeId: string;
+  moduleId: string;
+  position: number;
 };
 
 export type ProgrammeQuery = {

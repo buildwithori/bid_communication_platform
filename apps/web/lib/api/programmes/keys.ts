@@ -1,4 +1,4 @@
-import type { ProgrammeQuery } from "./types";
+import type { ProgrammeModuleQuery, ProgrammeQuery } from "./types";
 
 export const programmeKeys = {
   all: ["programmes"] as const,
@@ -8,6 +8,14 @@ export const programmeKeys = {
   summary: () => [...programmeKeys.all, "summary"] as const,
   details: () => [...programmeKeys.all, "detail"] as const,
   detail: (id: string) => [...programmeKeys.details(), id] as const,
+  modules: (programmeId: string) =>
+    [...programmeKeys.detail(programmeId), "modules"] as const,
+  moduleList: (programmeId: string, query?: ProgrammeModuleQuery) =>
+    [...programmeKeys.modules(programmeId), query ?? {}] as const,
+  reusableModuleLists: (programmeId: string) =>
+    [...programmeKeys.detail(programmeId), "reusable-modules"] as const,
+  reusableModules: (programmeId: string, query?: ProgrammeModuleQuery) =>
+    [...programmeKeys.reusableModuleLists(programmeId), query ?? {}] as const,
   deliverableRules: (programmeId: string) =>
     [...programmeKeys.detail(programmeId), "deliverable-rules"] as const,
 };

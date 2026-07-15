@@ -11,24 +11,36 @@ import { programmeKeys } from "./keys";
 import {
   archiveProgrammeRequest,
   createProgrammeDeliverableRuleRequest,
+  createProgrammeModuleRequest,
   createProgrammeRequest,
   getProgrammeRequest,
   getProgrammeSummaryRequest,
   listProgrammeDeliverableRulesRequest,
+  listProgrammeModulesRequest,
   listProgrammesRequest,
+  listReusableProgrammeModulesRequest,
+  moveProgrammeModuleRequest,
   publishProgrammeRequest,
   restoreProgrammeRequest,
+  reuseProgrammeModuleRequest,
   updateProgrammeDeliverableRuleRequest,
+  updateProgrammeModuleRequest,
   updateProgrammeRequest,
 } from "./requests";
 import type {
   ArchiveProgrammeVariables,
   CreateProgrammeDeliverableRuleVariables,
+  CreateProgrammeModuleVariables,
   CreateProgrammePayload,
+  MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
   ProgrammeDetail,
+  ProgrammeModuleQuery,
+  ProgrammeModuleRecord,
   ProgrammeQuery,
+  ReuseProgrammeModuleVariables,
   UpdateProgrammeDeliverableRuleVariables,
+  UpdateProgrammeModuleVariables,
   UpdateProgrammeVariables,
 } from "./types";
 
@@ -38,6 +50,7 @@ type MutationHandlers<TData> = {
 };
 
 type ProgrammePageQuery = Omit<ProgrammeQuery, "cursor">;
+type ProgrammeModulePageQuery = Omit<ProgrammeModuleQuery, "cursor">;
 
 export function useProgrammesPage(query: ProgrammePageQuery) {
   const [page, setCurrentPage] = useState(1);
@@ -119,6 +132,84 @@ export const useProgrammeDetailQuery = (id: string | null) =>
     enabled: Boolean(id),
   });
 
+export function useProgrammeModulesPage(
+  programmeId: string,
+  query: ProgrammeModulePageQuery,
+) {
+  const [page, setCurrentPage] = useState(1);
+  const [cursors, setCursors] = useState<Array<string | undefined>>([
+    undefined,
+  ]);
+  const cursor = cursors[page - 1];
+  const result = useQuery({
+    queryKey: programmeKeys.moduleList(programmeId, { ...query, cursor }),
+    queryFn: () =>
+      listProgrammeModulesRequest(programmeId, { ...query, cursor }),
+    enabled: Boolean(programmeId),
+  });
+
+  const resetPagination = useCallback(() => {
+    setCurrentPage(1);
+    setCursors([undefined]);
+  }, []);
+
+  const setPage = useCallback(
+    (nextPage: number) => {
+      if (nextPage < 1 || nextPage === page) return;
+      if (
+        (nextPage < page && cursors[nextPage - 1] !== undefined) ||
+        nextPage === 1
+      ) {
+        setCurrentPage(nextPage);
+        return;
+      }
+      if (nextPage === page + 1 && result.data?.nextCursor) {
+        setCursors((current) => {
+          const next = [...current];
+          next[nextPage - 1] = result.data?.nextCursor ?? undefined;
+          return next;
+        });
+        setCurrentPage(nextPage);
+      }
+    },
+    [cursors, page, result.data?.nextCursor],
+  );
+
+  return {
+    ...result,
+    page,
+    rows: result.data?.items ?? [],
+    totalItems: result.data?.totalItems ?? 0,
+    setPage,
+    resetPagination,
+  };
+}
+
+export function useLazyReusableProgrammeModules(
+  query: ProgrammeModulePageQuery & {
+    programmeId: string;
+    enabled: boolean;
+  },
+) {
+  const { programmeId, enabled, ...filters } = query;
+  const result = useInfiniteQuery({
+    queryKey: programmeKeys.reusableModules(programmeId, filters),
+    queryFn: ({ pageParam }) =>
+      listReusableProgrammeModulesRequest(programmeId, {
+        ...filters,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: enabled && Boolean(programmeId),
+  });
+
+  return {
+    ...result,
+    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+  };
+}
+
 export const useProgrammeDeliverableRulesQuery = (
   programmeId: string | null,
 ) =>
@@ -177,6 +268,65 @@ export const useArchiveProgrammeMutation = (
 export const useRestoreProgrammeMutation = (
   handlers?: MutationHandlers<ProgrammeDetail>,
 ) => useProgrammeMutation<string>(restoreProgrammeRequest, handlers);
+
+function useProgrammeModuleMutation<
+  TVariables extends { programmeId: string },
+>(
+  mutationFn: (variables: TVariables) => Promise<ProgrammeModuleRecord>,
+  handlers?: MutationHandlers<ProgrammeModuleRecord>,
+) {
+  const queryClient = useQueryClient();
+  return useMutation<ProgrammeModuleRecord, Error, TVariables>({
+    mutationFn,
+    onSuccess: (data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.modules(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.reusableModuleLists(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.detail(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.summary() });
+      handlers?.onSuccess?.(data);
+    },
+    onError: handlers?.onError,
+  });
+}
+
+export const useCreateProgrammeModuleMutation = (
+  handlers?: MutationHandlers<ProgrammeModuleRecord>,
+) =>
+  useProgrammeModuleMutation<CreateProgrammeModuleVariables>(
+    createProgrammeModuleRequest,
+    handlers,
+  );
+
+export const useUpdateProgrammeModuleMutation = (
+  handlers?: MutationHandlers<ProgrammeModuleRecord>,
+) =>
+  useProgrammeModuleMutation<UpdateProgrammeModuleVariables>(
+    updateProgrammeModuleRequest,
+    handlers,
+  );
+
+export const useReuseProgrammeModuleMutation = (
+  handlers?: MutationHandlers<ProgrammeModuleRecord>,
+) =>
+  useProgrammeModuleMutation<ReuseProgrammeModuleVariables>(
+    reuseProgrammeModuleRequest,
+    handlers,
+  );
+
+export const useMoveProgrammeModuleMutation = (
+  handlers?: MutationHandlers<ProgrammeModuleRecord>,
+) =>
+  useProgrammeModuleMutation<MoveProgrammeModuleVariables>(
+    moveProgrammeModuleRequest,
+    handlers,
+  );
 
 function useDeliverableRuleMutation<TVariables>(
   mutationFn: (variables: TVariables) => Promise<ProgrammeDeliverableRule>,
