@@ -122,6 +122,7 @@ export interface FormSelectProps {
   placeholder?: string;
   id?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function FormSelect({
@@ -131,11 +132,13 @@ export function FormSelect({
   placeholder,
   id,
   className,
+  disabled,
 }: FormSelectProps) {
   const selectedOption = options.find((option) => option.value === value);
 
   return (
     <Select
+      disabled={disabled}
       value={value}
       onValueChange={(nextValue: string) => {
         if (nextValue) onValueChange(nextValue);

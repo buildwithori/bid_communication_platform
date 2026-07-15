@@ -186,6 +186,31 @@ export function useProgrammeModulesPage(
   };
 }
 
+export function useLazyProgrammeModules(
+  query: ProgrammeModulePageQuery & {
+    programmeId: string;
+    enabled: boolean;
+  },
+) {
+  const { programmeId, enabled, ...filters } = query;
+  const result = useInfiniteQuery({
+    queryKey: programmeKeys.moduleList(programmeId, filters),
+    queryFn: ({ pageParam }) =>
+      listProgrammeModulesRequest(programmeId, {
+        ...filters,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: enabled && Boolean(programmeId),
+  });
+
+  return {
+    ...result,
+    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+  };
+}
+
 export function useLazyReusableProgrammeModules(
   query: ProgrammeModulePageQuery & {
     programmeId: string;

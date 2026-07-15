@@ -4,9 +4,7 @@ import nextTypeScript from "eslint-config-next/typescript";
 
 const rawApiModules = [
   "@/lib/api/client",
-  "@/lib/api/content",
   "@/lib/api/deliverables",
-  "@/lib/api/files",
   "@/lib/api/learning",
   "@/lib/api/sessions",
   "@/lib/api/tool-requests",

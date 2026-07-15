@@ -4,6 +4,7 @@ export {
   useCreateProgrammeModuleMutation,
   useCreateProgrammeMutation,
   useLazyProgrammesLookup,
+  useLazyProgrammeModules,
   useLazyReusableProgrammeModules,
   useMoveProgrammeModuleMutation,
   useProgrammeDeliverableRulesQuery,
