@@ -71,7 +71,7 @@ export class ContentService {
   ) {
     this.assertAdmin(user);
     await this.ensureModuleExists(moduleId);
-    return this.contentPage({ ...query, moduleId });
+    return this.moduleContentPage(moduleId, query);
   }
 
   async createModuleContentItem(
@@ -389,6 +389,76 @@ export class ContentService {
     return this.serializeRating(rating);
   }
 
+  private async moduleContentPage(
+    moduleId: string,
+    query: ContentItemQueryDto,
+  ) {
+    const take = query.take ?? 20;
+    const contentWhere = this.contentWhere({
+      ...query,
+      moduleId: undefined,
+      excludeModuleId: undefined,
+    });
+    const where: Prisma.ModuleContentItemWhereInput = {
+      moduleId,
+      contentItem: contentWhere,
+    };
+
+    const [rows, totalItems, grouped] = await Promise.all([
+      this.prisma.moduleContentItem.findMany({
+        where,
+        include: { contentItem: { include: contentItemInclude } },
+        orderBy: { position: 'asc' },
+        take: take + 1,
+        ...(query.cursor
+          ? { cursor: { id: query.cursor }, skip: 1 }
+          : {}),
+      }),
+      this.prisma.moduleContentItem.count({ where }),
+      this.prisma.contentItem.groupBy({
+        by: ['type'],
+        where: {
+          ...this.contentWhere({
+            ...query,
+            type: undefined,
+            moduleId: undefined,
+            excludeModuleId: undefined,
+          }),
+          modules: { some: { moduleId } },
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    const pageRows = rows.slice(0, take);
+    const usage = await this.contentUsage(
+      pageRows.map((row) => row.contentItemId),
+      moduleId,
+    );
+    const counts = { video: 0, pdf: 0, tool: 0 };
+    for (const row of grouped) counts[row.type] = row._count.id;
+
+    return {
+      items: pageRows.map((row) =>
+        this.serializeContentItem(row.contentItem, {
+          ...(usage.get(row.contentItemId) ?? {
+            modules: row.contentItem._count.modules,
+            programmes: 0,
+            position: row.position,
+          }),
+          position: row.position,
+        }),
+      ),
+      nextCursor:
+        rows.length > take ? pageRows[pageRows.length - 1]?.id ?? null : null,
+      totalItems,
+      summary: {
+        total: counts.video + counts.pdf + counts.tool,
+        ...counts,
+      },
+    };
+  }
+
   private async contentPage(query: ContentItemQueryDto) {
     const take = query.take ?? 20;
     const where = this.contentWhere(query);
@@ -447,6 +517,9 @@ export class ContentService {
       ...(query.trainerId ? { trainerId: query.trainerId } : {}),
       ...(query.moduleId
         ? { modules: { some: { moduleId: query.moduleId } } }
+        : {}),
+      ...(query.excludeModuleId
+        ? { modules: { none: { moduleId: query.excludeModuleId } } }
         : {}),
       ...(search
         ? {
