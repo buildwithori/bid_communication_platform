@@ -37,7 +37,7 @@ export type CreateContentItemInput = {
   trainerId?: string;
   durationSeconds?: number;
   fileAssetId?: string;
-  muxPlaybackId?: string;
+  videoAssetId?: string;
   toolId?: string;
   externalUrl?: string;
 };
@@ -51,7 +51,11 @@ export type ContentItemPayload = {
   durationSeconds: number | null;
   durationLabel: string | null;
   status: 'draft' | 'processing' | 'ready' | 'failed' | 'archived';
-  muxPlaybackId: string | null;
+  video: {
+    id: string;
+    durationSeconds: number | null;
+    status: 'pending' | 'processing' | 'ready' | 'failed' | 'archived';
+  } | null;
   file: {
     id: string;
     originalFilename: string;

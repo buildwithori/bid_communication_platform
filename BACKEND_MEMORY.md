@@ -342,3 +342,11 @@ Before merging backend work, ask:
 - Logout is an explicit public auth entry point so it can always expire an invalid or stale browser cookie; valid tokens are revoked when present.
 - Google OAuth mode is stored with state and enforced in the callback. Unknown identities cannot be created by login, OAuth failures return to the matching branded auth page, and onboarding endpoints reject non-entrepreneur roles.
 - Local Nest watch output uses `apps/api/tsconfig.docker.json` and the Compose `api_build` named volume at `apps/api/.docker`. Host production builds continue using `apps/api/dist`, preventing Docker from creating root-owned host build artifacts.
+
+## File And Video Infrastructure Completion (2026-07-15)
+
+- `files` owns presigned private object writes/reads, upload ownership and usage, provider metadata verification, file-signature validation, and audited ready transitions. Local Docker uses private MinIO; production uses DigitalOcean Spaces.
+- Provider credentials, storage keys, private URLs, and raw Mux identifiers never enter UI forms. Content creation attaches only internal `fileAssetId` or `videoAssetId` values.
+- `video` owns Mux direct uploads, cancellation, status polling, webhook transitions, and signed playback. The only public video route is `POST /webhooks/mux`; all upload and playback routes remain authenticated.
+- Mux callbacks require HMAC verification against the exact raw body, enforce a five-minute replay window, and record event IDs transactionally so duplicate deliveries are safe.
+- Ready/errored events update both `video_assets` and attached `content_items`. Signed-policy playback IDs remain backend metadata; authorized clients receive short-lived RS256 playback tokens.

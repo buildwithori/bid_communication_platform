@@ -229,3 +229,10 @@ Session workflow rules:
 - The audit worker processes pending/failed outbox rows automatically, prevents overlapping local runs, caps retries at ten attempts, and creates logs idempotently.
 - `audit_logs` are append-only at the database layer. The processor uses insert-only idempotency through the unique outbox relationship.
 - Generic Prisma/repository hooks may be added later only as a selected-model safety net. They must not replace named business lifecycle events or duplicate them.
+
+## Asset Infrastructure Completion (2026-07-15)
+
+- Non-video files are uploaded directly to private S3-compatible storage. Local Docker uses private MinIO; production uses DigitalOcean Spaces. The API verifies object size, MIME metadata, and supported file signatures before marking an asset ready.
+- File consumers pass an explicit usage and internal `fileAssetId`; storage keys and private provider URLs stay server-only. Reads use short-lived signed URLs after role/domain access checks.
+- Video consumers pass an internal `videoAssetId`, never a user-entered Mux upload, asset, or playback ID. Mux callbacks use the explicit public `POST /webhooks/mux` exception, raw-body HMAC verification, and durable event IDs for idempotency.
+- Ready videos use short-lived RS256 Mux playback tokens after programme/content authorization. Frontend file/video feature hooks own direct-upload progress, cancellation, status polling, failures, and TanStack calls.
