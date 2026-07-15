@@ -450,6 +450,7 @@ export default function AdminTrainersPage() {
         />
       ) : null}
       <TrainerDetailModal
+        key={detailId ?? "closed"}
         open={Boolean(detailId)}
         onOpenChange={(open) => !open && setDetailId(null)}
         trainer={detail.data}
@@ -473,6 +474,11 @@ function TrainerDetailModal({
   isLoading: boolean;
   error: Error | null;
 }) {
+  const [showAllProgrammes, setShowAllProgrammes] = React.useState(false);
+  const programmes = trainer?.portfolio.programmes ?? [];
+  const visibleProgrammes = showAllProgrammes ? programmes : programmes.slice(0, 3);
+  const hiddenProgrammeCount = Math.max(programmes.length - visibleProgrammes.length, 0);
+
   return (
     <Modal
       open={open}
@@ -625,46 +631,87 @@ function TrainerDetailModal({
               </div>
             </section>
 
-            <section className="rounded-xl border border-line bg-surface-panel p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
+            <section className="overflow-hidden rounded-2xl border border-black/[0.08] bg-surface-panel shadow-[0_12px_32px_rgba(26,26,26,0.04)]">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-gradient-to-r from-bid-light/70 via-surface-panel to-info-light/30 px-4 py-4">
                 <div>
                   <h3 className="font-semibold text-ink">Programme coverage</h3>
                   <p className="mt-1 text-sm leading-5 text-ink-muted">
-                    Programme access derived from this trainer&apos;s content ownership.
+                    Access derived from this trainer&apos;s content ownership.
                   </p>
                 </div>
-                <Badge tone="neutral">
-                  {trainer.portfolio.programmes.length} programme
-                  {trainer.portfolio.programmes.length === 1 ? "" : "s"}
+                <Badge tone="brand">
+                  {programmes.length} programme{programmes.length === 1 ? "" : "s"}
                 </Badge>
               </div>
-              <div className="mt-4 space-y-2">
-                {trainer.portfolio.programmes.length ? (
-                  trainer.portfolio.programmes.map((programme) => (
-                    <div
-                      key={programme.id}
-                      className="flex flex-col gap-3 rounded-xl border border-line/80 bg-surface-subtle px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-ink">
-                          {programme.name}
+
+              {programmes.length ? (
+                <>
+                  <div
+                    className={`space-y-2.5 p-3 ${
+                      showAllProgrammes
+                        ? "max-h-[320px] overflow-y-auto overscroll-contain"
+                        : ""
+                    }`}
+                  >
+                    {visibleProgrammes.map((programme) => (
+                      <div
+                        key={programme.id}
+                        className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-black/[0.08] bg-surface-panel px-4 py-3.5 shadow-[0_6px_18px_rgba(26,26,26,0.035)] transition hover:border-bid/25 hover:shadow-[0_10px_24px_rgba(123,29,75,0.08)] sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <span
+                          className="absolute inset-y-0 left-0 w-1 bg-bid opacity-75"
+                          aria-hidden="true"
+                        />
+                        <div className="flex min-w-0 items-start gap-3 pl-1">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bid-light text-bid-dark">
+                            <BookOpenCheck className="h-4.5 w-4.5" aria-hidden="true" />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-ink">
+                              {programme.name}
+                            </div>
+                            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-muted">
+                              <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                              <span>
+                                {new Date(programme.startDate).toLocaleDateString()} –{" "}
+                                {new Date(programme.endDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="mt-1 text-xs text-ink-muted">
-                          {new Date(programme.startDate).toLocaleDateString()} –{" "}
-                          {new Date(programme.endDate).toLocaleDateString()}
-                        </div>
+                        <Badge
+                          tone={programme.accessType === "free" ? "green" : "brand"}
+                          className="ml-12 w-fit shrink-0 sm:ml-0"
+                        >
+                          {programme.accessType === "free" ? "Free access" : "Assigned"}
+                        </Badge>
                       </div>
-                      <Badge tone={programme.accessType === "free" ? "green" : "blue"}>
-                        {programme.accessType === "free" ? "Free access" : "Assigned"}
-                      </Badge>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-                    No programme coverage yet.
+                    ))}
                   </div>
-                )}
-              </div>
+
+                  {programmes.length > 3 ? (
+                    <div className="flex items-center justify-between gap-3 border-t border-line bg-surface-subtle/60 px-4 py-3">
+                      <span className="text-xs text-ink-muted">
+                        {showAllProgrammes
+                          ? `Showing all ${programmes.length} programmes`
+                          : `${hiddenProgrammeCount} more programme${hiddenProgrammeCount === 1 ? "" : "s"}`}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAllProgrammes((current) => !current)}
+                      >
+                        {showAllProgrammes ? "Show less" : "View all"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="m-3 rounded-xl border border-dashed border-line bg-surface-subtle/50 px-4 py-8 text-center text-sm text-ink-muted">
+                  No programme coverage yet.
+                </div>
+              )}
             </section>
           </div>
         </div>
