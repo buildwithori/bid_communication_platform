@@ -3,7 +3,7 @@ import { BusinessMembership, Prisma, User, UserRole } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
-import { ProfileRecordQueryDto } from './dto/profile-record-query.dto';
+import { ProfileRecordQueryDto, ProgrammeAccessQueryDto } from './dto/profile-record-query.dto';
 import { UpsertFundraisingRoundDto, UpsertPeriodicUpdateDto, UpsertProgrammeGoalDto } from './dto/profile-records.dto';
 
 const DEFAULT_TAKE = 20;
@@ -18,6 +18,7 @@ type EntrepreneurMembership = BusinessMembership & {
     status: string;
     createdAt: Date;
     entrepreneurProgrammeGrants: Array<{
+      id: string;
       grantedAt: Date;
       programme: {
         id: string;
@@ -27,15 +28,7 @@ type EntrepreneurMembership = BusinessMembership & {
         endDate: Date;
       };
     }>;
-    programmeProgress: Array<{
-      programmeId: string;
-      status: string;
-      progressPercent: number;
-      completedModuleCount: number;
-      totalModuleCount: number;
-      completedContentCount: number;
-      totalContentCount: number;
-    }>;
+    _count: { entrepreneurProgrammeGrants: number };
   };
   business: {
     id: string;
@@ -92,8 +85,11 @@ export class EntrepreneursService {
       ]);
 
     const visibleRows = rows.slice(0, take);
+    const progress = await this.progressAggregates(visibleRows.map((row) => row.user.id));
     return {
-      items: visibleRows.map((row) => this.mapEntrepreneur(row)),
+      items: visibleRows.map((row) =>
+        this.mapEntrepreneur(row, progress.get(row.user.id)),
+      ),
       nextCursor:
         rows.length > take
           ? visibleRows[visibleRows.length - 1]?.id ?? null
@@ -121,7 +117,69 @@ export class EntrepreneursService {
       throw new NotFoundException('Entrepreneur was not found.');
     }
 
-    return this.mapEntrepreneur(membership);
+    const progress = await this.progressAggregates([membership.user.id]);
+    return this.mapEntrepreneur(membership, progress.get(membership.user.id));
+  }
+
+  async listProgrammeAccess(
+    user: User,
+    entrepreneurUserId: string,
+    query: ProgrammeAccessQueryDto,
+  ) {
+    await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
+    const take = query.take ?? DEFAULT_TAKE;
+    const where: Prisma.ProgrammeAccessGrantWhereInput = {
+      entrepreneurUserId,
+      revokedAt: null,
+      ...(query.search?.trim()
+        ? {
+            programme: {
+              name: { contains: query.search.trim(), mode: 'insensitive' },
+            },
+          }
+        : {}),
+    };
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.programmeAccessGrant.findMany({
+        where,
+        orderBy: [{ grantedAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          grantedAt: true,
+          programme: {
+            select: {
+              id: true,
+              name: true,
+              accessType: true,
+              startDate: true,
+              endDate: true,
+            },
+          },
+        },
+      }),
+      this.prisma.programmeAccessGrant.count({ where }),
+    ]);
+    const visibleRows = rows.slice(0, take);
+    const progress = await this.prisma.learnerProgrammeProgress.findMany({
+      where: {
+        entrepreneurUserId,
+        programmeId: { in: visibleRows.map((row) => row.programme.id) },
+      },
+    });
+    const progressByProgramme = new Map(progress.map((item) => [item.programmeId, item]));
+
+    return {
+      items: visibleRows.map((row) =>
+        this.mapProgrammeAccess(row, progressByProgramme.get(row.programme.id)),
+      ),
+      nextCursor:
+        rows.length > take
+          ? visibleRows[visibleRows.length - 1]?.id ?? null
+          : null,
+      totalItems,
+    };
   }
 
   async listProgrammeGoals(
@@ -611,7 +669,9 @@ export class EntrepreneursService {
           entrepreneurProgrammeGrants: {
             where: { revokedAt: null },
             orderBy: { grantedAt: 'desc' as const },
+            take: 3,
             select: {
+              id: true,
               grantedAt: true,
               programme: {
                 select: {
@@ -624,15 +684,9 @@ export class EntrepreneursService {
               },
             },
           },
-          programmeProgress: {
+          _count: {
             select: {
-              programmeId: true,
-              status: true,
-              progressPercent: true,
-              completedModuleCount: true,
-              totalModuleCount: true,
-              completedContentCount: true,
-              totalContentCount: true,
+              entrepreneurProgrammeGrants: { where: { revokedAt: null } },
             },
           },
         },
@@ -706,40 +760,84 @@ export class EntrepreneursService {
     return trimmed || null;
   }
 
-  private mapEntrepreneur(row: EntrepreneurMembership) {
-    const progressByProgramme = new Map(row.user.programmeProgress.map((progress) => [progress.programmeId, progress]));
-    const programmes = row.user.entrepreneurProgrammeGrants.map((grant) => {
-      const progress = progressByProgramme.get(grant.programme.id);
-      return {
-        id: grant.programme.id,
-        name: grant.programme.name,
-        accessType: grant.programme.accessType,
-        grantedAt: grant.grantedAt.toISOString(),
-        startDate: grant.programme.startDate.toISOString(),
-        endDate: grant.programme.endDate.toISOString(),
-        progress: progress
-          ? {
-              status: progress.status,
-              percent: progress.progressPercent,
-              completedModules: progress.completedModuleCount,
-              totalModules: progress.totalModuleCount,
-              completedContent: progress.completedContentCount,
-              totalContent: progress.totalContentCount,
-            }
-          : null,
+  private mapProgrammeAccess(
+    row: {
+      id: string;
+      grantedAt: Date;
+      programme: {
+        id: string;
+        name: string;
+        accessType: string;
+        startDate: Date;
+        endDate: Date;
       };
+    },
+    progress?: {
+      status: string;
+      progressPercent: number;
+      completedModuleCount: number;
+      totalModuleCount: number;
+      completedContentCount: number;
+      totalContentCount: number;
+    },
+  ) {
+    return {
+      grantId: row.id,
+      id: row.programme.id,
+      name: row.programme.name,
+      accessType: row.programme.accessType,
+      grantedAt: row.grantedAt.toISOString(),
+      startDate: row.programme.startDate.toISOString(),
+      endDate: row.programme.endDate.toISOString(),
+      progress: progress
+        ? {
+            status: progress.status,
+            percent: progress.progressPercent,
+            completedModules: progress.completedModuleCount,
+            totalModules: progress.totalModuleCount,
+            completedContent: progress.completedContentCount,
+            totalContent: progress.totalContentCount,
+          }
+        : null,
+    };
+  }
+
+  private async progressAggregates(entrepreneurUserIds: string[]) {
+    if (!entrepreneurUserIds.length) {
+      return new Map<string, { average: number; trackedProgrammes: number }>();
+    }
+    const rows = await this.prisma.learnerProgrammeProgress.groupBy({
+      by: ['entrepreneurUserId'],
+      where: { entrepreneurUserId: { in: entrepreneurUserIds } },
+      _avg: { progressPercent: true },
+      _count: { _all: true },
     });
 
-    const averageProgress = programmes.length
-      ? Math.round(
-          programmes.reduce((sum, programme) => sum + (programme.progress?.percent ?? 0), 0) / programmes.length,
-        )
-      : 0;
+    return new Map(
+      rows.map((row) => [
+        row.entrepreneurUserId,
+        {
+          average: Math.round(row._avg.progressPercent ?? 0),
+          trackedProgrammes: row._count._all,
+        },
+      ]),
+    );
+  }
+
+  private mapEntrepreneur(
+    row: EntrepreneurMembership,
+    learnerProgress = { average: 0, trackedProgrammes: 0 },
+  ) {
+    const programmes = row.user.entrepreneurProgrammeGrants.map((grant) =>
+      this.mapProgrammeAccess(grant),
+    );
 
     return {
       entrepreneurUserId: row.user.id,
       businessId: row.business.id,
       businessName: row.business.name,
+      firstName: row.user.firstName ?? '',
+      lastName: row.user.lastName ?? '',
       representativeName: [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') || row.user.email,
       email: row.user.email,
       phone: row.user.phone,
@@ -754,11 +852,9 @@ export class EntrepreneursService {
       programmeAccess: {
         freeResources: true,
         assignedProgrammes: programmes,
+        assignedProgrammeCount: row.user._count.entrepreneurProgrammeGrants,
       },
-      learnerProgress: {
-        average: averageProgress,
-        trackedProgrammes: programmes.filter((programme) => programme.progress).length,
-      },
+      learnerProgress,
     };
   }
 }

@@ -12,7 +12,7 @@ import {
   UpdateEntrepreneurStatusDto,
 } from './dto/entrepreneur-actions.dto';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
-import { ProfileRecordQueryDto } from './dto/profile-record-query.dto';
+import { ProfileRecordQueryDto, ProgrammeAccessQueryDto } from './dto/profile-record-query.dto';
 import {
   UpsertFundraisingRoundDto,
   UpsertPeriodicUpdateDto,
@@ -102,6 +102,15 @@ export class EntrepreneursController {
     @Body() dto: ProgrammeAccessDto,
   ) {
     return this.management.revokeProgramme(user, entrepreneurUserId, dto);
+  }
+
+  @Get(':entrepreneurUserId/programme-access')
+  listProgrammeAccess(
+    @CurrentUser() user: User,
+    @Param('entrepreneurUserId') entrepreneurUserId: string,
+    @Query() query: ProgrammeAccessQueryDto,
+  ) {
+    return this.entrepreneursService.listProgrammeAccess(user, entrepreneurUserId, query);
   }
 
   @Get(':entrepreneurUserId/programme-goals')
