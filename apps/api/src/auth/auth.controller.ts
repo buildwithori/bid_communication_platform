@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Query, Req, Res, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
@@ -32,10 +32,12 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
-  @Public() @Post('signup')
+  @Public()
+  @Post('signup')
   signup(@Body() dto: SignupDto) { return this.authService.signup(dto); }
 
-  @Public() @Post('login')
+  @Public()
+  @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: CookieResponse) {
     const result = await this.authService.login(dto);
     setSessionCookie(response, result.sessionToken);
@@ -43,19 +45,24 @@ export class AuthController {
     return body;
   }
 
-  @Public() @Post('forgot-password')
+  @Public()
+  @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) { return this.authService.forgotPassword(dto); }
 
-  @Public() @Post('reset-password')
+  @Public()
+  @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) { return this.authService.resetPassword(dto); }
 
-  @Public() @Post('verify-email')
+  @Public()
+  @Post('verify-email')
   verifyEmail(@Body() dto: TokenDto) { return this.authService.verifyEmail(dto); }
 
-  @Public() @Post('resend-verification')
+  @Public()
+  @Post('resend-verification')
   resendVerification(@Body() dto: ResendVerificationDto) { return this.authService.resendVerification(dto); }
 
-  @Public() @Get('google/start')
+  @Public()
+  @Get('google/start')
   googleStart(@Query('mode') requestedMode: string | undefined, @Res() response: CookieResponse) {
     const mode = requestedMode === 'signup' ? 'signup' : 'login';
     const authorization = this.googleAuth.createAuthorization(mode);
@@ -63,14 +70,22 @@ export class AuthController {
     response.redirect(authorization.url);
   }
 
-  @Public() @Get('google/callback')
+  @Public()
+  @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Query('state') state: string, @Req() request: CookieRequest, @Res() response: CookieResponse) {
     const oauth = readGoogleOAuthCookie(request);
-    if (!oauth) return response.redirect(`${this.webUrl()}/auth/login?oauthError=expired`);
-    const result = await this.googleAuth.handleCallback(code, oauth.state, state);
-    clearGoogleOAuthCookie(response);
-    setSessionCookie(response, result.sessionToken);
-    response.redirect(result.onboardingRequired ? `${this.webUrl()}/auth/onboarding` : `${this.webUrl()}/entrepreneur/dashboard`);
+    if (!oauth) return response.redirect(`${this.webUrl()}/auth/login?oauthError=failed`);
+
+    try {
+      const result = await this.googleAuth.handleCallback(code, oauth.state, state, oauth.mode);
+      clearGoogleOAuthCookie(response);
+      setSessionCookie(response, result.sessionToken);
+      response.redirect(result.onboardingRequired ? `${this.webUrl()}/auth/onboarding` : `${this.webUrl()}/entrepreneur/dashboard`);
+    } catch (error) {
+      clearGoogleOAuthCookie(response);
+      const authRoute = oauth.mode === 'signup' ? 'signup' : 'login';
+      response.redirect(`${this.webUrl()}/auth/${authRoute}?oauthError=${this.googleErrorCode(error)}`);
+    }
   }
 
   @Get('onboarding')
@@ -81,7 +96,8 @@ export class AuthController {
     return this.googleAuth.completeOnboarding(user.id, dto);
   }
 
-  @Public() @Post('refresh')
+  @Public()
+  @Post('refresh')
   async refresh(@Req() request: CookieRequest, @Res({ passthrough: true }) response: CookieResponse) {
     const result = await this.authService.refresh(readSessionCookie(request));
     setSessionCookie(response, result.sessionToken);
@@ -89,6 +105,7 @@ export class AuthController {
     return body;
   }
 
+  @Public()
   @Post('logout')
   async logout(@Req() request: CookieRequest, @Res({ passthrough: true }) response: CookieResponse) {
     const result = await this.authService.logout(readSessionCookie(request));
@@ -96,8 +113,16 @@ export class AuthController {
     return result;
   }
 
-  @Public() @Get('me')
+  @Public()
+  @Get('me')
   me(@Req() request: CookieRequest) { return this.authService.me(readSessionCookie(request)); }
+
+  private googleErrorCode(error: unknown) {
+    if (error instanceof UnauthorizedException) return 'account_not_found';
+    if (error instanceof ForbiddenException) return 'access_denied';
+    if (error instanceof ServiceUnavailableException) return 'unavailable';
+    return 'failed';
+  }
 
   private webUrl() { return this.config.getOrThrow<string>('APP_WEB_URL').replace(/\/$/, ''); }
 }

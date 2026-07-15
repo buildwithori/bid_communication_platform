@@ -1,33 +1,41 @@
 'use client';
 
 import * as React from 'react';
+import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentUser, type AuthUser } from '@/lib/api/auth';
+import { CURRENT_USER_QUERY_KEY, getCurrentUser, type AuthUser } from '@/lib/api/auth';
 import { Skeleton } from '@/components/shared/Card';
 import { routes } from '@/lib/routes';
 
 type WorkspaceRole = AuthUser['role'];
-const CURRENT_USER_QUERY_KEY = ['auth', 'me'];
 
 export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: WorkspaceRole[]; children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const allowedRoleKey = allowedRoles.join('|');
   const currentUserQuery = useQuery({ queryKey: CURRENT_USER_QUERY_KEY, queryFn: getCurrentUser, retry: false, staleTime: 0 });
   const user = currentUserQuery.data?.user;
+  const isAllowed = user ? allowedRoles.includes(user.role) : false;
 
   React.useEffect(() => {
     if (currentUserQuery.isLoading) return;
-    if (!user) return router.replace(routes.auth.login);
-    if (!user.emailVerifiedAt || user.status === 'pending') {
-      return router.replace(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);
+    if (!user) {
+      const loginUrl = `${routes.auth.login}?next=${encodeURIComponent(pathname)}`;
+      router.replace(loginUrl as Route);
+      return;
     }
-    if (user.onboardingRequired) return router.replace(routes.auth.onboarding);
-    if (!allowedRoles.includes(user.role)) router.replace(workspaceRouteForRole(user.role));
-  }, [allowedRoleKey, currentUserQuery.isLoading, pathname, router, user]);
+    if (!user.emailVerifiedAt || user.status === 'pending') {
+      router.replace(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);
+      return;
+    }
+    if (user.onboardingRequired) {
+      router.replace(routes.auth.onboarding);
+      return;
+    }
+    if (!isAllowed) router.replace(workspaceRouteForRole(user.role));
+  }, [currentUserQuery.isLoading, isAllowed, pathname, router, user]);
 
-  if (currentUserQuery.isLoading || !user || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !allowedRoles.includes(user.role)) {
+  if (currentUserQuery.isLoading || !user || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !isAllowed) {
     return <WorkspaceGuardFallback />;
   }
   return <>{children}</>;
@@ -46,7 +54,7 @@ function WorkspaceGuardFallback() {
   );
 }
 
-function workspaceRouteForRole(role: WorkspaceRole) {
+export function workspaceRouteForRole(role: WorkspaceRole) {
   if (role === 'admin') return routes.admin.dashboard;
   if (role === 'trainer') return routes.trainer.dashboard;
   return routes.entrepreneur.dashboard;

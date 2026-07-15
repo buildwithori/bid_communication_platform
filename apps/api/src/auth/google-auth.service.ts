@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthProvider, BusinessRelationship, BusinessSource, UserRole, UserStatus } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
@@ -26,7 +26,7 @@ export class GoogleAuthService {
     return { state, mode, url };
   }
 
-  async handleCallback(code: string, expectedState: string, returnedState: string) {
+  async handleCallback(code: string, expectedState: string, returnedState: string, mode: 'login' | 'signup') {
     if (!code || !returnedState || returnedState !== expectedState) {
       throw new BadRequestException('Google authentication state is invalid or expired.');
     }
@@ -47,6 +47,9 @@ export class GoogleAuthService {
 
     if (!user) {
       const byEmail = await this.prisma.user.findUnique({ where: { email } });
+      if (!byEmail && mode === 'login') {
+        throw new UnauthorizedException('No BID Hub account exists for this Google email.');
+      }
       if (byEmail && byEmail.role !== UserRole.entrepreneur) {
         throw new ForbiddenException('Google account entry is available to entrepreneur accounts only.');
       }
@@ -76,6 +79,7 @@ export class GoogleAuthService {
 
   async getOnboarding(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (user.role !== UserRole.entrepreneur) throw new ForbiddenException('Onboarding is only available to entrepreneur accounts.');
     return { user: this.serializeUser(user, await this.onboardingRequired(userId)) };
   }
 

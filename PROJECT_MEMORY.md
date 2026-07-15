@@ -196,3 +196,10 @@ Session workflow rules:
 - Typed routes and React Compiler are enabled. Shared navigation accepts Next's `Route` type, and dynamic URL construction stays centralized in `lib/routes.ts`.
 - ESLint uses the Next 16 flat configuration. React Compiler migration diagnostics remain visible as warnings so older UI can be improved incrementally without flattening or removing flows.
 - Client pages that read `useSearchParams()` must render beneath a page-specific Suspense fallback so static generation remains valid.
+
+## Auth And Workspace Entry Completion (2026-07-15)
+
+- Feature 2 is complete. Every admin, trainer, and entrepreneur layout is wrapped once by `WorkspaceGuard`; Proxy only performs the early cookie-presence redirect while `/auth/me` remains authoritative for session, verification, onboarding, and role routing.
+- Login may honor a `next` path only when it belongs to the authenticated users own workspace prefix. Cross-role and non-workspace destinations fall back to that roles dashboard.
+- Sidebar sign-out calls the logout API, shows an inline pending spinner, prevents duplicate clicks, clears the auth query, and then replaces the route with login.
+- Google login and Google signup are distinct: login may link an existing entrepreneur email but must not silently create a new account. New Google identities are created only through signup and go to onboarding when required fields are missing.

@@ -3,13 +3,16 @@
 import * as React from 'react';
 import Link from 'next/link';
 import type { Route } from 'next';
-import { usePathname } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { LoaderCircle, LogOut } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { BidLogo } from '@/components/shared/BidLogo';
 import { Avatar } from '@/components/shared/Avatar';
 import { Badge } from '@/components/shared/Badge';
 import { routes } from '@/lib/routes';
+import { CURRENT_USER_QUERY_KEY, logout } from '@/lib/api/auth';
 
 export interface NavItem {
   href: Route;
@@ -123,14 +126,34 @@ export function NavSidebar({
             <div className="truncate text-xs text-ink-faint">{user.subtitle}</div>
           </div>
         </div>
-        <Link
-          href={routes.auth.login}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Link>
+        <SignOutButton />
       </div>
     </div>
+  );
+}
+
+function SignOutButton() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: logout,
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+      router.replace(routes.auth.login);
+      router.refresh();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <button
+      type="button"
+      disabled={mutation.isPending}
+      onClick={() => mutation.mutate()}
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {mutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <LogOut className="h-4 w-4" aria-hidden="true" />}
+      {mutation.isPending ? 'Signing out...' : 'Sign out'}
+    </button>
   );
 }

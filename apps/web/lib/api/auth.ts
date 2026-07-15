@@ -1,5 +1,7 @@
 import { apiRequest } from './client';
 
+export const CURRENT_USER_QUERY_KEY = ['auth', 'me'] as const;
+
 export type AuthUser = {
   id: string;
   email: string;

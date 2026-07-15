@@ -77,6 +77,8 @@ Done when:
 - Auth UI remains visually consistent with the existing design.
 - Auth forms have validation, inline pending button states, and page-specific loading states.
 
+Implementation status (2026-07-15): Complete. Cookie sessions, regular and Google account entry, conditional Google onboarding, role-aware workspace guards, safe post-login return paths, real logout, branded auth email delivery, and page-specific pending states are wired and verified.
+
 ### 3. Company Settings, Lookups, And Taxonomies
 
 Scope:

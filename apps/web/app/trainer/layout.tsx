@@ -4,6 +4,7 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
+import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
 import { Button } from '@/components/shared/Button';
 import { NotificationsModal, type AppNotification } from '@/components/shared/NotificationsModal';
 import { trainerNav } from '@/lib/nav/trainer-nav';
@@ -51,7 +52,8 @@ export default function TrainerLayout({ children }: { children: React.ReactNode 
   const unreadCount = trainerNotifications.filter((notification) => notification.unread).length;
 
   return (
-    <AppShell
+    <WorkspaceGuard allowedRoles={['trainer']}>
+      <AppShell
       brandTitle="BID Hub"
       brandSubtitle="Trainer Workspace"
       role="trainer"
@@ -82,6 +84,7 @@ export default function TrainerLayout({ children }: { children: React.ReactNode 
         onOpenChange={setNotifOpen}
         notifications={trainerNotifications}
       />
-    </AppShell>
+      </AppShell>
+    </WorkspaceGuard>
   );
 }

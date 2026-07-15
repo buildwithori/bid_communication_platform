@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import * as React from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +13,7 @@ import { AuthModeTabs } from '@/components/auth/AuthModeTabs';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
+import { Skeleton } from '@/components/shared/Card';
 import { FormAutocomplete } from '@/components/shared/FormField';
 import { getGoogleAuthUrl, signup } from '@/lib/api/auth';
 import { signupSchema, type SignupForm as SignupFormValues } from '@/lib/forms/schemas';
@@ -22,11 +24,19 @@ import { cn } from '@/lib/utils';
 const countryOptions = countries.map((country) => ({ value: country, label: country }));
 
 export default function AuthSignupPage() {
-  return <AuthShell title="Create entrepreneur account" description="Entrepreneurs can create an account directly and start from the BID Hub workspace." className="max-w-[540px]"><AuthModeTabs active="signup" /><SignupForm /></AuthShell>;
+  return (
+    <AuthShell title="Create entrepreneur account" description="Entrepreneurs can create an account directly and start from the BID Hub workspace." className="max-w-[540px]">
+      <AuthModeTabs active="signup" />
+      <React.Suspense fallback={<SignupFormSkeleton />}>
+        <SignupForm />
+      </React.Suspense>
+    </AuthShell>
+  );
 }
 
 function SignupForm() {
   const router = useRouter();
+  const oauthError = useSearchParams().get('oauthError');
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: { businessName: '', representative: '', email: '', password: '', confirmPassword: '', country: '', phone: '' },
@@ -45,6 +55,7 @@ function SignupForm() {
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      {oauthError ? <div role="alert" className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{signupOauthError(oauthError)}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('signup'))}>Sign up with Google</AuthGoogleButton>
       <AuthDivider label="or create account with email" />
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
@@ -65,4 +76,14 @@ function SignupForm() {
       <Button type="submit" size="lg" className="h-11 w-full" isLoading={mutation.isPending} loadingLabel="Creating account...">Create account</Button>
     </form>
   );
+}
+
+function SignupFormSkeleton() {
+  return <div aria-label="Loading signup" aria-busy="true" className="space-y-4"><Skeleton className="h-11 w-full" />{Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-11 w-full" />)}</div>;
+}
+
+function signupOauthError(code: string) {
+  if (code === 'access_denied') return 'That Google account cannot be used for entrepreneur signup.';
+  if (code === 'unavailable') return 'Google signup is not configured right now. Create your account with email instead.';
+  return 'Google signup could not be completed. Please try again.';
 }

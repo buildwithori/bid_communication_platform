@@ -336,3 +336,9 @@ Before merging backend work, ask:
 - `AuthEmailService` builds an absolute logo URL from `APP_WEB_URL`, which is required because email clients cannot resolve application-relative image URLs.
 - Keep the API/email runtime on React 18 while the React Email 6.8 renderer is React 18-based. The Next.js web runtime independently uses React 19; TypeScript packages use React 19 definitions consistently across the monorepo to avoid duplicate ReactNode identities.
 - Docker email preview remains available at `http://localhost:3001`; Mailpit remains at `http://localhost:8025`. Every template must include complete default preview props so preview/export output never contains missing names, actions, or logo URLs.
+
+## Auth Completion And Docker Build Isolation (2026-07-15)
+
+- Logout is an explicit public auth entry point so it can always expire an invalid or stale browser cookie; valid tokens are revoked when present.
+- Google OAuth mode is stored with state and enforced in the callback. Unknown identities cannot be created by login, OAuth failures return to the matching branded auth page, and onboarding endpoints reject non-entrepreneur roles.
+- Local Nest watch output uses `apps/api/tsconfig.docker.json` and the Compose `api_build` named volume at `apps/api/.docker`. Host production builds continue using `apps/api/dist`, preventing Docker from creating root-owned host build artifacts.
