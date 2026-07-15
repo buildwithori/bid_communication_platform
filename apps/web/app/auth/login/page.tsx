@@ -4,7 +4,6 @@ import * as React from 'react';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock, Mail } from 'lucide-react';
@@ -16,7 +15,7 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
-import { getGoogleAuthUrl, login, type AuthUser } from '@/lib/api/auth';
+import { getGoogleAuthUrl, useLoginMutation, type AuthUser } from '@/lib/api/auth';
 import { loginSchema, type LoginForm as LoginFormValues } from '@/lib/forms/schemas';
 import { routes } from '@/lib/routes';
 
@@ -44,8 +43,7 @@ function LoginForm() {
   const nextPath = searchParams.get('next');
   const oauthError = searchParams.get('oauthError');
   const form = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
-  const mutation = useMutation({
-    mutationFn: login,
+  const mutation = useLoginMutation({
     onSuccess: ({ user }) => {
       if (!user.emailVerifiedAt || user.status === 'pending') {
         router.replace(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);

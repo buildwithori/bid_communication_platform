@@ -203,3 +203,12 @@ Session workflow rules:
 - Login may honor a `next` path only when it belongs to the authenticated users own workspace prefix. Cross-role and non-workspace destinations fall back to that roles dashboard.
 - Sidebar sign-out calls the logout API, shows an inline pending spinner, prevents duplicate clicks, clears the auth query, and then replaces the route with login.
 - Google login and Google signup are distinct: login may link an existing entrepreneur email but must not silently create a new account. New Google identities are created only through signup and go to onboarding when required fields are missing.
+
+## Frontend API Integration Boundary (2026-07-15)
+
+- Pages and components must never call `useQuery`, `useMutation`, `useInfiniteQuery`, `useQueryClient`, `apiRequest`, or raw feature request functions directly. `app/providers.tsx` is the only TanStack infrastructure exception.
+- Every integrated feature uses `apps/web/lib/api/<feature>/` with `types.ts`, `requests.ts`, `keys.ts`, `hooks.ts`, and `index.ts`; optional URL builders may live in `urls.ts`.
+- The public feature barrel exports consumer-safe hooks and shared types. Raw requests and query keys remain private to the feature integration layer.
+- Feature hooks own server-state behavior: queries, mutations, lazy enablement, cursor/infinite pagination, invalidation, optimistic updates, and cache cleanup. Pages/components own rendering, local UI state, form-to-payload mapping, navigation, and user feedback.
+- API payload, response, and shared domain types must live in feature `types.ts` files, not pages. A page/component may define a type locally only when it is private presentation state for that file, such as its tab union, modal draft, or table-only view row.
+- ESLint enforces the page/component import boundary. See `docs/frontend-api-integration.md` for the canonical structure.

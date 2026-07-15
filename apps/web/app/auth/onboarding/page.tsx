@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Briefcase, Mail, Phone, UserPlus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -12,7 +11,7 @@ import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { FormAutocomplete } from '@/components/shared/FormField';
-import { completeGoogleOnboarding, getGoogleOnboarding } from '@/lib/api/auth';
+import { useCompleteGoogleOnboardingMutation, useGoogleOnboardingQuery } from '@/lib/api/auth';
 import { entrepreneurOnboardingSchema, type EntrepreneurOnboardingForm } from '@/lib/forms/schemas';
 import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
@@ -26,7 +25,7 @@ export default function EntrepreneurOnboardingPage() {
 
 function OnboardingForm() {
   const router = useRouter();
-  const account = useQuery({ queryKey: ['auth', 'onboarding'], queryFn: getGoogleOnboarding, retry: false });
+  const account = useGoogleOnboardingQuery();
   const form = useForm<EntrepreneurOnboardingForm>({
     resolver: zodResolver(entrepreneurOnboardingSchema),
     defaultValues: { businessName: '', representative: '', email: '', country: 'Ghana', phone: '' },
@@ -45,11 +44,7 @@ function OnboardingForm() {
     });
   }, [account.data, form, router]);
 
-  const mutation = useMutation({
-    mutationFn: (values: EntrepreneurOnboardingForm) => completeGoogleOnboarding({
-      businessName: values.businessName, representativeName: values.representative,
-      email: values.email, country: values.country, phone: values.phone,
-    }),
+  const mutation = useCompleteGoogleOnboardingMutation({
     onSuccess: () => { toast.success('Signup details completed.'); router.replace(routes.entrepreneur.dashboard); },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -58,7 +53,7 @@ function OnboardingForm() {
   if (account.isError) return <div className="rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">Your Google signup session could not be loaded. Return to sign in and try again.</div>;
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, country: values.country, phone: values.phone }))}>
       <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3 text-sm leading-6 text-ink-muted">Google supplied your verified name and email. Add the missing business and contact details to open your workspace.</div>
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
       <div className="grid gap-3 sm:grid-cols-2">

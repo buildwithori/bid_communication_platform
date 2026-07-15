@@ -3,8 +3,7 @@
 import * as React from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { CURRENT_USER_QUERY_KEY, getCurrentUser, type AuthUser } from '@/lib/api/auth';
+import { useCurrentUserQuery, type AuthUser } from '@/lib/api/auth';
 import { Skeleton } from '@/components/shared/Card';
 import { routes } from '@/lib/routes';
 
@@ -13,7 +12,7 @@ type WorkspaceRole = AuthUser['role'];
 export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: WorkspaceRole[]; children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const currentUserQuery = useQuery({ queryKey: CURRENT_USER_QUERY_KEY, queryFn: getCurrentUser, retry: false, staleTime: 0 });
+  const currentUserQuery = useCurrentUserQuery();
   const user = currentUserQuery.data?.user;
   const isAllowed = user ? allowedRoles.includes(user.role) : false;
 

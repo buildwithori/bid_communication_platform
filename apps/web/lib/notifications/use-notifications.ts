@@ -3,11 +3,10 @@
 import * as React from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationsQuery,
   type NotificationRecord,
   type NotificationSeverity,
 } from '@/lib/api/notifications';
@@ -26,27 +25,9 @@ export type MappedNotification = AppNotification & {
 
 export function useNotifications() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-
-  const notificationsQuery = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => listNotifications({ take: 20 }),
-    refetchInterval: 60_000,
-  });
-
-  const invalidate = React.useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['notifications'] });
-  }, [queryClient]);
-
-  const markReadMutation = useMutation({
-    mutationFn: markNotificationRead,
-    onSuccess: invalidate,
-  });
-
-  const markAllReadMutation = useMutation({
-    mutationFn: markAllNotificationsRead,
-    onSuccess: invalidate,
-  });
+  const notificationsQuery = useNotificationsQuery({ take: 20 });
+  const markReadMutation = useMarkNotificationReadMutation();
+  const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
   const records: NotificationRecord[] = notificationsQuery.data?.items ?? [];
   const notifications = React.useMemo(

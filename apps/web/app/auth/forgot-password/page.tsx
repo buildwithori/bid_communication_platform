@@ -1,6 +1,5 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail } from 'lucide-react';
@@ -9,7 +8,7 @@ import { AuthBackToLoginLink } from '@/components/auth/AuthBackToLoginLink';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
-import { forgotPassword } from '@/lib/api/auth';
+import { useForgotPasswordMutation } from '@/lib/api/auth';
 import { forgotPasswordSchema, type ForgotPasswordForm as ForgotPasswordFormValues } from '@/lib/forms/schemas';
 
 export default function ForgotPasswordPage() {
@@ -18,8 +17,7 @@ export default function ForgotPasswordPage() {
 
 function ForgotPasswordForm() {
   const form = useForm<ForgotPasswordFormValues>({ resolver: zodResolver(forgotPasswordSchema), defaultValues: { email: '' } });
-  const mutation = useMutation({
-    mutationFn: forgotPassword,
+  const mutation = useForgotPasswordMutation({
     onSuccess: () => toast.success('If an account exists for that address, reset instructions are on the way.'),
     onError: (error: Error) => toast.error(error.message),
   });

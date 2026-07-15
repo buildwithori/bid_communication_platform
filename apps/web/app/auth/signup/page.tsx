@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Briefcase, Lock, Mail, UserPlus } from 'lucide-react';
@@ -15,7 +14,7 @@ import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { FormAutocomplete } from '@/components/shared/FormField';
-import { getGoogleAuthUrl, signup } from '@/lib/api/auth';
+import { getGoogleAuthUrl, useSignupMutation } from '@/lib/api/auth';
 import { signupSchema, type SignupForm as SignupFormValues } from '@/lib/forms/schemas';
 import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
@@ -41,11 +40,7 @@ function SignupForm() {
     resolver: zodResolver(signupSchema),
     defaultValues: { businessName: '', representative: '', email: '', password: '', confirmPassword: '', country: '', phone: '' },
   });
-  const mutation = useMutation({
-    mutationFn: (values: SignupFormValues) => signup({
-      businessName: values.businessName, representativeName: values.representative, email: values.email,
-      password: values.password, country: values.country, phone: values.phone,
-    }),
+  const mutation = useSignupMutation({
     onSuccess: ({ user }) => {
       toast.success('Account created. Check your email to verify your account.');
       router.push(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);
@@ -54,7 +49,7 @@ function SignupForm() {
   });
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, password: values.password, country: values.country, phone: values.phone }))}>
       {oauthError ? <div role="alert" className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{signupOauthError(oauthError)}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('signup'))}>Sign up with Google</AuthGoogleButton>
       <AuthDivider label="or create account with email" />

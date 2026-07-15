@@ -19,6 +19,9 @@ This document is the working plan for backend and frontend integration. The goal
 - Buttons that trigger async work must show an inline loading spinner beside the button label and prevent duplicate submission while pending.
 - Backend APIs should do the heavy lifting: filtering, searching, aggregation, counts, dashboard metrics, and report summaries should be computed in the database/query layer, not assembled with large client-side datasets.
 
+- Frontend pages and components must never import TanStack Query, `apiRequest`, raw request modules, or query keys. They consume feature integration hooks from `apps/web/lib/api/<feature>/index.ts`; the feature hook layer owns queries, mutations, pagination, invalidation, and cache behavior.
+- API payload, response, and shared domain types belong in the feature integration `types.ts`. Types may stay in a page or component only when they are private presentation types used solely by that page or component.
+
 ## Seed Policy
 
 Default seed data should stay small:

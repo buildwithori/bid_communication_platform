@@ -4,7 +4,6 @@ import * as React from 'react';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -12,7 +11,7 @@ import { BidLogo } from '@/components/shared/BidLogo';
 import { Avatar } from '@/components/shared/Avatar';
 import { Badge } from '@/components/shared/Badge';
 import { routes } from '@/lib/routes';
-import { CURRENT_USER_QUERY_KEY, logout } from '@/lib/api/auth';
+import { useLogoutMutation } from '@/lib/api/auth';
 
 export interface NavItem {
   href: Route;
@@ -134,11 +133,8 @@ export function NavSidebar({
 
 function SignOutButton() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: logout,
+  const mutation = useLogoutMutation({
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: CURRENT_USER_QUERY_KEY });
       router.replace(routes.auth.login);
       router.refresh();
     },

@@ -2,14 +2,13 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
 import { CheckCircle2, CircleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuthBackToLoginLink } from '@/components/auth/AuthBackToLoginLink';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
-import { resendVerification, verifyEmail } from '@/lib/api/auth';
+import { useResendVerificationMutation, useVerifyEmailMutation } from '@/lib/api/auth';
 import { routes } from '@/lib/routes';
 
 export default function VerifyEmailPage() {
@@ -22,12 +21,10 @@ function VerifyEmailPanel() {
   const token = searchParams.get('token');
   const email = searchParams.get('email');
   const attemptedToken = React.useRef<string | null>(null);
-  const verifyMutation = useMutation({
-    mutationFn: verifyEmail,
+  const verifyMutation = useVerifyEmailMutation({
     onSuccess: () => { toast.success('Email verified. You can now sign in.'); router.replace(routes.auth.login); },
   });
-  const resendMutation = useMutation({
-    mutationFn: resendVerification,
+  const resendMutation = useResendVerificationMutation({
     onSuccess: () => toast.success('If verification is still required, a new email is on the way.'),
     onError: (error: Error) => toast.error(error.message),
   });
