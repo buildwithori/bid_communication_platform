@@ -7,6 +7,7 @@ export const routes = {
     signup: '/auth/signup',
     forgotPassword: '/auth/forgot-password',
     resetPassword: '/auth/reset-password',
+    acceptInvitation: '/auth/accept-invitation',
     verifyEmail: '/auth/verify-email',
     onboarding: '/auth/onboarding',
   },

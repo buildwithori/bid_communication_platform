@@ -42,9 +42,15 @@ export const adminInviteSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Enter a valid email'),
-  note: z.string().optional(),
 });
 export type AdminInviteForm = z.infer<typeof adminInviteSchema>;
+
+export const adminProfileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
+});
+export type AdminProfileForm = z.infer<typeof adminProfileSchema>;
 
 export const programSchema = z.object({
   name: z.string().min(1, 'Program name is required'),
@@ -237,6 +243,9 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   });
 export type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
+
+export const acceptAdminInvitationSchema = resetPasswordSchema;
+export type AcceptAdminInvitationForm = z.infer<typeof acceptAdminInvitationSchema>;
 
 export const contentItemSchema = z
   .object({
