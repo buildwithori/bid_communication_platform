@@ -15,6 +15,7 @@ import {
   grantProgrammeAccessRequest,
   inviteEntrepreneurRequest,
   listEntrepreneursRequest,
+  listEffectiveToolsRequest,
   listFundraisingRoundsRequest,
   listPeriodicUpdatesRequest,
   listProgrammeAccessRequest,
@@ -31,6 +32,7 @@ import {
 import type {
   AcceptEntrepreneurInvitationPayload,
   CursorPage,
+  EffectiveToolQuery,
   EntrepreneurPage,
   EntrepreneurProfilePayload,
   EntrepreneurQuery,
@@ -181,6 +183,25 @@ export function useProgrammeAccessQuery(
     queryKey: entrepreneurKeys.access(id ?? "none", query),
     queryFn: ({ pageParam }) =>
       listProgrammeAccessRequest(id as string, { ...query, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: Boolean(id),
+  });
+  return {
+    ...result,
+    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+    totalItems: result.data?.pages[0]?.totalItems ?? 0,
+  };
+}
+
+export function useEffectiveToolsQuery(
+  id: string | null,
+  query: Omit<EffectiveToolQuery, "cursor"> = {},
+) {
+  const result = useInfiniteQuery({
+    queryKey: entrepreneurKeys.tools(id ?? "none", query),
+    queryFn: ({ pageParam }) =>
+      listEffectiveToolsRequest(id as string, { ...query, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(id),

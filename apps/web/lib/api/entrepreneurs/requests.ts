@@ -2,6 +2,8 @@ import { apiRequest } from '../client';
 import type {
   AcceptEntrepreneurInvitationPayload,
   CursorPage,
+  EffectiveToolAccess,
+  EffectiveToolQuery,
   EntrepreneurPage,
   EntrepreneurProfilePayload,
   EntrepreneurQuery,
@@ -23,7 +25,7 @@ import type {
   UpdateEntrepreneurVariables,
 } from './types';
 
-function queryString(query?: EntrepreneurQuery | ProfileRecordQuery | ProgrammeAccessQuery) {
+function queryString(query?: EntrepreneurQuery | ProfileRecordQuery | ProgrammeAccessQuery | EffectiveToolQuery) {
   const params = new URLSearchParams();
   if (query?.search) params.set('search', query.search);
   if (query && 'sectorId' in query && query.sectorId) params.set('sectorId', query.sectorId);
@@ -31,6 +33,8 @@ function queryString(query?: EntrepreneurQuery | ProfileRecordQuery | ProgrammeA
   if (query && 'status' in query && query.status) params.set('status', query.status);
   if (query && 'source' in query && query.source) params.set('source', query.source);
   if (query && 'programmeId' in query && query.programmeId) params.set('programmeId', query.programmeId);
+  if (query && 'type' in query && query.type) params.set('type', query.type);
+  if (query && 'toolAreaId' in query && query.toolAreaId) params.set('toolAreaId', query.toolAreaId);
   if (query?.take) params.set('take', String(query.take));
   if (query?.cursor) params.set('cursor', query.cursor);
   const value = params.toString();
@@ -64,6 +68,8 @@ export const acceptEntrepreneurInvitationRequest = (payload: AcceptEntrepreneurI
 
 export const listProgrammeAccessRequest = (id: string, query?: ProgrammeAccessQuery) =>
   apiRequest<CursorPage<EntrepreneurProgrammeAccess>>(`/entrepreneurs/${id}/programme-access${queryString(query)}`);
+export const listEffectiveToolsRequest = (id: string, query?: EffectiveToolQuery) =>
+  apiRequest<CursorPage<EffectiveToolAccess>>(`/tools/entrepreneur/${id}${queryString(query)}`);
 export const listProgrammeGoalsRequest = (id: string, query?: ProfileRecordQuery) =>
   apiRequest<CursorPage<ProgrammeGoalRecord>>(`/entrepreneurs/${id}/programme-goals${queryString(query)}`);
 export const listFundraisingRoundsRequest = (id: string, query?: ProfileRecordQuery) =>

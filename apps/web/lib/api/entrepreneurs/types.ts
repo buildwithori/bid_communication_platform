@@ -105,6 +105,25 @@ export type ProgrammeAccessQuery = {
   cursor?: string;
 };
 
+export type EffectiveToolAccess = {
+  id: string;
+  name: string;
+  description: string;
+  type: 'pdf' | 'embedded_tool';
+  iconKey: string;
+  visibility: 'all_entrepreneurs' | 'programmes' | 'entrepreneurs';
+  accessSource: 'global' | 'programme' | 'individual';
+  toolArea: { id: string; name: string; key: string };
+};
+
+export type EffectiveToolQuery = {
+  search?: string;
+  type?: EffectiveToolAccess['type'];
+  toolAreaId?: string;
+  take?: number;
+  cursor?: string;
+};
+
 export type ProfileRecordQuery = {
   search?: string;
   programmeId?: string;
