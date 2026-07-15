@@ -12,7 +12,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select';
 import {
   Command,
@@ -150,9 +149,9 @@ export function FormSelect({
           className,
         )}
       >
-        <SelectValue placeholder={placeholder}>
-          {selectedOption?.label}
-        </SelectValue>
+        <span className={cn('truncate', !selectedOption && 'text-ink-muted')}>
+          {selectedOption?.label ?? placeholder}
+        </span>
       </SelectTrigger>
       <SelectContent className="text-sm">
         {options.map((o) => (
