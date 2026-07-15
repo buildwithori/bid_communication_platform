@@ -133,6 +133,8 @@ Done when:
 - Admin notification modal uses the shared notification component.
 - List/search/filter endpoints are paginated and scoped.
 
+Implementation status (2026-07-15): Complete. The admin directory, backend-filtered metrics, cursor pagination, search and filters, detail view, invitation/resend/acceptance lifecycle, status controls, and profile settings are backed by authenticated APIs with page-specific skeletons and guarded mutations. Invitation, acceptance, status, profile, and calendar lifecycle changes emit transactional audit events. Admin Google Calendar connection state uses a reusable admin/trainer OAuth module with encrypted token storage and an authenticated callback; completing a live Google connection requires deployment Google OAuth credentials. The existing admin shell continues to use the shared notification modal.
+
 ### 5. Trainer Invites And Trainer Settings
 
 Scope:
