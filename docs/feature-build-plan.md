@@ -111,6 +111,8 @@ Done when:
 - Mutations validate uniqueness and active/inactive state.
 - Settings changes emit audit events.
 
+Implementation status (2026-07-15): Complete. Company settings and all four backend-managed taxonomies use authenticated APIs, cursor pagination, server-side search and filtered totals, uniqueness and active-state validation, page-specific skeletons, guarded mutation buttons, and transactional audit outbox events. Lazy infinite-query hooks are available for autocomplete consumers. The legacy stages/sectors route redirects to the canonical settings area; admin profile and calendar settings remain scoped to Feature 4.
+
 ### 4. Admin Team Invites And Admin Settings
 
 Scope:
