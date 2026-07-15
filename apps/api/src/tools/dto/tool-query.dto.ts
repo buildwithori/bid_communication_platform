@@ -1,6 +1,19 @@
-import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { EntrepreneurToolStatus, EntrepreneurToolType, EntrepreneurToolVisibility } from '@prisma/client';
+import { Transform } from "class-transformer";
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator";
+import {
+  EntrepreneurToolStatus,
+  EntrepreneurToolType,
+  EntrepreneurToolVisibility,
+} from "@prisma/client";
 
 export class ToolQueryDto {
   @IsOptional()
@@ -34,4 +47,9 @@ export class ToolQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  includeUnavailable?: boolean;
 }
