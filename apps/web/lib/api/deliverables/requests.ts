@@ -20,6 +20,7 @@ function toQueryString(query?: DeliverableQuery | DeliverableGroupQuery) {
   if ("programmeId" in (query ?? {}) && query?.programmeId) params.set("programmeId", query.programmeId);
   if (query && "view" in query && query.view) params.set("view", query.view);
   if (query && "status" in query && query.status) params.set("status", query.status);
+  if (query && "overdue" in query && query.overdue) params.set("overdue", "true");
   if (query?.take) params.set("take", String(query.take));
   if (query?.cursor) params.set("cursor", query.cursor);
   const value = params.toString();

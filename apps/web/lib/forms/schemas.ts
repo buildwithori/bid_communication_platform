@@ -400,7 +400,7 @@ export const reuseModuleSchema = z.object({
 export type ReuseModuleForm = z.infer<typeof reuseModuleSchema>;
 
 export const deliverableReviewSchema = z.object({
-  feedback: z.string().min(1, 'Add feedback before requesting changes'),
+  feedback: z.string().trim().min(3, 'Feedback must be at least 3 characters').max(2000, 'Feedback must be 2,000 characters or fewer'),
 });
 export type DeliverableReviewForm = z.infer<typeof deliverableReviewSchema>;
 

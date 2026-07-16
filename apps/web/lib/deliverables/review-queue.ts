@@ -18,6 +18,7 @@ export type DeliverableReviewRow = {
   fileId: string | null;
   fileSizeBytes: string | null;
   submittedAt: string;
+  waitingDays: number | null;
   dueAt: string;
   dueRule: string;
   dueSource: 'programme-requirement' | 'manual-override';
@@ -53,6 +54,7 @@ export function mapDeliverableReviewRow(row: DeliverableReviewQueueItem): Delive
     fileId: latestSubmission?.file.id ?? null,
     fileSizeBytes: latestSubmission?.file.sizeBytes ?? null,
     submittedAt: latestSubmission?.submittedAt ?? row.updatedAt,
+    waitingDays: row.waitingDays,
     dueAt: row.dueDate,
     dueRule: dueRuleLabel(row),
     dueSource: row.dueSource === 'manual_override' ? 'manual-override' : 'programme-requirement',

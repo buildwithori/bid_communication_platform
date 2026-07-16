@@ -229,9 +229,12 @@ export class DeliverablesService {
       throw new ForbiddenException('You cannot review deliverables.');
     }
     const take = query.take ?? DEFAULT_TAKE;
-    const where = { ...this.buildInstanceWhere(user, query), submissions: { some: {} } };
+    const overdueWhere: Prisma.DeliverableInstanceWhereInput = query.overdue
+      ? { dueDate: { lt: new Date() }, status: { not: DeliverableInstanceStatus.approved } }
+      : {};
+    const where = { ...this.buildInstanceWhere(user, query), submissions: { some: {} }, ...overdueWhere };
     const summaryWhere = { ...this.buildInstanceWhere(user, query, true), submissions: { some: {} } };
-    const [rows, totalItems, statusGroups] = await Promise.all([
+    const [rows, totalItems, statusGroups, overdueReviewCount] = await Promise.all([
       this.prisma.deliverableInstance.findMany({
         where,
         orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
@@ -241,12 +244,20 @@ export class DeliverablesService {
       }),
       this.prisma.deliverableInstance.count({ where }),
       this.prisma.deliverableInstance.groupBy({ by: ['status'], where: summaryWhere, _count: { _all: true } }),
+      this.prisma.deliverableInstance.count({
+        where: {
+          ...summaryWhere,
+          dueDate: { lt: new Date() },
+          status: { not: DeliverableInstanceStatus.approved },
+        },
+      }),
     ]);
     return {
       ...toCursorPage(rows, take, (row) => row.id),
       items: rows.slice(0, take).map((row) => this.mapReviewQueueItem(row)),
       totalItems,
       summary: this.statusSummary(statusGroups),
+      overdueReviewCount,
     };
   }
 

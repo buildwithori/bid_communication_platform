@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { DeliverableInstanceStatus } from '@prisma/client';
 
 export class DeliverableReviewQueryDto {
@@ -15,6 +15,11 @@ export class DeliverableReviewQueryDto {
   @IsOptional()
   @IsString()
   programmeId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  overdue?: boolean;
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))

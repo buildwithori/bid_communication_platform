@@ -12,6 +12,7 @@ export type DeliverableQuery = {
   search?: string;
   status?: DeliverableStatus;
   programmeId?: string;
+  overdue?: boolean;
   take?: number;
   cursor?: string;
 };
@@ -112,6 +113,7 @@ export type DeliverableInstancePage = DeliverablePage<DeliverableInstance> & {
 };
 export type DeliverableReviewQueuePage = DeliverablePage<DeliverableReviewQueueItem> & {
   summary: DeliverableStatusSummary;
+  overdueReviewCount: number;
 };
 export type DeliverableSubmissionPage = DeliverablePage<DeliverableSubmission>;
 export type DeliverableFeedbackPage = DeliverablePage<DeliverableFeedback>;

@@ -166,6 +166,7 @@ export function useDeliverableReviewQueuePage(query: PageQuery) {
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
     summary: result.data?.summary,
+    overdueReviewCount: result.data?.overdueReviewCount ?? 0,
     setPage,
     resetPagination,
   };
