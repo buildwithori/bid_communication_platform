@@ -21,6 +21,7 @@ import {
   hashToken,
 } from '../auth/auth.tokens';
 import { PrismaService } from '../database/prisma.service';
+import { DeliverableLifecycleService } from '../deliverables/deliverable-lifecycle.service';
 import {
   AcceptEntrepreneurInvitationDto,
   EntrepreneurProfileDto,
@@ -40,6 +41,7 @@ export class EntrepreneurManagementService {
     private readonly audit: AuditService,
     private readonly email: EntrepreneursEmailService,
     private readonly entrepreneurs: EntrepreneursService,
+    private readonly deliverableLifecycle: DeliverableLifecycleService,
   ) {}
 
   async invite(actor: User, dto: InviteEntrepreneurDto) {
@@ -103,6 +105,7 @@ export class EntrepreneurManagementService {
             })),
           });
         }
+        await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, user.id);
         await tx.invitation.create({
           data: {
             email,
@@ -326,8 +329,8 @@ export class EntrepreneurManagementService {
         summary: `Granted access to ${programme.name}`,
         payload: { programmeId: programme.id },
       },
-      (tx) =>
-        tx.programmeAccessGrant.upsert({
+      async (tx) => {
+        const grant = await tx.programmeAccessGrant.upsert({
           where: {
             programmeId_entrepreneurUserId: {
               programmeId: programme.id,
@@ -345,7 +348,10 @@ export class EntrepreneurManagementService {
             revokedAt: null,
             revokeReason: null,
           },
-        }),
+        });
+        await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, entrepreneurUserId);
+        return grant;
+      },
     );
     return this.entrepreneurs.getEntrepreneur(actor, entrepreneur.id);
   }
@@ -420,6 +426,10 @@ export class EntrepreneurManagementService {
             stageId: dto.stageId || null,
           },
         });
+        await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(
+          tx,
+          entrepreneur.id,
+        );
         return { id: entrepreneur.id };
       },
     );

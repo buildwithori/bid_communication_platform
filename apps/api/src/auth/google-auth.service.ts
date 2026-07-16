@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthProvider, BusinessRelationship, BusinessSource, UserRole, UserStatus } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../database/prisma.service';
+import { DeliverableLifecycleService } from '../deliverables/deliverable-lifecycle.service';
 import { AuthService } from './auth.service';
 import { createPlainToken } from './auth.tokens';
 import { GoogleOnboardingDto } from './dto/google-onboarding.dto';
@@ -13,6 +14,7 @@ export class GoogleAuthService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly deliverableLifecycle: DeliverableLifecycleService,
   ) {}
 
   createAuthorization(mode: 'login' | 'signup') {
@@ -98,6 +100,7 @@ export class GoogleAuthService {
         const business = await tx.business.create({ data: { name: dto.businessName.trim(), country: dto.country.trim(), source: BusinessSource.self_registered, onboardingCompletedAt: new Date() } });
         await tx.businessMembership.create({ data: { userId, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true } });
       }
+      await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, userId);
     });
     return this.getOnboarding(userId);
   }

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import { BusinessRelationship, BusinessSource, User, UserRole, UserStatus } from '@prisma/client';
 import { AuthEmailService } from './auth-email.service';
 import { PrismaService } from '../database/prisma.service';
+import { DeliverableLifecycleService } from '../deliverables/deliverable-lifecycle.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
@@ -18,6 +19,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: AuthEmailService,
+    private readonly deliverableLifecycle: DeliverableLifecycleService,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -43,6 +45,7 @@ export class AuthService {
       await tx.businessMembership.create({
         data: { userId: createdUser.id, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true },
       });
+      await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, createdUser.id);
       await tx.emailVerificationToken.create({
         data: { userId: createdUser.id, tokenHash: verificationTokenHash, expiresAt: addMinutes(new Date(), VERIFICATION_DURATION_MINUTES) },
       });

@@ -3,6 +3,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { EmailModule } from '../email/email.module';
+import { DeliverableLifecycleModule } from '../deliverables/deliverable-lifecycle.module';
 import {
   EntrepreneurInvitationsController,
   EntrepreneursController,
@@ -12,7 +13,7 @@ import { EntrepreneursEmailService } from './entrepreneurs-email.service';
 import { EntrepreneursService } from './entrepreneurs.service';
 
 @Module({
-  imports: [AuthModule, DatabaseModule, EmailModule, AuditModule],
+  imports: [AuthModule, DatabaseModule, EmailModule, AuditModule, DeliverableLifecycleModule],
   controllers: [EntrepreneursController, EntrepreneurInvitationsController],
   providers: [
     EntrepreneursService,
