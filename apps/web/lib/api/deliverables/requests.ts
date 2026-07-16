@@ -14,11 +14,12 @@ import type {
   UpdateDeliverableDueDateVariables,
 } from "./types";
 
-function toQueryString(query?: DeliverableQuery) {
+function toQueryString(query?: DeliverableQuery | DeliverableGroupQuery) {
   const params = new URLSearchParams();
   if (query?.search) params.set("search", query.search);
-  if (query?.status) params.set("status", query.status);
-  if (query?.programmeId) params.set("programmeId", query.programmeId);
+  if ("programmeId" in (query ?? {}) && query?.programmeId) params.set("programmeId", query.programmeId);
+  if (query && "view" in query && query.view) params.set("view", query.view);
+  if (query && "status" in query && query.status) params.set("status", query.status);
   if (query?.take) params.set("take", String(query.take));
   if (query?.cursor) params.set("cursor", query.cursor);
   const value = params.toString();

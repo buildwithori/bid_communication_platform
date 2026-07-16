@@ -2,373 +2,156 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, Clock3, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
+import { AlertCircle, ArrowRight, CalendarClock, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
+import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
+import { Card, CardHeader } from '@/components/shared/Card';
+import { TableEmptyState, TableFilterAutocomplete, TableFilterInput, TableFilterSelect, TablePagination, TableToolbar } from '@/components/shared/DataTable';
 import { MetricGrid } from '@/components/shared/MetricGrid';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
-import {
-  TableEmptyState,
-  TableFilterAutocomplete,
-  TableFilterInput,
-  TableFilterSelect,
-  TablePagination,
-  TableToolbar,
-} from '@/components/shared/DataTable';
-import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
-import { programs } from '@/lib/mock-data/programs';
-import { deliverableGroups } from '@/lib/mock-data';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { entrepreneurHasProgramme } from '@/lib/programme-access';
-import { cn } from '@/lib/utils';
-import type { BadgeTone, Deliverable, DeliverableGroup, DeliverableStatus, Program } from '@/types';
+import { useDeliverableGroupsPage, useLazyDeliverableGroups, type DeliverableGroup, type DeliverableGroupQuery } from '@/lib/api/deliverables';
 import { routes } from '@/lib/routes';
+import type { BadgeTone } from '@/types';
 
-const groupProgrammeMap: Record<string, Program | undefined> = {};
-programs.forEach((program) => {
-  const group = deliverableGroups.find((item) => item.programmeId === program.id);
-  if (group) groupProgrammeMap[group.id] = program;
-});
+const ALL = 'all';
+type StatusFilter = typeof ALL | NonNullable<DeliverableGroupQuery['view']>;
 
-type StatusFilter = 'all' | 'needs-action' | 'under-review' | 'approved';
-
-type GroupSummary = {
-  total: number;
-  needsAction: number;
-  overdue: number;
-  changes: number;
-  submitted: number;
-  approved: number;
-  unreadFeedback: number;
-  nextDue?: Deliverable;
-};
-
-const statusMeta: Record<DeliverableStatus, { label: string; tone: BadgeTone }> = {
-  pending: { label: 'Not submitted', tone: 'amber' },
-  overdue: { label: 'Overdue', tone: 'red' },
-  submitted: { label: 'Under review', tone: 'blue' },
-  'changes-requested': { label: 'Changes required', tone: 'amber' },
-  reviewed: { label: 'Approved', tone: 'green' },
-};
-
-function formatDate(value?: string) {
-  if (!value) return 'No due date';
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+function formatDate(value?: string | null) {
+  if (!value) return 'No open due date';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function getDeliverablesForGroup(
-  group: DeliverableGroup,
-  deliverables: Deliverable[],
-) {
-  if (group.id === 'g-general') {
-    return deliverables.filter((item) => item.group === 'general');
-  }
-  return deliverables.filter((item) => item.programmeId === group.programmeId);
-}
-
-function isNeedsAction(deliverable: Deliverable) {
-  return deliverable.status === 'pending' || deliverable.status === 'overdue' || deliverable.status === 'changes-requested';
-}
-
-function hasUnreadFeedback(deliverable: Deliverable) {
-  return deliverable.feedbackHistory?.some((feedback) => !feedback.readAt) ?? false;
-}
-
-function getGroupSummary(items: Deliverable[]): GroupSummary {
-  const actionableItems = items.filter(isNeedsAction);
-  const nextDue = actionableItems
-    .filter((item) => item.dueDate)
-    .sort((left, right) => new Date(left.dueDate ?? '').getTime() - new Date(right.dueDate ?? '').getTime())[0];
-
-  return {
-    total: items.length,
-    needsAction: actionableItems.length,
-    overdue: items.filter((item) => item.status === 'overdue').length,
-    changes: items.filter((item) => item.status === 'changes-requested').length,
-    submitted: items.filter((item) => item.status === 'submitted').length,
-    approved: items.filter((item) => item.status === 'reviewed').length,
-    unreadFeedback: items.filter(hasUnreadFeedback).length,
-    nextDue,
-  };
-}
-
-function getPrimaryBadge(summary: GroupSummary) {
-  if (summary.changes > 0) return { label: `${summary.changes} changes required`, tone: 'amber' as BadgeTone };
-  if (summary.overdue > 0) return { label: `${summary.overdue} overdue`, tone: 'red' as BadgeTone };
-  if (summary.needsAction > 0) return { label: `${summary.needsAction} to submit`, tone: 'amber' as BadgeTone };
-  if (summary.submitted > 0) return { label: `${summary.submitted} under review`, tone: 'blue' as BadgeTone };
-  if (summary.approved > 0) return { label: `${summary.approved} approved`, tone: 'green' as BadgeTone };
-  return { label: 'No deliverables yet', tone: 'neutral' as BadgeTone };
-}
-
-function matchesStatus(summary: GroupSummary, filter: StatusFilter) {
-  if (filter === 'all') return true;
-  if (filter === 'needs-action') return summary.needsAction > 0;
-  if (filter === 'under-review') return summary.submitted > 0;
-  return summary.total > 0 && summary.approved === summary.total;
+function primaryBadge(group: DeliverableGroup): { label: string; tone: BadgeTone } {
+  if (group.counts.changes_required > 0) return { label: group.counts.changes_required + ' changes required', tone: 'amber' };
+  if (group.counts.overdue > 0) return { label: group.counts.overdue + ' overdue', tone: 'red' };
+  if (group.needsAction > 0) return { label: group.needsAction + ' to submit', tone: 'amber' };
+  if (group.counts.submitted > 0) return { label: group.counts.submitted + ' under review', tone: 'blue' };
+  return { label: group.counts.approved + ' approved', tone: 'green' };
 }
 
 export default function DeliverablesPage() {
   const router = useRouter();
-  const { entrepreneur, deliverables } = useEntrepreneurStore();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('all');
-  const [groupFilter, setGroupFilter] = React.useState('all');
-  const [page, setPage] = React.useState(1);
+  const deferredQuery = React.useDeferredValue(query.trim());
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(ALL);
+  const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(6);
+  const [lookupOpen, setLookupOpen] = React.useState(false);
+  const [lookupSearch, setLookupSearch] = React.useState('');
+  const groups = useDeliverableGroupsPage({
+    search: deferredQuery || undefined,
+    programmeId: programmeFilter === ALL ? undefined : programmeFilter,
+    view: statusFilter === ALL ? undefined : statusFilter,
+    take: pageSize,
+  });
+  const lookup = useLazyDeliverableGroups({ enabled: lookupOpen, search: lookupSearch || undefined, take: 20 });
+  const summary = groups.summary;
+  const needsAction = (summary?.not_submitted ?? 0) + (summary?.overdue ?? 0) + (summary?.changes_required ?? 0);
 
-  const accessibleGroups = React.useMemo(() => {
-    return deliverableGroups.filter((group) => !group.programmeId || entrepreneurHasProgramme(entrepreneur, group.programmeId));
-  }, [entrepreneur]);
-
-  const groupOptions = React.useMemo(
-    () => accessibleGroups.map((group) => ({ value: group.id, label: group.label })),
-    [accessibleGroups],
-  );
-
-  const summaries = React.useMemo(() => {
-    return new Map(accessibleGroups.map((group) => [group.id, getGroupSummary(getDeliverablesForGroup(group, deliverables))]));
-  }, [accessibleGroups, deliverables]);
-
-  const totalRequired = React.useMemo(
-    () => accessibleGroups.reduce((count, group) => count + (summaries.get(group.id)?.total ?? 0), 0),
-    [accessibleGroups, summaries],
-  );
-  const needsAction = React.useMemo(
-    () => accessibleGroups.reduce((count, group) => count + (summaries.get(group.id)?.needsAction ?? 0), 0),
-    [accessibleGroups, summaries],
-  );
-  const underReview = React.useMemo(
-    () => accessibleGroups.reduce((count, group) => count + (summaries.get(group.id)?.submitted ?? 0), 0),
-    [accessibleGroups, summaries],
-  );
-  const approved = React.useMemo(
-    () => accessibleGroups.reduce((count, group) => count + (summaries.get(group.id)?.approved ?? 0), 0),
-    [accessibleGroups, summaries],
-  );
-
-  const filteredGroups = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return accessibleGroups.filter((group) => {
-      const items = getDeliverablesForGroup(group, deliverables);
-      const summary = summaries.get(group.id) ?? getGroupSummary(items);
-      const program = groupProgrammeMap[group.id];
-      const matchesGroup = groupFilter === 'all' || group.id === groupFilter;
-      const matchesCurrentStatus = matchesStatus(summary, statusFilter);
-      const matchesQuery =
-        !needle ||
-        [
-          group.label,
-          program?.description ?? '',
-          group.programmeId ? 'programme deliverables' : 'general deliverables',
-          ...items.map((item) => `${item.name} ${item.fileName ?? ''} ${item.notes ?? ''}`),
-          ...items.flatMap((item) => item.feedbackHistory?.map((feedback) => feedback.message) ?? []),
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-      return matchesGroup && matchesCurrentStatus && matchesQuery;
-    });
-  }, [accessibleGroups, deliverables, groupFilter, query, statusFilter, summaries]);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [groupFilter, query, statusFilter, pageSize]);
-
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredGroups.slice(start, start + pageSize);
-  }, [filteredGroups, page, pageSize]);
+  function resetFilters() {
+    setQuery('');
+    setStatusFilter(ALL);
+    setProgrammeFilter(ALL);
+    groups.resetPagination();
+  }
 
   return (
     <>
       <PageHeader
         title="Deliverables"
         description="Track work to submit, BID feedback, and approved submissions."
-        actions={
-          <Button onClick={() => setUploadOpen(true)}>
-            <UploadCloud className="h-4 w-4" />
-            Upload deliverable
-          </Button>
-        }
+        actions={<Button onClick={() => setUploadOpen(true)}><UploadCloud className="h-4 w-4" />Upload deliverable</Button>}
       />
 
       <MetricGrid>
-        <StatCard label="Required" value={totalRequired} dotColor="bid" />
-        <StatCard label="Needs action" value={needsAction} dotColor="warning" />
-        <StatCard label="Under review" value={underReview} dotColor="info" />
-        <StatCard label="Approved" value={approved} dotColor="success" />
+        <StatCard label="Required" value={summary ? summary.not_submitted + summary.overdue + summary.submitted + summary.changes_required + summary.approved : '—'} dotColor="bid" />
+        <StatCard label="Needs action" value={summary ? needsAction : '—'} dotColor="warning" />
+        <StatCard label="Under review" value={summary?.submitted ?? '—'} dotColor="info" />
+        <StatCard label="Approved" value={summary?.approved ?? '—'} dotColor="success" />
       </MetricGrid>
 
+      {groups.unreadFeedbackTotal > 0 && (
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-warning/20 bg-warning-light px-4 py-3 text-sm text-warning-dark">
+          <MessageSquareText className="h-4 w-4 shrink-0" />
+          {groups.unreadFeedbackTotal} deliverable{groups.unreadFeedbackTotal === 1 ? ' has' : 's have'} new BID feedback.
+        </div>
+      )}
+
       <Card className="mt-4">
-        <CardHeader
-          title="Deliverable workspace"
-          description={`${filteredGroups.length} group${filteredGroups.length === 1 ? '' : 's'} in this view`}
-        />
+        <CardHeader title="Deliverable workspace" description={groups.isLoading ? 'Loading programme groups...' : groups.totalItems + ' programme group' + (groups.totalItems === 1 ? '' : 's') + ' in this view'} />
         <TableToolbar>
           <div>
             <div className="text-sm font-medium text-ink">Find the work you need to submit</div>
-            <div className="mt-0.5 text-sm text-ink-muted">
-              Search by programme, deliverable, file, or feedback.
-            </div>
+            <div className="mt-0.5 text-sm text-ink-muted">Search and filter without loading every deliverable.</div>
           </div>
           <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(220px,280px)_minmax(180px,220px)_minmax(170px,200px)]">
-            <TableFilterInput
-              icon
-              placeholder="Search deliverables..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <TableFilterInput icon placeholder="Search deliverables..." value={query} onChange={(event) => { setQuery(event.target.value); groups.resetPagination(); }} />
             <TableFilterAutocomplete
-              value={groupFilter}
-              onValueChange={setGroupFilter}
-              options={[{ value: 'all', label: 'All groups' }, ...groupOptions]}
-              placeholder="All groups"
-              searchPlaceholder="Search groups..."
-              emptyMessage="No group found."
+              value={programmeFilter}
+              onValueChange={(value) => { setProgrammeFilter(value); groups.resetPagination(); }}
+              options={[{ value: ALL, label: 'All programmes' }, ...lookup.rows.map((group) => ({ value: group.id, label: group.name }))]}
+              placeholder="All programmes"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No programme found."
+              onOpenChange={setLookupOpen}
+              onSearchChange={setLookupSearch}
+              isLoading={lookup.isLoading}
+              hasMore={lookup.hasNextPage}
+              onLoadMore={() => lookup.fetchNextPage()}
             />
-            <TableFilterSelect
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-            >
-              <option value="all">All statuses</option>
-              <option value="needs-action">Needs action</option>
-              <option value="under-review">Under review</option>
-              <option value="approved">Approved</option>
+            <TableFilterSelect value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); groups.resetPagination(); }}>
+              <option value={ALL}>All statuses</option>
+              <option value="needs_action">Needs action</option>
+              <option value="under_review">Under review</option>
+              <option value="approved">Fully approved</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>
 
-        {pageRows.length > 0 ? (
+        {groups.isLoading ? (
+          <DeliverableGroupsSkeleton />
+        ) : groups.isError ? (
+          <TableEmptyState title="Deliverables could not be loaded" description={groups.error.message} action={<Button variant="outline" onClick={() => groups.refetch()}>Try again</Button>} />
+        ) : groups.rows.length ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            {pageRows.map((group) => {
-              const program = groupProgrammeMap[group.id];
-              const items = getDeliverablesForGroup(group, deliverables);
-              const summary = summaries.get(group.id) ?? getGroupSummary(items);
-              const primaryBadge = getPrimaryBadge(summary);
-              const nextDue = summary.nextDue;
-              const accentBg =
-                group.accent === 'bid' ? 'bg-bid-light text-bid' : group.accent === 'info' ? 'bg-info-light text-info' : 'bg-success-light text-success';
-              const completion = summary.total > 0 ? Math.round((summary.approved / summary.total) * 100) : 0;
-
+            {groups.rows.map((group: DeliverableGroup, index: number) => {
+              const badge = primaryBadge(group);
+              const completion = group.total ? Math.round((group.counts.approved / group.total) * 100) : 0;
+              const accent = index % 3 === 0 ? 'bg-bid-light text-bid' : index % 3 === 1 ? 'bg-info-light text-info' : 'bg-success-light text-success';
               return (
-                <button
-                  type="button"
-                  key={group.id}
-                  onClick={() => router.push(routes.entrepreneur.deliverableGroup(group.id))}
-                  className={cn(
-                    'group flex min-h-[252px] flex-col rounded-xl border border-black/[0.08] bg-white p-5 text-left shadow-[0_14px_34px_rgba(26,26,26,0.045)] transition hover:border-bid/40 hover:shadow-[0_18px_42px_rgba(26,26,26,0.07)] focus:outline-none focus:ring-2 focus:ring-bid/20',
-                    group.accent === 'bid' && 'border-l-[3px] border-l-bid',
-                    group.accent === 'info' && 'border-l-[3px] border-l-info',
-                    group.accent === 'success' && 'border-l-[3px] border-l-success',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', accentBg)}>
-                      <FileText className="h-5 w-5" strokeWidth={1.7} />
-                    </span>
-                    <Badge tone={primaryBadge.tone}>{primaryBadge.label}</Badge>
+                <button key={group.id} type="button" onClick={() => router.push(routes.entrepreneur.deliverableGroup(group.id))} className="group rounded-2xl border border-line bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-bid/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={'grid h-11 w-11 place-items-center rounded-xl ' + accent}><FileText className="h-5 w-5" /></span>
+                    <Badge tone={badge.tone}>{badge.label}</Badge>
                   </div>
-
-                  <div className="mt-4 min-w-0">
-                    <div className="text-base font-semibold leading-6 text-ink transition-colors group-hover:text-bid">
-                      {group.label}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">
-                      {program?.description ?? 'General submissions requested by BID outside a specific programme.'}
-                    </p>
+                  <h2 className="mt-4 text-lg font-semibold text-ink">{group.name}</h2>
+                  <p className="mt-1 text-sm leading-6 text-ink-muted">{group.accessType === 'free' ? 'Free programme deliverables and BID feedback.' : 'Assigned programme submissions, feedback, and approvals.'}</p>
+                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-surface-subtle p-3 text-center">
+                    <div><div className="text-lg font-semibold text-ink">{group.total}</div><div className="text-xs text-ink-muted">Required</div></div>
+                    <div><div className="text-lg font-semibold text-warning-dark">{group.needsAction}</div><div className="text-xs text-ink-muted">Action</div></div>
+                    <div><div className="text-lg font-semibold text-success-dark">{group.counts.approved}</div><div className="text-xs text-ink-muted">Approved</div></div>
                   </div>
-
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <MiniMetric label="Action" value={summary.needsAction} tone={summary.needsAction > 0 ? 'warning' : 'neutral'} />
-                    <MiniMetric label="Review" value={summary.submitted} tone={summary.submitted > 0 ? 'info' : 'neutral'} />
-                    <MiniMetric label="Approved" value={summary.approved} tone={summary.approved > 0 ? 'success' : 'neutral'} />
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs text-ink-muted"><span>Completion</span><span>{completion}%</span></div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-subtle"><div className="h-full rounded-full bg-success transition-all" style={{ width: completion + '%' }} /></div>
                   </div>
-
-                  <div className="mt-4 rounded-xl border border-line bg-surface-subtle px-3 py-3">
-                    {nextDue ? (
-                      <div className="flex items-start gap-2">
-                        <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-ink">Next due: {nextDue.name}</div>
-                          <div className="mt-0.5 text-sm text-ink-muted">{formatDate(nextDue.dueDate)}</div>
-                        </div>
-                      </div>
-                    ) : summary.submitted > 0 ? (
-                      <div className="flex items-start gap-2">
-                        <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-info" />
-                        <div>
-                          <div className="text-sm font-medium text-ink">Waiting for BID review</div>
-                          <div className="mt-0.5 text-sm text-ink-muted">Submitted work is in the review queue.</div>
-                        </div>
-                      </div>
-                    ) : summary.unreadFeedback > 0 ? (
-                      <div className="flex items-start gap-2">
-                        <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                        <div>
-                          <div className="text-sm font-medium text-ink">New feedback available</div>
-                          <div className="mt-0.5 text-sm text-ink-muted">Open this group to review BID feedback.</div>
-                        </div>
-                      </div>
-                    ) : summary.total > 0 && summary.approved === summary.total ? (
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                        <div>
-                          <div className="text-sm font-medium text-ink">All deliverables approved</div>
-                          <div className="mt-0.5 text-sm text-ink-muted">No action needed right now.</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
-                        <div>
-                          <div className="text-sm font-medium text-ink">No required deliverables yet</div>
-                          <div className="mt-0.5 text-sm text-ink-muted">BID has not added submissions here.</div>
-                        </div>
-                      </div>
-                    )}
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4 text-sm">
+                    <span className="flex items-center gap-2 text-ink-muted"><CalendarClock className="h-4 w-4" />{formatDate(group.nextDueDate)}</span>
+                    <span className="flex items-center gap-1 font-medium text-bid">Open workspace<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></span>
                   </div>
-
-                  <div className="mt-auto pt-4">
-                    <div className="mb-2 h-2 overflow-hidden rounded-full bg-surface-subtle">
-                      <div className="h-full rounded-full bg-bid" style={{ width: `${completion}%` }} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-ink-muted">{completion}% approved</span>
-                      <span className="inline-flex items-center gap-1 font-medium text-bid">
-                        Open group <ArrowRight className="h-4 w-4" />
-                      </span>
-                    </div>
-                  </div>
+                  {group.unreadFeedback > 0 && <div className="mt-3 flex items-center gap-2 text-sm font-medium text-warning-dark"><AlertCircle className="h-4 w-4" />{group.unreadFeedback} new feedback item{group.unreadFeedback === 1 ? '' : 's'}</div>}
                 </button>
               );
             })}
           </div>
         ) : (
-          <TableEmptyState
-            title="No deliverable groups found"
-            description="Try changing the search term or status filter."
-          />
+          <TableEmptyState title="No deliverable groups match this view" description="Adjust the filters or clear the search." action={<Button variant="outline" onClick={resetFilters}>Clear filters</Button>} />
         )}
 
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filteredGroups.length}
-          pageSizeOptions={[6, 12, 24]}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
-        />
+        <TablePagination page={groups.page} pageSize={pageSize} pageSizeOptions={[6, 12, 24]} totalItems={groups.totalItems} onPageChange={groups.setPage} onPageSizeChange={(next) => { setPageSize(next); groups.resetPagination(); }} />
       </Card>
 
       <UploadDeliverableModal open={uploadOpen} onOpenChange={setUploadOpen} />
@@ -376,28 +159,6 @@ export default function DeliverablesPage() {
   );
 }
 
-function MiniMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: 'warning' | 'info' | 'success' | 'neutral';
-}) {
-  const toneClass = {
-    warning: 'text-warning-dark bg-warning-light',
-    info: 'text-info bg-info-light',
-    success: 'text-success-dark bg-success-light',
-    neutral: 'text-ink-muted bg-surface-subtle',
-  }[tone];
-
-  return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className={cn('mt-1 inline-flex min-w-7 justify-center rounded-md px-2 py-0.5 text-sm font-semibold', toneClass)}>
-        {value}
-      </div>
-    </div>
-  );
+function DeliverableGroupsSkeleton() {
+  return <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-[310px] animate-pulse rounded-2xl border border-line bg-surface-subtle" />)}</div>;
 }

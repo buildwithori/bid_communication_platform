@@ -30,6 +30,20 @@ type MutationHandlers<TData> = {
 };
 type GroupPageQuery = Omit<DeliverableGroupQuery, "cursor">;
 
+export function useLazyDeliverableGroups(
+  query: GroupPageQuery & { enabled: boolean },
+) {
+  const { enabled, ...filters } = query;
+  const result = useInfiniteQuery({
+    queryKey: deliverableKeys.groupList(filters),
+    queryFn: ({ pageParam }) => listDeliverableGroupsRequest({ ...filters, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return { ...result, rows: result.data?.pages.flatMap((page) => page.items) ?? [] };
+}
+
 export function useDeliverableGroupsPage(query: GroupPageQuery) {
   const [page, setCurrentPage] = useState(1);
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
@@ -57,10 +71,29 @@ export function useDeliverableGroupsPage(query: GroupPageQuery) {
       setCurrentPage(nextPage);
     }
   }, [cursors, page, result.data?.nextCursor]);
-  return { ...result, page, rows: result.data?.items ?? [], totalItems: result.data?.totalItems ?? 0, setPage, resetPagination };
+  return { ...result, page, rows: result.data?.items ?? [], totalItems: result.data?.totalItems ?? 0, summary: result.data?.summary, unreadFeedbackTotal: result.data?.unreadFeedbackTotal ?? 0, setPage, resetPagination };
 }
 
 type PageQuery = Omit<DeliverableQuery, "cursor">;
+
+export function useLazyDeliverableInstances(
+  query: PageQuery & { enabled: boolean },
+) {
+  const { enabled, ...filters } = query;
+  const result = useInfiniteQuery({
+    queryKey: deliverableKeys.instanceList(filters),
+    queryFn: ({ pageParam }) =>
+      listDeliverableInstancesRequest({ ...filters, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return {
+    ...result,
+    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+    totalItems: result.data?.pages[0]?.totalItems ?? 0,
+  };
+}
 
 export function useDeliverableInstancesPage(query: PageQuery) {
   const [page, setCurrentPage] = useState(1);

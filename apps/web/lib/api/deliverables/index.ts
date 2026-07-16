@@ -2,6 +2,8 @@ export {
   useDeliverableFeedbackQuery,
   useDeliverableGroupsPage,
   useDeliverableInstancesPage,
+  useLazyDeliverableGroups,
+  useLazyDeliverableInstances,
   useDeliverableReviewQueuePage,
   useDeliverableSubmissionsQuery,
   useMarkDeliverableReviewReadMutation,

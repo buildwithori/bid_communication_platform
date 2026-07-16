@@ -90,8 +90,20 @@ export class DeliverablesService {
   async listGroups(user: User, query: DeliverableGroupQueryDto) {
     const take = pageSize(query);
     const search = query.search?.trim();
+    const groupStatusFilter: Prisma.DeliverableInstanceWhereInput = query.view === 'needs_action'
+      ? { status: { in: [DeliverableInstanceStatus.not_submitted, DeliverableInstanceStatus.overdue, DeliverableInstanceStatus.changes_required] } }
+      : query.view === 'under_review'
+        ? { status: DeliverableInstanceStatus.submitted }
+        : {};
     const where: Prisma.ProgrammeWhereInput = {
-      deliverableInstances: { some: { entrepreneurUserId: user.id } },
+      deliverableInstances: { some: { entrepreneurUserId: user.id, ...groupStatusFilter } },
+      ...(query.view === 'approved'
+        ? { deliverableInstances: {
+            some: { entrepreneurUserId: user.id },
+            none: { entrepreneurUserId: user.id, status: { not: DeliverableInstanceStatus.approved } },
+          } }
+        : {}),
+      ...(query.programmeId ? { id: query.programmeId } : {}),
       ...(search
         ? {
             OR: [
@@ -101,7 +113,7 @@ export class DeliverablesService {
           }
         : {}),
     };
-    const [programmes, totalItems] = await Promise.all([
+    const [programmes, totalItems, overallStatusGroups, unreadFeedbackTotal] = await Promise.all([
       this.prisma.programme.findMany({
         where,
         orderBy: [{ name: 'asc' }, { id: 'asc' }],
@@ -110,6 +122,17 @@ export class DeliverablesService {
         select: { id: true, name: true, accessType: true },
       }),
       this.prisma.programme.count({ where }),
+      this.prisma.deliverableInstance.groupBy({
+        by: ['status'],
+        where: { entrepreneurUserId: user.id },
+        _count: { _all: true },
+      }),
+      this.prisma.deliverableInstance.count({
+        where: {
+          entrepreneurUserId: user.id,
+          submissions: { some: { reviews: { some: { readAt: null } } } },
+        },
+      }),
     ]);
     const page = programmes.slice(0, take);
     const programmeIds = page.map((programme) => programme.id);
@@ -165,6 +188,8 @@ export class DeliverablesService {
       }),
       nextCursor: programmes.length > take ? page[page.length - 1]?.id ?? null : null,
       totalItems,
+      summary: this.statusSummary(overallStatusGroups),
+      unreadFeedbackTotal,
     };
   }
 

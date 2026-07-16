@@ -1,143 +1,123 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Clock3, FileText, UploadCloud } from 'lucide-react';
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Modal } from '@/components/shared/Modal';
-import { FormAutocomplete, FormField, FormTextarea, FormInput } from '@/components/shared/FormField';
-import { Button } from '@/components/shared/Button';
+import { AlertTriangle, CheckCircle2, Clock3, FileText, UploadCloud } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/shared/Badge';
-import { deliverableSchema, type DeliverableForm } from '@/lib/forms/schemas';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { deliverableGroups } from '@/lib/mock-data';
-import type { BadgeTone, Deliverable, DeliverableStatus } from '@/types';
+import { Button } from '@/components/shared/Button';
+import { FormAutocomplete, FormField, FormTextarea } from '@/components/shared/FormField';
+import { Modal } from '@/components/shared/Modal';
+import {
+  useLazyDeliverableInstances,
+  useSubmitDeliverableMutation,
+  type DeliverableInstance,
+  type DeliverableStatus,
+} from '@/lib/api/deliverables';
+import { useDirectFileUploadMutation } from '@/lib/api/files';
+import type { BadgeTone } from '@/types';
 
 const statusMeta: Record<DeliverableStatus, { label: string; tone: BadgeTone; helper: string }> = {
-  pending: { label: 'Not submitted', tone: 'amber', helper: 'Upload the required file for BID review.' },
+  not_submitted: { label: 'Not submitted', tone: 'amber', helper: 'Upload the required file for BID review.' },
   overdue: { label: 'Overdue', tone: 'red', helper: 'This requirement is past its due date.' },
   submitted: { label: 'Submitted', tone: 'blue', helper: 'BID is reviewing the latest upload.' },
-  'changes-requested': { label: 'Changes required', tone: 'amber', helper: 'Upload a revised file after addressing BID feedback.' },
-  reviewed: { label: 'Approved', tone: 'green', helper: 'BID has accepted this deliverable.' },
+  changes_required: { label: 'Changes required', tone: 'amber', helper: 'Upload a revised file after addressing BID feedback.' },
+  approved: { label: 'Approved', tone: 'green', helper: 'BID has accepted this deliverable.' },
 };
 
-function formatDate(value?: string) {
+function formatDate(value?: string | null) {
   if (!value) return 'No due date';
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function latestFeedback(deliverable?: Deliverable | null) {
-  if (!deliverable?.feedbackHistory?.length) return deliverable?.reviewFeedback;
-  return [...deliverable.feedbackHistory].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )[0]?.message;
-}
-
-function sampleFileName(deliverable?: Deliverable | null) {
-  if (!deliverable) return 'Business_Model_Canvas.pdf';
-  const extension = deliverable.fileType ?? 'pdf';
-  return `${deliverable.name.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}_updated.${extension}`;
+function isOpenRequirement(item: DeliverableInstance) {
+  return item.status === 'not_submitted' || item.status === 'overdue' || item.status === 'changes_required';
 }
 
 export function UploadDeliverableModal({
   open,
   onOpenChange,
   deliverable,
-  groupId,
+  programmeId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  deliverable?: Deliverable | null;
-  groupId?: string;
+  deliverable?: DeliverableInstance | null;
+  programmeId?: string;
 }) {
-  const { deliverables, submitDeliverable } = useEntrepreneurStore();
-  const activeGroup = React.useMemo(
-    () => (groupId ? deliverableGroups.find((group) => group.id === groupId) : undefined),
-    [groupId],
-  );
-  const eligibleDeliverables = React.useMemo(
-    () =>
-      deliverables.filter((item) => {
-        const matchesGroup =
-          !groupId ||
-          (activeGroup?.id === 'g-general'
-            ? item.group === 'general'
-            : item.programmeId === activeGroup?.programmeId);
-        const needsSubmission = item.status === 'pending' || item.status === 'overdue' || item.status === 'changes-requested';
-        return matchesGroup && needsSubmission;
-      }),
-    [activeGroup, deliverables, groupId],
-  );
-
-  const form = useForm<DeliverableForm>({
-    resolver: zodResolver(deliverableSchema),
-    defaultValues: { deliverableId: '', name: '', fileName: '', notes: '' },
+  const [selectedId, setSelectedId] = React.useState(deliverable?.id ?? '');
+  const [file, setFile] = React.useState<File | null>(null);
+  const [note, setNote] = React.useState('');
+  const requirements = useLazyDeliverableInstances({
+    programmeId,
+    take: 20,
+    enabled: open && !deliverable,
   });
-  const selectedDeliverableId = form.watch('deliverableId');
-  const selectedDeliverable =
-    deliverable ?? eligibleDeliverables.find((item) => item.id === selectedDeliverableId) ?? null;
-  const isResubmission = selectedDeliverable?.status === 'changes-requested';
-  const currentFeedback = latestFeedback(selectedDeliverable);
-  const canSubmit = !!selectedDeliverable;
+  const eligible = React.useMemo(
+    () => requirements.rows.filter(isOpenRequirement),
+    [requirements.rows],
+  );
+  const selected = deliverable ?? eligible.find((item) => item.id === selectedId) ?? null;
+  const isResubmission = selected?.status === 'changes_required';
+  const upload = useDirectFileUploadMutation();
+  const submit = useSubmitDeliverableMutation({
+    onSuccess: () => {
+      toast.success(isResubmission ? 'Deliverable resubmitted' : 'Deliverable submitted for review');
+      resetAndClose();
+    },
+  });
+  const isSaving = upload.isPending || submit.isPending;
 
-  React.useEffect(() => {
-    if (!open) return;
-    form.reset({
-      deliverableId: deliverable?.id ?? '',
-      name: deliverable?.name ?? '',
-      fileName: deliverable?.fileName ?? '',
-      notes: '',
-    });
-  }, [deliverable, form, open]);
-
-  const onSubmit = (values: DeliverableForm) => {
-    submitDeliverable(values);
+  function resetAndClose() {
+    setSelectedId(deliverable?.id ?? '');
+    setFile(null);
+    setNote('');
+    upload.reset();
     onOpenChange(false);
-    form.reset();
-  };
+  }
+
+  function requestClose() {
+    if (!isSaving) resetAndClose();
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || !file || isSaving) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Files must be 25 MB or smaller.');
+      return;
+    }
+    try {
+      const asset = await upload.mutateAsync({ file, usage: 'deliverable_submission' });
+      await submit.mutateAsync({ instanceId: selected.id, fileAssetId: asset.id, note: note.trim() || undefined });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.');
+    }
+  }
 
   return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={isResubmission ? 'Resubmit deliverable' : 'Upload deliverable'}
-      width="wide"
-    >
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <Modal open={open} onOpenChange={(next) => !next && requestClose()} title={isResubmission ? 'Resubmit deliverable' : 'Upload deliverable'} width="wide">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {!deliverable && (
-          <FormField
-            label="BID requirement"
-            error={form.formState.errors.deliverableId?.message}
-            className="mb-0"
-          >
+          <FormField label="BID requirement" className="mb-0">
             <FormAutocomplete
-              value={form.watch('deliverableId') ?? ''}
-              onValueChange={(value) => {
-                const selected = eligibleDeliverables.find((item) => item.id === value);
-                form.setValue('deliverableId', value, { shouldValidate: true });
-                if (selected) {
-                  form.setValue('name', selected.name);
-                  form.setValue('fileName', '');
-                }
-              }}
-              placeholder={eligibleDeliverables.length ? 'Select a deliverable requirement' : 'No open requirements'}
-              searchPlaceholder="Search requirements..."
-              emptyMessage="No open deliverables match that search."
-              disabled={eligibleDeliverables.length === 0}
-              options={eligibleDeliverables.map((item) => ({
+              value={selectedId}
+              onValueChange={setSelectedId}
+              placeholder={requirements.isLoading ? 'Loading requirements...' : 'Select a deliverable requirement'}
+              searchPlaceholder="Search loaded requirements..."
+              emptyMessage="No open requirements found."
+              isLoading={requirements.isLoading}
+              hasMore={requirements.hasNextPage}
+              onLoadMore={() => requirements.fetchNextPage()}
+              options={eligible.map((item) => ({
                 value: item.id,
-                label: item.name,
-                description: `${item.groupLabel} · ${statusMeta[item.status].label} · Due ${formatDate(item.dueDate)}`,
+                label: item.deliverable,
+                description: item.programme.name + ' · ' + statusMeta[item.status].label + ' · Due ' + formatDate(item.dueDate),
               }))}
             />
           </FormField>
         )}
 
-        {selectedDeliverable ? (
+        {selected ? (
           <div className="rounded-xl border border-line bg-surface-subtle p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 gap-3">
@@ -145,84 +125,66 @@ export function UploadDeliverableModal({
                   {isResubmission ? <AlertTriangle className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                 </span>
                 <div className="min-w-0">
-                  <div className="font-semibold text-ink">{selectedDeliverable.name}</div>
-                  <div className="mt-1 text-sm text-ink-muted">{selectedDeliverable.groupLabel}</div>
+                  <div className="font-semibold text-ink">{selected.deliverable}</div>
+                  <div className="mt-1 text-sm text-ink-muted">{selected.programme.name}</div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge tone={statusMeta[selectedDeliverable.status].tone}>
-                      {statusMeta[selectedDeliverable.status].label}
-                    </Badge>
-                    <span className="text-sm text-ink-muted">
-                      Due {formatDate(selectedDeliverable.dueDate)}
-                    </span>
+                    <Badge tone={statusMeta[selected.status].tone}>{statusMeta[selected.status].label}</Badge>
+                    <span className="text-sm text-ink-muted">Due {formatDate(selected.dueDate)}</span>
                   </div>
                 </div>
               </div>
-              {selectedDeliverable.submittedAt && (
+              {selected.latestSubmission && (
                 <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-muted">
                   <div className="font-medium text-ink">Latest upload</div>
-                  <div>{selectedDeliverable.fileName}</div>
-                  <div>{formatDate(selectedDeliverable.submittedAt)}</div>
+                  <div className="max-w-[230px] truncate">{selected.latestSubmission.file.originalFilename}</div>
+                  <div>{formatDate(selected.latestSubmission.submittedAt)}</div>
                 </div>
               )}
             </div>
             <div className="mt-3 flex items-start gap-2 text-sm text-ink-muted">
-              {selectedDeliverable.status === 'submitted' ? (
-                <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
-              ) : (
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              )}
-              <span>{statusMeta[selectedDeliverable.status].helper}</span>
+              {selected.status === 'submitted' ? <Clock3 className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+              <span>{statusMeta[selected.status].helper}</span>
             </div>
           </div>
         ) : (
           <div className="rounded-xl border border-line bg-surface-subtle px-4 py-5 text-sm text-ink-muted">
-            Select a BID requirement before uploading. The submitted file will be attached to that requirement for review.
+            Select a BID requirement before uploading. The file will be attached to that requirement for review.
           </div>
         )}
 
-        {isResubmission && currentFeedback && (
+        {isResubmission && selected?.latestReview && (
           <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3">
             <div className="text-sm font-semibold text-warning-dark">Current BID feedback to address</div>
-            <p className="mt-2 text-sm leading-6 text-warning-dark">{currentFeedback}</p>
+            <p className="mt-2 text-sm leading-6 text-warning-dark">{selected.latestReview.feedback}</p>
           </div>
         )}
 
-        <input type="hidden" {...form.register('name')} />
-        <button
-          type="button"
-          disabled={!selectedDeliverable}
-          onClick={() => {
-            if (!selectedDeliverable) return;
-            form.setValue('fileName', sampleFileName(selectedDeliverable), { shouldValidate: true });
-          }}
-          className="flex w-full flex-col items-center rounded-xl border-[1.5px] border-dashed border-line-strong px-5 py-6 text-center transition-colors hover:border-bid hover:bg-bid-light disabled:pointer-events-none disabled:opacity-60"
-          aria-label="Upload file"
-        >
-          <UploadCloud className="mx-auto mb-1 h-6 w-6 text-bid" />
-          <span className="text-sm font-medium text-ink">
-            {isResubmission ? 'Attach revised file' : 'Attach file for review'}
-          </span>
-          <span className="mt-1 text-xs text-ink-muted">
-            PDF, PPTX, DOCX, XLSX up to 25 MB. Click to select a sample file for this UI flow.
-          </span>
-        </button>
-
-        <FormField label="Selected file" error={form.formState.errors.fileName?.message} className="mb-0">
-          <FormInput
-            placeholder="Click the upload area to simulate selecting a file"
-            {...form.register('fileName')}
-          />
+        <FormField label="File" className="mb-0">
+          <label className="flex w-full cursor-pointer flex-col items-center rounded-xl border-[1.5px] border-dashed border-line-strong px-5 py-6 text-center transition-colors hover:border-bid hover:bg-bid-light">
+            <UploadCloud className="mb-1 h-6 w-6 text-bid" />
+            <span className="text-sm font-medium text-ink">{file?.name ?? (isResubmission ? 'Attach revised file' : 'Choose file for review')}</span>
+            <span className="mt-1 text-xs text-ink-muted">PDF, PPTX, DOCX, or XLSX up to 25 MB</span>
+            <input
+              type="file"
+              className="sr-only"
+              accept=".pdf,.pptx,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              disabled={!selected || isSaving}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
         </FormField>
+
+        {upload.isPending && (
+          <div className="rounded-lg bg-bid-light px-3 py-2 text-sm text-bid-dark">
+            Uploading {upload.progress.percent}%
+          </div>
+        )}
 
         <FormField label="Message to BID reviewer" optional className="mb-0">
-          <FormTextarea
-            rows={3}
-            placeholder={isResubmission ? 'Briefly explain what changed in this version...' : 'Add any context the reviewer should know...'}
-            {...form.register('notes')}
-          />
+          <FormTextarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} placeholder={isResubmission ? 'Briefly explain what changed in this version...' : 'Add any context the reviewer should know...'} />
         </FormField>
 
-        <Button type="submit" className="w-full" disabled={!canSubmit}>
+        <Button type="submit" className="w-full" disabled={!selected || !file} isLoading={isSaving} loadingLabel={upload.isPending ? 'Uploading file...' : 'Submitting...'}>
           {isResubmission ? 'Resubmit for review' : 'Submit for review'}
         </Button>
       </form>

@@ -134,6 +134,8 @@ export type UpdateDeliverableDueDateVariables = {
 
 export type DeliverableGroupQuery = {
   search?: string;
+  programmeId?: string;
+  view?: "needs_action" | "under_review" | "approved";
   take?: number;
   cursor?: string;
 };
@@ -147,4 +149,7 @@ export type DeliverableGroup = {
   unreadFeedback: number;
   nextDueDate: string | null;
 };
-export type DeliverableGroupPage = DeliverablePage<DeliverableGroup>;
+export type DeliverableGroupPage = DeliverablePage<DeliverableGroup> & {
+  summary: DeliverableStatusSummary;
+  unreadFeedbackTotal: number;
+};
