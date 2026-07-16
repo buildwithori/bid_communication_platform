@@ -14,6 +14,8 @@ export class JobsHealthService {
     private readonly recurringQueue: Queue,
     @InjectQueue(QUEUE_NAMES.transactionalEmail)
     private readonly transactionalEmailQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.reportExports)
+    private readonly reportExportQueue: Queue,
   ) {}
 
   async status() {
@@ -40,6 +42,7 @@ export class JobsHealthService {
         this.notificationQueue,
         this.recurringQueue,
         this.transactionalEmailQueue,
+        this.reportExportQueue,
       ].map(async (queue) => ({
         name: queue.name,
         counts: await queue.getJobCounts("wait", "active", "delayed", "failed"),

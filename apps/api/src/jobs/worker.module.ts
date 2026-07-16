@@ -7,10 +7,12 @@ import { DatabaseModule } from "../database/database.module";
 import { DeliverableLifecycleModule } from "../deliverables/deliverable-lifecycle.module";
 import { EmailModule } from "../email/email.module";
 import { NotificationDeliveryService } from "../notifications/notification-delivery.service";
+import { ReportingModule } from "../reporting/reporting.module";
 import { JobsModule } from "./jobs.module";
 import { AuditProcessor } from "./processors/audit.processor";
 import { NotificationDeliveryProcessor } from "./processors/notification-delivery.processor";
 import { RecurringDeliverablesProcessor } from "./processors/recurring-deliverables.processor";
+import { ReportExportProcessor } from "./processors/report-export.processor";
 import { TransactionalEmailProcessor } from "./processors/transactional-email.processor";
 import { WorkerHeartbeatService } from "./worker-heartbeat.service";
 
@@ -26,6 +28,7 @@ import { WorkerHeartbeatService } from "./worker-heartbeat.service";
     JobsModule,
     AuditModule,
     DeliverableLifecycleModule,
+    ReportingModule,
   ],
   providers: [
     NotificationDeliveryService,
@@ -33,6 +36,7 @@ import { WorkerHeartbeatService } from "./worker-heartbeat.service";
     NotificationDeliveryProcessor,
     RecurringDeliverablesProcessor,
     TransactionalEmailProcessor,
+    ReportExportProcessor,
     WorkerHeartbeatService,
   ],
 })

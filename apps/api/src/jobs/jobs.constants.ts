@@ -3,6 +3,7 @@ export const QUEUE_NAMES = {
   notificationDelivery: "bid-notification-delivery",
   recurringDeliverables: "bid-recurring-deliverables",
   transactionalEmail: "bid-transactional-email",
+  reportExports: "bid-report-exports",
 } as const;
 
 export const JOB_NAMES = {
@@ -15,6 +16,7 @@ export const JOB_NAMES = {
   adminInvitationEmail: "admin-invitation-email",
   trainerInvitationEmail: "trainer-invitation-email",
   entrepreneurInvitationEmail: "entrepreneur-invitation-email",
+  generateReportExport: "generate-report-export",
 } as const;
 
 export const QUEUE_PREFIX = "bid-hub";

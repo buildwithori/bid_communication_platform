@@ -109,6 +109,23 @@ export class StorageService {
     return new Uint8Array(await response.arrayBuffer());
   }
 
+  async putObject(storageKey: string, mimeType: string, body: Uint8Array) {
+    const signed = this.presign(
+      { method: 'PUT', storageKey, mimeType, expiresInSeconds: 300 },
+      { internal: true },
+    );
+    const response = await fetch(signed.url, {
+      method: 'PUT',
+      headers: { 'content-type': mimeType },
+      body: body as unknown as BodyInit,
+    });
+    if (!response.ok) {
+      throw new ServiceUnavailableException(
+        'Object storage could not save the generated file.',
+      );
+    }
+  }
+
   private amzDate(date: Date) {
     return date.toISOString().replace(/[:-]|\.\d{3}/g, '');
   }
