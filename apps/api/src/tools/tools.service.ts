@@ -57,18 +57,71 @@ export class ToolsService {
 
   async listTools(user: User, query: ToolQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
-    const rows = await this.prisma.tool.findMany({
-      where: this.buildToolWhere(user, query),
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-      take: take + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: toolInclude,
-    });
+    const where = this.buildToolWhere(user, query);
+    const scope = this.readScopeWhere(user);
+    const [
+      rows,
+      totalItems,
+      published,
+      drafts,
+      archived,
+      global,
+      programmeTargeted,
+      entrepreneurTargeted,
+    ] = await this.prisma.$transaction([
+      this.prisma.tool.findMany({
+        where,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        take: take + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: toolInclude,
+      }),
+      this.prisma.tool.count({ where }),
+      this.prisma.tool.count({
+        where: { AND: [scope, { status: EntrepreneurToolStatus.published }] },
+      }),
+      this.prisma.tool.count({
+        where: { AND: [scope, { status: EntrepreneurToolStatus.draft }] },
+      }),
+      this.prisma.tool.count({
+        where: { AND: [scope, { status: EntrepreneurToolStatus.archived }] },
+      }),
+      this.prisma.tool.count({
+        where: {
+          AND: [
+            scope,
+            { visibility: EntrepreneurToolVisibility.all_entrepreneurs },
+          ],
+        },
+      }),
+      this.prisma.tool.count({
+        where: {
+          AND: [scope, { visibility: EntrepreneurToolVisibility.programmes }],
+        },
+      }),
+      this.prisma.tool.count({
+        where: {
+          AND: [
+            scope,
+            { visibility: EntrepreneurToolVisibility.entrepreneurs },
+          ],
+        },
+      }),
+    ]);
 
     const nextCursor = rows.length > take ? (rows[take - 1]?.id ?? null) : null;
     return {
       items: rows.slice(0, take).map((tool) => this.mapTool(tool)),
       nextCursor,
+      totalItems,
+      summary: {
+        statuses: { published, draft: drafts, archived },
+        visibility: {
+          allEntrepreneurs: global,
+          programmes: programmeTargeted,
+          entrepreneurs: entrepreneurTargeted,
+        },
+      },
     };
   }
 

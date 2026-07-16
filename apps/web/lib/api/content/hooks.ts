@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { contentKeys } from "./keys";
-import { listTools } from "../tools";
+import { listToolsRequest } from "../tools/requests";
 import {
   attachContentItemRequest,
   createModuleContentItemRequest,
@@ -38,7 +38,9 @@ type Handlers = {
 
 function useCursorPage(
   query: PageQuery,
-  request: (query: ContentItemQuery) => ReturnType<typeof listContentItemsRequest>,
+  request: (
+    query: ContentItemQuery,
+  ) => ReturnType<typeof listContentItemsRequest>,
   queryKey: (query: ContentItemQuery) => readonly unknown[],
   enabled = true,
 ) {
@@ -96,21 +98,17 @@ function useCursorPage(
   };
 }
 
-export const useMyContentRatingQuery = (
-  contentItemId: string | null,
-) =>
+export const useMyContentRatingQuery = (contentItemId: string | null) =>
   useQuery({
     queryKey: contentKeys.rating(contentItemId ?? "none"),
     queryFn: () => getMyContentRatingRequest(contentItemId as string),
     enabled: Boolean(contentItemId),
   });
 
-export const useSaveContentRatingMutation = (
-  handlers?: {
-    onSuccess?: (data: ContentRatingPayload) => void;
-    onError?: (error: Error) => void;
-  },
-) => {
+export const useSaveContentRatingMutation = (handlers?: {
+  onSuccess?: (data: ContentRatingPayload) => void;
+  onError?: (error: Error) => void;
+}) => {
   const client = useQueryClient();
   return useMutation<ContentRatingPayload, Error, SaveContentRatingInput>({
     mutationFn: saveContentRatingRequest,
@@ -123,11 +121,7 @@ export const useSaveContentRatingMutation = (
 };
 
 export const useContentItemsPage = (query: PageQuery) =>
-  useCursorPage(
-    query,
-    listContentItemsRequest,
-    contentKeys.list,
-  );
+  useCursorPage(query, listContentItemsRequest, contentKeys.list);
 
 export const useModuleContentItemsPage = (
   moduleId: string,
@@ -174,7 +168,7 @@ export function useLazyEmbeddedToolsLookup({
   const result = useInfiniteQuery({
     queryKey: [...contentKeys.all, "embedded-tools", search ?? ""],
     queryFn: ({ pageParam }) =>
-      listTools({
+      listToolsRequest({
         search,
         type: "embedded_tool",
         status: "published",
