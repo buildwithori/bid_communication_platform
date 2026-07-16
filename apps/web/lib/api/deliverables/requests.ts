@@ -1,6 +1,8 @@
 import { apiRequest } from "../client";
 import type {
   DeliverableFeedbackPage,
+  DeliverableGroupPage,
+  DeliverableGroupQuery,
   DeliverableInstance,
   DeliverableInstancePage,
   DeliverableQuery,
@@ -22,6 +24,11 @@ function toQueryString(query?: DeliverableQuery) {
   const value = params.toString();
   return value ? "?" + value : "";
 }
+
+export const listDeliverableGroupsRequest = (query?: DeliverableGroupQuery) =>
+  apiRequest<DeliverableGroupPage>(
+    "/deliverable-groups" + toQueryString(query),
+  );
 
 export const listDeliverableInstancesRequest = (query?: DeliverableQuery) =>
   apiRequest<DeliverableInstancePage>(

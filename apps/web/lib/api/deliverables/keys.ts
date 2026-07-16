@@ -1,7 +1,10 @@
-import type { DeliverableQuery } from "./types";
+import type { DeliverableGroupQuery, DeliverableQuery } from "./types";
 
 export const deliverableKeys = {
   all: ["deliverables"] as const,
+  groups: () => [...deliverableKeys.all, "groups"] as const,
+  groupList: (query?: DeliverableGroupQuery) =>
+    [...deliverableKeys.groups(), query ?? {}] as const,
   instances: () => [...deliverableKeys.all, "instances"] as const,
   instanceList: (query?: DeliverableQuery) =>
     [...deliverableKeys.instances(), query ?? {}] as const,

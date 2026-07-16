@@ -131,3 +131,20 @@ export type UpdateDeliverableDueDateVariables = {
   dueDate: string;
   reason?: string;
 };
+
+export type DeliverableGroupQuery = {
+  search?: string;
+  take?: number;
+  cursor?: string;
+};
+export type DeliverableGroup = {
+  id: string;
+  name: string;
+  accessType: "free" | "assigned";
+  counts: DeliverableStatusSummary;
+  total: number;
+  needsAction: number;
+  unreadFeedback: number;
+  nextDueDate: string | null;
+};
+export type DeliverableGroupPage = DeliverablePage<DeliverableGroup>;

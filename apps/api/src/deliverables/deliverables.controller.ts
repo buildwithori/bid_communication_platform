@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { DeliverableGroupQueryDto } from './dto/deliverable-group-query.dto';
 import { DeliverableHistoryQueryDto } from './dto/deliverable-history-query.dto';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
@@ -15,6 +16,12 @@ import { SubmitDeliverableDto } from './dto/submit-deliverable.dto';
 @Controller()
 export class DeliverablesController {
   constructor(private readonly deliverablesService: DeliverablesService) {}
+
+  @Get('deliverable-groups')
+  @Roles(UserRole.entrepreneur)
+  listGroups(@CurrentUser() user: User, @Query() query: DeliverableGroupQueryDto) {
+    return this.deliverablesService.listGroups(user, query);
+  }
 
   @Get('deliverable-instances')
   listInstances(@CurrentUser() user: User, @Query() query: DeliverableInstanceQueryDto) {

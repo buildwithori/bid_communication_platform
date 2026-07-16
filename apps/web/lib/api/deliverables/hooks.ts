@@ -5,6 +5,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { deliverableKeys } from "./keys";
 import {
   listDeliverableFeedbackRequest,
+  listDeliverableGroupsRequest,
   listDeliverableInstancesRequest,
   listDeliverableReviewQueueRequest,
   listDeliverableSubmissionsRequest,
@@ -14,6 +15,7 @@ import {
   updateDeliverableDueDateRequest,
 } from "./requests";
 import type {
+  DeliverableGroupQuery,
   DeliverableInstance,
   DeliverableQuery,
   DeliverableReview,
@@ -26,6 +28,38 @@ type MutationHandlers<TData> = {
   onSuccess?: (data: TData) => void;
   onError?: (error: Error) => void;
 };
+type GroupPageQuery = Omit<DeliverableGroupQuery, "cursor">;
+
+export function useDeliverableGroupsPage(query: GroupPageQuery) {
+  const [page, setCurrentPage] = useState(1);
+  const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
+  const cursor = cursors[page - 1];
+  const result = useQuery({
+    queryKey: deliverableKeys.groupList({ ...query, cursor }),
+    queryFn: () => listDeliverableGroupsRequest({ ...query, cursor }),
+  });
+  const resetPagination = useCallback(() => {
+    setCurrentPage(1);
+    setCursors([undefined]);
+  }, []);
+  const setPage = useCallback((nextPage: number) => {
+    if (nextPage < 1 || nextPage === page) return;
+    if ((nextPage < page && cursors[nextPage - 1] !== undefined) || nextPage === 1) {
+      setCurrentPage(nextPage);
+      return;
+    }
+    if (nextPage === page + 1 && result.data?.nextCursor) {
+      setCursors((current) => {
+        const next = [...current];
+        next[nextPage - 1] = result.data?.nextCursor ?? undefined;
+        return next;
+      });
+      setCurrentPage(nextPage);
+    }
+  }, [cursors, page, result.data?.nextCursor]);
+  return { ...result, page, rows: result.data?.items ?? [], totalItems: result.data?.totalItems ?? 0, setPage, resetPagination };
+}
+
 type PageQuery = Omit<DeliverableQuery, "cursor">;
 
 export function useDeliverableInstancesPage(query: PageQuery) {

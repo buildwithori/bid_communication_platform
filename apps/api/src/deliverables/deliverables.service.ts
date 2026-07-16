@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { cursorArgs, pageSize, toCursorPage } from '../common/pagination/cursor-pagination.dto';
 import { PrismaService } from '../database/prisma.service';
 import { FilesService } from '../files/files.service';
+import { DeliverableGroupQueryDto } from './dto/deliverable-group-query.dto';
 import { DeliverableHistoryQueryDto } from './dto/deliverable-history-query.dto';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
@@ -85,6 +86,87 @@ export class DeliverablesService {
     private readonly filesService: FilesService,
     private readonly audit: AuditService,
   ) {}
+
+  async listGroups(user: User, query: DeliverableGroupQueryDto) {
+    const take = pageSize(query);
+    const search = query.search?.trim();
+    const where: Prisma.ProgrammeWhereInput = {
+      deliverableInstances: { some: { entrepreneurUserId: user.id } },
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { deliverableRules: { some: { name: { contains: search, mode: 'insensitive' } } } },
+            ],
+          }
+        : {}),
+    };
+    const [programmes, totalItems] = await Promise.all([
+      this.prisma.programme.findMany({
+        where,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+        select: { id: true, name: true, accessType: true },
+      }),
+      this.prisma.programme.count({ where }),
+    ]);
+    const page = programmes.slice(0, take);
+    const programmeIds = page.map((programme) => programme.id);
+    const instanceWhere: Prisma.DeliverableInstanceWhereInput = {
+      entrepreneurUserId: user.id,
+      programmeId: { in: programmeIds },
+    };
+    const [statusGroups, dueGroups, unreadGroups] = programmeIds.length
+      ? await Promise.all([
+          this.prisma.deliverableInstance.groupBy({
+            by: ['programmeId', 'status'],
+            where: instanceWhere,
+            _count: { _all: true },
+          }),
+          this.prisma.deliverableInstance.groupBy({
+            by: ['programmeId'],
+            where: {
+              ...instanceWhere,
+              status: { in: [
+                DeliverableInstanceStatus.not_submitted,
+                DeliverableInstanceStatus.overdue,
+                DeliverableInstanceStatus.changes_required,
+              ] },
+            },
+            _min: { dueDate: true },
+          }),
+          this.prisma.deliverableInstance.groupBy({
+            by: ['programmeId'],
+            where: {
+              ...instanceWhere,
+              submissions: { some: { reviews: { some: { readAt: null } } } },
+            },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], [], []];
+
+    return {
+      items: page.map((programme) => {
+        const counts = this.statusSummary(
+          statusGroups
+            .filter((group) => group.programmeId === programme.id)
+            .map((group) => ({ status: group.status, _count: group._count })),
+        );
+        return {
+          ...programme,
+          counts,
+          total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+          needsAction: counts.not_submitted + counts.overdue + counts.changes_required,
+          unreadFeedback: unreadGroups.find((group) => group.programmeId === programme.id)?._count._all ?? 0,
+          nextDueDate: dueGroups.find((group) => group.programmeId === programme.id)?._min.dueDate?.toISOString() ?? null,
+        };
+      }),
+      nextCursor: programmes.length > take ? page[page.length - 1]?.id ?? null : null,
+      totalItems,
+    };
+  }
 
   async listInstances(user: User, query: DeliverableInstanceQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;

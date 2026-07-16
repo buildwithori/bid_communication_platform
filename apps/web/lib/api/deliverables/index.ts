@@ -1,5 +1,6 @@
 export {
   useDeliverableFeedbackQuery,
+  useDeliverableGroupsPage,
   useDeliverableInstancesPage,
   useDeliverableReviewQueuePage,
   useDeliverableSubmissionsQuery,
@@ -11,6 +12,9 @@ export {
 
 export type {
   DeliverableDueType,
+  DeliverableGroup,
+  DeliverableGroupPage,
+  DeliverableGroupQuery,
   DeliverableFeedback,
   DeliverableFeedbackPage,
   DeliverableFile,
