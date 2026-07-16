@@ -80,6 +80,15 @@ export class ProgrammesController {
     return this.programmesService.listProgrammeModules(user, id, query);
   }
 
+  @Get(':id/modules/:moduleId')
+  getProgrammeModule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('moduleId') moduleId: string,
+  ) {
+    return this.programmesService.getProgrammeModule(user, id, moduleId);
+  }
+
   @Get(':id/reusable-modules')
   @Roles(UserRole.admin)
   listReusableModules(

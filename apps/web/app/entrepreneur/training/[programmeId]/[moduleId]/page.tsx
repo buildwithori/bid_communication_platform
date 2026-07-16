@@ -1,202 +1,295 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { notFound, useRouter } from 'next/navigation';
+import * as React from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  ChevronLeft,
   FileText,
+  Layers3,
   PlayCircle,
-  Star,
   Wrench,
   type LucideIcon,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { Breadcrumb } from '@/components/shared/Breadcrumb';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { ProgressBar } from '@/components/shared/ProgressBar';
-import { LearningContentPlayer } from '@/components/entrepreneur/LearningContentPlayer';
+} from "lucide-react";
+import { Badge } from "@/components/shared/Badge";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import {
-  programById,
-  moduleById,
-  contentForModule,
-  modulesForProgram,
-} from '@/lib/mock-data/programs';
-import { moduleWithProgress } from '@/lib/training/progress';
-import { getContentTrainer } from '@/lib/content-trainer-access';
-import { cn } from '@/lib/utils';
-import type { BadgeTone, ContentItem, ContentProgress, ContentType } from '@/types';
-import { routes } from '@/lib/routes';
+  LearningContentPlayer,
+  type LearningPlaylistEntry,
+} from "@/components/entrepreneur/LearningContentPlayer";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { ProgressBar } from "@/components/shared/ProgressBar";
+import {
+  useModuleContentItemsInfinite,
+  type ContentItemRecord,
+  type ContentItemType,
+} from "@/lib/api/content";
+import {
+  useProgrammeDetailQuery,
+  useProgrammeModuleDetailQuery,
+} from "@/lib/api/programmes";
+import { routes } from "@/lib/routes";
+import { cn } from "@/lib/utils";
+import type { BadgeTone } from "@/types";
 
 const contentMeta: Record<
-  ContentType,
+  ContentItemType,
   { label: string; icon: LucideIcon; tone: BadgeTone; iconClass: string }
 > = {
-  video: { label: 'Video', icon: PlayCircle, tone: 'brand', iconClass: 'bg-bid-light text-bid' },
-  pdf: { label: 'PDF', icon: FileText, tone: 'blue', iconClass: 'bg-info-light text-info' },
-  tool: { label: 'Tool', icon: Wrench, tone: 'green', iconClass: 'bg-success-light text-success-dark' },
+  video: {
+    label: "Video",
+    icon: PlayCircle,
+    tone: "brand",
+    iconClass: "bg-bid-light text-bid",
+  },
+  pdf: {
+    label: "PDF",
+    icon: FileText,
+    tone: "blue",
+    iconClass: "bg-info-light text-info",
+  },
+  tool: {
+    label: "Tool",
+    icon: Wrench,
+    tone: "green",
+    iconClass: "bg-success-light text-success-dark",
+  },
 };
 
-export default function ModuleContentPage({
-  params,
-}: {
-  params: { programmeId: string; moduleId: string };
-}) {
-  const router = useRouter();
-  const [activeContent, setActiveContent] = React.useState<ContentItem | null>(null);
+export default function TrainingModulePage() {
+  const params = useParams<{ programmeId: string; moduleId: string }>();
+  const programme = useProgrammeDetailQuery(params.programmeId);
+  const moduleQuery = useProgrammeModuleDetailQuery(params.programmeId, params.moduleId);
+  const content = useModuleContentItemsInfinite(params.moduleId, {
+    programmeId: params.programmeId,
+    take: 10,
+    enabled: true,
+  });
+  const [activeEntry, setActiveEntry] = React.useState<LearningPlaylistEntry | null>(null);
 
-  const program = programById(params.programmeId);
-  const trainingModule = moduleById(params.moduleId);
-  if (!program || !trainingModule || !program.moduleIds.includes(trainingModule.id)) return notFound();
+  const playlist = content.rows.map((item) => ({
+    programmeId: params.programmeId,
+    moduleId: params.moduleId,
+    moduleTitle: moduleQuery.data?.title ?? "Module",
+    item,
+  }));
 
-  const programmeModules = modulesForProgram(program.id).map(moduleWithProgress);
-  const moduleIndex = programmeModules.findIndex((module) => module.id === trainingModule.id);
-  const previousModule = moduleIndex > 0 ? programmeModules[moduleIndex - 1] : undefined;
-  const nextModule = moduleIndex >= 0 && moduleIndex < programmeModules.length - 1
-    ? programmeModules[moduleIndex + 1]
-    : undefined;
-  const moduleProgress = moduleWithProgress(trainingModule);
-  const items = contentForModule(trainingModule.id);
-  const firstOpenItem = items.find((item) => item.progress !== 'completed') ?? items[0] ?? null;
-  const completedItems = items.filter((item) => item.progress === 'completed').length;
-  const videos = items.filter((item) => item.type === 'video').length;
-  const files = items.filter((item) => item.type === 'pdf').length;
-  const tools = items.filter((item) => item.type === 'tool').length;
+  if (
+    (programme.isLoading && !programme.data) ||
+    (moduleQuery.isLoading && !moduleQuery.data) ||
+    (content.isLoading && content.rows.length === 0)
+  ) {
+    return <TrainingModuleSkeleton />;
+  }
+
+  if (
+    programme.isError ||
+    moduleQuery.isError ||
+    content.isError ||
+    !programme.data ||
+    !moduleQuery.data
+  ) {
+    const error = programme.isError
+      ? programme.error
+      : moduleQuery.isError
+        ? moduleQuery.error
+        : content.error;
+    return (
+      <>
+        <ModuleBreadcrumb programmeName="Programme" moduleName="Module" programmeId={params.programmeId} />
+        <PageHeader title="Module" description="Open learning content and track your progress." />
+        <Card>
+          <Notice>
+            This module could not be loaded. {error?.message ?? "Please try again."}
+          </Notice>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={() => {
+              void programme.refetch();
+              void moduleQuery.refetch();
+              void content.refetch();
+            }}
+          >
+            Try again
+          </Button>
+        </Card>
+      </>
+    );
+  }
+
+  const programmeDetail = programme.data;
+  const moduleDetail = moduleQuery.data;
+  const progress = moduleDetail.learnerProgress?.progressPercent ?? 0;
+  const completedItems = moduleDetail.learnerProgress?.completedContentCount ?? 0;
+  const totalItems = moduleDetail.learnerProgress?.totalContentCount ?? moduleDetail.content.total;
+  const nextEntry =
+    playlist.find((entry) => entry.item.learnerProgress?.status !== "completed") ??
+    playlist[0] ??
+    null;
 
   return (
     <>
-      <Breadcrumb
-        items={[
-          { label: 'Training Library', href: routes.entrepreneur.training },
-          { label: program.name, href: routes.entrepreneur.trainingProgram(program.id) },
-          { label: trainingModule.title },
-        ]}
+      <ModuleBreadcrumb
+        programmeName={programmeDetail.name}
+        moduleName={moduleDetail.title}
+        programmeId={programmeDetail.id}
       />
       <PageHeader
-        title={trainingModule.title}
-        description={trainingModule.description ?? 'Open each learning item and complete this module when ready.'}
+        title={moduleDetail.title}
+        description={moduleDetail.description || "Open each learning item and complete the module in order."}
         actions={
-          <Button variant="outline" onClick={() => router.push(routes.entrepreneur.trainingProgram(program.id))}>
-            <ChevronLeft className="h-4 w-4" />
-            Programme
-          </Button>
+          nextEntry ? (
+            <Button type="button" onClick={() => setActiveEntry(nextEntry)}>
+              {progress > 0 ? "Resume module" : "Start module"}
+              <PlayCircle className="h-4 w-4" />
+            </Button>
+          ) : undefined
         }
       />
 
-      <Card padding="lg" className="mb-4">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="min-w-0">
+      <Card padding="lg" accent="bid" className="mb-4">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div>
             <div className="flex flex-wrap items-center gap-2">
-              {moduleStatusBadge(moduleProgress.status)}
-              <Badge tone="neutral">Module {moduleIndex + 1} of {programmeModules.length}</Badge>
-              <Badge tone="brand">{videos} video{videos === 1 ? '' : 's'}</Badge>
-              <Badge tone="blue">{files} file{files === 1 ? '' : 's'}</Badge>
-              <Badge tone="green">{tools} tool{tools === 1 ? '' : 's'}</Badge>
+              <ModuleStatusBadge status={moduleDetail.learnerProgress?.status ?? "not_started"} />
+              <Badge tone="neutral">Module {moduleDetail.position}</Badge>
+              <Badge tone={moduleDetail.readiness === "ready" ? "green" : "amber"}>
+                {moduleDetail.readiness === "ready" ? "Ready" : "Content pending"}
+              </Badge>
             </div>
-
-            <div className="mt-5 max-w-3xl">
+            <div className="mt-5 max-w-2xl">
               <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-ink">Module progress</span>
-                <span className="text-ink-muted">{moduleProgress.progress}% complete</span>
+                <span className="text-ink-muted">{progress}% complete</span>
               </div>
-              <ProgressBar value={moduleProgress.progress} width="100%" className="h-2.5" />
+              <ProgressBar value={progress} width="100%" className="h-2.5" />
+              <p className="mt-2 text-sm text-ink-muted">
+                {completedItems + " of " + totalItems + " learning items completed"}
+              </p>
             </div>
-
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              <Button type="button" disabled={!firstOpenItem} onClick={() => firstOpenItem && setActiveContent(firstOpenItem)}>
-                {moduleProgress.status === 'completed' ? 'Review content' : 'Continue content'}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" onClick={markComplete}>
-                <CheckCircle2 className="h-4 w-4" />
-                Mark module complete
-              </Button>
-            </div>
+            {nextEntry ? (
+              <div className="mt-5 rounded-xl border border-line bg-surface-subtle p-4">
+                <div className="text-sm font-medium text-ink">Up next</div>
+                <div className="mt-1 text-lg font-semibold text-ink">{nextEntry.item.title}</div>
+                <p className="mt-1 text-sm text-ink-muted">
+                  {contentMeta[nextEntry.item.type].label}
+                  {nextEntry.item.durationLabel ? " · " + nextEntry.item.durationLabel : ""}
+                </p>
+                <Button type="button" size="sm" className="mt-3" onClick={() => setActiveEntry(nextEntry)}>
+                  Open content
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <ModuleMetric icon={CheckCircle2} label="Completed" value={`${completedItems}/${items.length}`} />
-            <ModuleMetric icon={PlayCircle} label="Learning items" value={items.length} />
-            <ModuleMetric icon={Star} label="Ratings" value="After each item" />
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <ModuleMetric icon={Layers3} label="Learning items" value={moduleDetail.content.total} />
+            <ModuleMetric icon={CheckCircle2} label="Completed" value={completedItems} />
+            <ModuleMetric
+              icon={PlayCircle}
+              label="Remaining"
+              value={Math.max(totalItems - completedItems, 0)}
+            />
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardHeader
             title="Module content"
-            description="Open a video, file, or tool without leaving your learning flow."
+            description="Open each item to learn, save progress, and provide feedback."
           />
-          {items.length > 0 ? (
+          {content.rows.length > 0 ? (
             <div className="space-y-3">
-              {items.map((item, index) => (
+              {content.rows.map((item, index) => (
                 <ContentLessonRow
                   key={item.id}
                   item={item}
                   index={index}
-                  onOpen={() => setActiveContent(item)}
+                  onOpen={() => {
+                    const entry = playlist.find((candidate) => candidate.item.id === item.id);
+                    if (entry) setActiveEntry(entry);
+                  }}
                 />
               ))}
+              {content.hasNextPage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  isLoading={content.isFetchingNextPage}
+                  loadingLabel="Loading more..."
+                  onClick={() => void content.fetchNextPage()}
+                >
+                  Load more content
+                </Button>
+              ) : null}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-line-strong bg-surface-subtle px-4 py-12 text-center text-sm text-ink-muted">
-              Content has not been added to this module yet.
+              Ready learning content has not been added to this module yet.
             </div>
           )}
         </Card>
 
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Module navigation" description="Move through the programme in order." />
+            <CardHeader title="Module navigation" description="Move through the programme in sequence." />
             <div className="space-y-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start"
-                disabled={!previousModule}
-                onClick={() => previousModule && router.push(routes.entrepreneur.trainingModule(program.id, previousModule.id))}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Previous module
-              </Button>
-              <Button
-                type="button"
-                className="w-full justify-start"
-                disabled={!nextModule}
-                onClick={() => nextModule && router.push(routes.entrepreneur.trainingModule(program.id, nextModule.id))}
-              >
-                Next module
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              {moduleDetail.navigation.previous ? (
+                <Button asChild type="button" variant="outline" className="w-full justify-start">
+                  <Link href={routes.entrepreneur.trainingModule(programmeDetail.id, moduleDetail.navigation.previous.id)}>
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="truncate">{moduleDetail.navigation.previous.title}</span>
+                  </Link>
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                  <ArrowLeft className="h-4 w-4" />
+                  First module
+                </Button>
+              )}
+              {moduleDetail.navigation.next ? (
+                <Button asChild type="button" className="w-full justify-start">
+                  <Link href={routes.entrepreneur.trainingModule(programmeDetail.id, moduleDetail.navigation.next.id)}>
+                    <span className="truncate">{moduleDetail.navigation.next.title}</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button type="button" className="w-full justify-start" disabled>
+                  Last module
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </Card>
 
           <Card>
-            <CardHeader title="Programme" description={program.name} />
-            <p className="text-sm leading-6 text-ink-muted">{program.description}</p>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-4 w-full"
-              onClick={() => router.push(routes.entrepreneur.trainingProgram(program.id))}
-            >
-              View programme modules
+            <CardHeader title="Programme" description={programmeDetail.name} />
+            <p className="text-sm leading-6 text-ink-muted">{programmeDetail.description}</p>
+            <Button asChild variant="outline" className="mt-4 w-full">
+              <Link href={routes.entrepreneur.trainingProgram(programmeDetail.id)}>
+                View programme learning path
+              </Link>
             </Button>
           </Card>
         </div>
       </div>
 
       <LearningContentPlayer
-        item={activeContent}
-        playlist={items}
-        onChangeItem={setActiveContent}
-        onClose={() => setActiveContent(null)}
+        entry={activeEntry}
+        playlist={playlist}
+        onChangeEntry={setActiveEntry}
+        onClose={() => setActiveEntry(null)}
       />
     </>
   );
@@ -207,14 +300,13 @@ function ContentLessonRow({
   index,
   onOpen,
 }: {
-  item: ContentItem;
+  item: ContentItemRecord;
   index: number;
   onOpen: () => void;
 }) {
   const meta = contentMeta[item.type];
   const Icon = meta.icon;
-  const trainer = getContentTrainer(item.id);
-
+  const status = item.learnerProgress?.status ?? "not_started";
   return (
     <button
       type="button"
@@ -224,23 +316,74 @@ function ContentLessonRow({
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-subtle text-sm font-semibold text-ink-muted">
         {index + 1}
       </span>
-      <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', meta.iconClass)}>
+      <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl", meta.iconClass)}>
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-base font-semibold text-ink group-hover:text-bid">{item.title}</span>
           <Badge tone={meta.tone}>{meta.label}</Badge>
-          {progressBadge(item.progress)}
+          <ContentProgressBadge status={status} />
         </span>
         <span className="mt-1 block text-sm leading-6 text-ink-muted">
-          {item.chapter}
-          {item.durationLabel ? ` · ${item.durationLabel}` : ''}
-          {trainer ? ` · ${trainer.fullName}` : ''}
+          {[
+            item.durationLabel,
+            item.trainer ? "By " + item.trainer.name : null,
+            item.learnerProgress && item.learnerProgress.progressPercent > 0
+              ? item.learnerProgress.progressPercent + "% complete"
+              : null,
+          ].filter(Boolean).join(" · ") || "Ready to open"}
         </span>
       </span>
       <span className="hidden shrink-0 text-sm font-medium text-bid sm:block">Open</span>
     </button>
+  );
+}
+
+function ModuleBreadcrumb({
+  programmeName,
+  moduleName,
+  programmeId,
+}: {
+  programmeName: string;
+  moduleName: string;
+  programmeId: string;
+}) {
+  return (
+    <Breadcrumb
+      items={[
+        { label: "Training Library", href: routes.entrepreneur.training },
+        { label: programmeName, href: routes.entrepreneur.trainingProgram(programmeId) },
+        { label: moduleName },
+      ]}
+    />
+  );
+}
+
+function TrainingModuleSkeleton() {
+  return (
+    <>
+      <ModuleBreadcrumb programmeName="Programme" moduleName="Module" programmeId="loading" />
+      <PageHeader title="Module" description="Loading content and progress." />
+      <Card padding="lg" className="mb-4">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4">
+            <Skeleton className="h-5 w-56" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-20 w-full" />)}
+          </div>
+        </div>
+      </Card>
+      <Card>
+        <Skeleton className="h-6 w-44" />
+        <div className="mt-4 space-y-3">
+          {Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -264,18 +407,22 @@ function ModuleMetric({
   );
 }
 
-function moduleStatusBadge(status: 'not-started' | 'in-progress' | 'completed') {
-  if (status === 'completed') return <Badge tone="green">Completed</Badge>;
-  if (status === 'in-progress') return <Badge tone="amber">In progress</Badge>;
+function ModuleStatusBadge({
+  status,
+}: {
+  status: "not_started" | "in_progress" | "completed";
+}) {
+  if (status === "completed") return <Badge tone="green">Completed</Badge>;
+  if (status === "in_progress") return <Badge tone="amber">In progress</Badge>;
   return <Badge tone="neutral">Not started</Badge>;
 }
 
-function progressBadge(progress: ContentProgress) {
-  if (progress === 'completed') return <Badge tone="green">Done</Badge>;
-  if (progress === 'in-progress') return <Badge tone="amber">In progress</Badge>;
+function ContentProgressBadge({
+  status,
+}: {
+  status: "not_started" | "in_progress" | "completed";
+}) {
+  if (status === "completed") return <Badge tone="green">Done</Badge>;
+  if (status === "in_progress") return <Badge tone="amber">In progress</Badge>;
   return <Badge tone="neutral">Not started</Badge>;
-}
-
-function markComplete() {
-  toast.success('Module marked complete');
 }

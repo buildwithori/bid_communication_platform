@@ -12,6 +12,8 @@ export const programmeKeys = {
     [...programmeKeys.detail(programmeId), "modules"] as const,
   moduleList: (programmeId: string, query?: ProgrammeModuleQuery) =>
     [...programmeKeys.modules(programmeId), query ?? {}] as const,
+  moduleDetail: (programmeId: string, moduleId: string) =>
+    [...programmeKeys.modules(programmeId), "detail", moduleId] as const,
   reusableModuleLists: (programmeId: string) =>
     [...programmeKeys.detail(programmeId), "reusable-modules"] as const,
   reusableModules: (programmeId: string, query?: ProgrammeModuleQuery) =>

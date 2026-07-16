@@ -7,6 +7,7 @@ import type {
   MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
   ProgrammeDetail,
+  ProgrammeModuleDetail,
   ProgrammeModulePage,
   ProgrammeModuleQuery,
   ProgrammeModuleRecord,
@@ -86,6 +87,10 @@ export const restoreProgrammeRequest = (id: string) =>
 function toModuleQueryString(query?: ProgrammeModuleQuery) {
   const params = new URLSearchParams();
   if (query?.search) params.set("search", query.search);
+  if (query?.contentType) params.set("contentType", query.contentType);
+  if (query?.progressStatus) {
+    params.set("progressStatus", query.progressStatus);
+  }
   if (query?.take) params.set("take", String(query.take));
   if (query?.cursor) params.set("cursor", query.cursor);
   const value = params.toString();
@@ -98,6 +103,14 @@ export const listProgrammeModulesRequest = (
 ) =>
   apiRequest<ProgrammeModulePage>(
     `/programmes/${programmeId}/modules${toModuleQueryString(query)}`,
+  );
+
+export const getProgrammeModuleRequest = (
+  programmeId: string,
+  moduleId: string,
+) =>
+  apiRequest<ProgrammeModuleDetail>(
+    "/programmes/" + programmeId + "/modules/" + moduleId,
   );
 
 export const listReusableProgrammeModulesRequest = (

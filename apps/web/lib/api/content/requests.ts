@@ -14,6 +14,7 @@ import type {
 function queryString(query?: ContentItemQuery) {
   const params = new URLSearchParams();
   if (query?.search) params.set("search", query.search);
+  if (query?.programmeId) params.set("programmeId", query.programmeId);
   if (query?.type) params.set("type", query.type);
   if (query?.status) params.set("status", query.status);
   if (query?.trainerId) params.set("trainerId", query.trainerId);

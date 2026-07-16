@@ -113,6 +113,13 @@ export type ProgrammeModuleRecord = {
   updatedAt: string;
 };
 
+export type ProgrammeModuleDetail = ProgrammeModuleRecord & {
+  navigation: {
+    previous: { id: string; title: string } | null;
+    next: { id: string; title: string } | null;
+  };
+};
+
 export type ProgrammeModulePage = {
   items: ProgrammeModuleRecord[];
   nextCursor: string | null;
@@ -137,6 +144,8 @@ export type ReusableProgrammeModulePage = {
 
 export type ProgrammeModuleQuery = {
   search?: string;
+  contentType?: ProgrammeContentType;
+  progressStatus?: "not_started" | "in_progress" | "completed";
   take?: number;
   cursor?: string;
 };

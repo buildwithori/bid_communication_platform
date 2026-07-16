@@ -70,14 +70,24 @@ export class ContentService {
     moduleId: string,
     query: ContentItemQueryDto,
   ) {
-    await this.assertModuleReadAccess(user, moduleId);
+    await this.assertModuleReadAccess(user, moduleId, query.programmeId);
     return this.moduleContentPage(moduleId, query, user);
   }
 
-  private async assertModuleReadAccess(user: User, moduleId: string) {
+  private async assertModuleReadAccess(
+    user: User,
+    moduleId: string,
+    programmeId?: string,
+  ) {
     if (user.role === UserRole.admin) {
       await this.ensureModuleExists(moduleId);
       return;
+    }
+
+    if (user.role === UserRole.entrepreneur && !programmeId) {
+      throw new BadRequestException(
+        "Programme context is required for learner module content.",
+      );
     }
 
     const module = await this.prisma.learningModule.findFirst({
@@ -85,6 +95,7 @@ export class ContentService {
         id: moduleId,
         programmes: {
           some: {
+            ...(programmeId ? { programmeId } : {}),
             programme:
               user.role === UserRole.entrepreneur
                 ? {
@@ -492,9 +503,29 @@ export class ContentService {
     ]);
 
     const pageRows = rows.slice(0, take);
-    const usage = await this.contentUsage(
-      pageRows.map((row) => row.contentItemId),
-      moduleId,
+    const contentItemIds = pageRows.map((row) => row.contentItemId);
+    const [usage, learnerProgressRows] = await Promise.all([
+      this.contentUsage(contentItemIds, moduleId),
+      user.role === UserRole.entrepreneur && query.programmeId
+        ? this.prisma.learnerContentProgress.findMany({
+            where: {
+              entrepreneurUserId: user.id,
+              programmeId: query.programmeId,
+              moduleId,
+              contentItemId: { in: contentItemIds },
+            },
+            select: {
+              contentItemId: true,
+              status: true,
+              progressPercent: true,
+              lastPositionSeconds: true,
+              completedAt: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    const learnerProgress = new Map(
+      learnerProgressRows.map((row) => [row.contentItemId, row]),
     );
     const counts = { video: 0, pdf: 0, tool: 0 };
     for (const row of grouped) counts[row.type] = row._count.id;
@@ -508,7 +539,7 @@ export class ContentService {
             position: row.position,
           }),
           position: row.position,
-        }),
+        }, learnerProgress.get(row.contentItemId)),
       ),
       nextCursor:
         rows.length > take ? pageRows[pageRows.length - 1]?.id ?? null : null,
@@ -791,6 +822,12 @@ export class ContentService {
   private serializeContentItem(
     item: ContentItemWithInclude,
     usage?: ContentUsage,
+    learnerProgress?: {
+      status: "not_started" | "in_progress" | "completed";
+      progressPercent: number;
+      lastPositionSeconds: number | null;
+      completedAt: Date | null;
+    },
   ) {
     const file = item.fileAssets[0] ?? null;
     return {
@@ -835,6 +872,14 @@ export class ContentService {
         programmes: 0,
         position: null,
       },
+      learnerProgress: learnerProgress
+        ? {
+            status: learnerProgress.status,
+            progressPercent: learnerProgress.progressPercent,
+            lastPositionSeconds: learnerProgress.lastPositionSeconds,
+            completedAt: learnerProgress.completedAt?.toISOString() ?? null,
+          }
+        : null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
     };

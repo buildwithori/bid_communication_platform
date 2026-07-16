@@ -31,6 +31,10 @@ export class ContentItemQueryDto {
 
   @IsOptional()
   @IsString()
+  programmeId?: string;
+
+  @IsOptional()
+  @IsString()
   moduleId?: string;
 
   @IsOptional()

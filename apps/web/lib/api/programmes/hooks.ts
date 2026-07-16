@@ -13,6 +13,7 @@ import {
   createProgrammeDeliverableRuleRequest,
   createProgrammeModuleRequest,
   createProgrammeRequest,
+  getProgrammeModuleRequest,
   getProgrammeRequest,
   getProgrammeSummaryRequest,
   listProgrammeDeliverableRulesRequest,
@@ -130,6 +131,20 @@ export const useProgrammeDetailQuery = (id: string | null) =>
     queryKey: programmeKeys.detail(id ?? "none"),
     queryFn: () => getProgrammeRequest(id as string),
     enabled: Boolean(id),
+  });
+
+export const useProgrammeModuleDetailQuery = (
+  programmeId: string | null,
+  moduleId: string | null,
+) =>
+  useQuery({
+    queryKey: programmeKeys.moduleDetail(
+      programmeId ?? "none",
+      moduleId ?? "none",
+    ),
+    queryFn: () =>
+      getProgrammeModuleRequest(programmeId as string, moduleId as string),
+    enabled: Boolean(programmeId && moduleId),
   });
 
 export function useProgrammeModulesPage(

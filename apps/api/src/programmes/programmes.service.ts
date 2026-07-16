@@ -348,28 +348,85 @@ export class ProgrammesService {
     }
 
     const take = query.take ?? DEFAULT_TAKE;
-    const where: Prisma.ProgrammeModuleWhereInput = {
-      programmeId,
-      ...(query.search?.trim()
-        ? {
-            module: {
+    if (query.progressStatus && user.role !== UserRole.entrepreneur) {
+      throw new BadRequestException(
+        "Module progress filtering is only available to entrepreneurs.",
+      );
+    }
+    const moduleFilters: Prisma.LearningModuleWhereInput[] = [];
+    if (query.search?.trim()) {
+      const search = query.search.trim();
+      moduleFilters.push({
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          {
+            contentItems: {
+              some: {
+                contentItem: {
+                  title: { contains: search, mode: "insensitive" },
+                  ...(user.role === UserRole.entrepreneur
+                    ? { status: ContentItemStatus.ready }
+                    : {}),
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+    if (query.contentType) {
+      moduleFilters.push({
+        contentItems: {
+          some: {
+            contentItem: {
+              type: query.contentType,
+              ...(user.role === UserRole.entrepreneur
+                ? { status: ContentItemStatus.ready }
+                : {}),
+            },
+          },
+        },
+      });
+    }
+    if (query.progressStatus && user.role === UserRole.entrepreneur) {
+      moduleFilters.push(
+        query.progressStatus === "not_started"
+          ? {
               OR: [
                 {
-                  title: {
-                    contains: query.search.trim(),
-                    mode: 'insensitive' as const,
+                  progress: {
+                    none: {
+                      entrepreneurUserId: user.id,
+                      programmeId,
+                    },
                   },
                 },
                 {
-                  description: {
-                    contains: query.search.trim(),
-                    mode: 'insensitive' as const,
+                  progress: {
+                    some: {
+                      entrepreneurUserId: user.id,
+                      programmeId,
+                      status: "not_started",
+                    },
                   },
                 },
               ],
+            }
+          : {
+              progress: {
+                some: {
+                  entrepreneurUserId: user.id,
+                  programmeId,
+                  status: query.progressStatus,
+                },
+              },
             },
-          }
-        : {}),
+      );
+    }
+    const where: Prisma.ProgrammeModuleWhereInput = {
+      programmeId,
+      ...(moduleFilters.length ? { module: { AND: moduleFilters } } : {}),
     };
     const [rows, totalItems] = await Promise.all([
       this.prisma.programmeModule.findMany({
@@ -400,6 +457,49 @@ export class ProgrammesService {
       ),
       nextCursor: rows.length > take ? pageRows.at(-1)?.id ?? null : null,
       totalItems,
+    };
+  }
+
+  async getProgrammeModule(
+    user: User,
+    programmeId: string,
+    moduleId: string,
+  ) {
+    if (!(await this.canReadProgramme(user, programmeId))) {
+      throw new ForbiddenException("You do not have access to this programme.");
+    }
+    const row = await this.prisma.programmeModule.findUnique({
+      where: { programmeId_moduleId: { programmeId, moduleId } },
+      include: {
+        module: {
+          include: {
+            _count: { select: { contentItems: true, programmes: true } },
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException("Programme module was not found.");
+
+    const [metrics, previous, next] = await Promise.all([
+      this.moduleContentMetrics([moduleId], user, programmeId),
+      this.prisma.programmeModule.findFirst({
+        where: { programmeId, position: { lt: row.position } },
+        orderBy: [{ position: "desc" }, { id: "desc" }],
+        select: { module: { select: { id: true, title: true } } },
+      }),
+      this.prisma.programmeModule.findFirst({
+        where: { programmeId, position: { gt: row.position } },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: { module: { select: { id: true, title: true } } },
+      }),
+    ]);
+
+    return {
+      ...this.mapProgrammeModule(row, metrics.get(moduleId)),
+      navigation: {
+        previous: previous?.module ?? null,
+        next: next?.module ?? null,
+      },
     };
   }
 

@@ -68,6 +68,12 @@ export type ContentItemRecord = {
     programmes: number;
     position: number | null;
   };
+  learnerProgress: {
+    status: "not_started" | "in_progress" | "completed";
+    progressPercent: number;
+    lastPositionSeconds: number | null;
+    completedAt: string | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -86,6 +92,7 @@ export type ContentItemPage = {
 
 export type ContentItemQuery = {
   search?: string;
+  programmeId?: string;
   type?: ContentItemType;
   status?: ContentItemStatus;
   trainerId?: string;

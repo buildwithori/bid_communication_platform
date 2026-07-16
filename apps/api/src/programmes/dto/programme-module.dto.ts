@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -15,6 +16,14 @@ export class ProgrammeModuleQueryDto {
   @IsString()
   @MaxLength(120)
   search?: string;
+
+  @IsOptional()
+  @IsIn(["video", "pdf", "tool"])
+  contentType?: "video" | "pdf" | "tool";
+
+  @IsOptional()
+  @IsIn(["not_started", "in_progress", "completed"])
+  progressStatus?: "not_started" | "in_progress" | "completed";
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
