@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Modal } from '@/components/shared/Modal';
@@ -15,6 +15,10 @@ interface MessageModalProps {
   recipientDetail?: string;
   defaultSubject?: string;
   defaultMessage?: string;
+  showPriority?: boolean;
+  onSubmit?: (
+    values: Pick<MessageForm, 'subject' | 'channel' | 'message'>,
+  ) => Promise<void> | void;
 }
 
 export function MessageModal({
@@ -24,6 +28,8 @@ export function MessageModal({
   recipientDetail,
   defaultSubject = '',
   defaultMessage = '',
+  showPriority = true,
+  onSubmit: deliverMessage,
 }: MessageModalProps) {
   const form = useForm<MessageForm>({
     resolver: zodResolver(messageSchema),
@@ -34,12 +40,18 @@ export function MessageModal({
       message: defaultMessage,
     },
   });
+  const channel = useWatch({ control: form.control, name: 'channel' });
+  const priority = useWatch({ control: form.control, name: 'priority' });
 
-  const onSubmit = (values: MessageForm) => {
-    const channelLabel = values.channel === 'in-app' ? 'In-app message' : 'Email';
-    toast.success('Message prepared', {
-      description: `${channelLabel} for ${recipientName}`,
-    });
+  const onSubmit = async (values: MessageForm) => {
+    if (deliverMessage) {
+      await deliverMessage(values);
+    } else {
+      const channelLabel = values.channel === 'in-app' ? 'In-app message' : 'Email';
+      toast.success('Message prepared', {
+        description: `${channelLabel} for ${recipientName}`,
+      });
+    }
     onOpenChange(false);
     form.reset(values);
   };
@@ -59,7 +71,7 @@ export function MessageModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Channel" error={form.formState.errors.channel?.message}>
             <FormSelect
-              value={form.watch('channel')}
+              value={channel}
               onValueChange={(value) => form.setValue('channel', value as MessageForm['channel'], { shouldValidate: true })}
               options={[
                 { value: 'email', label: 'Email' },
@@ -67,17 +79,19 @@ export function MessageModal({
               ]}
             />
           </FormField>
-          <FormField label="Priority" error={form.formState.errors.priority?.message}>
-            <FormSelect
-              value={form.watch('priority')}
-              onValueChange={(value) => form.setValue('priority', value as MessageForm['priority'], { shouldValidate: true })}
-              options={[
-                { value: 'standard', label: 'Standard follow-up' },
-                { value: 'needs-response', label: 'Needs response' },
-                { value: 'urgent', label: 'Urgent issue' },
-              ]}
-            />
-          </FormField>
+          {showPriority && (
+            <FormField label="Priority" error={form.formState.errors.priority?.message}>
+              <FormSelect
+                value={priority}
+                onValueChange={(value) => form.setValue('priority', value as MessageForm['priority'], { shouldValidate: true })}
+                options={[
+                  { value: 'standard', label: 'Standard follow-up' },
+                  { value: 'needs-response', label: 'Needs response' },
+                  { value: 'urgent', label: 'Urgent issue' },
+                ]}
+              />
+            </FormField>
+          )}
         </div>
 
         <FormField label="Message" error={form.formState.errors.message?.message}>
@@ -92,7 +106,13 @@ export function MessageModal({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit">Send message</Button>
+          <Button
+            type="submit"
+            isLoading={form.formState.isSubmitting}
+            loadingLabel="Sending..."
+          >
+            Send message
+          </Button>
         </div>
       </form>
     </Modal>

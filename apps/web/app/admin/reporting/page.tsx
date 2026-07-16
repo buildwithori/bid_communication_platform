@@ -1,17 +1,13 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
-import { PageHeader, Notice } from '@/components/shared/PageHeader';
-import { StatCard } from '@/components/shared/StatCard';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { BarChartRow } from '@/components/shared/BarChartRow';
-import { Button } from '@/components/shared/Button';
-import { Badge } from '@/components/shared/Badge';
-import { ProgrammeAccessList } from '@/components/shared/ProgrammeAccessList';
-import { MessageModal } from '@/components/shared/MessageModal';
-import { FormAutocomplete } from '@/components/shared/FormField';
+import * as React from "react";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
+import { ReportingPageSkeleton } from "@/components/reporting/ReportingPageSkeleton";
+import { Badge } from "@/components/shared/Badge";
+import { BarChartRow } from "@/components/shared/BarChartRow";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -20,293 +16,273 @@ import {
   TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
+} from "@/components/shared/DataTable";
 import {
-  reportingMetrics,
-  reportingByProgramme,
-} from '@/lib/mock-data';
-import { programs } from '@/lib/mock-data/programs';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
+  FormAutocomplete,
+  FormInput,
+  FormSelect,
+} from "@/components/shared/FormField";
+import { MessageModal } from "@/components/shared/MessageModal";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { ProgrammeAccessList } from "@/components/shared/ProgrammeAccessList";
+import { StatCard } from "@/components/shared/StatCard";
+import { useLazyProgrammesLookup } from "@/lib/api/programmes";
 import {
-  getOverduePeriodicUpdates,
-  type OverdueUpdateRow,
-} from '@/lib/reporting/overdue-updates';
-import { useCompanyConfigStore } from '@/lib/stores/company-config-store';
-import { entrepreneurHasProgramme } from '@/lib/programme-access';
-import type { FundingRound, PeriodicUpdate, ProgramBreakdownRow } from '@/types';
-import { toast } from 'sonner';
+  useCreateReportExportMutation,
+  useOverdueUpdatesPage,
+  useReportExportDownloadMutation,
+  useReportExportQuery,
+  useReportingOverviewQuery,
+  useSendReportingReminderMutation,
+  type OverdueUpdate,
+  type ReportExportFormat,
+  type ReportPriority,
+  type ReportingBreakdown,
+} from "@/lib/api/reporting";
 
-const ALL = 'all';
+const ALL = "all";
+const NO_PROGRAMME = "none";
 
-function formatMoneyShort(value: number) {
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}m`;
-  return `$${Math.round(value / 1000)}k`;
+function initialDate(month: number, day: number) {
+  const year = new Date().getFullYear();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function toPercent(value: number, max: number) {
-  if (max <= 0) return 0;
-  return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
+function formatMoneyShort(cents: number, currency: string) {
+  const amount = cents / 100;
+  return new Intl.NumberFormat("en", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
 }
 
-function buildJobsBreakdown(selectedProgramme: string): ProgramBreakdownRow[] {
-  const formalPrograms =
-    selectedProgramme === ALL
-      ? programs
-      : programs.filter((program) => program.id === selectedProgramme);
-  const rows: ProgramBreakdownRow[] = formalPrograms.map((program) => {
-    const value = entrepreneurs.reduce(
-      (sum, entrepreneur) =>
-        sum +
-        (entrepreneur.periodicUpdates ?? [])
-          .filter((update) => update.programmeId === program.id)
-          .reduce((updateSum, update) => updateSum + update.jobsCreated, 0),
-      0,
-    );
-    return {
-      programName: program.name,
-      value,
-      label: String(value),
-      accent: program.accent,
-      percent: 0,
-    };
-  });
-
-  if (selectedProgramme === ALL) {
-    const unattributed = entrepreneurs.reduce(
-      (sum, entrepreneur) =>
-        sum +
-        (entrepreneur.periodicUpdates ?? [])
-          .filter((update) => !update.programmeId)
-          .reduce((updateSum, update) => updateSum + update.jobsCreated, 0),
-      0,
-    );
-    rows.push({
-      programName: 'Company-wide / unattributed',
-      value: unattributed,
-      label: String(unattributed),
-      accent: 'neutral',
-      percent: 0,
-    });
-  }
-
-  const max = Math.max(...rows.map((row) => row.value), 0);
-  return rows.map((row) => ({ ...row, percent: toPercent(row.value, max) }));
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(value));
 }
 
-function buildFundsBreakdown(selectedProgramme: string): ProgramBreakdownRow[] {
-  const formalPrograms =
-    selectedProgramme === ALL
-      ? programs
-      : programs.filter((program) => program.id === selectedProgramme);
-  const rows: ProgramBreakdownRow[] = formalPrograms.map((program) => {
-    const value = entrepreneurs.reduce(
-      (sum, entrepreneur) =>
-        sum +
-        entrepreneur.fundingRounds
-          .filter((round) => round.programmeId === program.id)
-          .reduce((roundSum, round) => roundSum + round.amountUsd, 0),
-      0,
-    );
-    return {
-      programName: program.name,
-      value,
-      label: formatMoneyShort(value),
-      accent: program.accent,
-      percent: 0,
-    };
-  });
-
-  if (selectedProgramme === ALL) {
-    const unattributed = entrepreneurs.reduce(
-      (sum, entrepreneur) =>
-        sum +
-        entrepreneur.fundingRounds
-          .filter((round) => !round.programmeId)
-          .reduce((roundSum, round) => roundSum + round.amountUsd, 0),
-      0,
-    );
-    rows.push({
-      programName: 'Company-wide / unattributed',
-      value: unattributed,
-      label: formatMoneyShort(unattributed),
-      accent: 'neutral',
-      percent: 0,
-    });
-  }
-
-  const max = Math.max(...rows.map((row) => row.value), 0);
-  return rows.map((row) => ({ ...row, percent: toPercent(row.value, max) }));
-}
-
-function updateMatchesProgramme(update: PeriodicUpdate, selectedProgramme: string) {
-  return selectedProgramme === ALL || update.programmeId === selectedProgramme;
-}
-
-function roundMatchesProgramme(round: FundingRound, selectedProgramme: string) {
-  return selectedProgramme === ALL || round.programmeId === selectedProgramme;
-}
-
-function getFollowUpPriority(daysOverdue: number) {
-  if (daysOverdue > 90) return { label: 'Critical', tone: 'red' as const };
-  if (daysOverdue > 30) return { label: 'Late', tone: 'amber' as const };
-  return { label: 'Newly overdue', tone: 'blue' as const };
+function priorityMeta(priority: ReportPriority) {
+  if (priority === "critical")
+    return { label: "Critical", tone: "red" as const };
+  if (priority === "late")
+    return { label: "31–90 days late", tone: "amber" as const };
+  return { label: "Newly overdue", tone: "blue" as const };
 }
 
 export default function AdminReportingPage() {
-  const { companyConfig } = useCompanyConfigStore();
-  const [selectedProgramme, setSelectedProgramme] = useState<string>(ALL);
-  const [overdueQuery, setOverdueQuery] = useState('');
-  const [overdueProgrammeFilter, setOverdueProgrammeFilter] = useState(ALL);
-  const [overduePriorityFilter, setOverduePriorityFilter] = useState(ALL);
-  const [overduePage, setOverduePage] = useState(1);
-  const [overduePageSize, setOverduePageSize] = useState(10);
-  const [messageTarget, setMessageTarget] = useState<OverdueUpdateRow | null>(null);
-
-  const programmeData =
-    selectedProgramme !== ALL ? reportingByProgramme[selectedProgramme] : null;
-
-  const baseMetrics = programmeData?.metrics ?? reportingMetrics;
-  const jobs = useMemo(() => buildJobsBreakdown(selectedProgramme), [selectedProgramme]);
-  const funds = useMemo(() => buildFundsBreakdown(selectedProgramme), [selectedProgramme]);
-  const impactMetrics = useMemo(() => {
-    const matchingUpdates = entrepreneurs.flatMap((entrepreneur) =>
-      (entrepreneur.periodicUpdates ?? []).filter((update) =>
-        updateMatchesProgramme(update, selectedProgramme),
-      ),
-    );
-    const matchingFunders = entrepreneurs.filter((entrepreneur) =>
-      entrepreneur.fundingRounds.some((round) => roundMatchesProgramme(round, selectedProgramme)),
-    );
-    const matchingRounds = entrepreneurs.flatMap((entrepreneur) =>
-      entrepreneur.fundingRounds.filter((round) => roundMatchesProgramme(round, selectedProgramme)),
-    );
-
-    return {
-      ...baseMetrics,
-      jobsCreated: matchingUpdates.reduce((sum, update) => sum + update.jobsCreated, 0),
-      jobsWomen: matchingUpdates.reduce((sum, update) => sum + update.jobsWomen, 0),
-      jobsMen: matchingUpdates.reduce((sum, update) => sum + update.jobsMen, 0),
-      fundsMobilisedUsd: matchingRounds.reduce((sum, round) => sum + round.amountUsd, 0),
-      entrepreneursWithFunds: matchingFunders.length,
-    };
-  }, [baseMetrics, selectedProgramme]);
-
-  const overdueUpdates = useMemo(
-    () =>
-      getOverduePeriodicUpdates({
-        entrepreneurs,
-        programs,
-        overdueAfterDays: companyConfig.reporting.periodicUpdateOverdueAfterDays,
-      }),
-    [companyConfig.reporting.periodicUpdateOverdueAfterDays],
+  const [selectedProgramme, setSelectedProgramme] = React.useState(ALL);
+  const [dateFrom, setDateFrom] = React.useState(() => initialDate(1, 1));
+  const [dateTo, setDateTo] = React.useState(() => initialDate(12, 31));
+  const [appliedDateFrom, setAppliedDateFrom] = React.useState(() =>
+    initialDate(1, 1),
   );
-
-  const programmeOverdue =
-    selectedProgramme === ALL
-      ? overdueUpdates
-      : overdueUpdates.filter((u) => entrepreneurHasProgramme(u.entrepreneur, selectedProgramme));
-  const filteredOverdue = useMemo(() => {
-    const needle = overdueQuery.trim().toLowerCase();
-    return programmeOverdue.filter((u) => {
-      const matchesSearch =
-        !needle ||
-        [
-          u.entrepreneur.businessName,
-          u.entrepreneur.representative,
-          u.programmes.map((programme) => programme.name).join(' '),
-          u.lastReportLabel,
-          u.lastReportDateLabel,
-          `${u.daysWithoutReport}`,
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-      const matchesProgramme =
-        overdueProgrammeFilter === ALL ||
-        (overdueProgrammeFilter === 'no-formal-programme' && u.programmes.length === 0) ||
-        u.programmes.some((programme) => programme.id === overdueProgrammeFilter);
-      const matchesPriority =
-        overduePriorityFilter === ALL ||
-        (overduePriorityFilter === 'newly-overdue' && u.daysOverdue <= 30) ||
-        (overduePriorityFilter === 'late' && u.daysOverdue > 30 && u.daysOverdue <= 90) ||
-        (overduePriorityFilter === 'critical' && u.daysOverdue > 90);
-
-      return matchesSearch && matchesProgramme && matchesPriority;
-    });
-  }, [overduePriorityFilter, overdueProgrammeFilter, overdueQuery, programmeOverdue]);
-  const overduePageRows = filteredOverdue.slice(
-    (overduePage - 1) * overduePageSize,
-    overduePage * overduePageSize,
+  const [appliedDateTo, setAppliedDateTo] = React.useState(() =>
+    initialDate(12, 31),
   );
+  const [programmeOpen, setProgrammeOpen] = React.useState(false);
+  const [programmeSearch, setProgrammeSearch] = React.useState("");
+  const [overdueProgrammeOpen, setOverdueProgrammeOpen] = React.useState(false);
+  const [overdueProgrammeSearch, setOverdueProgrammeSearch] =
+    React.useState("");
+  const [overdueQuery, setOverdueQuery] = React.useState("");
+  const deferredOverdueQuery = React.useDeferredValue(overdueQuery.trim());
+  const [overdueProgramme, setOverdueProgramme] = React.useState(ALL);
+  const [overduePriority, setOverduePriority] = React.useState(ALL);
+  const [pageSize, setPageSize] = React.useState(10);
+  const [messageTarget, setMessageTarget] =
+    React.useState<OverdueUpdate | null>(null);
+  const [exportFormat, setExportFormat] =
+    React.useState<ReportExportFormat>("xlsx");
+  const [exportId, setExportId] = React.useState<string | null>(null);
+  const invalidDates = !dateFrom || !dateTo || dateFrom > dateTo;
 
-  const programmeOptions = useMemo(
+  const reportQuery = {
+    programmeId: selectedProgramme === ALL ? undefined : selectedProgramme,
+    dateFrom: appliedDateFrom,
+    dateTo: appliedDateTo,
+  };
+  const report = useReportingOverviewQuery(reportQuery);
+  const programmes = useLazyProgrammesLookup({
+    enabled: programmeOpen,
+    search: programmeSearch || undefined,
+    take: 20,
+  });
+  const overdueProgrammes = useLazyProgrammesLookup({
+    enabled: overdueProgrammeOpen,
+    search: overdueProgrammeSearch || undefined,
+    take: 20,
+  });
+  const effectiveOverdueProgramme =
+    selectedProgramme !== ALL ? selectedProgramme : overdueProgramme;
+  const overdue = useOverdueUpdatesPage({
+    search: deferredOverdueQuery || undefined,
+    programmeId:
+      effectiveOverdueProgramme === ALL ? undefined : effectiveOverdueProgramme,
+    priority:
+      overduePriority === ALL ? undefined : (overduePriority as ReportPriority),
+    take: pageSize,
+  });
+  const resetOverduePagination = overdue.resetPagination;
+  React.useEffect(() => {
+    resetOverduePagination();
+  }, [
+    deferredOverdueQuery,
+    effectiveOverdueProgramme,
+    overduePriority,
+    pageSize,
+    resetOverduePagination,
+  ]);
+
+  const createExport = useCreateReportExportMutation({
+    onSuccess: (created) => {
+      setExportId(created.id);
+      toast.success(
+        "Report export queued. You can keep working while it is generated.",
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const exportResult = useReportExportQuery(exportId);
+  const downloadExport = useReportExportDownloadMutation({
+    onSuccess: ({ download }) => window.location.assign(download.url),
+    onError: (error) => toast.error(error.message),
+  });
+  const sendReminder = useSendReportingReminderMutation({
+    onSuccess: () => {
+      toast.success("Periodic update reminder sent.");
+      setMessageTarget(null);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const programmeOptions = React.useMemo(() => {
+    const options = [
+      { value: ALL, label: "All programmes" },
+      ...programmes.rows.map((programme) => ({
+        value: programme.id,
+        label: programme.name,
+      })),
+    ];
+    const scope = report.data?.scope;
+    if (
+      scope?.programmeId &&
+      !options.some((option) => option.value === scope.programmeId)
+    ) {
+      options.push({ value: scope.programmeId, label: scope.programmeName });
+    }
+    return options;
+  }, [programmes.rows, report.data?.scope]);
+  const overdueProgrammeOptions = React.useMemo(
     () => [
-      { value: ALL, label: 'All programmes' },
-      ...programs.map((program) => ({ value: program.id, label: program.name })),
+      { value: ALL, label: "All programme access" },
+      { value: NO_PROGRAMME, label: "No programme" },
+      ...overdueProgrammes.rows.map((programme) => ({
+        value: programme.id,
+        label: programme.name,
+      })),
     ],
-    [],
+    [overdueProgrammes.rows],
   );
 
-  const columns: Column<OverdueUpdateRow>[] = [
+  const columns: Column<OverdueUpdate>[] = [
     {
-      key: 'action',
-      header: 'Action',
+      key: "action",
+      header: "Action",
+      className: "w-[84px]",
       cell: (row) => (
         <RowActions
           actions={[
-            { label: 'Send reminder', onSelect: () => setMessageTarget(row) },
+            { label: "Send reminder", onSelect: () => setMessageTarget(row) },
           ]}
         />
       ),
-      className: 'w-[84px]',
     },
     {
-      key: 'ent',
-      header: 'Entrepreneur',
-      cell: (u) => (
+      key: "entrepreneur",
+      header: "Entrepreneur",
+      cell: (row) => (
         <div>
-          <div className="font-medium text-ink">{u.entrepreneur.businessName}</div>
-          <div className="text-sm text-ink-muted">{u.entrepreneur.representative}</div>
+          <div className="font-medium text-ink">{row.businessName}</div>
+          <div className="text-sm text-ink-muted">{row.representativeName}</div>
         </div>
       ),
     },
     {
-      key: 'prog',
-      header: 'Programme access',
-      cell: (u) => (
+      key: "programmes",
+      header: "Programme access",
+      cell: (row) => (
         <ProgrammeAccessList
-          programmes={u.programmes}
+          programmes={row.programmes}
           maxVisible={2}
-          modalTitle={`${u.entrepreneur.businessName} programme access`}
+          modalTitle={`${row.businessName} programme access`}
           className="min-w-[220px] max-w-[320px]"
         />
       ),
     },
     {
-      key: 'lastPeriod',
-      header: 'Last report',
-      cell: (u) => (
+      key: "lastReport",
+      header: "Last report",
+      cell: (row) => (
         <div>
-          <div className="font-medium text-ink">{u.lastReportLabel}</div>
-          <div className="text-sm text-ink-muted">{u.lastReportDateLabel}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'followUp',
-      header: 'Follow-up status',
-      cell: (u) => (
-        <div className="min-w-[170px]">
-          <Badge tone={getFollowUpPriority(u.daysOverdue).tone}>
-            {getFollowUpPriority(u.daysOverdue).label}
-          </Badge>
-          <div className="mt-2 text-sm text-ink-muted">
-            {u.daysOverdue} days past follow-up window
+          <div className="font-medium text-ink">
+            {row.lastReport
+              ? `${formatDate(row.lastReport.periodStart)} – ${formatDate(row.lastReport.periodEnd)}`
+              : "No report submitted"}
+          </div>
+          <div className="text-sm text-ink-muted">
+            {row.lastReport
+              ? `Submitted ${formatDate(row.lastReport.submittedAt)}`
+              : `Joined ${formatDate(row.joinedAt)}`}
           </div>
         </div>
       ),
     },
+    {
+      key: "priority",
+      header: "Follow-up status",
+      cell: (row) => {
+        const meta = priorityMeta(row.priority);
+        return (
+          <div className="min-w-[170px]">
+            <Badge tone={meta.tone}>{meta.label}</Badge>
+            <div className="mt-2 text-sm text-ink-muted">
+              {row.daysOverdue} days past follow-up window
+            </div>
+          </div>
+        );
+      },
+    },
   ];
+
+  if (report.isLoading || (overdue.isLoading && !overdue.data)) {
+    return <ReportingPageSkeleton />;
+  }
+  if (report.isError || !report.data) {
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title="Reporting & analytics"
+          description="Programme performance, jobs created and funds mobilised"
+        />
+        <Notice className="border border-danger/20 bg-danger/5 text-danger">
+          Reporting could not be loaded. {report.error?.message}
+        </Notice>
+        <Button onClick={() => report.refetch()} isLoading={report.isFetching}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  const data = report.data;
+  const currentExport = exportResult.data;
 
   return (
     <>
@@ -314,175 +290,314 @@ export default function AdminReportingPage() {
         title="Reporting & analytics"
         description="Programme performance, jobs created and funds mobilised"
         actions={
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="w-full sm:w-[260px]">
-              <FormAutocomplete
-                value={selectedProgramme}
-                onValueChange={(value) => {
-                  setSelectedProgramme(value);
-                  setOverdueProgrammeFilter(ALL);
-                  setOverduePriorityFilter(ALL);
-                  setOverduePage(1);
-                }}
-                options={programmeOptions}
-                placeholder="All programmes"
-                searchPlaceholder="Search programmes..."
-                emptyMessage="No programme found."
-                className="bg-white"
-                popoverClassName="sm:w-[320px]"
-                listClassName="max-h-[260px]"
-              />
-            </div>
-
+          <div className="grid w-full gap-2 sm:grid-cols-[190px_150px_auto] lg:w-auto">
+            <FormSelect
+              value={exportFormat}
+              onValueChange={(value) =>
+                setExportFormat(value as ReportExportFormat)
+              }
+              options={[
+                { value: "xlsx", label: "Excel workbook" },
+                { value: "csv", label: "CSV file" },
+              ]}
+            />
             <Button
-              onClick={() => toast.success('Exporting report…')}
+              onClick={() =>
+                createExport.mutate({ ...reportQuery, format: exportFormat })
+              }
+              isLoading={createExport.isPending}
+              loadingLabel="Queueing…"
+              disabled={invalidDates}
               className="flex items-center gap-1.5"
             >
               <Download className="h-3.5 w-3.5" />
-              Export PDF report
+              Export report
             </Button>
           </div>
         }
       />
 
+      <Card className="mb-4">
+        <CardHeader
+          title="Report scope"
+          description="Choose the programme and reporting period applied to every metric and export."
+        />
+        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_180px_180px]">
+          <FormAutocomplete
+            value={selectedProgramme}
+            onValueChange={(value) => {
+              setSelectedProgramme(value);
+              setOverdueProgramme(ALL);
+              overdue.resetPagination();
+            }}
+            options={programmeOptions}
+            placeholder="All programmes"
+            searchPlaceholder="Search programmes..."
+            onOpenChange={setProgrammeOpen}
+            onSearchChange={setProgrammeSearch}
+            isLoading={programmes.isLoading || programmes.isFetchingNextPage}
+            hasMore={Boolean(programmes.hasNextPage)}
+            onLoadMore={() => programmes.fetchNextPage()}
+          />
+          <FormInput
+            type="date"
+            aria-label="Report start date"
+            value={dateFrom}
+            onChange={(event) => {
+              const next = event.target.value;
+              setDateFrom(next);
+              if (next && dateTo && next <= dateTo) {
+                setAppliedDateFrom(next);
+                setAppliedDateTo(dateTo);
+              }
+            }}
+          />
+          <FormInput
+            type="date"
+            aria-label="Report end date"
+            value={dateTo}
+            onChange={(event) => {
+              const next = event.target.value;
+              setDateTo(next);
+              if (dateFrom && next && dateFrom <= next) {
+                setAppliedDateFrom(dateFrom);
+                setAppliedDateTo(next);
+              }
+            }}
+          />
+        </div>
+        {invalidDates ? (
+          <p className="mt-2 text-sm text-danger">
+            Select a valid start and end date. Metrics remain on the last valid
+            range until this is corrected.
+          </p>
+        ) : null}
+      </Card>
+
       <Notice>
-        <strong>How this data is collected:</strong> jobs come from periodic impact
-        updates, while funds mobilised come from fundraising history. Each record can
-        be attributed to a programme; records without attribution stay
-        company-wide and are not forced into a programme chart.
+        <strong>How this data is collected:</strong> {data.sources.jobs}{" "}
+        {data.sources.funds} Records without programme attribution remain
+        company-wide and are never forced into a programme result.
       </Notice>
+
+      {currentExport ? (
+        <Notice
+          className={
+            currentExport.status === "failed"
+              ? "border border-danger/20 bg-danger/5 text-danger"
+              : "border border-info/20 bg-info/5 text-info-dark"
+          }
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              {currentExport.status === "ready"
+                ? `Your ${currentExport.format.toUpperCase()} export is ready.`
+                : currentExport.status === "failed"
+                  ? (currentExport.failureReason ?? "The report export failed.")
+                  : "Your report is being generated in the background."}
+            </span>
+            {currentExport.status === "ready" ? (
+              <Button
+                size="sm"
+                variant="info"
+                isLoading={downloadExport.isPending}
+                onClick={() => downloadExport.mutate(currentExport.id)}
+              >
+                Download export
+              </Button>
+            ) : null}
+          </div>
+        </Notice>
+      ) : null}
 
       <MetricGrid>
         <StatCard
           label="Jobs created (period)"
-          value={impactMetrics.jobsCreated}
-          subline={`${impactMetrics.jobsWomen} women · ${impactMetrics.jobsMen} men`}
+          value={data.metrics.jobsCreated}
+          subline={`${data.metrics.jobsWomen} women · ${data.metrics.jobsMen} men`}
           dotColor="bid"
         />
         <StatCard
           label="Funds mobilised (period)"
-          value={formatMoneyShort(impactMetrics.fundsMobilisedUsd)}
-          subline={`Across ${impactMetrics.entrepreneursWithFunds} entrepreneurs`}
+          value={formatMoneyShort(
+            data.metrics.fundsMobilisedCents,
+            data.settings.currency,
+          )}
+          subline={`${data.metrics.entrepreneursWithFunds} entrepreneurs · ${data.settings.currency}`}
           dotColor="info"
         />
         <StatCard
           label="Update submission rate"
-          value={`${impactMetrics.updateSubmissionRate}%`}
-          subline={`${impactMetrics.submittedUpdatesThisQuarter} of ${impactMetrics.totalEntrepreneurs} this quarter`}
+          value={`${data.metrics.updateSubmissionRate}%`}
+          subline={`${data.metrics.submittedEntrepreneurs} of ${data.metrics.totalEntrepreneurs} entrepreneurs`}
           dotColor="warning"
         />
         <StatCard
           label="Training completion rate"
-          value={`${impactMetrics.trainingCompletionRate}%`}
+          value={`${data.metrics.trainingCompletionRate}%`}
+          subline={`${data.metrics.overdueEntrepreneurs} need reporting follow-up`}
         />
       </MetricGrid>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Jobs created by programme" description="Only periodic updates attributed to a programme are counted under that programme" />
-          {jobs.map((r) => (
-            <BarChartRow
-              key={r.programName}
-              label={r.programName}
-              value={r.label}
-              percent={r.percent}
-              accent={r.accent}
-            />
-          ))}
+          <CardHeader
+            title="Jobs created by programme"
+            description={data.sources.jobs}
+          />
+          {data.jobsByProgramme.length ? (
+            data.jobsByProgramme.map((row: ReportingBreakdown) => (
+              <BarChartRow
+                key={row.programmeId ?? "unattributed"}
+                label={row.programmeName}
+                value={String(row.value)}
+                percent={row.percent}
+                accent={row.programmeId ? "info" : "neutral"}
+              />
+            ))
+          ) : (
+            <div className="rounded-lg border border-dashed border-line px-3 py-8 text-center text-sm text-ink-muted">
+              No job impact updates fall in this reporting period.
+            </div>
+          )}
         </Card>
         <Card>
-          <CardHeader title="Funds mobilised by programme" description="Only funding rounds attributed to a programme are counted under that programme" />
-          {funds.map((r) => (
-            <BarChartRow
-              key={r.programName}
-              label={r.programName}
-              value={r.label}
-              percent={r.percent}
-              accent={r.accent}
-            />
-          ))}
+          <CardHeader
+            title="Funds mobilised by programme"
+            description={data.sources.funds}
+          />
+          {data.fundsByProgramme.length ? (
+            data.fundsByProgramme.map((row: ReportingBreakdown) => (
+              <BarChartRow
+                key={row.programmeId ?? "unattributed"}
+                label={row.programmeName}
+                value={formatMoneyShort(row.value, data.settings.currency)}
+                percent={row.percent}
+                accent={row.programmeId ? "success" : "neutral"}
+              />
+            ))
+          ) : (
+            <div className="rounded-lg border border-dashed border-line px-3 py-8 text-center text-sm text-ink-muted">
+              No {data.settings.currency} fundraising rounds fall in this
+              reporting period.
+            </div>
+          )}
         </Card>
       </div>
 
       <Card className="mt-4">
         <CardHeader
           title="Entrepreneurs with overdue updates"
-          description={`Company setting: follow up after ${companyConfig.reporting.periodicUpdateOverdueAfterDays} days without a submitted periodic update. If no update exists, the count starts from the entrepreneur's join date.`}
+          description={`Follow up after ${data.settings.periodicUpdateOverdueAfterDays} days without a submitted periodic update. If none exists, counting starts from the entrepreneur's join date.`}
         />
         <TableToolbar>
           <div>
-            <div className="text-sm font-medium text-ink">Search overdue updates</div>
+            <div className="text-sm font-medium text-ink">
+              Reporting follow-up queue
+            </div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Find entrepreneurs by business, representative, programme, or last report.
+              {data.sources.overdue}
             </div>
           </div>
-          <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[320px_260px_220px]">
+          <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[300px_250px_210px]">
             <TableFilterInput
               icon
               placeholder="Search overdue updates..."
               value={overdueQuery}
-              onChange={(event) => {
-                setOverdueQuery(event.target.value);
-                setOverduePage(1);
-              }}
+              onChange={(event) => setOverdueQuery(event.target.value)}
             />
             <TableFilterAutocomplete
-              value={overdueProgrammeFilter}
+              value={effectiveOverdueProgramme}
               onValueChange={(value) => {
-                setOverdueProgrammeFilter(value);
-                setOverduePage(1);
+                setOverdueProgramme(value);
+                overdue.resetPagination();
               }}
-              options={[
-                { value: ALL, label: 'All programme access' },
-                { value: 'no-formal-programme', label: 'No programme' },
-                ...programs.map((program) => ({ value: program.id, label: program.name })),
-              ]}
+              options={
+                selectedProgramme !== ALL
+                  ? programmeOptions.filter(
+                      (option) => option.value === selectedProgramme,
+                    )
+                  : overdueProgrammeOptions
+              }
+              disabled={selectedProgramme !== ALL}
+              onOpenChange={setOverdueProgrammeOpen}
+              onSearchChange={setOverdueProgrammeSearch}
+              isLoading={
+                overdueProgrammes.isLoading ||
+                overdueProgrammes.isFetchingNextPage
+              }
+              hasMore={Boolean(overdueProgrammes.hasNextPage)}
+              onLoadMore={() => overdueProgrammes.fetchNextPage()}
               placeholder="All programme access"
-              searchPlaceholder="Search programmes..."
-              emptyMessage="No programme found."
             />
             <TableFilterAutocomplete
-              value={overduePriorityFilter}
+              value={overduePriority}
               onValueChange={(value) => {
-                setOverduePriorityFilter(value);
-                setOverduePage(1);
+                setOverduePriority(value);
+                overdue.resetPagination();
               }}
               options={[
-                { value: ALL, label: 'All follow-up priority' },
-                { value: 'newly-overdue', label: 'Newly overdue' },
-                { value: 'late', label: '31-90 days late' },
-                { value: 'critical', label: 'More than 90 days late' },
+                { value: ALL, label: "All follow-up priority" },
+                { value: "newly_overdue", label: "Newly overdue" },
+                { value: "late", label: "31–90 days late" },
+                { value: "critical", label: "More than 90 days late" },
               ]}
               placeholder="All follow-up priority"
-              searchPlaceholder="Search priority..."
-              emptyMessage="No priority found."
             />
           </div>
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={overduePageRows}
-          rowKey={(u) => u.entrepreneur.id}
-          emptyMessage="No overdue updates for this programme."
-        />
-        <TablePagination
-          page={overduePage}
-          pageSize={overduePageSize}
-          totalItems={filteredOverdue.length}
-          onPageChange={setOverduePage}
-          onPageSizeChange={(next) => {
-            setOverduePageSize(next);
-            setOverduePage(1);
-          }}
-        />
+        {overdue.isError ? (
+          <Notice className="border border-danger/20 bg-danger/5 text-danger">
+            The follow-up queue could not be loaded. {overdue.error.message}
+          </Notice>
+        ) : (
+          <>
+            <DataTable
+              columns={columns}
+              rows={overdue.rows}
+              rowKey={(row) => row.id}
+              emptyMessage="No overdue updates match this report scope."
+            />
+            <TablePagination
+              page={overdue.page}
+              pageSize={pageSize}
+              totalItems={overdue.totalItems}
+              onPageChange={overdue.setPage}
+              onPageSizeChange={(next) => setPageSize(next)}
+            />
+          </>
+        )}
       </Card>
+
       <MessageModal
-        open={!!messageTarget}
+        open={Boolean(messageTarget)}
         onOpenChange={(open) => !open && setMessageTarget(null)}
-        recipientName={messageTarget?.entrepreneur.representative ?? 'Entrepreneur'}
-        recipientDetail={messageTarget ? `${messageTarget.entrepreneur.businessName} · ${messageTarget.daysWithoutReport} days without report` : undefined}
-        defaultSubject={messageTarget ? `Periodic update reminder for ${messageTarget.entrepreneur.businessName}` : ''}
-        defaultMessage={messageTarget ? `Hi ${messageTarget.entrepreneur.representative}, please submit your latest periodic update so BID can keep your programme reporting current.` : ''}
+        showPriority={false}
+        onSubmit={async ({ subject, message, channel }) => {
+          if (!messageTarget) return;
+          await sendReminder.mutateAsync({
+            entrepreneurUserId: messageTarget.entrepreneurUserId,
+            subject,
+            message,
+            channel: channel === "in-app" ? "in_app" : "email",
+          });
+        }}
+        recipientName={messageTarget?.representativeName ?? "Entrepreneur"}
+        recipientDetail={
+          messageTarget
+            ? `${messageTarget.businessName} · ${messageTarget.daysWithoutReport} days without report`
+            : undefined
+        }
+        defaultSubject={
+          messageTarget
+            ? `Periodic update reminder for ${messageTarget.businessName}`
+            : ""
+        }
+        defaultMessage={
+          messageTarget
+            ? `Hi ${messageTarget.representativeName}, please submit your latest periodic update so BID can keep your programme reporting current.`
+            : ""
+        }
       />
     </>
   );

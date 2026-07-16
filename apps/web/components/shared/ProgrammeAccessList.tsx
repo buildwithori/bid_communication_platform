@@ -1,14 +1,21 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { Search } from 'lucide-react';
-import { Badge } from '@/components/shared/Badge';
-import { Modal } from '@/components/shared/Modal';
-import { cn } from '@/lib/utils';
-import type { Program } from '@/types';
+import * as React from "react";
+import { Search } from "lucide-react";
+import { Badge } from "@/components/shared/Badge";
+import { Modal } from "@/components/shared/Modal";
+import { cn } from "@/lib/utils";
+
+type ProgrammeAccessItem = {
+  id: string;
+  name: string;
+  description?: string | null;
+  accessType?: "free" | "assigned";
+  accent?: "info" | "success" | "bid" | "neutral";
+};
 
 interface ProgrammeAccessListProps {
-  programmes: Program[];
+  programmes: ProgrammeAccessItem[];
   includeFreeResources?: boolean;
   maxVisible?: number;
   emptyLabel?: string;
@@ -17,36 +24,42 @@ interface ProgrammeAccessListProps {
   modalTitle?: string;
 }
 
-function programmeTone(programme: Program) {
-  if (programme.accessType === 'free') return 'neutral' as const;
-  if (programme.accent === 'info') return 'blue' as const;
-  if (programme.accent === 'success') return 'green' as const;
-  return 'blue' as const;
+function programmeTone(programme: ProgrammeAccessItem) {
+  if (programme.accessType === "free") return "neutral" as const;
+  if (programme.accent === "info") return "blue" as const;
+  if (programme.accent === "success") return "green" as const;
+  return "blue" as const;
 }
 
 export function ProgrammeAccessList({
   programmes,
   includeFreeResources = true,
   maxVisible = 2,
-  emptyLabel = 'No programme',
+  emptyLabel = "No programme",
   className,
   chipClassName,
-  modalTitle = 'Programme access',
+  modalTitle = "Programme access",
 }: ProgrammeAccessListProps) {
   const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const assignedProgrammes = React.useMemo(
-    () => programmes.filter((programme) => programme.accessType !== 'free'),
+    () =>
+      programmes.filter(
+        (programme) => (programme.accessType ?? "assigned") !== "free",
+      ),
     [programmes],
   );
   const visibleProgrammes = assignedProgrammes.slice(0, maxVisible);
-  const hiddenCount = Math.max(assignedProgrammes.length - visibleProgrammes.length, 0);
+  const hiddenCount = Math.max(
+    assignedProgrammes.length - visibleProgrammes.length,
+    0,
+  );
   const filteredProgrammes = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return assignedProgrammes;
     return assignedProgrammes.filter((programme) =>
-      [programme.name, programme.description ?? '', programme.accessType]
-        .join(' ')
+      [programme.name, programme.description ?? "", programme.accessType]
+        .join(" ")
         .toLowerCase()
         .includes(needle),
     );
@@ -54,15 +67,22 @@ export function ProgrammeAccessList({
 
   return (
     <>
-      <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-1.5', className)}>
+      <div
+        className={cn(
+          "flex min-w-0 max-w-full flex-wrap items-center gap-1.5",
+          className,
+        )}
+      >
         {includeFreeResources && (
-          <Badge tone="neutral" className={chipClassName}>Free resources</Badge>
+          <Badge tone="neutral" className={chipClassName}>
+            Free resources
+          </Badge>
         )}
         {visibleProgrammes.map((programme) => (
           <Badge
             key={programme.id}
             tone={programmeTone(programme)}
-            className={cn('max-w-[220px] truncate', chipClassName)}
+            className={cn("max-w-[220px] truncate", chipClassName)}
             title={programme.name}
           >
             {programme.name}
@@ -89,7 +109,8 @@ export function ProgrammeAccessList({
         <div className="space-y-4">
           <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
             <div className="text-sm font-semibold text-ink">
-              {assignedProgrammes.length} programme{assignedProgrammes.length === 1 ? '' : 's'} available
+              {assignedProgrammes.length} programme
+              {assignedProgrammes.length === 1 ? "" : "s"} available
             </div>
             <div className="mt-1 text-sm text-ink-muted">
               Free resources remain available to every entrepreneur by default.
@@ -108,10 +129,15 @@ export function ProgrammeAccessList({
 
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {filteredProgrammes.map((programme) => (
-              <div key={programme.id} className="rounded-xl border border-line bg-white px-4 py-3">
+              <div
+                key={programme.id}
+                className="rounded-xl border border-line bg-white px-4 py-3"
+              >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <div className="font-semibold text-ink">{programme.name}</div>
+                    <div className="font-semibold text-ink">
+                      {programme.name}
+                    </div>
                     {programme.description && (
                       <div className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">
                         {programme.description}
@@ -119,7 +145,7 @@ export function ProgrammeAccessList({
                     )}
                   </div>
                   <Badge tone={programmeTone(programme)} className="shrink-0">
-                    {programme.accessType === 'free' ? 'Free' : 'Programme'}
+                    {programme.accessType === "free" ? "Free" : "Programme"}
                   </Badge>
                 </div>
               </div>
