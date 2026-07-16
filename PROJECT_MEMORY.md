@@ -188,7 +188,7 @@ Session workflow rules:
 ## Known Cleanup
 
 - README may lag behind current product decisions. Prefer this memory file when there is a conflict, then update README when doing documentation work.
-- Data is still mocked/in-memory under `lib/mock-data` and `lib/stores`.
+- Legacy prototype components and stores still exist under `lib/mock-data` and `lib/stores`, but active application routes no longer mount seed-backed business-data providers or import mock business records. The shared country list is static reference data and remains intentionally local.
 
 ## Next.js 16 Foundation (2026-07-15)
 
@@ -307,3 +307,10 @@ Session workflow rules:
 - Authentication is limited by both trusted client IP and normalized account/token identity. Redis keys contain only SHA-256 identities. Rejections return `429` plus `Retry-After`; limiter storage failures fail protected routes closed with a safe `503`.
 - The final lifecycle review confirms all mandatory invitation, access/profile, programme, content/module, deliverable, tool, session, calendar, and company-setting actions are transactionally audited. High-volume progress, notification reads, session-cookie rotation, and temporary upload creation remain intentionally outside the business audit stream.
 - Feature 16 is complete. The production API build, live Docker health, live authentication throttle, typecheck, and all 41 focused backend tests pass.
+
+## Post-Integration Runtime Cleanup (2026-07-16)
+
+- Admin, trainer, and entrepreneur workspace chrome must derive identity and role/business context from their authenticated profile feature hooks. Never restore hard-coded seed people in layouts.
+- The entrepreneur schedule combines sessions and deliverable deadlines from authenticated backend date-window queries. Calendar hooks automatically follow every cursor before rendering the complete window, so a batch size never becomes a hidden event cap.
+- Deliverable instance queries accept validated `dateFrom`/`dateTo` filters, preserve role scope, reject reversed ranges, and remain cursor-paginated.
+- Active-route mock and direct-API boundary audits, changed-file lint, monorepo typechecks, both production builds, focused hardening tests, and live Docker profile/window/health responses pass.

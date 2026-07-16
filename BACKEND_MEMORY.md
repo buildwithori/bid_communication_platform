@@ -421,3 +421,11 @@ Before merging backend work, ask:
 - Rate-limit identities are SHA-256 hashed before entering Redis. Malformed auth bodies still continue to DTO validation, successful requests expose limit/remaining headers, exhausted requests expose `Retry-After`, and Redis failures return a safe `503` on protected routes.
 - The mandatory lifecycle review covers invitation acceptance/replacement, role/profile access, programme lifecycle/access, module/content creation/ownership/order, deliverable rules/reviews/due dates, tool lifecycle/access/request decisions, session transitions, calendar connections, and company settings/taxonomies. High-frequency learning progress, notification reads, cookie rotation, and temporary upload creation are deliberately excluded from business audit noise.
 - Feature 16 is complete. The production API build, live Docker dependency health, live 10-then-429 authentication check, API typecheck, and all 41 focused backend tests pass.
+
+## Schedule Window And Runtime Identity Contracts (2026-07-16)
+
+- Workspace shells use authenticated admin, trainer, and entrepreneur profile endpoints; seed users and in-memory business stores are not runtime identity sources.
+- `GET /deliverable-instances` supports optional ISO `dateFrom` and `dateTo` filters. Date filters are composed with existing role scope, search/status/programme filters, cursor ordering, counts, and aggregates; reversed ranges return a safe validation error.
+- The entrepreneur month calendar fetches sessions and deliverables only for its visible six-week window. Feature hooks automatically drain every cursor page before the calendar leaves its tailored skeleton.
+- Fixed `take` values in the calendar are transport batch sizes, not product limits. Do not replace cursor draining with one oversized request or React-side access filtering.
+- The static country definition list is reference data; business users, programmes, sessions, deliverables, tools, settings, and summaries must remain backend-backed.
