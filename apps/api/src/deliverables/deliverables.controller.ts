@@ -34,6 +34,11 @@ export class DeliverablesController {
   }
 
 
+  @Get('deliverable-instances/:id')
+  getInstance(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.deliverablesService.getInstance(user, id);
+  }
+
   @Get('deliverable-instances/:id/submissions')
   listSubmissions(
     @CurrentUser() user: User,

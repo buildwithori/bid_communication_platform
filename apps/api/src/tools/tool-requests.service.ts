@@ -5,13 +5,19 @@ import {
 } from "@nestjs/common";
 import {
   EntrepreneurToolStatus,
+  NotificationChannel,
+  NotificationEntityType,
+  NotificationSeverity,
+  NotificationType,
   Prisma,
   ToolRequestStatus,
   User,
   UserRole,
+  UserStatus,
 } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { ToolRequestQueryDto } from "./dto/tool-request-query.dto";
 import {
   CreateToolRequestDto,
@@ -77,6 +83,7 @@ export class ToolRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async listRequests(user: User, query: ToolRequestQueryDto) {
@@ -162,6 +169,7 @@ export class ToolRequestsService {
           .then((request) => ({ ...request, name: request.title })),
     );
 
+    await this.notifyAdminsOfRequest(user, created);
     return this.mapRequest(created);
   }
 
@@ -259,7 +267,65 @@ export class ToolRequestsService {
           .then((request) => ({ ...request, name: request.title })),
     );
 
+    if (isDecision) await this.notifyEntrepreneurOfDecision(user, updated);
     return this.mapRequest(updated);
+  }
+
+  private async notifyAdminsOfRequest(
+    actor: User,
+    request: ToolRequestWithInclude,
+  ) {
+    const admins = await this.prisma.user.findMany({
+      where: { role: UserRole.admin, status: UserStatus.active },
+      select: { id: true },
+    });
+    const business =
+      request.entrepreneurUser.businessMemberships[0]?.business.name ??
+      this.userName(request.entrepreneurUser);
+
+    await this.notifications.createNotifications(
+      admins.map((admin) => ({
+        recipientUserId: admin.id,
+        actorUserId: actor.id,
+        type: NotificationType.tool_request_updated,
+        title: "New entrepreneur tool request",
+        body: `${business} requested ${request.title}.`,
+        severity: NotificationSeverity.info,
+        entityType: NotificationEntityType.tool_request,
+        entityId: request.id,
+        actionUrl: `/admin/tool-requests?requestId=${request.id}`,
+        channels: [NotificationChannel.in_app, NotificationChannel.email],
+      })),
+    );
+  }
+
+  private async notifyEntrepreneurOfDecision(
+    actor: User,
+    request: ToolRequestWithInclude,
+  ) {
+    const labels: Record<ToolRequestStatus, string> = {
+      under_review: "moved back to review",
+      in_development: "moved into development",
+      built: "completed",
+      declined: "declined",
+    };
+    await this.notifications.createNotification({
+      recipientUserId: request.entrepreneurUserId,
+      actorUserId: actor.id,
+      type: NotificationType.tool_request_updated,
+      title: "Tool request updated",
+      body: `${request.title} was ${labels[request.status]}.`,
+      severity:
+        request.status === ToolRequestStatus.declined
+          ? NotificationSeverity.warning
+          : request.status === ToolRequestStatus.built
+            ? NotificationSeverity.success
+            : NotificationSeverity.info,
+      entityType: NotificationEntityType.tool_request,
+      entityId: request.id,
+      actionUrl: `/entrepreneur/tools?requestId=${request.id}`,
+      channels: [NotificationChannel.in_app, NotificationChannel.email],
+    });
   }
 
   private ensureAllowedTransition(

@@ -983,24 +983,22 @@ export class SessionsService {
       select: { id: true, role: true },
     });
 
-    await Promise.all(
-      recipients.map((recipient) =>
-        this.notifications.createNotification({
-          recipientUserId: recipient.id,
-          actorUserId: actor.id,
-          type: NotificationType.session_request,
-          title: "New session request",
-          body: `${this.sessionEntrepreneurName(session)} requested ${this.sessionTypeLabel(session.type)}.`,
-          severity: NotificationSeverity.info,
-          entityType: NotificationEntityType.session,
-          entityId: session.id,
-          actionUrl:
-            recipient.role === UserRole.admin
-              ? "/admin/sessions"
-              : "/trainer/sessions",
-          channels: [NotificationChannel.in_app, NotificationChannel.email],
-        }),
-      ),
+    await this.notifications.createNotifications(
+      recipients.map((recipient) => ({
+        recipientUserId: recipient.id,
+        actorUserId: actor.id,
+        type: NotificationType.session_request,
+        title: "New session request",
+        body: `${this.sessionEntrepreneurName(session)} requested ${this.sessionTypeLabel(session.type)}.`,
+        severity: NotificationSeverity.info,
+        entityType: NotificationEntityType.session,
+        entityId: session.id,
+        actionUrl:
+          recipient.role === UserRole.admin
+            ? `/admin/sessions?sessionId=${session.id}`
+            : `/trainer/sessions?sessionId=${session.id}`,
+        channels: [NotificationChannel.in_app, NotificationChannel.email],
+      })),
     );
   }
 
@@ -1023,7 +1021,7 @@ export class SessionsService {
       severity,
       entityType: NotificationEntityType.session,
       entityId: session.id,
-      actionUrl: "/entrepreneur/schedule",
+      actionUrl: `/entrepreneur/schedule?sessionId=${session.id}`,
       channels: [NotificationChannel.in_app, NotificationChannel.email],
     });
   }
