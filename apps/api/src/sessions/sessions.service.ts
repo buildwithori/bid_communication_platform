@@ -866,7 +866,6 @@ export class SessionsService {
               },
             ],
           },
-          ...(user.role === UserRole.admin ? [{}] : []),
         ],
       },
       include: sessionInclude,
