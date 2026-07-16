@@ -17,7 +17,8 @@
     "start:worker": "node dist/worker.js",
     "start:worker:dev": "nest start --watch --entryFile worker",
     "start:worker:dev:docker": "nest start --watch --entryFile worker --path tsconfig.worker-docker.json",
-    "test:jobs": "node --test -r ts-node/register test/jobs.test.ts"
+    "test:jobs": "node --test -r ts-node/register test/jobs.test.ts",
+    "test:dashboards": "node --test -r ts-node/register test/dashboards.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",
