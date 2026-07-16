@@ -34,6 +34,14 @@ type ProgrammeBase = {
     average: number;
     trackedLearners: number;
   };
+  nextLearning: {
+    moduleId: string;
+    moduleTitle: string;
+    contentItemId: string;
+    contentTitle: string;
+    contentType: ProgrammeContentType;
+    resumePositionSeconds: number | null;
+  } | null;
 };
 
 export type ProgrammeListItem = ProgrammeBase & {
@@ -162,6 +170,7 @@ export type ProgrammeQuery = {
   search?: string;
   accessType?: ProgrammeAccessType;
   lifecycle?: ProgrammeLifecycle;
+  progressStatus?: "not_started" | "in_progress" | "completed";
   includeArchived?: boolean;
   grantableOnly?: boolean;
   take?: number;

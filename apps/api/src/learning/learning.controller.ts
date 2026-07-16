@@ -12,6 +12,12 @@ import { LearningService } from './learning.service';
 export class LearningController {
   constructor(private readonly learningService: LearningService) {}
 
+  @Get('catalogue/summary')
+  @Roles(UserRole.entrepreneur)
+  getCatalogueSummary(@CurrentUser() user: User) {
+    return this.learningService.getCatalogueSummary(user);
+  }
+
   @Get('progress')
   getProgress(@CurrentUser() user: User, @Query() query: LearnerProgressQueryDto) {
     return this.learningService.getProgress(user, query);

@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { ProgrammeAccessType } from '@prisma/client';
+import { LearnerProgressStatus, ProgrammeAccessType } from '@prisma/client';
 
 const lifecycleValues = ['draft', 'scheduled', 'active', 'completed', 'archived'] as const;
 
@@ -19,6 +19,10 @@ export class ProgrammeQueryDto {
   @IsOptional()
   @IsIn(lifecycleValues)
   lifecycle?: ProgrammeLifecycle;
+
+  @IsOptional()
+  @IsIn(Object.values(LearnerProgressStatus))
+  progressStatus?: LearnerProgressStatus;
 
   @IsOptional()
   @Transform(({ value }) => {

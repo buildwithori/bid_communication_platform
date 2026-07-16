@@ -25,6 +25,9 @@ function toQueryString(query?: ProgrammeQuery) {
   if (query?.search) params.set("search", query.search);
   if (query?.accessType) params.set("accessType", query.accessType);
   if (query?.lifecycle) params.set("lifecycle", query.lifecycle);
+  if (query?.progressStatus) {
+    params.set("progressStatus", query.progressStatus);
+  }
   if (typeof query?.includeArchived === "boolean") {
     params.set("includeArchived", String(query.includeArchived));
   }

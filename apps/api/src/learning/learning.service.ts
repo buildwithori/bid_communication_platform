@@ -13,6 +13,62 @@ import { LearnerContentProgressInputDto, SyncLearnerProgressDto } from './dto/sy
 export class LearningService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getCatalogueSummary(user: User) {
+    if (user.role !== UserRole.entrepreneur) {
+      throw new ForbiddenException(
+        'Only entrepreneurs have a training catalogue summary.',
+      );
+    }
+    const programmeWhere: Prisma.ProgrammeWhereInput = {
+      publishedAt: { not: null },
+      archivedAt: null,
+      OR: [
+        { accessType: ProgrammeAccessType.free },
+        {
+          accessGrants: {
+            some: { entrepreneurUserId: user.id, revokedAt: null },
+          },
+        },
+      ],
+    };
+    const [total, free, assigned, inProgress, completed] = await Promise.all([
+      this.prisma.programme.count({ where: programmeWhere }),
+      this.prisma.programme.count({
+        where: { AND: [programmeWhere, { accessType: ProgrammeAccessType.free }] },
+      }),
+      this.prisma.programme.count({
+        where: {
+          AND: [programmeWhere, { accessType: ProgrammeAccessType.assigned }],
+        },
+      }),
+      this.prisma.learnerProgrammeProgress.count({
+        where: {
+          entrepreneurUserId: user.id,
+          status: LearnerProgressStatus.in_progress,
+          programme: programmeWhere,
+        },
+      }),
+      this.prisma.learnerProgrammeProgress.count({
+        where: {
+          entrepreneurUserId: user.id,
+          status: LearnerProgressStatus.completed,
+          programme: programmeWhere,
+        },
+      }),
+    ]);
+
+    return {
+      programmes: {
+        total,
+        free,
+        assigned,
+        inProgress,
+        completed,
+        notStarted: Math.max(total - inProgress - completed, 0),
+      },
+    };
+  }
+
   async getProgress(user: User, query: LearnerProgressQueryDto) {
     if (query.contentItemId && !query.moduleId) {
       throw new BadRequestException(

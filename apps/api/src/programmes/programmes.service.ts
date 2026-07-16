@@ -33,6 +33,14 @@ type ProgrammeListMetrics = {
   content: { total: number; videos: number; pdfs: number; tools: number };
   readyModules: number;
   learnerProgress: { average: number; trackedLearners: number };
+  nextLearning: {
+    moduleId: string;
+    moduleTitle: string;
+    contentItemId: string;
+    contentTitle: string;
+    contentType: string;
+    resumePositionSeconds: number | null;
+  } | null;
 };
 
 type ContentCountRow = {
@@ -44,6 +52,16 @@ type ContentCountRow = {
 type ReadyModuleCountRow = {
   programmeId: string;
   count: bigint;
+};
+
+type NextLearningRow = {
+  programmeId: string;
+  moduleId: string;
+  moduleTitle: string;
+  contentItemId: string;
+  contentTitle: string;
+  contentType: string;
+  resumePositionSeconds: number | null;
 };
 
 type AggregateCountRow = {
@@ -305,7 +323,10 @@ export class ProgrammesService {
 
     const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
     const pageRows = rows.slice(0, take);
-    const metrics = await this.programmeListMetrics(pageRows.map((programme) => programme.id));
+    const metrics = await this.programmeListMetrics(
+      pageRows.map((programme) => programme.id),
+      user,
+    );
     const items = pageRows.map((programme) => this.mapProgrammeListItem(programme, metrics.get(programme.id)));
 
     return { items, nextCursor, totalItems };
@@ -698,7 +719,7 @@ export class ProgrammesService {
       throw new ForbiddenException('You do not have access to this programme.');
     }
 
-    const metrics = await this.programmeListMetrics([id]);
+    const metrics = await this.programmeListMetrics([id], user);
     return this.mapProgrammeDetailSummary(programme, metrics.get(id));
   }
 
@@ -1040,6 +1061,38 @@ export class ProgrammesService {
       filters.push({ accessType: query.accessType });
     }
 
+    if (query.progressStatus) {
+      if (user.role !== UserRole.entrepreneur) {
+        throw new BadRequestException(
+          'Progress status filtering is only available to entrepreneurs.',
+        );
+      }
+      filters.push(
+        query.progressStatus === 'not_started'
+          ? {
+              OR: [
+                { progress: { none: { entrepreneurUserId: user.id } } },
+                {
+                  progress: {
+                    some: {
+                      entrepreneurUserId: user.id,
+                      status: 'not_started',
+                    },
+                  },
+                },
+              ],
+            }
+          : {
+              progress: {
+                some: {
+                  entrepreneurUserId: user.id,
+                  status: query.progressStatus,
+                },
+              },
+            },
+      );
+    }
+
     if (query.grantableOnly) {
       filters.push({ publishedAt: { not: null }, archivedAt: null });
     }
@@ -1084,6 +1137,8 @@ export class ProgrammesService {
 
     if (user.role === UserRole.entrepreneur) {
       return {
+        publishedAt: { not: null },
+        archivedAt: null,
         OR: [
           { accessType: ProgrammeAccessType.free },
           { accessGrants: { some: { entrepreneurUserId: user.id, revokedAt: null } } },
@@ -1152,27 +1207,35 @@ export class ProgrammesService {
       content: metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 },
       readiness: moduleCount === 0 ? 0 : Math.round((readyModuleCount / moduleCount) * 100),
       learnerProgress: metrics?.learnerProgress ?? { average: 0, trackedLearners: 0 },
+      nextLearning: metrics?.nextLearning ?? null,
     };
   }
 
-  private async programmeListMetrics(programmeIds: string[]) {
+  private async programmeListMetrics(programmeIds: string[], user: User) {
     const metrics = new Map<string, ProgrammeListMetrics>();
     for (const programmeId of programmeIds) {
       metrics.set(programmeId, {
         content: { total: 0, videos: 0, pdfs: 0, tools: 0 },
         readyModules: 0,
         learnerProgress: { average: 0, trackedLearners: 0 },
+        nextLearning: null,
       });
     }
     if (programmeIds.length === 0) return metrics;
 
-    const [contentRows, readyModuleRows, progressRows] = await Promise.all([
+    const visibleContent =
+      user.role === UserRole.entrepreneur
+        ? Prisma.sql`AND ci.status::text = 'ready'`
+        : Prisma.empty;
+    const [contentRows, readyModuleRows, progressRows, nextLearningRows] =
+      await Promise.all([
       this.prisma.$queryRaw<ContentCountRow[]>(Prisma.sql`
         SELECT pm.programme_id AS "programmeId", ci.type::text AS "type", COUNT(*)::bigint AS "count"
         FROM programme_modules pm
         JOIN module_content_items mci ON mci.module_id = pm.module_id
         JOIN content_items ci ON ci.id = mci.content_item_id
         WHERE pm.programme_id IN (${Prisma.join(programmeIds)})
+        ${visibleContent}
         GROUP BY pm.programme_id, ci.type
       `),
       this.prisma.$queryRaw<ReadyModuleCountRow[]>(Prisma.sql`
@@ -1192,12 +1255,57 @@ export class ProgrammesService {
         WHERE pm.programme_id IN (${Prisma.join(programmeIds)})
         GROUP BY pm.programme_id
       `),
-      this.prisma.learnerProgrammeProgress.groupBy({
-        by: ['programmeId'],
-        where: { programmeId: { in: programmeIds } },
-        _avg: { progressPercent: true },
-        _count: { _all: true },
-      }),
+      user.role === UserRole.entrepreneur
+        ? this.prisma.learnerProgrammeProgress.findMany({
+            where: {
+              entrepreneurUserId: user.id,
+              programmeId: { in: programmeIds },
+            },
+            select: { programmeId: true, progressPercent: true },
+          })
+        : this.prisma.learnerProgrammeProgress.groupBy({
+            by: ['programmeId'],
+            where: { programmeId: { in: programmeIds } },
+            _avg: { progressPercent: true },
+            _count: { _all: true },
+          }),
+      user.role === UserRole.entrepreneur
+        ? this.prisma.$queryRaw<NextLearningRow[]>(Prisma.sql`
+            SELECT
+              p.id AS "programmeId",
+              next_item."moduleId",
+              next_item."moduleTitle",
+              next_item."contentItemId",
+              next_item."contentTitle",
+              next_item."contentType",
+              next_item."resumePositionSeconds"
+            FROM programmes p
+            JOIN LATERAL (
+              SELECT
+                pm.module_id AS "moduleId",
+                m.title AS "moduleTitle",
+                ci.id AS "contentItemId",
+                ci.title AS "contentTitle",
+                ci.type::text AS "contentType",
+                lcp.last_position_seconds AS "resumePositionSeconds"
+              FROM programme_modules pm
+              JOIN modules m ON m.id = pm.module_id
+              JOIN module_content_items mci ON mci.module_id = pm.module_id
+              JOIN content_items ci ON ci.id = mci.content_item_id
+              LEFT JOIN learner_content_progress lcp
+                ON lcp.entrepreneur_user_id = ${user.id}
+                AND lcp.programme_id = pm.programme_id
+                AND lcp.module_id = pm.module_id
+                AND lcp.content_item_id = ci.id
+              WHERE pm.programme_id = p.id
+                AND ci.status::text = 'ready'
+                AND (lcp.status IS NULL OR lcp.status::text <> 'completed')
+              ORDER BY pm.position ASC, mci.position ASC, mci.id ASC
+              LIMIT 1
+            ) next_item ON TRUE
+            WHERE p.id IN (${Prisma.join(programmeIds)})
+          `)
+        : Promise.resolve([] as NextLearningRow[]),
     ]);
 
     for (const row of contentRows) {
@@ -1216,9 +1324,28 @@ export class ProgrammesService {
     for (const row of progressRows) {
       const value = metrics.get(row.programmeId);
       if (!value) continue;
-      value.learnerProgress = {
-        average: Math.round(row._avg.progressPercent ?? 0),
-        trackedLearners: row._count._all,
+      if ('_avg' in row) {
+        value.learnerProgress = {
+          average: Math.round(row._avg.progressPercent ?? 0),
+          trackedLearners: row._count._all,
+        };
+      } else {
+        value.learnerProgress = {
+          average: row.progressPercent,
+          trackedLearners: 1,
+        };
+      }
+    }
+    for (const row of nextLearningRows) {
+      const value = metrics.get(row.programmeId);
+      if (!value) continue;
+      value.nextLearning = {
+        moduleId: row.moduleId,
+        moduleTitle: row.moduleTitle,
+        contentItemId: row.contentItemId,
+        contentTitle: row.contentTitle,
+        contentType: row.contentType,
+        resumePositionSeconds: row.resumePositionSeconds,
       };
     }
 
@@ -1261,6 +1388,7 @@ export class ProgrammesService {
           : Math.round((readyModuleCount / moduleCount) * 100),
       learnerProgress:
         metrics?.learnerProgress ?? { average: 0, trackedLearners: 0 },
+      nextLearning: metrics?.nextLearning ?? null,
     };
   }
 
