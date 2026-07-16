@@ -111,7 +111,7 @@ export function UploadDeliverableModal({
               options={eligible.map((item) => ({
                 value: item.id,
                 label: item.deliverable,
-                description: item.programme.name + ' · ' + statusMeta[item.status].label + ' · Due ' + formatDate(item.dueDate),
+                description: item.programme.name + ' · ' + statusMeta[item.status].label + ' · Due ' + formatDate(item.dueDate) + (item.periodStart && item.periodEnd ? ' · Period ' + formatDate(item.periodStart) + ' – ' + formatDate(item.periodEnd) : ''),
               }))}
             />
           </FormField>
@@ -127,6 +127,9 @@ export function UploadDeliverableModal({
                 <div className="min-w-0">
                   <div className="font-semibold text-ink">{selected.deliverable}</div>
                   <div className="mt-1 text-sm text-ink-muted">{selected.programme.name}</div>
+                  {selected.periodStart && selected.periodEnd && (
+                    <div className="mt-1 text-sm text-ink-muted">Reporting period {formatDate(selected.periodStart)} – {formatDate(selected.periodEnd)}</div>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge tone={statusMeta[selected.status].tone}>{statusMeta[selected.status].label}</Badge>
                     <span className="text-sm text-ink-muted">Due {formatDate(selected.dueDate)}</span>

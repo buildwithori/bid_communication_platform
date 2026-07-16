@@ -99,6 +99,7 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
         <button type="button" onClick={() => setActive(row)} className="block min-w-[250px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20">
           <span className="block font-semibold text-ink">{row.deliverable}</span>
           <span className="mt-1 block max-w-[280px] truncate text-sm text-ink-muted">{row.fileName}</span>
+          {row.periodStart && row.periodEnd && <span className="mt-1 block text-xs text-ink-faint">{formatDate(row.periodStart)} – {formatDate(row.periodEnd)}</span>}
           {row.latestFeedback && <span className="mt-1 block text-sm text-ink-muted">Feedback {row.feedbackReadAt ? 'read ' + formatDate(row.feedbackReadAt) : 'unread'}</span>}
         </button>
       ),
@@ -182,7 +183,7 @@ function ReviewDeliverableModal({ review, isSaving, onClose, onReview }: { revie
     <Modal open={Boolean(review)} onOpenChange={(open) => !open && !isSaving && onClose()} title={review ? (canReview ? 'Review ' : 'Review history — ') + review.deliverable : 'Review deliverable'} width="wide">
       {review && (
         <form onSubmit={form.handleSubmit((values) => { if (review.submissionId) onReview(review.submissionId, 'changes_required', values.feedback); })}>
-          <div className="mb-4 rounded-xl border border-line bg-surface-subtle px-4 py-4"><div className="font-semibold text-ink">{review.fileName}</div><div className="mt-1 text-sm text-ink-muted">Submitted by {review.businessName} for {review.programme}</div><div className="mt-1 text-sm text-ink-muted">Submitted {formatDate(review.submittedAt)} · Due {formatDate(review.dueAt)} · {review.dueSource === 'manual-override' ? 'Manual override' : 'Programme rule'}</div></div>
+          <div className="mb-4 rounded-xl border border-line bg-surface-subtle px-4 py-4"><div className="font-semibold text-ink">{review.fileName}</div><div className="mt-1 text-sm text-ink-muted">Submitted by {review.businessName} for {review.programme}</div><div className="mt-1 text-sm text-ink-muted">Submitted {formatDate(review.submittedAt)} · Due {formatDate(review.dueAt)} · {review.dueSource === 'manual-override' ? 'Manual override' : 'Programme rule'}</div>{review.periodStart && review.periodEnd && <div className="mt-1 text-sm text-ink-muted">Reporting period {formatDate(review.periodStart)} – {formatDate(review.periodEnd)}</div>}</div>
 
           <ReviewHistory feedback={feedback} submissions={submissions} />
 

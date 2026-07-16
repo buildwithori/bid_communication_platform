@@ -10,6 +10,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).optional(),
   REDIS_URL: z.string().min(1).optional(),
   AUDIT_PROCESS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(5_000),
+  DELIVERABLE_RECURRENCE_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(900_000),
   EMAIL_TRANSPORT: z.enum(["smtp", "resend"]).default("smtp"),
   MAIL_FROM: z.string().min(1).default("BID Hub <no-reply@bid.local>"),
   SMTP_HOST: z.string().min(1).default("localhost"),

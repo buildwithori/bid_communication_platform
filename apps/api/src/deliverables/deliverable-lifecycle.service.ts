@@ -6,10 +6,13 @@ import {
   Prisma,
   ProgrammeAccessType,
 } from '@prisma/client';
+import { RecurringDeliverableService } from './recurring-deliverable.service';
 
 @Injectable()
 export class DeliverableLifecycleService {
-  async syncFixedDateInstancesForEntrepreneur(
+  constructor(private readonly recurring: RecurringDeliverableService) {}
+
+  async syncInstancesForEntrepreneur(
     tx: Prisma.TransactionClient,
     entrepreneurUserId: string,
   ) {
@@ -50,7 +53,13 @@ export class DeliverableLifecycleService {
       select: { id: true, programmeId: true, dueDate: true },
     });
 
-    if (!rules.length) return { created: 0 };
+    if (!rules.length) {
+      const recurringCreated = await this.recurring.sync(
+        tx,
+        entrepreneurUserId,
+      );
+      return { fixedCreated: 0, recurringCreated };
+    }
     const result = await tx.deliverableInstance.createMany({
       data: rules.map((rule) => ({
         ruleId: rule.id,
@@ -64,6 +73,7 @@ export class DeliverableLifecycleService {
       })),
       skipDuplicates: true,
     });
-    return { created: result.count };
+    const recurringCreated = await this.recurring.sync(tx, entrepreneurUserId);
+    return { fixedCreated: result.count, recurringCreated };
   }
 }

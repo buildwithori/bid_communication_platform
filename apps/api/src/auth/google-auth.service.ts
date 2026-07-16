@@ -100,7 +100,7 @@ export class GoogleAuthService {
         const business = await tx.business.create({ data: { name: dto.businessName.trim(), country: dto.country.trim(), source: BusinessSource.self_registered, onboardingCompletedAt: new Date() } });
         await tx.businessMembership.create({ data: { userId, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true } });
       }
-      await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, userId);
+      await this.deliverableLifecycle.syncInstancesForEntrepreneur(tx, userId);
     });
     return this.getOnboarding(userId);
   }

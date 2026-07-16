@@ -56,6 +56,8 @@ export type DeliverableInstance = {
   deliverable: string;
   status: DeliverableStatus;
   dueDate: string;
+  periodStart: string | null;
+  periodEnd: string | null;
   dueSource: "manual_override" | "programme_rule";
   dueUpdatedAt: string | null;
   dueUpdatedBy: DeliverableUser | null;

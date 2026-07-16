@@ -105,7 +105,7 @@ export class EntrepreneurManagementService {
             })),
           });
         }
-        await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, user.id);
+        await this.deliverableLifecycle.syncInstancesForEntrepreneur(tx, user.id);
         await tx.invitation.create({
           data: {
             email,
@@ -349,7 +349,7 @@ export class EntrepreneurManagementService {
             revokeReason: null,
           },
         });
-        await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, entrepreneurUserId);
+        await this.deliverableLifecycle.syncInstancesForEntrepreneur(tx, entrepreneurUserId);
         return grant;
       },
     );
@@ -426,7 +426,7 @@ export class EntrepreneurManagementService {
             stageId: dto.stageId || null,
           },
         });
-        await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(
+        await this.deliverableLifecycle.syncInstancesForEntrepreneur(
           tx,
           entrepreneur.id,
         );

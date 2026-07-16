@@ -20,6 +20,8 @@ export type DeliverableReviewRow = {
   submittedAt: string;
   waitingDays: number | null;
   dueAt: string;
+  periodStart: string | null;
+  periodEnd: string | null;
   dueRule: string;
   dueSource: 'programme-requirement' | 'manual-override';
   dueUpdatedAt?: string;
@@ -56,6 +58,8 @@ export function mapDeliverableReviewRow(row: DeliverableReviewQueueItem): Delive
     submittedAt: latestSubmission?.submittedAt ?? row.updatedAt,
     waitingDays: row.waitingDays,
     dueAt: row.dueDate,
+    periodStart: row.periodStart,
+    periodEnd: row.periodEnd,
     dueRule: dueRuleLabel(row),
     dueSource: row.dueSource === 'manual_override' ? 'manual-override' : 'programme-requirement',
     dueUpdatedAt: row.dueUpdatedAt ?? undefined,

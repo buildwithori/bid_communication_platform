@@ -653,6 +653,8 @@ Rules:
   - entrepreneur_user_id
   - programme_id
   - due_date
+  - period_start nullable
+  - period_end nullable
   - status: not_submitted, submitted, changes_required, approved, overdue
 - `deliverable_submissions`
   - instance_id
@@ -678,6 +680,9 @@ Rules:
 - Fixed-date rules copy `due_date` directly into each applicable instance.
 - Module-completion rules create or activate an instance when the learner completes the configured module; the concrete due date should come from company configuration, for example "due N days after module completion".
 - Recurring rules generate instances per reporting cadence and period.
+- New recurring periods are calendar-aligned: monthly, calendar-quarterly, or January-June/July-December. Generation starts no earlier than programme/access eligibility, stops at the programme end date, and uses the period end as the concrete due date.
+- Recurring generation is database-set-based and idempotent. One-time rules have one instance per rule/entrepreneur/programme; recurring rules have one instance per rule/entrepreneur/programme/period start.
+- Legacy recurring instances created before period tracking retain their due date and derive one cadence window backward because their original calendar anchor cannot be recovered safely.
 - Reviews are history. Do not overwrite feedback.
 - `changes_required` is a status, not just a note.
 - Entrepreneurs need unread feedback tracking.

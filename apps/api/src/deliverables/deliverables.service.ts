@@ -11,6 +11,7 @@ import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { ReviewDeliverableDto } from './dto/review-deliverable.dto';
 import { SubmitDeliverableDto } from './dto/submit-deliverable.dto';
 import { UpdateDeliverableDueDateDto } from './dto/update-deliverable-due-date.dto';
+import { RecurringDeliverableService } from './recurring-deliverable.service';
 
 const DEFAULT_TAKE = 20;
 const userSelect = { id: true, firstName: true, lastName: true, email: true } as const;
@@ -85,9 +86,11 @@ export class DeliverablesService {
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
     private readonly audit: AuditService,
+    private readonly recurring: RecurringDeliverableService,
   ) {}
 
   async listGroups(user: User, query: DeliverableGroupQueryDto) {
+    await this.recurring.ensureCurrent();
     const take = pageSize(query);
     const search = query.search?.trim();
     const groupStatusFilter: Prisma.DeliverableInstanceWhereInput = query.view === 'needs_action'
@@ -194,6 +197,7 @@ export class DeliverablesService {
   }
 
   async listInstances(user: User, query: DeliverableInstanceQueryDto) {
+    await this.recurring.ensureCurrent();
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildInstanceWhere(user, query);
     const summaryWhere = this.buildInstanceWhere(user, query, true);
@@ -225,6 +229,7 @@ export class DeliverablesService {
   }
 
   async listReviewQueue(user: User, query: DeliverableReviewQueryDto) {
+    await this.recurring.ensureCurrent();
     if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
       throw new ForbiddenException('You cannot review deliverables.');
     }
@@ -525,6 +530,8 @@ export class DeliverablesService {
       deliverable: instance.rule.name,
       status: instance.status,
       dueDate: instance.dueDate.toISOString(),
+      periodStart: instance.periodStart?.toISOString() ?? null,
+      periodEnd: instance.periodEnd?.toISOString() ?? null,
       dueSource: instance.dueUpdatedAt ? 'manual_override' : 'programme_rule',
       dueUpdatedAt: instance.dueUpdatedAt?.toISOString() ?? null,
       dueUpdatedBy: instance.dueUpdatedBy ? this.mapUser(instance.dueUpdatedBy) : null,

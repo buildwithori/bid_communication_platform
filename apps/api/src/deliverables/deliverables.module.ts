@@ -3,11 +3,18 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { FilesModule } from '../files/files.module';
+import { DeliverableLifecycleModule } from './deliverable-lifecycle.module';
 import { DeliverablesController } from './deliverables.controller';
 import { DeliverablesService } from './deliverables.service';
 
 @Module({
-  imports: [AuditModule, AuthModule, DatabaseModule, FilesModule],
+  imports: [
+    AuditModule,
+    AuthModule,
+    DatabaseModule,
+    FilesModule,
+    DeliverableLifecycleModule,
+  ],
   controllers: [DeliverablesController],
   providers: [DeliverablesService],
 })

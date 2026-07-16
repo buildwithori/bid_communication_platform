@@ -45,7 +45,7 @@ export class AuthService {
       await tx.businessMembership.create({
         data: { userId: createdUser.id, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true },
       });
-      await this.deliverableLifecycle.syncFixedDateInstancesForEntrepreneur(tx, createdUser.id);
+      await this.deliverableLifecycle.syncInstancesForEntrepreneur(tx, createdUser.id);
       await tx.emailVerificationToken.create({
         data: { userId: createdUser.id, tokenHash: verificationTokenHash, expiresAt: addMinutes(new Date(), VERIFICATION_DURATION_MINUTES) },
       });

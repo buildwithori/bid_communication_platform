@@ -1102,6 +1102,8 @@ model DeliverableInstance {
   entrepreneurUserId String                    @map("entrepreneur_user_id")
   programmeId        String                    @map("programme_id")
   dueDate            DateTime                  @map("due_date")
+  periodStart        DateTime?                 @map("period_start")
+  periodEnd          DateTime?                 @map("period_end")
   status             DeliverableInstanceStatus @default(not_submitted)
   dueUpdatedAt       DateTime?                 @map("due_updated_at")
   dueUpdatedById     String?                   @map("due_updated_by_id")
@@ -1115,10 +1117,13 @@ model DeliverableInstance {
   dueUpdatedBy User?                    @relation("DeliverableDueDateUpdatedBy", fields: [dueUpdatedById], references: [id])
   submissions  DeliverableSubmission[]
 
-  @@unique([ruleId, entrepreneurUserId, programmeId])
+  // Partial unique indexes for one-time and recurring occurrences live in the
+  // SQL migration because Prisma does not currently express partial indexes.
+  @@index([ruleId, entrepreneurUserId, programmeId])
   @@index([entrepreneurUserId, status])
   @@index([programmeId, status])
   @@index([dueDate])
+  @@index([periodStart, periodEnd])
   @@index([dueUpdatedById])
   @@map("deliverable_instances")
 }

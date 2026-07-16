@@ -92,6 +92,9 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
               <div className="font-semibold text-ink">{item.deliverable}</div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
                 <span>{meta.helper}</span>
+                {item.periodStart && item.periodEnd && (
+                  <span>{formatDate(item.periodStart)} – {formatDate(item.periodEnd)}</span>
+                )}
                 {item.hasUnreadFeedback && <Badge tone="amber">New feedback</Badge>}
                 {item.submissionCount > 1 && <Badge tone="neutral">{item.submissionCount} versions</Badge>}
               </div>
