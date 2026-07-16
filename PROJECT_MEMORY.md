@@ -278,3 +278,12 @@ Session workflow rules:
 - BullMQ jobs use bounded attempts, exponential backoff, and capped completed/failed retention. Transactional email jobs containing short-lived tokens are deleted immediately after success and retained for at most one day on terminal failure. Templates remain owned by their feature modules and are rendered only in the worker.
 - Audit and notification database rows remain the durable business source of truth. Both recover stale processing locks; audit failures now persist `nextAttemptAt` and bounded delayed retries. BullMQ controls execution but does not replace transactional outbox guarantees.
 - API health must validate Redis connectivity and the TTL-backed worker heartbeat. A reachable Redis server without a live consumer is unhealthy. Local and production Compose both run a dedicated worker; local API and worker watch output use separate named volumes.
+
+## Role Dashboard Completion (2026-07-16)
+
+- Feature 14 dashboards consume role-specific aggregate endpoints through `lib/api/dashboards/`; dashboard pages must not fetch broad domain lists or calculate business summaries in React.
+- Admin funding cards and trends aggregate only fundraising rounds in the company default currency. Never add unlike currencies together or show a period comparison unless the backend returns a real comparable window.
+- Trainer dashboard scope is inferred from trainer-attributed content across every eligible programme and its entrepreneurs. Full aggregate scope must not inherit a visual preview cap; only returned preview collections may be capped.
+- Entrepreneur dashboard data is authenticated-user scoped. Recent activity comes from durable notifications with safe resource action URLs, not invented client-side activity.
+- Dashboard operational lists remain compact previews and link to full management views. Any growing queue embedded in a dashboard uses backend search/filter/cursor pagination.
+- Admin, trainer, and entrepreneur dashboards each retain a page-specific skeleton plus explicit error and minimal-data empty states.

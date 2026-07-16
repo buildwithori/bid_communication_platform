@@ -388,3 +388,13 @@ Before merging backend work, ask:
 - Audit outbox processing recovers five-minute stale locks, uses atomic claims, creates logs idempotently, stores safe failure text, and schedules database-level retry time. Notification delivery retains its own claim/attempt/delivery status model beneath BullMQ.
 - The worker refreshes a Redis heartbeat with a TTL. Public API health returns unhealthy when Redis is unavailable or the heartbeat is stale, and exposes bounded queue state counts for operations.
 - Local Compose keeps Redis internal, shares the API development image, isolates API/worker watch output into separate named volumes, and runs migrations only from the API container. Production Compose loads the provisioned root `.env` and runs API and worker as separate services from the same production image.
+
+## Dashboard Aggregate Contracts (2026-07-16)
+
+- `DashboardsModule` owns authenticated role endpoints for admin, trainer, and entrepreneur dashboard shapes. Controllers enforce the role; services enforce user and inferred programme scope.
+- Dashboard responses are deliberately shaped read models: metric cards, bounded chart windows, capped previews, and action counts. Preview caps must never accidentally cap the underlying aggregate population.
+- Admin fundraising totals, leaderboards, and six-month trends include only rounds matching the company default currency and return that currency alongside the values. Cross-currency arithmetic is forbidden without an explicit conversion model.
+- Admin recent entrepreneurs is a separate backend-searched and filtered cursor endpoint with lookahead pagination. Visual preview limits do not become hidden dataset limits.
+- Trainer scope is inferred from content attribution and programme access. Entrepreneur scope always begins with the authenticated entrepreneur user ID, including progress, sessions, deliverables, and notification activity.
+- Six-week and six-month series are calculated in the database/query service from authoritative timestamps. Missing periods are returned as zero-value buckets so React only renders the series.
+- Dashboard query paths have compound indexes for membership chronology, active programme grants, fundraising currency/date, and learner completion windows.

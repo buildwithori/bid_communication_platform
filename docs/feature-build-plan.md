@@ -460,6 +460,8 @@ Done when:
 - Charts and stats render with page-specific skeletons while loading.
 - Empty dashboard states make sense for the minimal seed database.
 
+Implementation status (2026-07-16): Complete. Authenticated, role-scoped dashboard endpoints now return database-backed cards, chart series, capped operational previews, and next-action counts for admin, trainer, and entrepreneur workspaces. Admin funding totals and trends use only the company default currency so unlike currencies are never combined; the recent-entrepreneur queue has backend search, filters, and cursor pagination. Trainer scope is derived from trainer-attributed programme content across the full eligible portfolio, while only presentation previews are capped. Entrepreneur metrics, sessions, deliverables, learning progress, and recent activity are restricted to the authenticated user. Each dashboard now uses its feature API hooks, tailored loading skeleton, explicit error and minimal-data empty states, and links preview actions to full management pages or exact resource context. Dashboard query indexes, role metadata, user-scope, cursor lookahead, live API, production build, and authenticated browser smoke tests are verified.
+
 ### 15. Reporting And Analytics
 
 Scope:
