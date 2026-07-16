@@ -26,6 +26,9 @@ export type ToolRecord = {
     programmeIds: string[];
     entrepreneurUserIds: string[];
     hiddenEntrepreneurUserIds: string[];
+    programmes: Array<{ id: string; name: string }>;
+    entrepreneurs: Array<{ id: string; name: string }>;
+    hiddenEntrepreneurs: Array<{ id: string; name: string }>;
   };
   createdBy: { id: string; name: string; email: string };
   updatedBy: { id: string; name: string; email: string } | null;

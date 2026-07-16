@@ -39,9 +39,46 @@ const toolInclude = {
   updatedBy: {
     select: { id: true, firstName: true, lastName: true, email: true },
   },
-  programmeAccess: { select: { programmeId: true } },
-  entrepreneurAccess: { select: { entrepreneurUserId: true } },
-  hiddenEntrepreneurs: { select: { entrepreneurUserId: true } },
+  programmeAccess: {
+    select: {
+      programmeId: true,
+      programme: { select: { name: true } },
+    },
+  },
+  entrepreneurAccess: {
+    select: {
+      entrepreneurUserId: true,
+      entrepreneur: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          businessMemberships: {
+            where: { isPrimary: true },
+            take: 1,
+            select: { business: { select: { name: true } } },
+          },
+        },
+      },
+    },
+  },
+  hiddenEntrepreneurs: {
+    select: {
+      entrepreneurUserId: true,
+      entrepreneur: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          businessMemberships: {
+            where: { isPrimary: true },
+            take: 1,
+            select: { business: { select: { name: true } } },
+          },
+        },
+      },
+    },
+  },
 } satisfies Prisma.ToolInclude;
 
 type ToolWithInclude = Prisma.ToolGetPayload<{ include: typeof toolInclude }>;
@@ -760,6 +797,28 @@ export class ToolsService {
         hiddenEntrepreneurUserIds: tool.hiddenEntrepreneurs.map(
           (access) => access.entrepreneurUserId,
         ),
+        programmes: tool.programmeAccess.map((access) => ({
+          id: access.programmeId,
+          name: access.programme.name,
+        })),
+        entrepreneurs: tool.entrepreneurAccess.map((access) => ({
+          id: access.entrepreneurUserId,
+          name:
+            access.entrepreneur.businessMemberships[0]?.business.name ??
+            [access.entrepreneur.firstName, access.entrepreneur.lastName]
+              .filter(Boolean)
+              .join(" ") ??
+            access.entrepreneur.email,
+        })),
+        hiddenEntrepreneurs: tool.hiddenEntrepreneurs.map((access) => ({
+          id: access.entrepreneurUserId,
+          name:
+            access.entrepreneur.businessMemberships[0]?.business.name ??
+            [access.entrepreneur.firstName, access.entrepreneur.lastName]
+              .filter(Boolean)
+              .join(" ") ??
+            access.entrepreneur.email,
+        })),
       },
       createdBy: this.mapUser(tool.createdBy),
       updatedBy: tool.updatedBy ? this.mapUser(tool.updatedBy) : null,
