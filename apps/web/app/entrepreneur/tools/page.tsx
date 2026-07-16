@@ -1,26 +1,31 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import * as React from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  LayoutGrid,
-  FileText,
-  Timer,
-  Star,
-  Plus,
   CalendarDays,
-  Wrench,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-} from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Tabs } from '@/components/shared/Tabs';
-import { Modal } from '@/components/shared/Modal';
-import { FormField, FormInput, FormSelect, FormTextarea } from '@/components/shared/FormField';
-import { DatePicker } from '@/components/shared/DatePicker';
+  FileText,
+  LayoutGrid,
+  Plus,
+  Star,
+  Timer,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import {
+  Card,
+  CardHeader,
+  Skeleton,
+  TableSkeleton,
+} from "@/components/shared/Card";
+import { DatePicker } from "@/components/shared/DatePicker";
 import {
   DataTable,
   RowActions,
@@ -30,24 +35,36 @@ import {
   TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toolRequestSchema, type ToolRequestForm } from '@/lib/forms/schemas';
-import { toast } from 'sonner';
-import { tools } from '@/lib/mock-data';
-import { toolRequests, toolRequestStatusMeta, type ToolRequest } from '@/lib/mock-data/admin-workflows';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { toolAreaOptions } from '@/lib/tool-areas';
-import { cn } from '@/lib/utils';
-import { formatProgrammeAccess } from '@/lib/programme-access';
-import { isToolVisibleToEntrepreneur } from '@/lib/tool-access';
-import type { LucideIcon } from 'lucide-react';
-import type { Tool } from '@/types';
+} from "@/components/shared/DataTable";
+import {
+  FormAutocomplete,
+  FormField,
+  FormInput,
+  FormTextarea,
+} from "@/components/shared/FormField";
+import { Modal } from "@/components/shared/Modal";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Tabs } from "@/components/shared/Tabs";
+import {
+  useCreateToolRequestMutation,
+  useToolRequestsPage,
+} from "@/lib/api/tool-requests";
+import { useLazyToolAreasQuery } from "@/lib/api/settings";
+import { useToolsPage } from "@/lib/api/tools";
+import { toolRequestSchema, type ToolRequestForm } from "@/lib/forms/schemas";
+import {
+  mapToolRequestRecordToUi,
+  toolRequestStatusMeta,
+  uiToApiToolRequestStatus,
+  type ToolRequest,
+} from "@/lib/tool-requests";
+import { mapToolRecordToUi } from "@/lib/tools/tool-records";
+import { cn } from "@/lib/utils";
+import type { Tool } from "@/types";
 
-type ToolTab = 'all' | 'pdf' | 'embed' | 'requests';
+type ToolTab = "all" | "pdf" | "embed" | "requests";
 
-const iconMap: Record<Tool['iconKey'], LucideIcon> = {
+const iconMap: Record<Tool["iconKey"], LucideIcon> = {
   canvas: LayoutGrid,
   document: FileText,
   timer: Timer,
@@ -56,9 +73,17 @@ const iconMap: Record<Tool['iconKey'], LucideIcon> = {
   calendar: CalendarDays,
 };
 
-function ToolCard({ tool, onClick }: { tool: Tool; onClick?: () => void }) {
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function ToolCard({ tool, onClick }: { tool: Tool; onClick: () => void }) {
   const Icon = iconMap[tool.iconKey] ?? Wrench;
-  const isOnline = tool.type === 'embed';
+  const isOnline = tool.type === "embed";
   return (
     <Card
       onClick={onClick}
@@ -67,21 +92,23 @@ function ToolCard({ tool, onClick }: { tool: Tool; onClick?: () => void }) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div
           className={cn(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl',
-            isOnline ? 'bg-bid-light' : 'bg-info-light',
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+            isOnline ? "bg-bid-light" : "bg-info-light",
           )}
         >
           <Icon
-            className={cn('h-6 w-6', isOnline ? 'text-bid' : 'text-info')}
+            className={cn("h-6 w-6", isOnline ? "text-bid" : "text-info")}
             strokeWidth={1.7}
           />
         </div>
-        <Badge tone={isOnline ? 'green' : 'blue'}>
-          {isOnline ? 'Online tool' : 'PDF resource'}
+        <Badge tone={isOnline ? "green" : "blue"}>
+          {isOnline ? "Online tool" : "PDF resource"}
         </Badge>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-base font-semibold leading-tight text-ink transition group-hover:text-bid-dark">{tool.name}</div>
+        <div className="text-base font-semibold leading-tight text-ink transition group-hover:text-bid-dark">
+          {tool.name}
+        </div>
         <div className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">
           {tool.description}
         </div>
@@ -90,63 +117,86 @@ function ToolCard({ tool, onClick }: { tool: Tool; onClick?: () => void }) {
   );
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 function RequestToolModal({
   open,
+  busy,
   onOpenChange,
-  onRequestCreated,
+  onSubmit,
 }: {
   open: boolean;
+  busy: boolean;
   onOpenChange: (open: boolean) => void;
-  onRequestCreated: (values: ToolRequestForm) => void;
+  onSubmit: (values: ToolRequestForm) => void;
 }) {
+  const [areaSearch, setAreaSearch] = React.useState("");
+  const areas = useLazyToolAreasQuery({
+    enabled: open,
+    search: areaSearch || undefined,
+    active: true,
+    take: 20,
+  });
   const form = useForm<ToolRequestForm>({
     resolver: zodResolver(toolRequestSchema),
-    defaultValues: { name: '', category: '', neededBy: '', reason: '' },
+    defaultValues: { name: "", category: "", neededBy: "", reason: "" },
   });
+  const areaOptions =
+    areas.data?.pages.flatMap((page) =>
+      page.items.map((area) => ({ value: area.id, label: area.name })),
+    ) ?? [];
 
-  const onSubmit = (values: ToolRequestForm) => {
-    onRequestCreated(values);
-    onOpenChange(false);
-    form.reset();
-  };
+  const submit = (values: ToolRequestForm) => onSubmit(values);
 
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Request a tool">
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <FormField label="Tool name or idea" error={form.formState.errors.name?.message}>
-          <FormInput placeholder="e.g. Cash flow forecasting tool" {...form.register('name')} />
+      <form onSubmit={form.handleSubmit(submit)}>
+        <FormField
+          label="Tool name or idea"
+          error={form.formState.errors.name?.message}
+        >
+          <FormInput
+            placeholder="e.g. Cash flow forecasting tool"
+            {...form.register("name")}
+          />
         </FormField>
-        <FormField label="Tool area" error={form.formState.errors.category?.message}>
-          <FormSelect
-            value={form.watch('category')}
-            onValueChange={(value) => form.setValue('category', value, { shouldValidate: true })}
+        <FormField
+          label="Tool area"
+          error={form.formState.errors.category?.message}
+        >
+          <FormAutocomplete
+            value={form.watch("category")}
+            onValueChange={(value) =>
+              form.setValue("category", value, { shouldValidate: true })
+            }
+            options={areaOptions}
             placeholder="Select the area this tool supports"
-            options={toolAreaOptions}
+            searchPlaceholder="Search tool areas..."
+            emptyMessage="No tool area found."
+            onSearchChange={setAreaSearch}
+            isLoading={areas.isLoading || areas.isFetchingNextPage}
+            hasMore={Boolean(areas.hasNextPage)}
+            onLoadMore={() => void areas.fetchNextPage()}
           />
         </FormField>
         <FormField label="Needed by" optional>
           <DatePicker
-            value={form.watch('neededBy')}
-            onChange={(value) => form.setValue('neededBy', value, { shouldValidate: true })}
+            value={form.watch("neededBy")}
+            onChange={(value) =>
+              form.setValue("neededBy", value, { shouldValidate: true })
+            }
             placeholder="Select a date if time-sensitive"
           />
         </FormField>
-        <FormField label="Why would this help you?">
+        <FormField
+          label="Why would this help you?"
+          error={form.formState.errors.reason?.message}
+        >
           <FormTextarea
             rows={3}
-            placeholder="Tell the BID team what you need and why…"
-            {...form.register('reason')}
+            placeholder="Tell the BID team what you need and why&"
+            {...form.register("reason")}
           />
         </FormField>
-        <Button type="submit" className="w-full">
+        <Button type="submit" className="w-full" isLoading={busy}>
           Send request
         </Button>
       </form>
@@ -167,15 +217,19 @@ function ToolPreviewModal({
 }) {
   if (!tool) return null;
   const Icon = iconMap[tool.iconKey] ?? Wrench;
-  const isOnline = tool.type === 'embed';
+  const isOnline = tool.type === "embed";
   const previewUrl = isOnline ? tool.embedUrl : tool.pdfUrl;
-  const currentIndex = Math.max(tools.findIndex((item) => item.id === tool.id), 0);
+  const currentIndex = Math.max(
+    tools.findIndex((item) => item.id === tool.id),
+    0,
+  );
   const previousTool = currentIndex > 0 ? tools[currentIndex - 1] : undefined;
-  const nextTool = currentIndex < tools.length - 1 ? tools[currentIndex + 1] : undefined;
+  const nextTool =
+    currentIndex < tools.length - 1 ? tools[currentIndex + 1] : undefined;
 
   return (
     <Modal
-      open={!!tool}
+      open={Boolean(tool)}
       onOpenChange={(open) => !open && onClose()}
       title="Tool preview"
       width="media"
@@ -186,72 +240,85 @@ function ToolPreviewModal({
             <div className="flex min-w-0 items-start gap-3">
               <span
                 className={cn(
-                  'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl',
-                  isOnline ? 'bg-bid-light text-bid' : 'bg-info-light text-info',
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                  isOnline
+                    ? "bg-bid-light text-bid"
+                    : "bg-info-light text-info",
                 )}
               >
                 <Icon className="h-6 w-6" strokeWidth={1.8} />
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={isOnline ? 'green' : 'blue'}>{isOnline ? 'Online tool' : 'PDF resource'}</Badge>
+                  <Badge tone={isOnline ? "green" : "blue"}>
+                    {isOnline ? "Online tool" : "PDF resource"}
+                  </Badge>
                   <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
                     {currentIndex + 1} of {tools.length}
                   </span>
                 </div>
-                <div className="mt-2 text-2xl font-semibold leading-tight text-ink">{tool.name}</div>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-muted">{tool.description}</p>
+                <div className="mt-2 text-2xl font-semibold leading-tight text-ink">
+                  {tool.name}
+                </div>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-muted">
+                  {tool.description}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => previousTool && onChangeTool(previousTool)} disabled={!previousTool} className="min-w-[112px]">
-                <ChevronLeft className="h-4 w-4" />
-                Previous
+              <Button
+                variant="outline"
+                onClick={() => previousTool && onChangeTool(previousTool)}
+                disabled={!previousTool}
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
               </Button>
-              <Button variant="outline" onClick={() => nextTool && onChangeTool(nextTool)} disabled={!nextTool} className="min-w-[92px]">
-                Next
-                <ChevronRight className="h-4 w-4" />
+              <Button
+                variant="outline"
+                onClick={() => nextTool && onChangeTool(nextTool)}
+                disabled={!nextTool}
+              >
+                Next <ChevronRight className="h-4 w-4" />
               </Button>
               {previewUrl ? (
-                <Button asChild variant="outline" className="border-bid/35 bg-bid-light/35 text-bid-dark hover:border-bid/50 hover:bg-bid-light hover:text-bid-dark">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-bid/35 bg-bid-light/35 text-bid-dark hover:bg-bid-light"
+                >
                   <a href={previewUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Open
+                    <ExternalLink className="h-4 w-4" /> Open
                   </a>
                 </Button>
               ) : null}
             </div>
           </div>
         </div>
-
         <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-sm">
           {previewUrl ? (
             <iframe
               title={`${tool.name} preview`}
               src={previewUrl}
-              sandbox={isOnline ? 'allow-forms allow-popups allow-same-origin allow-scripts' : undefined}
+              sandbox={
+                isOnline
+                  ? "allow-forms allow-popups allow-same-origin allow-scripts"
+                  : undefined
+              }
               className="h-[56vh] min-h-[430px] w-full bg-white"
             />
           ) : (
             <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">
               <div>
-                <div className="text-base font-semibold text-ink">Preview is not available</div>
+                <div className="text-base font-semibold text-ink">
+                  Preview is not available
+                </div>
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-                  This tool needs a {isOnline ? 'tool link' : 'PDF link'} before it can be previewed.
+                  This tool needs a {isOnline ? "tool link" : "PDF file"} before
+                  it can be previewed.
                 </p>
               </div>
             </div>
           )}
-        </div>
-
-        <div className="flex flex-col gap-2 rounded-2xl border border-black/[0.08] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 text-sm text-ink-muted">
-            {previousTool ? <span className="block truncate">Previous: {previousTool.name}</span> : <span>No previous tool</span>}
-          </div>
-          <div className="text-sm font-medium text-ink-muted">{currentIndex + 1} / {tools.length}</div>
-          <div className="min-w-0 text-sm text-ink-muted sm:text-right">
-            {nextTool ? <span className="block truncate">Next: {nextTool.name}</span> : <span>No next tool</span>}
-          </div>
         </div>
       </div>
     </Modal>
@@ -268,72 +335,64 @@ function ViewToolRequestModal({
   onBrowseTools: () => void;
 }) {
   const statusMeta = request ? toolRequestStatusMeta[request.status] : null;
-  const hasAdminDecision = Boolean(
-    request && (request.status !== 'under-review' || request.adminNote),
-  );
-
   return (
     <Modal
-      open={!!request}
+      open={Boolean(request)}
       onOpenChange={(open) => !open && onClose()}
-      title={request ? request.toolName : 'Tool request'}
+      title={request?.toolName ?? "Tool request"}
       width="wide"
     >
-      {request && statusMeta && (
+      {request && statusMeta ? (
         <div>
           <div className="rounded-xl border border-line bg-surface-subtle p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm text-ink-muted">Request from</div>
-                <div className="mt-1 font-semibold text-ink">{request.businessName}</div>
-                <div className="mt-1 text-sm text-ink-muted">{request.programme}</div>
+                <div className="mt-1 font-semibold text-ink">
+                  {request.businessName}
+                </div>
+                <div className="mt-1 text-sm text-ink-muted">
+                  {request.programme}
+                </div>
               </div>
               <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
             </div>
           </div>
-
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <RequestInfoBlock label="Tool area" value={request.category} />
-            <RequestInfoBlock label="Requested" value={`${formatDate(request.requestedAt)} (${request.requestedAgo})`} />
-            {request.neededBy && <RequestInfoBlock label="Needed by" value={formatDate(request.neededBy)} />}
+            <RequestInfoBlock
+              label="Requested"
+              value={`${formatDate(request.requestedAt)} (${request.requestedAgo})`}
+            />
+            {request.neededBy ? (
+              <RequestInfoBlock
+                label="Needed by"
+                value={formatDate(request.neededBy)}
+              />
+            ) : null}
             <RequestInfoBlock label="Current status" value={statusMeta.label} />
           </div>
-
           <div className="mt-4 grid gap-3">
             <RequestInfoPanel title="Business need" text={request.reason} />
-            {hasAdminDecision && (
-              <div className="rounded-xl border border-line bg-white px-4 py-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-ink">Admin decision</div>
-                    <div className="mt-1 text-sm text-ink-muted">
-                      {request.status === 'in-development' && 'Approved for development'}
-                      {request.status === 'built' && 'Built and added to the tool library'}
-                      {request.status === 'declined' && 'Declined by BID'}
-                      {request.status === 'under-review' && 'BID added a review note'}
-                    </div>
-                  </div>
-                  <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
-                </div>
-                {request.adminNote && (
-                  <p className="mt-3 text-sm leading-6 text-ink-muted">{request.adminNote}</p>
-                )}
-              </div>
-            )}
+            {request.adminNote ? (
+              <RequestInfoPanel
+                title="BID decision note"
+                text={request.adminNote}
+              />
+            ) : null}
           </div>
-
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={onClose}>
               Close
             </Button>
-            {request.status === 'built' && (
+            {request.status === "built" ? (
               <Button type="button" onClick={onBrowseTools}>
                 Browse tools
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </Modal>
   );
 }
@@ -341,7 +400,9 @@ function ViewToolRequestModal({
 function RequestInfoBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-line bg-white px-3 py-2">
-      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">
+        {label}
+      </div>
       <div className="mt-1 text-sm font-medium text-ink">{value}</div>
     </div>
   );
@@ -357,122 +418,124 @@ function RequestInfoPanel({ title, text }: { title: string; text: string }) {
 }
 
 export default function ToolsPage() {
-  const { entrepreneur } = useEntrepreneurStore();
-  const [tab, setTab] = React.useState<ToolTab>('all');
-  const [query, setQuery] = React.useState('');
-  const [page, setPage] = React.useState(1);
+  const [tab, setTab] = React.useState<ToolTab>("all");
+  const [query, setQuery] = React.useState("");
+  const deferredQuery = React.useDeferredValue(query);
   const [pageSize, setPageSize] = React.useState(6);
-  const [requestQuery, setRequestQuery] = React.useState('');
-  const [requestStatus, setRequestStatus] = React.useState<'all' | ToolRequest['status']>('all');
-  const [requestCategory, setRequestCategory] = React.useState('all');
-  const [requestPage, setRequestPage] = React.useState(1);
+  const [requestQuery, setRequestQuery] = React.useState("");
+  const deferredRequestQuery = React.useDeferredValue(requestQuery);
+  const [requestStatus, setRequestStatus] = React.useState<
+    "all" | ToolRequest["status"]
+  >("all");
+  const [requestCategory, setRequestCategory] = React.useState("all");
   const [requestPageSize, setRequestPageSize] = React.useState(10);
   const [requestOpen, setRequestOpen] = React.useState(false);
-  const [activeRequest, setActiveRequest] = React.useState<ToolRequest | null>(null);
+  const [activeRequest, setActiveRequest] = React.useState<ToolRequest | null>(
+    null,
+  );
   const [activeTool, setActiveTool] = React.useState<Tool | null>(null);
-  const [myRequests, setMyRequests] = React.useState<ToolRequest[]>(() =>
-    toolRequests.filter((request) => request.businessName === entrepreneur.businessName),
+  const [areaOpen, setAreaOpen] = React.useState(false);
+  const [areaSearch, setAreaSearch] = React.useState("");
+
+  const toolPage = useToolsPage({
+    search: deferredQuery || undefined,
+    type: tab === "pdf" ? "pdf" : tab === "embed" ? "embedded_tool" : undefined,
+    take: pageSize,
+  });
+  const requestPage = useToolRequestsPage({
+    search: deferredRequestQuery || undefined,
+    status:
+      requestStatus === "all"
+        ? undefined
+        : uiToApiToolRequestStatus[requestStatus],
+    toolAreaId: requestCategory === "all" ? undefined : requestCategory,
+    take: requestPageSize,
+  });
+  const requestMutation = useCreateToolRequestMutation({
+    onSuccess: (record) => {
+      toast.success("Request sent to BID team", { description: record.title });
+      setRequestOpen(false);
+    },
+    onError: (error) =>
+      toast.error("Could not send request", { description: error.message }),
+  });
+  const areas = useLazyToolAreasQuery({
+    enabled: areaOpen,
+    search: areaSearch || undefined,
+    active: true,
+    take: 20,
+  });
+
+  const tools: Tool[] = React.useMemo<Tool[]>(
+    () => toolPage.rows.map(mapToolRecordToUi),
+    [toolPage.rows],
   );
-
-  const accessibleTools = React.useMemo(
-    () => tools.filter((tool) => isToolVisibleToEntrepreneur(tool, entrepreneur)),
-    [entrepreneur],
+  const requests = React.useMemo(
+    () => requestPage.rows.map(mapToolRequestRecordToUi),
+    [requestPage.rows],
   );
-
-  const filtered = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return accessibleTools.filter((tool) => {
-      const matchesTab = tab === 'requests' ? false : tab === 'all' || tool.type === tab;
-      const matchesQuery =
-        !needle ||
-        [tool.name, tool.description, tool.type]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-      return matchesTab && matchesQuery;
-    });
-  }, [accessibleTools, query, tab]);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [query, tab, pageSize]);
-
-  React.useEffect(() => {
-    setRequestPage(1);
-  }, [requestQuery, requestStatus, requestCategory, requestPageSize]);
-
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
-
-  const filteredRequests = React.useMemo(() => {
-    const needle = requestQuery.trim().toLowerCase();
-    return myRequests.filter((request) => {
-      const matchesQuery =
-        !needle ||
-        [request.toolName, request.reason, request.category, request.status, request.requestedAgo]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-      const matchesStatus = requestStatus === 'all' || request.status === requestStatus;
-      const matchesCategory = requestCategory === 'all' || request.category === requestCategory;
-      return matchesQuery && matchesStatus && matchesCategory;
-    });
-  }, [myRequests, requestCategory, requestQuery, requestStatus]);
-
-  const requestRows = React.useMemo(() => {
-    const start = (requestPage - 1) * requestPageSize;
-    return filteredRequests.slice(start, start + requestPageSize);
-  }, [filteredRequests, requestPage, requestPageSize]);
+  const areaOptions = [
+    { value: "all", label: "All tool areas" },
+    ...(areas.data?.pages.flatMap((page) => page.items) ?? []).map((area) => ({
+      value: area.id,
+      label: area.name,
+    })),
+  ];
 
   const requestColumns: Column<ToolRequest>[] = [
     {
-      key: 'action',
-      header: 'Action',
+      key: "action",
+      header: "Action",
       cell: (request) => (
         <RowActions
           actions={[
-            { label: 'View request', onSelect: () => setActiveRequest(request) },
+            {
+              label: "View request",
+              onSelect: () => setActiveRequest(request),
+            },
           ]}
         />
       ),
-      className: 'w-[84px]',
+      className: "w-[84px]",
     },
     {
-      key: 'request',
-      header: 'Request',
+      key: "request",
+      header: "Request",
       cell: (request) => (
         <div className="min-w-[280px] max-w-[520px]">
           <button
             type="button"
             onClick={() => setActiveRequest(request)}
-            className="text-left font-medium text-ink transition hover:text-bid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+            className="text-left font-medium text-ink transition hover:text-bid"
           >
             {request.toolName}
           </button>
-          <div className="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">{request.reason}</div>
+          <div className="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">
+            {request.reason}
+          </div>
         </div>
       ),
     },
     {
-      key: 'area',
-      header: 'Tool area',
+      key: "area",
+      header: "Tool area",
       cell: (request) => <Badge tone="blue">{request.category}</Badge>,
     },
     {
-      key: 'timeline',
-      header: 'Timeline',
+      key: "timeline",
+      header: "Timeline",
       cell: (request) => (
         <div className="min-w-[150px] text-sm text-ink-muted">
           <div>Requested {request.requestedAgo}</div>
-          {request.neededBy && <div>Needed by {formatDate(request.neededBy)}</div>}
+          {request.neededBy ? (
+            <div>Needed by {formatDate(request.neededBy)}</div>
+          ) : null}
         </div>
       ),
     },
     {
-      key: 'status',
-      header: 'Status',
+      key: "status",
+      header: "Status",
       cell: (request) => {
         const meta = toolRequestStatusMeta[request.status];
         return <Badge tone={meta.tone}>{meta.label}</Badge>;
@@ -480,95 +543,109 @@ export default function ToolsPage() {
     },
   ];
 
-  const createToolRequest = (values: ToolRequestForm) => {
-    const request: ToolRequest = {
-      id: `tr-${Date.now()}`,
-      businessName: entrepreneur.businessName,
-      requesterName: entrepreneur.representative,
-      programme: formatProgrammeAccess(entrepreneur),
-      toolName: values.name,
-      category: values.category,
-      reason: values.reason || 'No additional context provided.',
-      requestedAt: '2026-07-07',
-      requestedAgo: 'Just now',
-      neededBy: values.neededBy || undefined,
-      status: 'under-review',
-    };
-    setMyRequests((current) => [request, ...current]);
-    toast.success('Request sent to BID team!', { description: values.name });
-  };
-
   return (
     <>
       <PageHeader
         title="Entrepreneur Tools"
         description="Downloadable PDF resources and embedded online tools"
         actions={
-          <Button onClick={() => setRequestOpen(true)}>
-            + Request a tool
-          </Button>
+          <Button onClick={() => setRequestOpen(true)}>+ Request a tool</Button>
         }
       />
       <Tabs
         value={tab}
         onChange={setTab}
         tabs={[
-          { value: 'all', label: 'All tools' },
-          { value: 'pdf', label: 'PDF resources' },
-          { value: 'embed', label: 'Online tools' },
-          { value: 'requests', label: 'My requests' },
+          { value: "all", label: "All tools" },
+          { value: "pdf", label: "PDF resources" },
+          { value: "embed", label: "Online tools" },
+          { value: "requests", label: "My requests" },
         ]}
       />
-      {tab === 'requests' ? (
+
+      {tab === "requests" ? (
         <Card>
           <CardHeader
             title="Your tool requests"
             description="Track requests you have sent to BID and the admin decision state."
-            actions={<Badge tone="neutral">{filteredRequests.length} request{filteredRequests.length === 1 ? '' : 's'}</Badge>}
+            actions={
+              <Badge tone="neutral">{requestPage.totalItems} requests</Badge>
+            }
           />
           <TableToolbar>
             <div>
-              <div className="text-sm font-medium text-ink">Filter requests</div>
-              <div className="mt-0.5 text-sm text-ink-muted">Search by request, tool area, status, or business need.</div>
+              <div className="text-sm font-medium text-ink">
+                Filter requests
+              </div>
+              <div className="mt-0.5 text-sm text-ink-muted">
+                Search by request, tool area, status, or business need.
+              </div>
             </div>
             <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[260px_180px_180px]">
               <TableFilterInput
                 icon
                 placeholder="Search requests..."
                 value={requestQuery}
-                onChange={(event) => setRequestQuery(event.target.value)}
+                onChange={(event) => {
+                  setRequestQuery(event.target.value);
+                  requestPage.resetPagination();
+                }}
               />
-              <TableFilterSelect value={requestStatus} onChange={(event) => setRequestStatus(event.target.value as typeof requestStatus)}>
+              <TableFilterSelect
+                value={requestStatus}
+                onChange={(event) => {
+                  setRequestStatus(event.target.value as typeof requestStatus);
+                  requestPage.resetPagination();
+                }}
+              >
                 <option value="all">All statuses</option>
                 {Object.entries(toolRequestStatusMeta).map(([value, meta]) => (
-                  <option key={value} value={value}>{meta.label}</option>
+                  <option key={value} value={value}>
+                    {meta.label}
+                  </option>
                 ))}
               </TableFilterSelect>
               <TableFilterAutocomplete
                 value={requestCategory}
-                onValueChange={setRequestCategory}
-                options={[{ value: 'all', label: 'All tool areas' }, ...toolAreaOptions]}
+                onValueChange={(value) => {
+                  setRequestCategory(value);
+                  requestPage.resetPagination();
+                }}
+                options={areaOptions}
                 placeholder="All tool areas"
                 searchPlaceholder="Search tool areas..."
                 emptyMessage="No tool area found."
+                onOpenChange={setAreaOpen}
+                onSearchChange={setAreaSearch}
+                isLoading={areas.isLoading || areas.isFetchingNextPage}
+                hasMore={Boolean(areas.hasNextPage)}
+                onLoadMore={() => void areas.fetchNextPage()}
               />
             </div>
           </TableToolbar>
-          <DataTable
-            columns={requestColumns}
-            rows={requestRows}
-            rowKey={(request) => request.id}
-            emptyMessage="No tool requests match this view."
-            tableClassName="min-w-[920px]"
-          />
+          {requestPage.isLoading ? (
+            <TableSkeleton rows={5} columns={5} />
+          ) : requestPage.isError ? (
+            <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">
+              {requestPage.error.message}
+            </div>
+          ) : (
+            <DataTable
+              columns={requestColumns}
+              rows={requests}
+              rowKey={(request) => request.id}
+              emptyMessage="No tool requests match this view."
+              tableClassName="min-w-[920px]"
+            />
+          )}
           <TablePagination
-            page={requestPage}
+            page={requestPage.page}
             pageSize={requestPageSize}
-            totalItems={filteredRequests.length}
-            onPageChange={setRequestPage}
+            totalItems={requestPage.totalItems}
+            onPageChange={requestPage.setPage}
             onPageSizeChange={(next) => {
               setRequestPageSize(next);
-              setRequestPage(1);
+              requestPage.resetPagination();
             }}
           />
         </Card>
@@ -578,7 +655,7 @@ export default function ToolsPage() {
             <div>
               <div className="text-sm font-medium text-ink">Browse tools</div>
               <div className="mt-0.5 text-sm text-ink-muted">
-                {filtered.length} tool{filtered.length === 1 ? '' : 's'} available in this view.
+                {toolPage.totalItems} tools available in this view.
               </div>
             </div>
             <div className="w-full sm:w-[320px]">
@@ -586,43 +663,80 @@ export default function ToolsPage() {
                 icon
                 placeholder="Search tools..."
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  toolPage.resetPagination();
+                }}
               />
             </div>
           </TableToolbar>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {pageRows.map((t) => (
-              <ToolCard
-                key={t.id}
-                tool={t}
-                onClick={() => setActiveTool(t)}
-              />
-            ))}
-          </div>
+          {toolPage.isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }, (_, index) => (
+                <Skeleton key={index} className="h-[170px] rounded-xl" />
+              ))}
+            </div>
+          ) : toolPage.isError ? (
+            <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">
+              {toolPage.error.message}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {tools.map((tool) => (
+                <ToolCard
+                  key={tool.id}
+                  tool={tool}
+                  onClick={() => setActiveTool(tool)}
+                />
+              ))}
+              {tools.length === 0 ? (
+                <div className="col-span-full rounded-xl border border-dashed border-line-strong bg-surface-subtle px-4 py-10 text-center text-sm text-ink-muted">
+                  No tools match this view.
+                </div>
+              ) : null}
+            </div>
+          )}
           <TablePagination
-            page={page}
+            page={toolPage.page}
             pageSize={pageSize}
-            totalItems={filtered.length}
+            totalItems={toolPage.totalItems}
             pageSizeOptions={[6, 12, 24]}
-            onPageChange={setPage}
+            onPageChange={toolPage.setPage}
             onPageSizeChange={(next) => {
               setPageSize(next);
-              setPage(1);
+              toolPage.resetPagination();
             }}
           />
         </Card>
       )}
 
-      <RequestToolModal open={requestOpen} onOpenChange={setRequestOpen} onRequestCreated={createToolRequest} />
+      <RequestToolModal
+        open={requestOpen}
+        busy={requestMutation.isPending}
+        onOpenChange={setRequestOpen}
+        onSubmit={(values) =>
+          requestMutation.mutate({
+            title: values.name,
+            toolAreaId: values.category,
+            businessNeed: values.reason,
+            neededBy: values.neededBy || null,
+          })
+        }
+      />
       <ViewToolRequestModal
         request={activeRequest}
         onClose={() => setActiveRequest(null)}
         onBrowseTools={() => {
           setActiveRequest(null);
-          setTab('all');
+          setTab("all");
         }}
       />
-      <ToolPreviewModal tool={activeTool} tools={filtered} onChangeTool={setActiveTool} onClose={() => setActiveTool(null)} />
+      <ToolPreviewModal
+        tool={activeTool}
+        tools={tools}
+        onChangeTool={setActiveTool}
+        onClose={() => setActiveTool(null)}
+      />
     </>
   );
 }

@@ -204,7 +204,7 @@ export const toolRequestSchema = z.object({
   name: z.string().min(1, 'Tool name or idea is required'),
   category: z.string().min(1, 'Select a tool area'),
   neededBy: z.string().optional(),
-  reason: z.string().optional(),
+  reason: z.string().trim().min(10, 'Explain the business need in at least 10 characters'),
 });
 export type ToolRequestForm = z.infer<typeof toolRequestSchema>;
 
