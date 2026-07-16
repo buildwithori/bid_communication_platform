@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { ApiErrorDetail, ApiErrorResponse } from '@bid/shared';
 import { RequestWithContext } from '../request-context/request-context.types';
 
@@ -6,6 +6,8 @@ type ResponseLike = { status(code: number): ResponseLike; json(body: ApiErrorRes
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();
     const request = http.getRequest<RequestWithContext>();
@@ -13,6 +15,17 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
     const messages = this.messages(exceptionResponse);
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(JSON.stringify({
+        event: 'http.request.failed',
+        status,
+        method: request.method ?? 'unknown',
+        path: request.originalUrl ?? request.url ?? 'unknown',
+        requestId: request.requestId ?? 'unknown',
+        correlationId: request.correlationId ?? request.requestId ?? 'unknown',
+        exception: exception instanceof Error ? exception.name : 'UnknownError',
+      }));
+    }
 
     response.status(status).json({
       error: {

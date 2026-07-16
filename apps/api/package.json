@@ -19,7 +19,8 @@
     "start:worker:dev:docker": "nest start --watch --entryFile worker --path tsconfig.worker-docker.json",
     "test:jobs": "node --test -r ts-node/register test/jobs.test.ts",
     "test:dashboards": "node --test -r ts-node/register test/dashboards.test.ts",
-    "test:reporting": "node --test -r ts-node/register test/reporting.test.ts"
+    "test:reporting": "node --test -r ts-node/register test/reporting.test.ts",
+    "test:hardening": "node --test -r ts-node/register test/hardening.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",

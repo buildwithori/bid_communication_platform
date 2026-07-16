@@ -128,6 +128,7 @@ test("report export status is scoped to the requesting admin", async () => {
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   await service.get({ id: "admin-1" } as never, "export-1");
 

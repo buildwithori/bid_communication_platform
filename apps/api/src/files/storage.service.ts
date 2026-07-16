@@ -109,6 +109,11 @@ export class StorageService {
     return new Uint8Array(await response.arrayBuffer());
   }
 
+  async healthCheck() {
+    await this.statObject('__bid-hub-healthcheck__');
+    return { provider: 's3-compatible' as const };
+  }
+
   async putObject(storageKey: string, mimeType: string, body: Uint8Array) {
     const signed = this.presign(
       { method: 'PUT', storageKey, mimeType, expiresInSeconds: 300 },

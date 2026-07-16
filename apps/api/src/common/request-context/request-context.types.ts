@@ -2,8 +2,12 @@ import type { User } from "@prisma/client";
 
 export type RequestWithContext = {
   headers: Record<string, string | string[] | undefined>;
+  method?: string;
+  originalUrl?: string;
+  url?: string;
   ip?: string;
   requestId?: string;
+  correlationId?: string;
   user?: User;
 };
 

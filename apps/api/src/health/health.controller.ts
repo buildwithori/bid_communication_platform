@@ -1,34 +1,31 @@
 import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Public } from "../auth/decorators/public.decorator";
-import { JobsHealthService } from "../jobs/jobs-health.service";
+import { OperationalHealthService } from "./operational-health.service";
 
 @Public()
 @Controller()
 export class HealthController {
   constructor(
     private readonly config: ConfigService,
-    private readonly jobs: JobsHealthService,
+    private readonly operational: OperationalHealthService,
   ) {}
 
   @Get("health")
   async getHealth() {
-    try {
-      const backgroundJobs = await this.jobs.status();
-      return {
-        app: "BID Hub",
-        status: "ok",
-        environment: this.config.get("NODE_ENV"),
-        backgroundJobs,
-        timestamp: new Date().toISOString(),
-      };
-    } catch {
-      throw new ServiceUnavailableException({
-        app: "BID Hub",
-        status: "unhealthy",
-        dependency: "background-jobs",
-        timestamp: new Date().toISOString(),
-      });
+    const health = await this.operational.status();
+    if (health.status === "unhealthy") {
+      throw new ServiceUnavailableException(
+        `Required dependencies unavailable: ${health.failed.join(", ")}.`,
+      );
     }
+    return {
+      app: "BID Hub",
+      status: health.status,
+      environment: this.config.get("NODE_ENV"),
+      dependencies: health.dependencies,
+      integrations: health.integrations,
+      timestamp: new Date().toISOString(),
+    };
   }
 }

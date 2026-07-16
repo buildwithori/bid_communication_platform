@@ -7,6 +7,7 @@ import {
 import { Observable } from "rxjs";
 import { RequestContextService } from "./request-context.service";
 import { RequestWithContext } from "./request-context.types";
+import { normalizeTraceId } from "./trace-id";
 
 @Injectable()
 export class RequestContextInterceptor implements NestInterceptor {
@@ -19,13 +20,15 @@ export class RequestContextInterceptor implements NestInterceptor {
     const request = executionContext
       .switchToHttp()
       .getRequest<RequestWithContext>();
+    const response = executionContext.switchToHttp().getResponse<{
+      setHeader(name: string, value: string): void;
+    }>();
     const userAgent = request.headers["user-agent"];
     const correlationHeader = request.headers["x-correlation-id"];
     const requestId = request.requestId ?? "unknown";
-    const correlationId =
-      typeof correlationHeader === "string" && correlationHeader.trim()
-        ? correlationHeader.trim()
-        : requestId;
+    const correlationId = normalizeTraceId(correlationHeader) ?? requestId;
+    request.correlationId = correlationId;
+    response.setHeader("x-correlation-id", correlationId);
 
     return new Observable((subscriber) =>
       this.context.run(

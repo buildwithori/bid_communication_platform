@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import type { Queue } from "bullmq";
 import * as ExcelJS from "exceljs";
+import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
 import { FilesService } from "../files/files.service";
 import { StorageService } from "../files/storage.service";
@@ -30,6 +31,7 @@ const MIME_TYPES: Record<ReportExportFormat, string> = {
 export class ReportExportService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
     private readonly reporting: ReportingService,
     private readonly storage: StorageService,
     private readonly files: FilesService,
@@ -45,16 +47,31 @@ export class ReportExportService {
       });
       if (!exists) throw new BadRequestException("Programme was not found.");
     }
-    const report = await this.prisma.reportExport.create({
-      data: {
-        requestedById: user.id,
-        programmeId: dto.programmeId ?? null,
-        format: dto.format,
-        dateFrom: period.from,
-        dateTo: period.to,
+    const report = await this.audit.capture(
+      {
+        action: "reports.export.requested",
+        entityType: "reportExport",
+        entityId: (result) => result.id,
+        summary: "Requested reporting export",
+        payload: {
+          format: dto.format,
+          programmeId: dto.programmeId ?? null,
+          dateFrom: period.from.toISOString(),
+          dateTo: period.to.toISOString(),
+        },
       },
-      include: { programme: { select: { name: true } } },
-    });
+      (tx) =>
+        tx.reportExport.create({
+          data: {
+            requestedById: user.id,
+            programmeId: dto.programmeId ?? null,
+            format: dto.format,
+            dateFrom: period.from,
+            dateTo: period.to,
+          },
+          include: { programme: { select: { name: true } } },
+        }),
+    );
     try {
       await this.queue.add(
         JOB_NAMES.generateReportExport,
