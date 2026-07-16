@@ -21,6 +21,7 @@ export class ToolsController {
   constructor(private readonly toolsService: ToolsService) {}
 
   @Get()
+  @Roles(UserRole.admin, UserRole.entrepreneur)
   listTools(@CurrentUser() user: User, @Query() query: ToolQueryDto) {
     return this.toolsService.listTools(user, query);
   }
@@ -77,6 +78,7 @@ export class ToolsController {
   }
 
   @Get(":id")
+  @Roles(UserRole.admin, UserRole.entrepreneur)
   getTool(@CurrentUser() user: User, @Param("id") id: string) {
     return this.toolsService.getTool(user, id);
   }
