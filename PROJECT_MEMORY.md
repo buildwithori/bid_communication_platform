@@ -274,7 +274,7 @@ Session workflow rules:
 
 - Background execution is split from the HTTP API. `AppModule` registers BullMQ queues and idempotent Job Schedulers; `WorkerModule` is bootstrapped through `src/worker.ts` as a separate local and production Compose service and owns all processors. Never reintroduce processor providers or polling timers into the API process.
 - Redis is an internal-only Compose dependency. `REDIS_URL` is required and supports authenticated `redis://` and TLS `rediss://` URLs. The shared queue prefix is `bid-hub`.
-- Named queues currently cover audit outbox processing, notification email delivery, recurring deliverable synchronization, and transactional auth/invitation email. Scheduled scan jobs use BullMQ Job Schedulers; processors drain bounded batches and rely on database claims/unique constraints for idempotency.
+- Named queues currently cover audit outbox processing, notification email delivery, recurring deliverable synchronization, transactional auth/invitation email, and report export generation. Scheduled scan jobs use BullMQ Job Schedulers; processors drain bounded batches and rely on database claims/unique constraints for idempotency.
 - BullMQ jobs use bounded attempts, exponential backoff, and capped completed/failed retention. Transactional email jobs containing short-lived tokens are deleted immediately after success and retained for at most one day on terminal failure. Templates remain owned by their feature modules and are rendered only in the worker.
 - Audit and notification database rows remain the durable business source of truth. Both recover stale processing locks; audit failures now persist `nextAttemptAt` and bounded delayed retries. BullMQ controls execution but does not replace transactional outbox guarantees.
 - API health must validate Redis connectivity and the TTL-backed worker heartbeat. A reachable Redis server without a live consumer is unhealthy. Local and production Compose both run a dedicated worker; local API and worker watch output use separate named volumes.
@@ -287,3 +287,12 @@ Session workflow rules:
 - Entrepreneur dashboard data is authenticated-user scoped. Recent activity comes from durable notifications with safe resource action URLs, not invented client-side activity.
 - Dashboard operational lists remain compact previews and link to full management views. Any growing queue embedded in a dashboard uses backend search/filter/cursor pagination.
 - Admin, trainer, and entrepreneur dashboards each retain a page-specific skeleton plus explicit error and minimal-data empty states.
+
+## Reporting And Analytics Completion (2026-07-16)
+
+- Feature 15 is complete. The admin reporting page consumes only `lib/api/reporting/` hooks; all aggregates, filtering, searching, counts, attribution, and overdue rules remain backend-owned.
+- Jobs use periodic updates whose periods overlap the selected range. Fundraising uses rounds dated in range and only the company default currency; unlike currencies are never combined. Programme-linked and company-wide/unattributed contributions remain explicit.
+- Overdue periodic updates derive from the company overdue-days setting and the latest submission, or membership join date when none exists. The queue supports server search, programme/priority filters, total counts, and cursor lookahead without hidden caps.
+- Report exports are durable requester-owned records. A dedicated bounded BullMQ processor builds CSV or XLSX, pages through all overdue rows, stores the result privately, and exposes it only through an expiring signed download URL.
+- Reporting reminder actions recheck current overdue eligibility before creating a recipient-scoped notification. The reporting flow supports email or in-app delivery and links to `/entrepreneur/profile`; it does not expose the unsupported generic message-priority field.
+- The reporting view has a page-specific skeleton, explicit source/range/currency notes, error and empty states, lazy programme autocompletes, inline export/reminder spinners, polling, and duplicate-submit protection.

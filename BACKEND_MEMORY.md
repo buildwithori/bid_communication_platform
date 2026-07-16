@@ -382,7 +382,7 @@ Before merging backend work, ask:
 
 - `JobsModule` owns the Redis connection and named queue registrations. `JobSchedulingModule` belongs only to the HTTP API and upserts BullMQ Job Schedulers. `WorkerModule`, started from `worker.ts`, belongs only to the dedicated worker process and registers processors.
 - Do not import processors into `AppModule` or add `setInterval` polling back to feature services. API replicas may safely upsert the same scheduler IDs; database claims and unique constraints remain the final idempotency boundary.
-- Current queues are `bid-audit`, `bid-notification-delivery`, `bid-recurring-deliverables`, and `bid-transactional-email`, under the `bid-hub` Redis prefix. Processor concurrency is intentionally bounded; periodic processors drain at most twenty database batches per job so they make progress without unbounded work.
+- Current queues are `bid-audit`, `bid-notification-delivery`, `bid-recurring-deliverables`, `bid-transactional-email`, and `bid-report-exports`, under the `bid-hub` Redis prefix. Processor concurrency is intentionally bounded; periodic processors drain at most twenty database batches per job so they make progress without unbounded work.
 - Auth verification, password reset, welcome, and admin/trainer/entrepreneur invitations enqueue typed jobs. The worker imports module-owned templates, builds all absolute links through `EmailService.appUrl()/logoUrl()`, and sends through SMTP/Mailpit or Resend.
 - Queue defaults are five attempts with exponential backoff and capped retention. Secret-bearing transactional email jobs override successful retention to immediate removal and terminal-failure retention to one day.
 - Audit outbox processing recovers five-minute stale locks, uses atomic claims, creates logs idempotently, stores safe failure text, and schedules database-level retry time. Notification delivery retains its own claim/attempt/delivery status model beneath BullMQ.
@@ -398,3 +398,14 @@ Before merging backend work, ask:
 - Trainer scope is inferred from content attribution and programme access. Entrepreneur scope always begins with the authenticated entrepreneur user ID, including progress, sessions, deliverables, and notification activity.
 - Six-week and six-month series are calculated in the database/query service from authoritative timestamps. Missing periods are returned as zero-value buckets so React only renders the series.
 - Dashboard query paths have compound indexes for membership chronology, active programme grants, fundraising currency/date, and learner completion windows.
+
+## Reporting Aggregate And Export Contracts (2026-07-16)
+
+- `ReportingModule` is admin-only. `GET /reporting/overview` owns jobs, funding, reporting coverage, training progress, and overdue aggregates; `GET /reporting/overdue-updates` owns search, filters, totals, and cursor pagination.
+- Report ranges default to the current UTC calendar year. A date-only end value includes the complete UTC day, invalid/reversed ranges are rejected, and ranges are bounded to ten years.
+- Jobs count periodic-update periods that overlap the report range. Funding counts fundraising-round dates in range and only values matching the company default currency. Do not sum unlike currencies.
+- Programme scope respects access type: assigned programmes require an active entrepreneur grant, while free programmes include all eligible active entrepreneurs. Unattributed jobs/funding remain visible in all-programme reports.
+- Overdue eligibility uses the company `periodicUpdateOverdueAfterDays` setting, primary active-business membership, and the latest submitted update or join date. Reminder submission revalidates this predicate before creating a `system` notification with an internal action URL.
+- `ReportExport` is the durable requester-scoped export aggregate with queued/processing/ready/failed states, attempt/failure metadata, private `FileAsset`, completion time, and expiry. Status and download endpoints always include `requestedById` scope.
+- `bid-report-exports` runs only in the dedicated worker with bounded concurrency and retry. It builds CSV/XLSX from backend aggregates, iterates the complete cursor-paged overdue queue in fixed batches, writes to private S3-compatible storage, and marks the record ready only after the file asset exists.
+- Export downloads use short-lived signed reads after requester ownership and ready-state checks. Redis job state is operational coordination; the database export record is the durable business source of truth.
