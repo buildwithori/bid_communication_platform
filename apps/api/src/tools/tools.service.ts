@@ -294,34 +294,55 @@ export class ToolsService {
   async createTool(user: User, dto: CreateToolDto) {
     await this.validateToolPayload(dto);
     if (dto.pdfAssetId) {
-      await this.files.markReadyForUser(user, dto.pdfAssetId, FileAssetUsage.tool_pdf);
+      await this.files.markReadyForUser(
+        user,
+        dto.pdfAssetId,
+        FileAssetUsage.tool_pdf,
+      );
     }
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const tool = await tx.tool.create({
-        data: {
-          name: dto.name.trim(),
-          description: dto.description.trim(),
+    const created = await this.audit.capture(
+      {
+        action: "tools.created",
+        entityType: "tool",
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Created tool ${name ?? ""}`.trim(),
+        payload: {
           type: dto.type,
-          toolAreaId: dto.toolAreaId,
-          iconKey: dto.iconKey.trim(),
           visibility: dto.visibility,
           status: dto.status,
-          pdfAssetId: dto.pdfAssetId || null,
-          embeddedUrl: dto.embeddedUrl?.trim() || null,
-          createdById: user.id,
-          publishedAt:
-            dto.status === EntrepreneurToolStatus.published ? new Date() : null,
-          archivedAt:
-            dto.status === EntrepreneurToolStatus.archived ? new Date() : null,
         },
-      });
+      },
+      async (tx) => {
+        const tool = await tx.tool.create({
+          data: {
+            name: dto.name.trim(),
+            description: dto.description.trim(),
+            type: dto.type,
+            toolAreaId: dto.toolAreaId,
+            iconKey: dto.iconKey.trim(),
+            visibility: dto.visibility,
+            status: dto.status,
+            pdfAssetId: dto.pdfAssetId || null,
+            embeddedUrl: dto.embeddedUrl?.trim() || null,
+            createdById: user.id,
+            publishedAt:
+              dto.status === EntrepreneurToolStatus.published
+                ? new Date()
+                : null,
+            archivedAt:
+              dto.status === EntrepreneurToolStatus.archived
+                ? new Date()
+                : null,
+          },
+        });
 
-      await this.replaceAudience(tx, tool.id, user.id, dto);
-      return tool.id;
-    });
+        await this.replaceAudience(tx, tool.id, user.id, dto);
+        return tool;
+      },
+    );
 
-    return this.getTool(user, created);
+    return this.getTool(user, created.id);
   }
 
   async updateTool(user: User, id: string, dto: UpsertToolDto) {
@@ -332,46 +353,67 @@ export class ToolsService {
     await this.validateToolPayload(merged);
 
     if (dto.pdfAssetId) {
-      await this.files.markReadyForUser(user, dto.pdfAssetId, FileAssetUsage.tool_pdf);
+      await this.files.markReadyForUser(
+        user,
+        dto.pdfAssetId,
+        FileAssetUsage.tool_pdf,
+      );
     }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.tool.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(dto.description !== undefined
-            ? { description: dto.description.trim() }
-            : {}),
-          ...(dto.type !== undefined ? { type: dto.type } : {}),
-          ...(dto.toolAreaId !== undefined
-            ? { toolAreaId: dto.toolAreaId }
-            : {}),
-          ...(dto.iconKey !== undefined ? { iconKey: dto.iconKey.trim() } : {}),
-          ...(dto.visibility !== undefined
-            ? { visibility: dto.visibility }
-            : {}),
-          ...(dto.pdfAssetId !== undefined
-            ? { pdfAssetId: dto.pdfAssetId || null }
-            : {}),
-          ...(dto.embeddedUrl !== undefined
-            ? { embeddedUrl: dto.embeddedUrl?.trim() || null }
-            : {}),
-          ...(dto.status !== undefined
-            ? this.statusPatch(existing.status, dto.status)
-            : {}),
-          updatedById: user.id,
+    await this.audit.capture(
+      {
+        action: "tools.updated",
+        entityType: "tool",
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Updated tool ${name ?? ""}`.trim(),
+        payload: {
+          previousStatus: existing.status,
+          nextStatus: dto.status ?? existing.status,
+          previousVisibility: existing.visibility,
+          nextVisibility: dto.visibility ?? existing.visibility,
         },
-      });
+      },
+      async (tx) => {
+        const tool = await tx.tool.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(dto.description !== undefined
+              ? { description: dto.description.trim() }
+              : {}),
+            ...(dto.type !== undefined ? { type: dto.type } : {}),
+            ...(dto.toolAreaId !== undefined
+              ? { toolAreaId: dto.toolAreaId }
+              : {}),
+            ...(dto.iconKey !== undefined
+              ? { iconKey: dto.iconKey.trim() }
+              : {}),
+            ...(dto.visibility !== undefined
+              ? { visibility: dto.visibility }
+              : {}),
+            ...(dto.pdfAssetId !== undefined
+              ? { pdfAssetId: dto.pdfAssetId || null }
+              : {}),
+            ...(dto.embeddedUrl !== undefined
+              ? { embeddedUrl: dto.embeddedUrl?.trim() || null }
+              : {}),
+            ...(dto.status !== undefined
+              ? this.statusPatch(existing.status, dto.status)
+              : {}),
+            updatedById: user.id,
+          },
+        });
 
-      if (
-        dto.visibility !== undefined ||
-        dto.programmeIds !== undefined ||
-        dto.entrepreneurUserIds !== undefined ||
-        dto.hiddenEntrepreneurUserIds !== undefined
-      ) {
-        await this.replaceAudience(tx, id, user.id, merged);
-      }
-    });
+        if (
+          dto.visibility !== undefined ||
+          dto.programmeIds !== undefined ||
+          dto.entrepreneurUserIds !== undefined ||
+          dto.hiddenEntrepreneurUserIds !== undefined
+        ) {
+          await this.replaceAudience(tx, id, user.id, merged);
+        }
+        return tool;
+      },
+    );
 
     return this.getTool(user, id);
   }
