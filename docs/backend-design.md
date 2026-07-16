@@ -690,44 +690,43 @@ Rules:
 
 ### Sessions
 
-- `session_requests`
-  - entrepreneur_user_id
-  - requested_by_id
-  - session_type
-  - topic
-  - notes
-  - requested_date
-  - requested_start_time
-  - target_type: specific_user, open_team
-  - target_user_id nullable
-  - status: awaiting_owner, awaiting_trainer, confirmed, declined, cancelled, completed
+Feature 12 uses one durable `sessions` lifecycle aggregate for both requests and confirmed sessions. This avoids duplicate request/session rows and keeps every role on one state machine.
+
 - `sessions`
-  - request_id nullable
   - entrepreneur_user_id
-  - owner_user_id
-  - owner_role
-  - session_type
-  - topic
-  - notes
-  - starts_at
-  - ends_at
-  - provider: google_meet for now
-  - meeting_url
-  - calendar_event_id
-  - status: confirmed, completed, cancelled
+  - programme_id nullable
+  - created_by_id
+  - owner_user_id nullable until accepted
+  - target_type: specific_user, open_team
+  - target_user_id nullable; a specific target must be an active trainer
+  - type: mentor_checkin, office_hours, investor_prep
+  - topic and optional notes
+  - source: entrepreneur_request, team_created
+  - status: requested, confirmed, declined, cancelled, completed
+  - starts_at, ends_at, timezone
+  - meeting_provider
+  - meeting_url nullable
+  - calendar_event_id nullable
+  - declined_reason, cancelled_reason, completed_at
+- `session_request_declines`
+  - session_id
+  - user_id
+  - reason
+  - one row per user/request
+  - an individual decline from an open-team request opts that user out without closing the request
 - `session_reschedules`
-  - session_id or request_id
+  - session_id
   - requested_by_id
   - previous_starts_at
   - previous_ends_at
   - new_starts_at
   - new_ends_at
   - reason
-  - status
 - `session_notes`
   - session_id
   - author_id
   - note
+  - visibility: internal, participant
 - `calendar_connections`
   - user_id
   - provider
@@ -737,15 +736,25 @@ Rules:
   - scopes
   - status
   - last_synced_at
+- `company_settings` session policy
+  - session_working_days
+  - session_workday_start_minutes
+  - session_workday_end_minutes
+  - session_slot_interval_minutes
+  - default_session_duration_minutes
 
 Rules:
 
-- Session requests and confirmed sessions are linked to the entrepreneur user, not the business record.
-- Business names shown in session calendars, admin queues, and trainer queues are derived through the entrepreneur user's business membership.
-- Time slots are computed from selected person/team, date, duration, and calendar availability.
-- Open team requests are accepted by the first eligible admin/trainer.
-- Only users with Google Calendar connection can accept Google Meet ownership.
-- Meeting links are generated in the background when ownership is confirmed.
+- Session records are linked to the entrepreneur user, not the business record.
+- Business names shown in session calendars and queues are derived through the entrepreneur user's primary business membership.
+- Specific-trainer availability is computed only from that active trainer's connected calendar.
+- Open-team slots are returned only when at least one eligible connected admin/trainer is free.
+- Availability combines Google free/busy data with confirmed BID Hub sessions and is rechecked during create, accept, and reschedule.
+- Open-team requests remain requested until the first eligible user accepts atomically.
+- Only users with a connected supported calendar can own a Google Meet session.
+- A real Google Calendar event and Meet link are created during confirmation; placeholder links are never generated.
+- Rescheduling updates the same Google event, records immutable previous/new times and reason, and rolls Calendar back if the database transition loses a race.
+- Internal notes are never returned to entrepreneurs.
 
 ### Tools
 
@@ -1130,9 +1139,9 @@ Current UI fields:
 
 Backend mapping:
 
-- Session requests and confirmed sessions stay separate until accepted/owned.
-- Session requests and confirmed sessions store `entrepreneur_user_id`; business display/reporting is derived through the entrepreneur user's business membership.
-- Google Meet links are generated after ownership confirmation.
+- Requests and confirmed meetings share one durable session lifecycle aggregate so every role reads the same state and no request/session reconciliation is required.
+- Sessions store `entrepreneur_user_id`; business display/reporting is derived through the entrepreneur user's business membership.
+- Google Meet links and Calendar event IDs are created only after ownership confirmation.
 - Tool visibility uses global, programme, and entrepreneur-level access/hidden-override tables. Do not store a giant selected-audience array on `tools`.
 - Tool request admin decisions are persisted and visible to the entrepreneur.
 
@@ -1203,16 +1212,18 @@ Rules:
 - Built should link to the created/published tool when available.
 - Declined requires a decision note.
 
-### Session Request
+### Session Lifecycle
 
 ```text
-Awaiting owner -> Confirmed -> Completed
-Awaiting owner -> Declined
+Requested -> Confirmed -> Completed
+Requested (specific trainer) -> Declined
+Requested -> Cancelled
 Confirmed -> Cancelled
-Confirmed -> Rescheduled -> Confirmed
+Confirmed --reschedule event--> Confirmed
+Requested (open team) --member opt-out--> Requested
 ```
 
-Specific trainer request can be represented as awaiting that trainer. Open BID team request remains `awaiting_owner` until accepted.
+A specific-trainer request is visible and actionable only to that trainer. An open-team request remains `requested` until the first eligible connected admin/trainer accepts it atomically; an individual opt-out does not change the shared request status. Rescheduling is immutable history, not a temporary session status.
 
 ## 12. API Design
 
@@ -1352,15 +1363,16 @@ Deliverables:
 Sessions:
 
 - `GET /sessions`
-- `POST /session-requests`
-- `GET /session-requests`
-- `POST /session-requests/:id/accept`
-- `POST /session-requests/:id/decline`
+- `GET /sessions/:id`
+- `GET /sessions/team-members`
+- `GET /sessions/availability`
 - `POST /sessions`
-- `POST /sessions/:id/reschedule`
+- `POST /sessions/:id/accept`
+- `POST /sessions/:id/decline`
+- `POST /sessions/:id/cancel`
+- `PATCH /sessions/:id/reschedule`
 - `POST /sessions/:id/complete`
 - `POST /sessions/:id/notes`
-- `GET /availability`
 
 Tools:
 
@@ -1948,28 +1960,28 @@ These decisions remove the remaining backend ambiguity before implementation:
 
 ## 27. Decision Log
 
-| Date | Decision | Rationale |
-| --- | --- | --- |
-| 2026-07-10 | Use NestJS for the backend. | The product now needs a dedicated backend with clear modules, services, jobs, auth, files, calendar, and video workflows. |
-| 2026-07-11 | Use the recommended monorepo shape. | Backend work should organize the repo into `apps/web`, `apps/api`, `packages/shared`, and root `prisma` instead of adding a root-level `backend/` app. |
-| 2026-07-10 | Use PostgreSQL with Prisma. | Relational domain, strong migrations, typed access, and good NestJS fit. |
-| 2026-07-10 | Own auth in NestJS. | Invitations, roles, verification, reset, Google signup, and future permissions should live near backend policies. |
+| Date       | Decision                                                                                    | Rationale                                                                                                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-10 | Use NestJS for the backend.                                                                 | The product now needs a dedicated backend with clear modules, services, jobs, auth, files, calendar, and video workflows.                                                                                                            |
+| 2026-07-11 | Use the recommended monorepo shape.                                                         | Backend work should organize the repo into `apps/web`, `apps/api`, `packages/shared`, and root `prisma` instead of adding a root-level `backend/` app.                                                                               |
+| 2026-07-10 | Use PostgreSQL with Prisma.                                                                 | Relational domain, strong migrations, typed access, and good NestJS fit.                                                                                                                                                             |
+| 2026-07-10 | Own auth in NestJS.                                                                         | Invitations, roles, verification, reset, Google signup, and future permissions should live near backend policies.                                                                                                                    |
 | 2026-07-11 | Users have one active role, no role changes at launch, and no role-specific profile tables. | Keeps auth/routing simple and avoids duplicate `admin_profiles`, `trainer_profiles`, and `entrepreneur_profiles` tables. Users must be created/invited through the correct role flow; business-specific data lives in domain tables. |
-| 2026-07-10 | Use BullMQ with Redis for jobs. | Reliable local/production queue model with retries, scheduling, and NestJS processors. |
-| 2026-07-10 | Use Mux for video. | Training video needs upload, transcoding, adaptive playback, thumbnails, and analytics. |
-| 2026-07-11 | Use separate local and production Docker Compose setup. | Local Compose supports development with Mailpit and hot reload; production Compose uses built frontend/API images, production env, restart policies, and health checks. |
-| 2026-07-11 | Use DigitalOcean Spaces for non-video files. | Deployment target is DigitalOcean, and Spaces provides S3-compatible storage for PDFs, deliverables, tools, and exports. |
-| 2026-07-11 | Use Resend with React Email and Mailpit. | Resend handles production delivery, React Email gives reusable branded templates, and Mailpit catches local development email. |
-| 2026-07-10 | Google Calendar/Meet first, provider-agnostic model. | Current product focuses on Google Meet, but future providers should not require schema redesign. |
-| 2026-07-12 | Run the first production deployment on one DigitalOcean Droplet with Docker Compose. | The initial operations model should stay simple: frontend, API, database, Redis, workers, and supporting services run as separate Compose services on one server. |
-| 2026-07-12 | Use httpOnly cookie sessions for browser auth. | Keeps tokens out of client JavaScript and fits the web-first app. |
-| 2026-07-12 | Do not support multi-business entrepreneur users at launch. | The product flow treats one entrepreneur account as belonging to one business; business switching would add complexity without a current requirement. |
-| 2026-07-12 | Give admins full access at launch. | Permission groups can be designed later; current admin workflows need broad operational access. |
-| 2026-07-12 | Keep trainers read-only except sessions and deliverable reviews. | Trainers support learning and feedback, but admins remain the owners of programme, content, entrepreneur, and settings management. |
-| 2026-07-12 | Use signed Mux playback from day one. | Training content is restricted, so private playback is the safer default. |
-| 2026-07-12 | Allow admins to accept and own sessions. | Admins may handle open BID team requests when their Google Calendar connection is available. |
-| 2026-07-12 | Start reporting exports with CSV/Excel only. | This covers operational needs without adding branded PDF generation to the first backend release. |
-| 2026-07-12 | Do not build data import for launch. | There is no current migration/import requirement, so implementation should focus on first-class product workflows. |
+| 2026-07-10 | Use BullMQ with Redis for jobs.                                                             | Reliable local/production queue model with retries, scheduling, and NestJS processors.                                                                                                                                               |
+| 2026-07-10 | Use Mux for video.                                                                          | Training video needs upload, transcoding, adaptive playback, thumbnails, and analytics.                                                                                                                                              |
+| 2026-07-11 | Use separate local and production Docker Compose setup.                                     | Local Compose supports development with Mailpit and hot reload; production Compose uses built frontend/API images, production env, restart policies, and health checks.                                                              |
+| 2026-07-11 | Use DigitalOcean Spaces for non-video files.                                                | Deployment target is DigitalOcean, and Spaces provides S3-compatible storage for PDFs, deliverables, tools, and exports.                                                                                                             |
+| 2026-07-11 | Use Resend with React Email and Mailpit.                                                    | Resend handles production delivery, React Email gives reusable branded templates, and Mailpit catches local development email.                                                                                                       |
+| 2026-07-10 | Google Calendar/Meet first, provider-agnostic model.                                        | Current product focuses on Google Meet, but future providers should not require schema redesign.                                                                                                                                     |
+| 2026-07-12 | Run the first production deployment on one DigitalOcean Droplet with Docker Compose.        | The initial operations model should stay simple: frontend, API, database, Redis, workers, and supporting services run as separate Compose services on one server.                                                                    |
+| 2026-07-12 | Use httpOnly cookie sessions for browser auth.                                              | Keeps tokens out of client JavaScript and fits the web-first app.                                                                                                                                                                    |
+| 2026-07-12 | Do not support multi-business entrepreneur users at launch.                                 | The product flow treats one entrepreneur account as belonging to one business; business switching would add complexity without a current requirement.                                                                                |
+| 2026-07-12 | Give admins full access at launch.                                                          | Permission groups can be designed later; current admin workflows need broad operational access.                                                                                                                                      |
+| 2026-07-12 | Keep trainers read-only except sessions and deliverable reviews.                            | Trainers support learning and feedback, but admins remain the owners of programme, content, entrepreneur, and settings management.                                                                                                   |
+| 2026-07-12 | Use signed Mux playback from day one.                                                       | Training content is restricted, so private playback is the safer default.                                                                                                                                                            |
+| 2026-07-12 | Allow admins to accept and own sessions.                                                    | Admins may handle open BID team requests when their Google Calendar connection is available.                                                                                                                                         |
+| 2026-07-12 | Start reporting exports with CSV/Excel only.                                                | This covers operational needs without adding branded PDF generation to the first backend release.                                                                                                                                    |
+| 2026-07-12 | Do not build data import for launch.                                                        | There is no current migration/import requirement, so implementation should focus on first-class product workflows.                                                                                                                   |
 
 ## 28. References
 

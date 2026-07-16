@@ -352,10 +352,19 @@ Before merging backend work, ask:
 - Mux callbacks require HMAC verification against the exact raw body, enforce a five-minute replay window, and record event IDs transactionally so duplicate deliveries are safe.
 - Ready/errored events update both `video_assets` and attached `content_items`. Signed-policy playback IDs remain backend metadata; authorized clients receive short-lived RS256 playback tokens.
 
-
 ## Entrepreneur Tools Completion (2026-07-16)
 
 - Feature 11 is complete. Tools use scalable authenticated catalogue APIs, backend filters/counts, private PDF assets or embedded URLs, normalized global/programme/entrepreneur audiences, and per-entrepreneur hidden overrides.
 - Admin tool management uses feature-sliced frontend hooks, lazy paginated tool-area/programme/entrepreneur selectors, protected direct uploads, backend aggregate cards, tailored skeletons, guarded async actions, and automatic lifecycle audit events.
 - Entrepreneur tool reads are effective-access scoped and redact admin creator metadata and other audience identities. Trainers are explicitly forbidden from tool catalogue and request endpoints.
 - Tool requests belong to the entrepreneur user. Queues use cursor pagination and backend status aggregates. Declines require a decision note; Built requires a linked published library tool; the backend returns valid next transitions.
+
+## Session Calendar Runtime (2026-07-16)
+
+- `CalendarService` owns encrypted Google OAuth credentials, free/busy reads, event insert/patch/delete, refreshed access-token persistence, and asynchronous Meet conference readiness polling.
+- `SessionAvailabilityService` combines Google busy intervals with confirmed local sessions. Availability windows are explicitly limited to 14 calendar days per request and support date-window infinite loading without hidden dataset caps.
+- Company-configured session policy supplies working days, workday bounds, slot step, and default duration. The service enforces IANA timezone conversion and applies the same policy to create and reschedule mutations.
+- Session acceptance performs a final availability check, then creates the Calendar event and uses a status-constrained audited update to prevent two users claiming an open request. A lost race deletes the extra Calendar event.
+- Session reschedules store `session_reschedules` history and update the same Calendar event. Existing confirmed rows without Calendar event IDs are repaired by creating a real event on first reschedule; legacy placeholder URLs are not exposed.
+- `session_request_declines` records per-user opt-out from open-team requests. Trainer query scope excludes opted-out requests while leaving them open to other eligible users.
+- Participant note visibility is enforced in the response mapper; entrepreneurs cannot read internal notes.

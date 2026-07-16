@@ -245,10 +245,19 @@ Session workflow rules:
 - Within a programme a trainer is authorized to support, the trainer may preview the full curriculum, including content attributed to other trainers. Signed PDF and Mux access checks must verify shared programme scope and must not expose unrelated programme content.
 - Programme and module lists use cursor pagination and backend search. Module content is fetched only when its modal opens, and signed file/video access is requested only when a preview opens.
 
-
 ## Entrepreneur Tools Integration Completion (2026-07-16)
 
 - Feature 11 is complete across /admin/entrepreneur-tools, /admin/tool-requests, and /entrepreneur/tools.
 - Tool and request pages consume only feature integration hooks. Tool areas and growing audience/tool selectors load lazily with infinite pagination; catalogue and request lists use backend search, filtering, counts, and cursor pagination.
 - Admins retain create/edit/details/preview/status/audience flows. PDF resources use the shared private direct-upload flow; embedded tools use validated URLs; hidden entrepreneur exceptions remain supported.
 - Entrepreneur requests require a real business need. Admin actions follow backend-provided transitions, and Built requires selecting the published library tool that fulfills the request.
+
+## Sessions And Calendar Completion (2026-07-16)
+
+- Feature 12 uses one durable session lifecycle aggregate across entrepreneur, trainer, and admin views. Requests are `requested` sessions with nullable owner and explicit open-team or specific-trainer targeting.
+- Specific-trainer booking slots come only from that active trainer's connected Google Calendar. Open-team slots exist only when at least one eligible connected admin/trainer is free, and acceptance rechecks the accepting user's Google and local availability before an atomic claim.
+- An open-team decline opts only that user out; it does not close the entrepreneur's request. A targeted-trainer decline closes the targeted request.
+- Confirmation creates a real Google Calendar event and Meet link. Reschedule updates that event, writes immutable previous/new time history and reason, and performs compensating Calendar rollback on a database race. Cancellation removes the Calendar event.
+- Company settings own session working days, start/end minutes, slot interval, and default duration. Backend availability and all create/reschedule mutations enforce the configured policy.
+- The sessions frontend integration lives under `lib/api/sessions/`. Booking trainer/owner/entrepreneur lookups are lazy and cursor-paginated; schedule windows use infinite cursor loading; queue search, filters, totals, and status metrics remain backend-owned.
+- Meeting links are exposed only for real confirmed/completed Calendar-backed sessions. Internal session notes are never returned to entrepreneurs.
