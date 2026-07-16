@@ -10,6 +10,7 @@ import {
   ContentItemType,
   FileAssetUsage,
   Prisma,
+  ProgrammeAccessType,
   ToolLinkSource,
   User,
   UserRole,
@@ -70,7 +71,7 @@ export class ContentService {
     query: ContentItemQueryDto,
   ) {
     await this.assertModuleReadAccess(user, moduleId);
-    return this.moduleContentPage(moduleId, query);
+    return this.moduleContentPage(moduleId, query, user);
   }
 
   private async assertModuleReadAccess(user: User, moduleId: string) {
@@ -84,17 +85,34 @@ export class ContentService {
         id: moduleId,
         programmes: {
           some: {
-            programme: {
-              modules: {
-                some: {
-                  module: {
-                    contentItems: {
-                      some: { contentItem: { trainerId: user.id } },
+            programme:
+              user.role === UserRole.entrepreneur
+                ? {
+                    archivedAt: null,
+                    publishedAt: { not: null },
+                    OR: [
+                      { accessType: ProgrammeAccessType.free },
+                      {
+                        accessGrants: {
+                          some: {
+                            entrepreneurUserId: user.id,
+                            revokedAt: null,
+                          },
+                        },
+                      },
+                    ],
+                  }
+                : {
+                    modules: {
+                      some: {
+                        module: {
+                          contentItems: {
+                            some: { contentItem: { trainerId: user.id } },
+                          },
+                        },
+                      },
                     },
                   },
-                },
-              },
-            },
           },
         },
       },
@@ -376,6 +394,7 @@ export class ContentService {
 
   async getMyRating(user: User, contentItemId: string) {
     this.assertEntrepreneur(user);
+    await this.assertContentReadAccess(user, contentItemId);
 
     const rating = await this.prisma.contentRating.findUnique({
       where: {
@@ -391,6 +410,7 @@ export class ContentService {
 
   async upsertRating(user: User, input: UpsertContentRatingDto) {
     this.assertEntrepreneur(user);
+    await this.assertContentReadAccess(user, input.contentItemId);
 
     const contentItem = await this.prisma.contentItem.findUnique({
       where: { id: input.contentItemId },
@@ -426,10 +446,14 @@ export class ContentService {
   private async moduleContentPage(
     moduleId: string,
     query: ContentItemQueryDto,
+    user: User,
   ) {
     const take = query.take ?? 20;
     const contentWhere = this.contentWhere({
       ...query,
+      ...(user.role === UserRole.entrepreneur
+        ? { status: ContentItemStatus.ready }
+        : {}),
       moduleId: undefined,
       excludeModuleId: undefined,
     });
@@ -454,6 +478,9 @@ export class ContentService {
         where: {
           ...this.contentWhere({
             ...query,
+            ...(user.role === UserRole.entrepreneur
+              ? { status: ContentItemStatus.ready }
+              : {}),
             type: undefined,
             moduleId: undefined,
             excludeModuleId: undefined,
@@ -647,6 +674,46 @@ export class ContentService {
     }
 
     return result;
+  }
+
+  private async assertContentReadAccess(user: User, contentItemId: string) {
+    const content = await this.prisma.contentItem.findFirst({
+      where: {
+        id: contentItemId,
+        status: ContentItemStatus.ready,
+        modules: {
+          some: {
+            module: {
+              programmes: {
+                some: {
+                  programme: {
+                    archivedAt: null,
+                    publishedAt: { not: null },
+                    OR: [
+                      { accessType: ProgrammeAccessType.free },
+                      {
+                        accessGrants: {
+                          some: {
+                            entrepreneurUserId: user.id,
+                            revokedAt: null,
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    if (!content) {
+      throw new ForbiddenException(
+        'You do not have access to this learning content.',
+      );
+    }
   }
 
   private async ensureModuleExists(moduleId: string) {

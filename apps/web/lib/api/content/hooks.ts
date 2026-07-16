@@ -12,17 +12,21 @@ import { listTools } from "../tools";
 import {
   attachContentItemRequest,
   createModuleContentItemRequest,
+  getMyContentRatingRequest,
   listContentItemsRequest,
   listModuleContentItemsRequest,
   moveModuleContentItemRequest,
+  saveContentRatingRequest,
   updateContentItemRequest,
 } from "./requests";
 import type {
   AttachContentItemVariables,
   ContentItemQuery,
   ContentItemRecord,
+  ContentRatingPayload,
   CreateModuleContentVariables,
   MoveModuleContentItemVariables,
+  SaveContentRatingInput,
   UpdateContentItemVariables,
 } from "./types";
 
@@ -91,6 +95,32 @@ function useCursorPage(
     resetPagination,
   };
 }
+
+export const useMyContentRatingQuery = (
+  contentItemId: string | null,
+) =>
+  useQuery({
+    queryKey: contentKeys.rating(contentItemId ?? "none"),
+    queryFn: () => getMyContentRatingRequest(contentItemId as string),
+    enabled: Boolean(contentItemId),
+  });
+
+export const useSaveContentRatingMutation = (
+  handlers?: {
+    onSuccess?: (data: ContentRatingPayload) => void;
+    onError?: (error: Error) => void;
+  },
+) => {
+  const client = useQueryClient();
+  return useMutation<ContentRatingPayload, Error, SaveContentRatingInput>({
+    mutationFn: saveContentRatingRequest,
+    onSuccess: (data) => {
+      client.setQueryData(contentKeys.rating(data.contentItemId), data);
+      handlers?.onSuccess?.(data);
+    },
+    onError: handlers?.onError,
+  });
+};
 
 export const useContentItemsPage = (query: PageQuery) =>
   useCursorPage(

@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { AssetStatus, FileAsset, Prisma, User, UserRole } from '@prisma/client';
+import { AssetStatus, ContentItemStatus, FileAsset, Prisma, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { AuditService } from '../audit/audit.service';
@@ -211,6 +211,36 @@ export class FilesService {
 
     if (user.role === UserRole.entrepreneur) {
       if (file.deliverableSubmissions.some((submission) => submission.instance.entrepreneurUserId === user.id)) return true;
+      if (file.contentItem) {
+        const programme = await this.prisma.programme.findFirst({
+          where: {
+            archivedAt: null,
+            publishedAt: { not: null },
+            OR: [
+              { accessType: ProgrammeAccessType.free },
+              {
+                accessGrants: {
+                  some: { entrepreneurUserId: user.id, revokedAt: null },
+                },
+              },
+            ],
+            modules: {
+              some: {
+                module: {
+                  contentItems: {
+                    some: {
+                      contentItemId: file.contentItem.id,
+                      contentItem: { status: ContentItemStatus.ready },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          select: { id: true },
+        });
+        if (programme) return true;
+      }
       if (!file.toolPdfAsset) return false;
 
       const hidden = file.toolPdfAsset.hiddenEntrepreneurs.some((entry) => entry.entrepreneurUserId === user.id);

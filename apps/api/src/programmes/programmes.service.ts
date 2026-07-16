@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
+import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, ContentItemStatus, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
@@ -78,6 +78,12 @@ type ModuleContentCountRow = {
 type ModuleContentMetrics = {
   content: { total: number; videos: number; pdfs: number; tools: number };
   readyItems: number;
+  learnerProgress: {
+    status: 'not_started' | 'in_progress' | 'completed';
+    progressPercent: number;
+    completedContentCount: number;
+    totalContentCount: number;
+  } | null;
 };
 
 @Injectable()
@@ -384,6 +390,8 @@ export class ProgrammesService {
     const pageRows = rows.slice(0, take);
     const metrics = await this.moduleContentMetrics(
       pageRows.map((row) => row.moduleId),
+      user,
+      programmeId,
     );
 
     return {
@@ -952,16 +960,22 @@ export class ProgrammesService {
         content.total > 0 && readyItems === content.total
           ? 'ready'
           : 'needs_content',
+      learnerProgress: metrics?.learnerProgress ?? null,
       updatedAt: row.module.updatedAt.toISOString(),
     };
   }
 
-  private async moduleContentMetrics(moduleIds: string[]) {
+  private async moduleContentMetrics(
+    moduleIds: string[],
+    user?: User,
+    programmeId?: string,
+  ) {
     const metrics = new Map<string, ModuleContentMetrics>();
     for (const moduleId of moduleIds) {
       metrics.set(moduleId, {
         content: { total: 0, videos: 0, pdfs: 0, tools: 0 },
         readyItems: 0,
+        learnerProgress: null,
       });
     }
     if (moduleIds.length === 0) return metrics;
@@ -975,6 +989,9 @@ export class ProgrammesService {
       FROM module_content_items mci
       JOIN content_items ci ON ci.id = mci.content_item_id
       WHERE mci.module_id IN (${Prisma.join(moduleIds)})
+      ${user?.role === UserRole.entrepreneur
+        ? Prisma.sql`AND ci.status::text = ${ContentItemStatus.ready}`
+        : Prisma.empty}
       GROUP BY mci.module_id, ci.type, ci.status
     `);
 
@@ -987,6 +1004,33 @@ export class ProgrammesService {
       if (row.type === 'pdf') value.content.pdfs += count;
       if (row.type === 'tool') value.content.tools += count;
       if (row.status === 'ready') value.readyItems += count;
+    }
+
+    if (user?.role === UserRole.entrepreneur && programmeId) {
+      const progressRows = await this.prisma.learnerModuleProgress.findMany({
+        where: {
+          entrepreneurUserId: user.id,
+          programmeId,
+          moduleId: { in: moduleIds },
+        },
+        select: {
+          moduleId: true,
+          status: true,
+          progressPercent: true,
+          completedContentCount: true,
+          totalContentCount: true,
+        },
+      });
+      for (const row of progressRows) {
+        const value = metrics.get(row.moduleId);
+        if (!value) continue;
+        value.learnerProgress = {
+          status: row.status,
+          progressPercent: row.progressPercent,
+          completedContentCount: row.completedContentCount,
+          totalContentCount: row.totalContentCount,
+        };
+      }
     }
     return metrics;
   }

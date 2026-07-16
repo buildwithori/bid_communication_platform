@@ -104,6 +104,12 @@ export type ProgrammeModuleRecord = {
     tools: number;
   };
   readiness: "ready" | "needs_content";
+  learnerProgress: {
+    status: "not_started" | "in_progress" | "completed";
+    progressPercent: number;
+    completedContentCount: number;
+    totalContentCount: number;
+  } | null;
   updatedAt: string;
 };
 

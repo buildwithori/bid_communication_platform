@@ -7,13 +7,10 @@ export {
   useModuleContentItemsInfinite,
   useModuleContentItemsPage,
   useMoveModuleContentItemMutation,
+  useMyContentRatingQuery,
+  useSaveContentRatingMutation,
   useUpdateContentItemMutation,
 } from "./hooks";
-
-export {
-  getMyContentRatingRequest as getMyContentRating,
-  saveContentRatingRequest as saveContentRating,
-} from "./requests";
 
 export type {
   AttachContentItemVariables,
