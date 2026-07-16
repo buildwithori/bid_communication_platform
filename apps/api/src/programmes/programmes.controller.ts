@@ -26,7 +26,7 @@ export class ProgrammesController {
   }
 
   @Get('summary')
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin, UserRole.trainer)
   getProgrammeSummary(@CurrentUser() user: User) {
     return this.programmesService.getProgrammeSummary(user);
   }

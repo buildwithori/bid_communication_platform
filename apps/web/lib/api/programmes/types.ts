@@ -60,6 +60,13 @@ export type ProgrammeSummary = {
   enrollment: {
     active: number;
   };
+  entrepreneurs: {
+    active: number;
+  };
+  content: {
+    total: number;
+    owned: number;
+  };
   learnerProgress: {
     average: number;
     trackedLearners: number;

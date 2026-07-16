@@ -69,9 +69,43 @@ export class ContentService {
     moduleId: string,
     query: ContentItemQueryDto,
   ) {
-    this.assertAdmin(user);
-    await this.ensureModuleExists(moduleId);
+    await this.assertModuleReadAccess(user, moduleId);
     return this.moduleContentPage(moduleId, query);
+  }
+
+  private async assertModuleReadAccess(user: User, moduleId: string) {
+    if (user.role === UserRole.admin) {
+      await this.ensureModuleExists(moduleId);
+      return;
+    }
+
+    const module = await this.prisma.learningModule.findFirst({
+      where: {
+        id: moduleId,
+        programmes: {
+          some: {
+            programme: {
+              modules: {
+                some: {
+                  module: {
+                    contentItems: {
+                      some: { contentItem: { trainerId: user.id } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!module) {
+      throw new ForbiddenException(
+        'You do not have access to this module content.',
+      );
+    }
   }
 
   async createModuleContentItem(

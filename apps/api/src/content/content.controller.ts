@@ -36,7 +36,7 @@ export class ContentController {
   }
 
   @Get('modules/:moduleId/items')
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin, UserRole.trainer)
   listModuleContentItems(
     @CurrentUser() user: User,
     @Param('moduleId') moduleId: string,

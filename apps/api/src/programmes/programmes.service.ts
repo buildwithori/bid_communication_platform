@@ -46,6 +46,10 @@ type ReadyModuleCountRow = {
   count: bigint;
 };
 
+type AggregateCountRow = {
+  count: bigint;
+};
+
 type ModuleContentCountRow = {
   moduleId: string;
   type: string;
@@ -195,21 +199,68 @@ export class ProgrammesService {
   }
 
   async getProgrammeSummary(user: User) {
-    this.assertAdmin(user);
     const now = new Date();
-    const [totalProgrammes, activeProgrammes, totalModules, activeEnrollment, progress] = await Promise.all([
-      this.prisma.programme.count(),
+    const scope = this.programmeScopeWhere(user) ?? {};
+    const [
+      totalProgrammes,
+      activeProgrammes,
+      totalModules,
+      activeEnrollment,
+      activeEntrepreneurs,
+      contentTotal,
+      ownedContent,
+      progress,
+    ] = await Promise.all([
+      this.prisma.programme.count({ where: scope }),
       this.prisma.programme.count({
         where: {
+          AND: [scope],
           archivedAt: null,
           publishedAt: { not: null },
           startDate: { lte: now },
           endDate: { gte: now },
         },
       }),
-      this.prisma.programmeModule.count(),
-      this.prisma.programmeAccessGrant.count({ where: { revokedAt: null } }),
+      this.prisma.programmeModule.count({ where: { programme: scope } }),
+      this.prisma.programmeAccessGrant.count({
+        where: { revokedAt: null, programme: scope },
+      }),
+      this.prisma.$queryRaw<AggregateCountRow[]>(Prisma.sql`
+        SELECT COUNT(DISTINCT pag.entrepreneur_user_id)::bigint AS "count"
+        FROM programme_access_grants pag
+        WHERE pag.revoked_at IS NULL
+        ${user.role === UserRole.trainer
+          ? Prisma.sql`
+              AND EXISTS (
+                SELECT 1
+                FROM programme_modules pm
+                JOIN module_content_items mci ON mci.module_id = pm.module_id
+                JOIN content_items ci ON ci.id = mci.content_item_id
+                WHERE pm.programme_id = pag.programme_id
+                  AND ci.trainer_id = ${user.id}
+              )
+            `
+          : Prisma.empty}
+      `),
+      this.prisma.moduleContentItem.count({
+        where: {
+          module: { programmes: { some: { programme: scope } } },
+        },
+      }),
+      user.role === UserRole.trainer
+        ? this.prisma.contentItem.count({
+            where: {
+              trainerId: user.id,
+              modules: {
+                some: {
+                  module: { programmes: { some: { programme: scope } } },
+                },
+              },
+            },
+          })
+        : Promise.resolve(0),
       this.prisma.learnerProgrammeProgress.aggregate({
+        where: { programme: scope },
         _avg: { progressPercent: true },
         _count: { _all: true },
       }),
@@ -219,6 +270,10 @@ export class ProgrammesService {
       programmes: { total: totalProgrammes, active: activeProgrammes },
       modules: { total: totalModules },
       enrollment: { active: activeEnrollment },
+      entrepreneurs: {
+        active: Number(activeEntrepreneurs[0]?.count ?? 0n),
+      },
+      content: { total: contentTotal, owned: ownedContent },
       learnerProgress: {
         average: Math.round(progress._avg.progressPercent ?? 0),
         trackedLearners: progress._count._all,
