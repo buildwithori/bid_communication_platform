@@ -3,6 +3,7 @@
 import { Download, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
+import { useSignedFileUrlQuery } from '@/lib/api/files';
 import type { DeliverableReviewRow } from '@/lib/deliverables/review-queue';
 
 function formatDate(value: string) {
@@ -33,7 +34,9 @@ export function DeliverableFilePreviewModal({
   onClose: () => void;
 }) {
   const fileSize = formatFileSize(review?.fileSizeBytes);
-  const canRenderPdf = review ? isPdf(review) && Boolean(review.fileUrl) : false;
+  const signedFile = useSignedFileUrlQuery(review?.fileId ?? undefined, Boolean(review));
+  const fileUrl = signedFile.data?.download.url ?? null;
+  const canRenderPdf = review ? isPdf(review) && Boolean(fileUrl) : false;
 
   return (
     <Modal
@@ -61,16 +64,16 @@ export function DeliverableFilePreviewModal({
                   </div>
                 </div>
               </div>
-              {review.fileUrl && (
+              {fileUrl && (
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <Button asChild variant="outline">
-                    <a href={review.fileUrl} target="_blank" rel="noreferrer">
+                    <a href={fileUrl} target="_blank" rel="noreferrer">
                       <ExternalLink className="h-4 w-4" />
                       Open
                     </a>
                   </Button>
                   <Button asChild>
-                    <a href={review.fileUrl} download>
+                    <a href={fileUrl} download>
                       <Download className="h-4 w-4" />
                       Download
                     </a>
@@ -80,11 +83,13 @@ export function DeliverableFilePreviewModal({
             </div>
           </div>
 
-          {canRenderPdf ? (
+          {signedFile.isLoading ? (
+            <div className="h-[360px] animate-pulse rounded-xl border border-line bg-surface-subtle" />
+          ) : canRenderPdf ? (
             <div className="overflow-hidden rounded-xl border border-line bg-white">
-              <iframe title={review.fileName} src={review.fileUrl ?? ''} className="h-[68vh] w-full bg-white" />
+              <iframe title={review.fileName} src={fileUrl ?? ''} className="h-[68vh] w-full bg-white" />
             </div>
-          ) : review.fileUrl ? (
+          ) : fileUrl ? (
             <div className="grid min-h-[360px] place-items-center rounded-xl border border-dashed border-line bg-surface-subtle p-8 text-center">
               <div>
                 <FileText className="mx-auto h-10 w-10 text-ink-faint" />
@@ -98,9 +103,9 @@ export function DeliverableFilePreviewModal({
             <div className="grid min-h-[360px] place-items-center rounded-xl border border-dashed border-line bg-surface-subtle p-8 text-center">
               <div>
                 <FileText className="mx-auto h-10 w-10 text-ink-faint" />
-                <div className="mt-4 text-base font-semibold text-ink">No file URL available</div>
+                <div className="mt-4 text-base font-semibold text-ink">File preview unavailable</div>
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-                  The submission record exists, but the file is not ready for preview yet.
+                  The file is still processing or its secure preview link could not be created. Try again shortly.
                 </p>
               </div>
             </div>

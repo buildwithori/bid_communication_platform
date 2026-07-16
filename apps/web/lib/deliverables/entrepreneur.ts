@@ -32,13 +32,15 @@ export function mapDeliverableInstanceToEntrepreneurDeliverable(
     notes: latestSubmission?.note ?? undefined,
     reviewFeedback: latestReview?.feedback,
     reviewer: latestReview?.reviewer.name,
-    feedbackHistory: instance.reviewHistory.map((review) => ({
-      id: review.id,
-      message: review.feedback,
-      reviewer: review.reviewer.name,
-      createdAt: review.createdAt,
-      readAt: review.readAt ?? undefined,
-    })),
+    feedbackHistory: latestReview
+      ? [{
+          id: latestReview.id,
+          message: latestReview.feedback,
+          reviewer: latestReview.reviewer.name,
+          createdAt: latestReview.createdAt,
+          readAt: latestReview.readAt ?? undefined,
+        }]
+      : [],
     status: mapDeliverableStatus(instance.status),
   };
 }
