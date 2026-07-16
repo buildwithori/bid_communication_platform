@@ -1,6 +1,14 @@
-import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { SessionSource, SessionStatus, SessionType } from '@prisma/client';
+import { Type } from "class-transformer";
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
+import { SessionSource, SessionStatus, SessionType } from "@prisma/client";
 
 export class SessionQueryDto {
   @IsOptional()

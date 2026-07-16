@@ -33,7 +33,7 @@ export class SessionAvailabilityService {
     const search = query.search?.trim();
     const rows = await this.prisma.user.findMany({
       where: {
-        role: { in: [UserRole.admin, UserRole.trainer] },
+        role: query.role ?? { in: [UserRole.admin, UserRole.trainer] },
         status: "active",
         calendarConnections: {
           some: {

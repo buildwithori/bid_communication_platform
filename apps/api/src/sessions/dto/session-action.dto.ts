@@ -1,5 +1,12 @@
-import { IsDateString, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { SessionNoteVisibility } from '@prisma/client';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { SessionNoteVisibility } from "@prisma/client";
 
 export class SessionReasonDto {
   @IsString()

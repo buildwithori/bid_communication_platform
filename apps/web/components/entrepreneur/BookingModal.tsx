@@ -80,6 +80,7 @@ export function BookingModal({
     enabled: open && recipient === "specific" && teamLookupOpen,
     search: deferredTrainerSearch || undefined,
     take: 20,
+    role: "trainer",
   });
   const availabilityQuery = {
     dateFrom: selectedDate,

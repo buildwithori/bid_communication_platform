@@ -1,6 +1,7 @@
 import { Type } from "class-transformer";
 import {
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -38,6 +39,10 @@ export class SessionTeamMemberQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  @IsOptional()
+  @IsIn(["admin", "trainer"])
+  role?: "admin" | "trainer";
 
   @IsOptional()
   @Type(() => Number)

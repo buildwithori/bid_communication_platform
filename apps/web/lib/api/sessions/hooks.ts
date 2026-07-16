@@ -71,6 +71,7 @@ export function useSessionsPage(query: Omit<SessionQuery, "cursor">) {
     ...result,
     page,
     rows: result.data?.items ?? [],
+    totalItems: result.data?.totalItems ?? 0,
     summary:
       result.data?.summary ??
       ({ total: 0, byStatus: {} } satisfies SessionPage["summary"]),

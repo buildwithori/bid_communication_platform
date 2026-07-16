@@ -81,6 +81,7 @@ export type SessionQuery = {
 export type SessionPage = {
   items: SessionRecord[];
   nextCursor: string | null;
+  totalItems: number;
   summary: { total: number; byStatus: Partial<Record<SessionStatus, number>> };
 };
 export type CreateSessionPayload = {
@@ -102,6 +103,7 @@ export type SessionTeamMemberQuery = {
   search?: string;
   take?: number;
   cursor?: string;
+  role?: "admin" | "trainer";
 };
 export type SessionTeamMemberPage = {
   items: SessionTeamMember[];

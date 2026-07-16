@@ -129,17 +129,34 @@ export class SessionsService {
 
   async listSessions(user: User, query: SessionQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
+    const where = this.buildWhere(user, query);
     const rows = await this.prisma.session.findMany({
-      where: this.buildWhere(user, query),
+      where,
       orderBy: [{ startAt: "asc" }, { id: "desc" }],
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: sessionInclude,
     });
 
+    const visibleRows = rows.slice(0, take);
+    const declinedIds =
+      user.role === UserRole.entrepreneur
+        ? new Set<string>()
+        : new Set(
+            (
+              await this.prisma.sessionRequestDecline.findMany({
+                where: {
+                  userId: user.id,
+                  sessionId: { in: visibleRows.map((session) => session.id) },
+                },
+                select: { sessionId: true },
+              })
+            ).map((entry) => entry.sessionId),
+          );
     const nextCursor = rows.length > take ? (rows[take]?.id ?? null) : null;
     const scopedWhere = this.buildWhere(user, { ...query, status: undefined });
-    const [total, grouped] = await Promise.all([
+    const [totalItems, total, grouped] = await Promise.all([
+      this.prisma.session.count({ where }),
       this.prisma.session.count({ where: scopedWhere }),
       this.prisma.session.groupBy({
         by: ["status"],
@@ -148,8 +165,11 @@ export class SessionsService {
       }),
     ]);
     return {
-      items: rows.slice(0, take).map((session) => this.mapSession(session)),
+      items: visibleRows.map((session) =>
+        this.mapSession(session, user.role, declinedIds.has(session.id)),
+      ),
       nextCursor,
+      totalItems,
       summary: {
         total,
         byStatus: Object.fromEntries(
@@ -165,7 +185,7 @@ export class SessionsService {
       include: sessionInclude,
     });
     if (!session) throw new NotFoundException("Session was not found.");
-    return this.mapSession(session);
+    return this.mapSession(session, user.role);
   }
 
   async createSession(user: User, dto: CreateSessionDto) {
@@ -206,7 +226,7 @@ export class SessionsService {
       throw new BadRequestException("Choose the specific BID team member.");
     }
     if (targetUserId) {
-      await this.ensureOwner(targetUserId);
+      await this.ensureTrainerTarget(targetUserId);
       await this.availability.assertUserAvailable(targetUserId, startAt, endAt);
     } else if (isEntrepreneurRequest) {
       await this.availability.assertAnyTeamMemberAvailable(startAt, endAt);
@@ -299,7 +319,7 @@ export class SessionsService {
       );
     }
 
-    return this.mapSession(created);
+    return this.mapSession(created, user.role);
   }
 
   async acceptSession(user: User, id: string) {
@@ -379,7 +399,7 @@ export class SessionsService {
       NotificationSeverity.success,
     );
 
-    return this.mapSession(updated);
+    return this.mapSession(updated, user.role);
   }
 
   async declineSession(user: User, id: string, dto: SessionReasonDto) {
@@ -412,7 +432,7 @@ export class SessionsService {
           }),
       );
       return {
-        ...this.mapSession(session),
+        ...this.mapSession(session, user.role),
         declinedByCurrentUser: true,
       };
     }
@@ -449,7 +469,7 @@ export class SessionsService {
       this.userName(user) + " declined " + updated.topic + ".",
       NotificationSeverity.warning,
     );
-    return this.mapSession(updated);
+    return this.mapSession(updated, user.role);
   }
 
   async cancelSession(user: User, id: string, dto: SessionReasonDto) {
@@ -496,7 +516,7 @@ export class SessionsService {
       this.userName(user) + " cancelled " + updated.topic + ".",
       NotificationSeverity.warning,
     );
-    return this.mapSession(updated);
+    return this.mapSession(updated, user.role);
   }
 
   async rescheduleSession(user: User, id: string, dto: RescheduleSessionDto) {
@@ -512,9 +532,9 @@ export class SessionsService {
     if (user.role === UserRole.trainer && session.ownerUserId !== user.id) {
       throw new ForbiddenException("You can only reschedule sessions you own.");
     }
-    if (!session.ownerUserId || !session.calendarEventId) {
+    if (!session.ownerUserId) {
       throw new BadRequestException(
-        "This confirmed session is missing its Calendar event.",
+        "This confirmed session is missing its Calendar owner.",
       );
     }
 
@@ -533,15 +553,29 @@ export class SessionsService {
       session.id,
     );
 
-    await this.calendar.updateSessionEvent({
-      ownerUserId: session.ownerUserId,
-      eventId: session.calendarEventId,
-      topic: session.topic,
-      notes: session.notes,
-      startAt,
-      endAt,
-      timezone: session.timezone,
-    });
+    const replacementEvent = session.calendarEventId
+      ? null
+      : await this.calendar.createSessionEvent({
+          ownerUserId: session.ownerUserId,
+          entrepreneurEmail: session.entrepreneur.email,
+          topic: session.topic,
+          notes: session.notes,
+          startAt,
+          endAt,
+          timezone: session.timezone,
+          requestId: session.id + "-legacy-reschedule",
+        });
+    if (session.calendarEventId) {
+      await this.calendar.updateSessionEvent({
+        ownerUserId: session.ownerUserId,
+        eventId: session.calendarEventId,
+        topic: session.topic,
+        notes: session.notes,
+        startAt,
+        endAt,
+        timezone: session.timezone,
+      });
+    }
 
     let updated: SessionWithInclude;
     try {
@@ -577,23 +611,38 @@ export class SessionsService {
               status: SessionStatus.confirmed,
               updatedAt: session.updatedAt,
             },
-            data: { startAt, endAt },
+            data: {
+              startAt,
+              endAt,
+              ...(replacementEvent
+                ? {
+                    calendarEventId: replacementEvent.eventId,
+                    meetingUrl: replacementEvent.meetingUrl,
+                  }
+                : {}),
+            },
             include: sessionInclude,
           });
         },
       );
     } catch (error) {
-      await this.calendar
-        .updateSessionEvent({
-          ownerUserId: session.ownerUserId,
-          eventId: session.calendarEventId,
-          topic: session.topic,
-          notes: session.notes,
-          startAt: session.startAt,
-          endAt: session.endAt,
-          timezone: session.timezone,
-        })
-        .catch(() => undefined);
+      if (replacementEvent) {
+        await this.calendar
+          .deleteSessionEvent(session.ownerUserId, replacementEvent.eventId)
+          .catch(() => undefined);
+      } else if (session.calendarEventId) {
+        await this.calendar
+          .updateSessionEvent({
+            ownerUserId: session.ownerUserId,
+            eventId: session.calendarEventId,
+            topic: session.topic,
+            notes: session.notes,
+            startAt: session.startAt,
+            endAt: session.endAt,
+            timezone: session.timezone,
+          })
+          .catch(() => undefined);
+      }
       throw new ConflictException(
         "The session changed while it was being rescheduled. Refresh and try again.",
       );
@@ -607,7 +656,7 @@ export class SessionsService {
       this.userName(user) + " rescheduled " + updated.topic + ".",
       NotificationSeverity.info,
     );
-    return this.mapSession(updated);
+    return this.mapSession(updated, user.role);
   }
 
   async completeSession(user: User, id: string, dto: CompleteSessionDto) {
@@ -664,7 +713,7 @@ export class SessionsService {
       this.userName(user) + " marked " + updated.topic + " as completed.",
       NotificationSeverity.success,
     );
-    return this.mapSession(updated);
+    return this.mapSession(updated, user.role);
   }
 
   async addNote(user: User, id: string, dto: AddSessionNoteDto) {
@@ -792,6 +841,7 @@ export class SessionsService {
   private async getSessionEntity(user: User, id: string) {
     const session = await this.prisma.session.findFirst({
       where: { id, ...this.scopeWhere(user) },
+      include: { entrepreneur: { select: { email: true } } },
     });
     if (!session) throw new NotFoundException("Session was not found.");
     return session;
@@ -842,6 +892,20 @@ export class SessionsService {
       throw new BadRequestException("Choose a valid entrepreneur.");
     }
     return entrepreneur;
+  }
+
+  private async ensureTrainerTarget(userId: string) {
+    const trainer = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        role: UserRole.trainer,
+        status: "active",
+      },
+      select: { id: true },
+    });
+    if (!trainer) {
+      throw new BadRequestException("Choose a valid active trainer.");
+    }
   }
 
   private async ensureOwner(userId: string) {
@@ -979,7 +1043,11 @@ export class SessionsService {
     return labels[type];
   }
 
-  private mapSession(session: SessionWithInclude) {
+  private mapSession(
+    session: SessionWithInclude,
+    viewerRole: UserRole,
+    declinedByCurrentUser = false,
+  ) {
     const business =
       session.entrepreneur.businessMemberships[0]?.business ?? null;
     return {
@@ -1017,6 +1085,7 @@ export class SessionsService {
       declinedReason: session.declinedReason,
       cancelledReason: session.cancelledReason,
       completedAt: session.completedAt?.toISOString() ?? null,
+      declinedByCurrentUser,
       reschedules: session.reschedules.map((entry) => ({
         id: entry.id,
         previousStartAt: entry.previousStartAt.toISOString(),
@@ -1027,13 +1096,19 @@ export class SessionsService {
         requestedBy: this.mapUser(entry.requestedBy),
         createdAt: entry.createdAt.toISOString(),
       })),
-      notesHistory: session.notesHistory.map((note) => ({
-        id: note.id,
-        note: note.note,
-        visibility: note.visibility,
-        author: this.mapUser(note.author),
-        createdAt: note.createdAt.toISOString(),
-      })),
+      notesHistory: session.notesHistory
+        .filter(
+          (note) =>
+            viewerRole !== UserRole.entrepreneur ||
+            note.visibility === SessionNoteVisibility.participant,
+        )
+        .map((note) => ({
+          id: note.id,
+          note: note.note,
+          visibility: note.visibility,
+          author: this.mapUser(note.author),
+          createdAt: note.createdAt.toISOString(),
+        })),
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
     };
