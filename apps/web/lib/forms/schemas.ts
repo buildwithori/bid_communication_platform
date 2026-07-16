@@ -373,7 +373,6 @@ export type ContentItemForm = z.infer<typeof contentItemSchema>;
 export const requiredDeliverableSchema = z
   .object({
     name: z.string().min(1, 'Deliverable name is required'),
-    due: z.string().min(1, 'Due rule is required'),
     dueType: z.enum(['fixed-date', 'module-completion', 'recurring']).default('fixed-date'),
     dueDate: z.string().optional(),
     moduleRule: z.string().optional(),

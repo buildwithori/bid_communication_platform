@@ -1,4 +1,4 @@
-import type { ProgrammeModuleQuery, ProgrammeQuery } from "./types";
+import type { ProgrammeDeliverableRuleQuery, ProgrammeModuleQuery, ProgrammeQuery } from "./types";
 
 export const programmeKeys = {
   all: ["programmes"] as const,
@@ -18,6 +18,10 @@ export const programmeKeys = {
     [...programmeKeys.detail(programmeId), "reusable-modules"] as const,
   reusableModules: (programmeId: string, query?: ProgrammeModuleQuery) =>
     [...programmeKeys.reusableModuleLists(programmeId), query ?? {}] as const,
-  deliverableRules: (programmeId: string) =>
+  deliverableRuleLists: (programmeId: string) =>
     [...programmeKeys.detail(programmeId), "deliverable-rules"] as const,
+  deliverableRules: (
+    programmeId: string,
+    query?: ProgrammeDeliverableRuleQuery,
+  ) => [...programmeKeys.deliverableRuleLists(programmeId), query ?? {}] as const,
 };

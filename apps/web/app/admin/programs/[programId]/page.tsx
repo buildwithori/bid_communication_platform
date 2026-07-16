@@ -51,7 +51,7 @@ import { ModuleModal } from '@/components/admin/ModuleModal';
 import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
 import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
 import { ProgrammeContentModal } from '@/components/admin/programmes/ProgrammeContentModal';
-import { RequiredDeliverablesSection } from '@/components/admin/programmes/RequiredDeliverablesSection';
+import { RequiredDeliverablesSection } from '@/components/admin/programmes/BackendRequiredDeliverablesSection';
 import {
   useArchiveProgrammeMutation,
   useMoveProgrammeModuleMutation,
@@ -66,7 +66,6 @@ import {
 } from '@/lib/api/programmes';
 import { moduleSchema, type ModuleForm } from '@/lib/forms/schemas';
 import { routes } from '@/lib/routes';
-import type { Module } from '@/types';
 
 type WorkspaceTab = 'curriculum' | 'deliverables' | 'readiness';
 
@@ -252,15 +251,6 @@ export default function AdminProgrammeWorkspacePage() {
   }
 
   const programme = detail.data;
-  const legacyModules = modules.rows.map<Module>((module) => ({
-    id: module.id,
-    order: module.position,
-    title: module.title,
-    description: module.description,
-    contentItemIds: [],
-    reuseCount: Math.max(module.programmeUses - 1, 0),
-  }));
-
   return (
     <>
       <PageHeader
@@ -402,8 +392,8 @@ export default function AdminProgrammeWorkspacePage() {
 
           {tab === 'deliverables' ? (
             <RequiredDeliverablesSection
+              programmeId={programmeId}
               programName={programme.name}
-              modules={legacyModules}
             />
           ) : null}
 

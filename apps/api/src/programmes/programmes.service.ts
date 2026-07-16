@@ -2,7 +2,10 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, ContentItemStatus, Prisma, Programme, ProgrammeAccessType, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { RecurringDeliverableService } from '../deliverables/recurring-deliverable.service';
+import { cursorArgs, pageSize, toCursorPage } from '../common/pagination/cursor-pagination.dto';
 import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto';
+import { ProgrammeDeliverableRuleQueryDto } from './dto/programme-deliverable-rule-query.dto';
 import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 import {
@@ -18,16 +21,11 @@ const DEFAULT_TAKE = 20;
 const deliverableRuleInclude = {
   dueAfterModule: { select: { id: true, title: true } },
   requiredStage: { select: { id: true, name: true, key: true } },
-  instances: {
-    select: {
-      id: true,
-      status: true,
-      submissions: { select: { id: true }, take: 1 },
-    },
-  },
+  _count: { select: { instances: true } },
 } satisfies Prisma.ProgrammeDeliverableRuleInclude;
 
 type ProgrammeDeliverableRuleWithInclude = Prisma.ProgrammeDeliverableRuleGetPayload<{ include: typeof deliverableRuleInclude }>;
+
 
 type ProgrammeListMetrics = {
   content: { total: number; videos: number; pdfs: number; tools: number };
@@ -91,6 +89,7 @@ export class ProgrammesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly recurringDeliverables: RecurringDeliverableService,
   ) {}
   async createProgramme(user: User, dto: CreateProgrammeDto) {
     this.assertAdmin(user);
@@ -741,18 +740,54 @@ export class ProgrammesService {
     return this.getProgrammeModuleSummary(programmeId, moduleId);
   }
 
-  async listDeliverableRules(user: User, programmeId: string) {
+  async listDeliverableRules(
+    user: User,
+    programmeId: string,
+    query: ProgrammeDeliverableRuleQueryDto,
+  ) {
     if (!(await this.canReadProgramme(user, programmeId))) {
       throw new ForbiddenException('You do not have access to this programme.');
     }
 
-    const rules = await this.prisma.programmeDeliverableRule.findMany({
-      where: { programmeId },
-      orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
-      include: this.deliverableRuleInclude(),
-    });
+    const take = pageSize(query);
+    const where: Prisma.ProgrammeDeliverableRuleWhereInput = {
+      programmeId,
+      ...(query.search?.trim()
+        ? { name: { contains: query.search.trim(), mode: 'insensitive' } }
+        : {}),
+    };
+    const [rules, totalItems] = await Promise.all([
+      this.prisma.programmeDeliverableRule.findMany({
+        where,
+        orderBy: [{ active: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+        include: this.deliverableRuleInclude(),
+      }),
+      this.prisma.programmeDeliverableRule.count({ where }),
+    ]);
+    const page = rules.slice(0, take);
+    const submittedGroups = page.length
+      ? await this.prisma.deliverableInstance.groupBy({
+          by: ['ruleId'],
+          where: {
+            ruleId: { in: page.map((rule) => rule.id) },
+            submissions: { some: {} },
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const submittedByRule = new Map(
+      submittedGroups.map((group) => [group.ruleId, group._count._all]),
+    );
 
-    return { items: rules.map((rule) => this.mapDeliverableRule(rule)) };
+    return {
+      ...toCursorPage(rules, take, (rule) => rule.id),
+      items: page.map((rule) =>
+        this.mapDeliverableRule(rule, submittedByRule.get(rule.id) ?? 0),
+      ),
+      totalItems,
+    };
   }
 
   async createDeliverableRule(user: User, programmeId: string, dto: CreateProgrammeDeliverableRuleDto) {
@@ -763,19 +798,24 @@ export class ProgrammesService {
     await this.ensureProgrammeExists(programmeId);
     await this.validateDeliverableRuleInput(programmeId, dto);
 
-    const rule = await this.prisma.programmeDeliverableRule.create({
-      data: this.deliverableRuleData(programmeId, dto) as Prisma.ProgrammeDeliverableRuleUncheckedCreateInput,
-      include: this.deliverableRuleInclude(),
-    });
-
-    await this.createImmediateDeliverableInstances(rule.id);
-
-    return this.mapDeliverableRule(
-      await this.prisma.programmeDeliverableRule.findUniqueOrThrow({
-        where: { id: rule.id },
+    const rule = await this.audit.capture(
+      {
+        action: 'programme_deliverable_rules.created',
+        entityType: 'programme_deliverable_rule',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Created deliverable rule ${name ?? ''}`.trim(),
+        payload: { programmeId, dueType: dto.dueType },
+      },
+      (tx) => tx.programmeDeliverableRule.create({
+        data: this.deliverableRuleData(programmeId, dto) as Prisma.ProgrammeDeliverableRuleUncheckedCreateInput,
         include: this.deliverableRuleInclude(),
       }),
     );
+
+    await this.createImmediateDeliverableInstances(rule.id);
+    await this.recurringDeliverables.sync(this.prisma);
+
+    return this.getDeliverableRuleResponse(rule.id);
   }
 
   async updateDeliverableRule(
@@ -796,15 +836,25 @@ export class ProgrammesService {
 
     await this.validateDeliverableRuleInput(programmeId, dto, ruleId);
 
-    const updated = await this.prisma.programmeDeliverableRule.update({
-      where: { id: ruleId },
-      data: this.deliverableRuleData(programmeId, dto, true) as Prisma.ProgrammeDeliverableRuleUncheckedUpdateInput,
-      include: this.deliverableRuleInclude(),
-    });
+    const updated = await this.audit.capture(
+      {
+        action: 'programme_deliverable_rules.updated',
+        entityType: 'programme_deliverable_rule',
+        entityId: ({ id }) => id,
+        summary: ({ name }) => `Updated deliverable rule ${name ?? ''}`.trim(),
+        payload: { programmeId, ruleId },
+      },
+      (tx) => tx.programmeDeliverableRule.update({
+        where: { id: ruleId },
+        data: this.deliverableRuleData(programmeId, dto, true) as Prisma.ProgrammeDeliverableRuleUncheckedUpdateInput,
+        include: this.deliverableRuleInclude(),
+      }),
+    );
 
     await this.createImmediateDeliverableInstances(ruleId);
+    await this.recurringDeliverables.sync(this.prisma);
 
-    return this.mapDeliverableRule(updated);
+    return this.getDeliverableRuleResponse(updated.id);
   }
 
   async getProgramme(user: User, id: string) {
@@ -986,8 +1036,23 @@ export class ProgrammesService {
     return grants.map((grant) => grant.entrepreneurUserId);
   }
 
-  private mapDeliverableRule(rule: ProgrammeDeliverableRuleWithInclude) {
-    const submittedCount = rule.instances.filter((instance) => instance.submissions.length > 0).length;
+  private async getDeliverableRuleResponse(ruleId: string) {
+    const [rule, submittedCount] = await Promise.all([
+      this.prisma.programmeDeliverableRule.findUniqueOrThrow({
+        where: { id: ruleId },
+        include: this.deliverableRuleInclude(),
+      }),
+      this.prisma.deliverableInstance.count({
+        where: { ruleId, submissions: { some: {} } },
+      }),
+    ]);
+    return this.mapDeliverableRule(rule, submittedCount);
+  }
+
+  private mapDeliverableRule(
+    rule: ProgrammeDeliverableRuleWithInclude,
+    submittedCount = 0,
+  ) {
 
     return {
       id: rule.id,
@@ -1001,7 +1066,7 @@ export class ProgrammesService {
       requiredStage: rule.requiredStage,
       active: rule.active,
       submittedCount,
-      assignedCount: rule.instances.length,
+      assignedCount: rule._count.instances,
       createdAt: rule.createdAt.toISOString(),
       updatedAt: rule.updatedAt.toISOString(),
     };

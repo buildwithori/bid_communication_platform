@@ -35,6 +35,7 @@ import type {
   CreateProgrammePayload,
   MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
+  ProgrammeDeliverableRuleQuery,
   ProgrammeDetail,
   ProgrammeModuleQuery,
   ProgrammeModuleRecord,
@@ -251,15 +252,50 @@ export function useLazyReusableProgrammeModules(
   };
 }
 
-export const useProgrammeDeliverableRulesQuery = (
-  programmeId: string | null,
-) =>
-  useQuery({
-    queryKey: programmeKeys.deliverableRules(programmeId ?? "none"),
+export function useProgrammeDeliverableRulesPage(
+  programmeId: string,
+  query: Omit<ProgrammeDeliverableRuleQuery, "cursor">,
+) {
+  const [page, setCurrentPage] = useState(1);
+  const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
+  const cursor = cursors[page - 1];
+  const result = useQuery({
+    queryKey: programmeKeys.deliverableRules(programmeId, { ...query, cursor }),
     queryFn: () =>
-      listProgrammeDeliverableRulesRequest(programmeId as string),
+      listProgrammeDeliverableRulesRequest(programmeId, { ...query, cursor }),
     enabled: Boolean(programmeId),
   });
+
+  const resetPagination = useCallback(() => {
+    setCurrentPage(1);
+    setCursors([undefined]);
+  }, []);
+
+  const setPage = useCallback((nextPage: number) => {
+    if (nextPage < 1 || nextPage === page) return;
+    if ((nextPage < page && cursors[nextPage - 1] !== undefined) || nextPage === 1) {
+      setCurrentPage(nextPage);
+      return;
+    }
+    if (nextPage === page + 1 && result.data?.nextCursor) {
+      setCursors((current) => {
+        const next = [...current];
+        next[nextPage - 1] = result.data?.nextCursor ?? undefined;
+        return next;
+      });
+      setCurrentPage(nextPage);
+    }
+  }, [cursors, page, result.data?.nextCursor]);
+
+  return {
+    ...result,
+    page,
+    rows: result.data?.items ?? [],
+    totalItems: result.data?.totalItems ?? 0,
+    setPage,
+    resetPagination,
+  };
+}
 
 function useProgrammeMutation<TVariables>(
   mutationFn: (variables: TVariables) => Promise<ProgrammeDetail>,
@@ -378,7 +414,7 @@ function useDeliverableRuleMutation<TVariables>(
     mutationFn,
     onSuccess: (data) => {
       void queryClient.invalidateQueries({
-        queryKey: programmeKeys.deliverableRules(data.programmeId),
+        queryKey: programmeKeys.deliverableRuleLists(data.programmeId),
       });
       handlers?.onSuccess?.(data);
     },

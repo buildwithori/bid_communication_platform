@@ -304,6 +304,8 @@ Done when:
 - Admin and trainer review queues expose due date, submitted file, review action, and feedback trail.
 - Due-date updates are audited.
 
+Implementation status (2026-07-16): Complete. Programme deliverable rules use authenticated, cursor-paginated backend search with backend submission/assignment counts, lazy module and business-stage lookups, audited guarded mutations, and immediate fixed or recurring instance generation. Fixed-date instances synchronize across signup, Google onboarding, invitations, programme grants, and business-stage changes; module-completion instances are created from backend completion events using the configured due window. Recurring instances use explicit reporting periods, partial uniqueness guarantees, eligibility-aware calendar cadence generation, a periodic lifecycle worker, read-time freshness checks, and idempotent historical backfills. Entrepreneur workspaces and admin/trainer review queues use cursor pagination, backend aggregates, secure file access, reporting-period labels, upload/resubmit, immutable review history, unread feedback, audited due overrides, tailored skeletons, and protected async actions.
+
 ### 11. Entrepreneur Tools And Tool Requests
 
 Scope:

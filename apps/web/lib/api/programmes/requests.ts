@@ -6,6 +6,8 @@ import type {
   CreateProgrammePayload,
   MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
+  ProgrammeDeliverableRulePage,
+  ProgrammeDeliverableRuleQuery,
   ProgrammeDetail,
   ProgrammeModuleDetail,
   ProgrammeModulePage,
@@ -168,9 +170,21 @@ export const moveProgrammeModuleRequest = ({
     },
   );
 
-export const listProgrammeDeliverableRulesRequest = (programmeId: string) =>
-  apiRequest<{ items: ProgrammeDeliverableRule[] }>(
-    `/programmes/${programmeId}/deliverable-rules`,
+function toDeliverableRuleQueryString(query?: ProgrammeDeliverableRuleQuery) {
+  const params = new URLSearchParams();
+  if (query?.search) params.set("search", query.search);
+  if (query?.take) params.set("take", String(query.take));
+  if (query?.cursor) params.set("cursor", query.cursor);
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
+export const listProgrammeDeliverableRulesRequest = (
+  programmeId: string,
+  query?: ProgrammeDeliverableRuleQuery,
+) =>
+  apiRequest<ProgrammeDeliverableRulePage>(
+    `/programmes/${programmeId}/deliverable-rules${toDeliverableRuleQueryString(query)}`,
   );
 
 export const createProgrammeDeliverableRuleRequest = ({

@@ -4,6 +4,7 @@ import { User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ProgrammeQueryDto } from './dto/programme-query.dto';
+import { ProgrammeDeliverableRuleQueryDto } from './dto/programme-deliverable-rule-query.dto';
 import { ProgrammesService } from './programmes.service';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
 import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
@@ -152,8 +153,12 @@ export class ProgrammesController {
   }
 
   @Get(':id/deliverable-rules')
-  listDeliverableRules(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.programmesService.listDeliverableRules(user, id);
+  listDeliverableRules(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Query() query: ProgrammeDeliverableRuleQueryDto,
+  ) {
+    return this.programmesService.listDeliverableRules(user, id, query);
   }
 
   @Post(':id/deliverable-rules')

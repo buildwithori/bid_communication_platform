@@ -44,7 +44,7 @@ import {
 } from '@/lib/api/entrepreneurs';
 import { useSignedFileUrlQuery } from '@/lib/api/files';
 import {
-  useProgrammeDeliverableRulesQuery,
+  useProgrammeDeliverableRulesPage,
   useProgrammeDetailQuery,
   useProgrammeModulesPage,
   type ProgrammeDeliverableRule,
@@ -770,22 +770,18 @@ function TrainerContentPreviewModal({
 }
 
 function DeliverablesTab({ programmeId }: { programmeId: string }) {
-  const rules = useProgrammeDeliverableRulesQuery(programmeId);
   const [search, setSearch] = React.useState('');
-  const [page, setPage] = React.useState(1);
+  const deferredSearch = React.useDeferredValue(search);
   const [pageSize, setPageSize] = React.useState(5);
-  const rows = React.useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    const items: ProgrammeDeliverableRule[] = rules.data?.items ?? [];
-    if (!needle) return items;
-    return items.filter((rule) =>
-      [rule.name, dueRuleLabel(rule), requiredScopeLabel(rule)]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [rules.data?.items, search]);
-  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const rules = useProgrammeDeliverableRulesPage(programmeId, {
+    search: deferredSearch || undefined,
+    take: pageSize,
+  });
+
+  const resetRulePagination = rules.resetPagination;
+  React.useEffect(() => {
+    resetRulePagination();
+  }, [deferredSearch, pageSize, resetRulePagination]);
 
   const columns: Column<ProgrammeDeliverableRule>[] = [
     {
@@ -843,10 +839,7 @@ function DeliverablesTab({ programmeId }: { programmeId: string }) {
             icon
             placeholder="Search deliverables..."
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
       </TableToolbar>
@@ -858,21 +851,18 @@ function DeliverablesTab({ programmeId }: { programmeId: string }) {
         <>
           <DataTable
             columns={columns}
-            rows={pageRows}
+            rows={rules.rows}
             rowKey={(rule) => rule.id}
             emptyMessage="No deliverable rules match this search."
             tableClassName="min-w-[900px]"
           />
           <TablePagination
-            page={page}
+            page={rules.page}
             pageSize={pageSize}
-            totalItems={rows.length}
+            totalItems={rules.totalItems}
             pageSizeOptions={[5, 10, 20]}
-            onPageChange={setPage}
-            onPageSizeChange={(nextPageSize) => {
-              setPageSize(nextPageSize);
-              setPage(1);
-            }}
+            onPageChange={rules.setPage}
+            onPageSizeChange={setPageSize}
           />
         </>
       )}

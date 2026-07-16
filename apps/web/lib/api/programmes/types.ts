@@ -243,6 +243,18 @@ export type ProgrammeDeliverableRule = {
   updatedAt: string;
 };
 
+export type ProgrammeDeliverableRuleQuery = {
+  search?: string;
+  take?: number;
+  cursor?: string;
+};
+
+export type ProgrammeDeliverableRulePage = {
+  items: ProgrammeDeliverableRule[];
+  nextCursor: string | null;
+  totalItems: number;
+};
+
 export type UpsertProgrammeDeliverableRulePayload = {
   name?: string;
   dueType?: ProgrammeDeliverableDueType;

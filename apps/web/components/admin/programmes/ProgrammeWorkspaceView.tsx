@@ -43,7 +43,7 @@ import { ManageContentModal, AddContentItemModal } from '@/components/admin/Mana
 import { ModuleDetailModal } from '@/components/admin/programmes/ModuleDetailModal';
 import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
 import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
-import { RequiredDeliverablesSection } from '@/components/admin/programmes/RequiredDeliverablesSection';
+import { RequiredDeliverablesSection } from '@/components/admin/programmes/BackendRequiredDeliverablesSection';
 import {
   archiveProgrammePatch,
   publishProgrammePatch,
@@ -405,7 +405,7 @@ export function ProgrammeWorkspaceView({
           )}
 
           {workspaceTab === 'deliverables' && (
-            <RequiredDeliverablesSection programName={program.name} modules={programModules} />
+            <RequiredDeliverablesSection programmeId={program.id} programName={program.name} />
           )}
 
           {workspaceTab === 'readiness' && (
