@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ReportExportFormat, ReportExportStatus } from "@prisma/client";
+import { ReportExportFormat, ReportExportStatus, UserRole } from "@prisma/client";
+import { DeliverablesService } from "../src/deliverables/deliverables.service";
 import { ApiExceptionFilter } from "../src/common/filters/api-exception.filter";
 import type { RequestWithContext } from "../src/common/request-context/request-context.types";
 import { RequestIdMiddleware } from "../src/common/request-context/request-id.middleware";
@@ -197,4 +198,55 @@ test("report export creation writes through lifecycle audit before enqueueing", 
     },
   ]);
   assert.equal(result.id, "export-1");
+});
+
+test("deliverable calendar windows preserve entrepreneur scope and reject reversed ranges", async () => {
+  let freshnessChecks = 0;
+  const service = new DeliverablesService(
+    {} as never,
+    {} as never,
+    {} as never,
+    {
+      ensureCurrent: async () => {
+        freshnessChecks += 1;
+      },
+    } as never,
+    {} as never,
+  );
+  const buildInstanceWhere = (
+    service as unknown as {
+      buildInstanceWhere(
+        user: { id: string; role: UserRole },
+        query: { dateFrom?: string; dateTo?: string },
+      ): unknown;
+    }
+  ).buildInstanceWhere.bind(service);
+  const dateFrom = "2026-07-01T00:00:00.000Z";
+  const dateTo = "2026-08-11T23:59:59.999Z";
+
+  assert.deepEqual(
+    buildInstanceWhere(
+      { id: "entrepreneur-1", role: UserRole.entrepreneur },
+      { dateFrom, dateTo },
+    ),
+    {
+      AND: [
+        { entrepreneurUserId: "entrepreneur-1" },
+        {
+          dueDate: {
+            gte: new Date(dateFrom),
+            lte: new Date(dateTo),
+          },
+        },
+      ],
+    },
+  );
+  await assert.rejects(
+    service.listInstances(
+      { id: "entrepreneur-1", role: UserRole.entrepreneur } as never,
+      { dateFrom: dateTo, dateTo: dateFrom },
+    ),
+    /date range is invalid/i,
+  );
+  assert.equal(freshnessChecks, 1);
 });

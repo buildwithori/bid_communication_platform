@@ -19,6 +19,8 @@ function toQueryString(query?: DeliverableQuery | DeliverableGroupQuery) {
   const params = new URLSearchParams();
   if (query?.search) params.set("search", query.search);
   if ("programmeId" in (query ?? {}) && query?.programmeId) params.set("programmeId", query.programmeId);
+  if (query && "dateFrom" in query && query.dateFrom) params.set("dateFrom", query.dateFrom);
+  if (query && "dateTo" in query && query.dateTo) params.set("dateTo", query.dateTo);
   if (query && "view" in query && query.view) params.set("view", query.view);
   if (query && "status" in query && query.status) params.set("status", query.status);
   if (query && "overdue" in query && query.overdue) params.set("overdue", "true");

@@ -284,6 +284,13 @@ export class DeliverablesService {
 
   async listInstances(user: User, query: DeliverableInstanceQueryDto) {
     await this.recurring.ensureCurrent();
+    if (
+      query.dateFrom &&
+      query.dateTo &&
+      new Date(query.dateFrom) > new Date(query.dateTo)
+    ) {
+      throw new BadRequestException("Deliverable date range is invalid.");
+    }
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildInstanceWhere(user, query);
     const summaryWhere = this.buildInstanceWhere(user, query, true);
@@ -739,6 +746,14 @@ export class DeliverablesService {
     }
     if (!ignoreStatus && query.status) filters.push({ status: query.status });
     if (query.programmeId) filters.push({ programmeId: query.programmeId });
+    if ("dateFrom" in query && (query.dateFrom || query.dateTo)) {
+      filters.push({
+        dueDate: {
+          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+          ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+        },
+      });
+    }
     return filters.length ? { AND: filters } : {};
   }
 

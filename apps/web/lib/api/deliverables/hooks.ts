@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deliverableKeys } from "./keys";
 import {
@@ -93,6 +93,28 @@ export function useLazyDeliverableInstances(
     ...result,
     rows: result.data?.pages.flatMap((page) => page.items) ?? [],
     totalItems: result.data?.pages[0]?.totalItems ?? 0,
+  };
+}
+
+export function useDeliverableCalendarWindowQuery(
+  query: Pick<DeliverableQuery, "dateFrom" | "dateTo" | "take">,
+) {
+  const result = useLazyDeliverableInstances({
+    ...query,
+    enabled: Boolean(query.dateFrom && query.dateTo),
+  });
+  const { fetchNextPage, hasNextPage, isError, isFetchingNextPage } = result;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isError, isFetchingNextPage]);
+  return {
+    ...result,
+    isLoading:
+      result.isLoading ||
+      isFetchingNextPage ||
+      (!isError && Boolean(hasNextPage)),
   };
 }
 

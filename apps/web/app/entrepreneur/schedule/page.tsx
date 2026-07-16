@@ -18,12 +18,14 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { BookingModal } from "@/components/entrepreneur/BookingModal";
 import { LinkedSessionDetailModal } from "@/components/sessions/LinkedSessionDetailModal";
-import { useEntrepreneurStore } from "@/lib/stores/entrepreneur-store";
 import { cn } from "@/lib/utils";
-import type { Deliverable } from "@/types";
+import {
+  useDeliverableCalendarWindowQuery,
+  type DeliverableInstance,
+} from "@/lib/api/deliverables";
 import {
   useCancelSessionMutation,
-  useInfiniteSessionsQuery,
+  useSessionCalendarWindowQuery,
   type SessionRecord,
   type SessionStatus,
 } from "@/lib/api/sessions";
@@ -168,16 +170,16 @@ function sessionToCalendarItem(session: SessionRecord): CalendarItem {
 }
 
 function deliverableToCalendarItem(
-  deliverable: Deliverable,
+  deliverable: DeliverableInstance,
 ): CalendarItem | null {
-  if (!deliverable.dueDate || deliverable.status === "reviewed") return null;
+  if (deliverable.status === "approved") return null;
   return {
     id: `deliverable-${deliverable.id}`,
     source: "deliverable",
-    title: `${deliverable.name} due`,
-    date: deliverable.dueDate,
+    title: `${deliverable.deliverable} due`,
+    date: toDateValue(new Date(deliverable.dueDate)),
     category: "deadline",
-    description: deliverable.groupLabel,
+    description: deliverable.programme.name,
   };
 }
 
@@ -198,7 +200,6 @@ function isSameMonth(value: string, monthDate: Date) {
 }
 
 export default function SchedulePage() {
-  const { deliverables } = useEntrepreneurStore();
   const todayDate = React.useMemo(() => new Date(), []);
   const todayValue = React.useMemo(() => toDateValue(todayDate), [todayDate]);
   const [bookOpen, setBookOpen] = React.useState(false);
@@ -223,32 +224,39 @@ export default function SchedulePage() {
   );
   const windowStart = monthCells[0];
   const windowEnd = monthCells[monthCells.length - 1];
-  const sessionsQuery = useInfiniteSessionsQuery({
-    dateFrom: new Date(
-      windowStart.getFullYear(),
-      windowStart.getMonth(),
-      windowStart.getDate(),
-    ).toISOString(),
-    dateTo: new Date(
-      windowEnd.getFullYear(),
-      windowEnd.getMonth(),
-      windowEnd.getDate(),
-      23,
-      59,
-      59,
-      999,
-    ).toISOString(),
-    take: 100,
+  const dateFrom = new Date(
+    windowStart.getFullYear(),
+    windowStart.getMonth(),
+    windowStart.getDate(),
+  ).toISOString();
+  const dateTo = new Date(
+    windowEnd.getFullYear(),
+    windowEnd.getMonth(),
+    windowEnd.getDate(),
+    23,
+    59,
+    59,
+    999,
+  ).toISOString();
+  const sessionsQuery = useSessionCalendarWindowQuery({
+    dateFrom,
+    dateTo,
+    take: 50,
+  });
+  const deliverablesQuery = useDeliverableCalendarWindowQuery({
+    dateFrom,
+    dateTo,
+    take: 50,
   });
   const calendarItems = React.useMemo(
     () =>
       sortCalendarItems([
         ...sessionsQuery.rows.map(sessionToCalendarItem),
-        ...deliverables
+        ...deliverablesQuery.rows
           .map(deliverableToCalendarItem)
           .filter((item): item is CalendarItem => Boolean(item)),
       ]),
-    [deliverables, sessionsQuery.rows],
+    [deliverablesQuery.rows, sessionsQuery.rows],
   );
 
   const itemsByDate = React.useMemo(() => {
@@ -267,13 +275,19 @@ export default function SchedulePage() {
     1,
     Math.ceil(upcomingItems.length / nextPageSize),
   );
+  const currentNextPage = Math.min(nextPage, nextTotalPages);
   const nextItems = upcomingItems.slice(
-    (nextPage - 1) * nextPageSize,
-    nextPage * nextPageSize,
+    (currentNextPage - 1) * nextPageSize,
+    currentNextPage * nextPageSize,
   );
   const nextStart =
-    upcomingItems.length === 0 ? 0 : (nextPage - 1) * nextPageSize + 1;
-  const nextEnd = Math.min(nextPage * nextPageSize, upcomingItems.length);
+    upcomingItems.length === 0
+      ? 0
+      : (currentNextPage - 1) * nextPageSize + 1;
+  const nextEnd = Math.min(
+    currentNextPage * nextPageSize,
+    upcomingItems.length,
+  );
   const selectedItems = itemsByDate[selectedDate] ?? [];
   const monthItems = React.useMemo(
     () => calendarItems.filter((item) => isSameMonth(item.date, visibleMonth)),
@@ -300,10 +314,6 @@ export default function SchedulePage() {
     visibleMonth.getMonth() === todayDate.getMonth();
   const isSelectedToday = selectedDate === todayValue;
 
-  React.useEffect(() => {
-    setNextPage((current) => Math.min(current, nextTotalPages));
-  }, [nextTotalPages]);
-
   const moveMonth = (offset: number) => {
     setVisibleMonth(
       (current) =>
@@ -316,8 +326,37 @@ export default function SchedulePage() {
     setVisibleMonth(todayDate);
   };
 
-  if (sessionsQuery.isLoading) {
+  if (sessionsQuery.isLoading || deliverablesQuery.isLoading) {
     return <SchedulePageSkeleton />;
+  }
+
+  if (sessionsQuery.isError || deliverablesQuery.isError) {
+    return (
+      <>
+        <PageHeader
+          title="Schedule"
+          description="Your sessions and deliverable deadlines could not be loaded."
+        />
+        <Card padding="lg" className="text-center">
+          <CalendarDays className="mx-auto h-8 w-8 text-ink-faint" />
+          <div className="mt-3 font-semibold text-ink">
+            Schedule unavailable
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">
+            Try loading this calendar window again.
+          </p>
+          <Button
+            className="mt-4"
+            onClick={() => {
+              void sessionsQuery.refetch();
+              void deliverablesQuery.refetch();
+            }}
+          >
+            Try again
+          </Button>
+        </Card>
+      </>
+    );
   }
 
   return (
@@ -509,10 +548,8 @@ export default function SchedulePage() {
                   variant="outline"
                   size="icon"
                   aria-label="Previous upcoming items"
-                  disabled={nextPage === 1}
-                  onClick={() =>
-                    setNextPage((current) => Math.max(1, current - 1))
-                  }
+                  disabled={currentNextPage === 1}
+                  onClick={() => setNextPage(Math.max(1, currentNextPage - 1))}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -520,10 +557,10 @@ export default function SchedulePage() {
                   variant="outline"
                   size="icon"
                   aria-label="Next upcoming items"
-                  disabled={nextPage === nextTotalPages}
+                  disabled={currentNextPage === nextTotalPages}
                   onClick={() =>
-                    setNextPage((current) =>
-                      Math.min(nextTotalPages, current + 1),
+                    setNextPage(
+                      Math.min(nextTotalPages, currentNextPage + 1),
                     )
                   }
                 >

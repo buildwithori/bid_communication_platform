@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -95,6 +95,25 @@ export function useInfiniteSessionsQuery(
   return {
     ...result,
     rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+  };
+}
+
+export function useSessionCalendarWindowQuery(
+  query: Omit<SessionQuery, "cursor">,
+) {
+  const result = useInfiniteSessionsQuery(query);
+  const { fetchNextPage, hasNextPage, isError, isFetchingNextPage } = result;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isError, isFetchingNextPage]);
+  return {
+    ...result,
+    isLoading:
+      result.isLoading ||
+      isFetchingNextPage ||
+      (!isError && Boolean(hasNextPage)),
   };
 }
 

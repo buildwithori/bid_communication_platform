@@ -12,6 +12,8 @@ export type DeliverableQuery = {
   search?: string;
   status?: DeliverableStatus;
   programmeId?: string;
+  dateFrom?: string;
+  dateTo?: string;
   overdue?: boolean;
   take?: number;
   cursor?: string;

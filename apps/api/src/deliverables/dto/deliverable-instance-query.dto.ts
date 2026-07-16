@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { DeliverableInstanceStatus } from '@prisma/client';
 
 export class DeliverableInstanceQueryDto {
@@ -15,6 +15,14 @@ export class DeliverableInstanceQueryDto {
   @IsOptional()
   @IsString()
   programmeId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateTo?: string;
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
