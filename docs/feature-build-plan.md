@@ -430,6 +430,8 @@ Done when:
 - Dev emails are visible in Mailpit.
 - Delivery status and read state are persisted.
 
+Implementation status (2026-07-16): Complete. Durable recipient-scoped notifications now power the shared admin, trainer, and entrepreneur notification centre with cursor pagination, backend unread/total counts, persisted read state, lazy loading, and safe internal action URLs that open the exact session, deliverable, or tool-request detail context. Session, deliverable, and tool lifecycles emit batched in-app and email fanout with company defaults and user overrides. Email deliveries run through a retrying worker with atomic claims, stale-job recovery, attempt metadata, and persisted pending/processing/sent/failed/skipped status. Module-owned React Email templates use the shared BID brand and every runtime action/logo URL is built from APP_WEB_URL through EmailService. Mailpit delivery and env-rooted links were verified in Docker. Transactional auth/invitation email remains owned by those modules because recipients may not yet have an active notification account; reporting/system emitters will attach to this foundation when their owning lifecycle features are implemented.
+
 ### 14. Dashboards And Operational Aggregates
 
 Scope:

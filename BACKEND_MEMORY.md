@@ -368,3 +368,12 @@ Before merging backend work, ask:
 - Session reschedules store `session_reschedules` history and update the same Calendar event. Existing confirmed rows without Calendar event IDs are repaired by creating a real event on first reschedule; legacy placeholder URLs are not exposed.
 - `session_request_declines` records per-user opt-out from open-team requests. Trainer query scope excludes opted-out requests while leaving them open to other eligible users.
 - Participant note visibility is enforced in the response mapper; entrepreneurs cannot read internal notes.
+
+## Notification Delivery Runtime (2026-07-16)
+
+- Notifications are recipient-scoped durable records with separate per-channel delivery rows. In-app visibility requires a sent in-app delivery; skipped channels do not leak into the notification centre.
+- Multi-recipient lifecycle fanout uses NotificationsService.createNotifications so company defaults and exact user/type preferences are fetched in batches and the event fanout is created transactionally.
+- The email worker atomically claims pending/failed delivery rows, recovers stale processing rows, caps attempts, applies exponential retry delay, and persists sent/failed timestamps and safe failure reasons. A fixed worker batch is processing backpressure, not a hidden API-list cap.
+- Notification actionUrl accepts only application-relative paths beginning with one slash. Frontend routing ignores unsafe values and exact-detail routes refetch the resource through a role-scoped endpoint.
+- Session, deliverable, and tool-request lifecycles currently emit in-app and email notifications. Auth and invitation messages remain direct module-owned transactional email where the recipient may not have an active user record; reporting and system producers should reuse the notification service when their owning features are built.
+- Every runtime email URL, including CTA and logo URLs, must use EmailService.appUrl()/logoUrl(), which read APP_WEB_URL. Do not assemble roots inside feature email services.

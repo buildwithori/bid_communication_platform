@@ -261,3 +261,11 @@ Session workflow rules:
 - Company settings own session working days, start/end minutes, slot interval, and default duration. Backend availability and all create/reschedule mutations enforce the configured policy.
 - The sessions frontend integration lives under `lib/api/sessions/`. Booking trainer/owner/entrepreneur lookups are lazy and cursor-paginated; schedule windows use infinite cursor loading; queue search, filters, totals, and status metrics remain backend-owned.
 - Meeting links are exposed only for real confirmed/completed Calendar-backed sessions. Internal session notes are never returned to entrepreneurs.
+
+## Notifications And Email Completion (2026-07-16)
+
+- Feature 13 uses one durable, recipient-scoped notification system across admin, trainer, and entrepreneur workspaces. Lists are cursor-paginated, unread/total counts are backend-computed, read state is persisted, and the shared notification centre loads lazily.
+- Notification action URLs must be safe internal application paths and should identify the exact resource with a query ID when the destination opens a detail modal. Session, deliverable, and tool-request destinations resolve that scoped resource from the backend rather than relying on the currently loaded list page.
+- Lifecycle fanout resolves company defaults and user preferences in batches, creates per-channel delivery rows, and never performs business summaries in React. User notification preferences live in each role settings/profile experience.
+- All runtime email action links and brand assets must derive their absolute root from APP_WEB_URL through the shared EmailService helpers. Feature modules own their templates and orchestration; preview props may use illustrative local values only for the React Email preview runtime.
+- Notification email delivery is asynchronous and retryable, with atomic claims, stale-processing recovery, capped exponential backoff, attempt metadata, and persisted pending/processing/sent/failed/skipped states.
