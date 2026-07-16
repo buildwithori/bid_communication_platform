@@ -3,7 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, ToolRequestStatus, User, UserRole } from "@prisma/client";
+import {
+  EntrepreneurToolStatus,
+  Prisma,
+  ToolRequestStatus,
+  User,
+  UserRole,
+} from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { ToolRequestQueryDto } from "./dto/tool-request-query.dto";
@@ -188,10 +194,25 @@ export class ToolRequestsService {
     if (isDecision) {
       this.ensureAllowedTransition(existing.status, nextStatus);
     }
-    if (nextStatus === ToolRequestStatus.built && !nextLinkedToolId) {
-      throw new BadRequestException(
-        "Link the built tool before marking this request as built.",
-      );
+    if (nextStatus === ToolRequestStatus.built) {
+      if (!nextLinkedToolId) {
+        throw new BadRequestException(
+          "Link the built tool before marking this request as built.",
+        );
+      }
+      const publishedTool = await this.prisma.tool.findFirst({
+        where: {
+          id: nextLinkedToolId,
+          status: EntrepreneurToolStatus.published,
+          archivedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!publishedTool) {
+        throw new BadRequestException(
+          "Built requests must link to a published tool in the library.",
+        );
+      }
     }
     if (nextStatus === ToolRequestStatus.declined && !nextDecisionNote) {
       throw new BadRequestException(
