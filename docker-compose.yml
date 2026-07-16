@@ -25,6 +25,34 @@ services:
       api:
         condition: service_healthy
 
+  worker:
+    image: bid-hub-api-dev
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: development
+    command: sh scripts/docker-dev-entrypoint.sh npm --workspace @bid/api run start:worker:dev:docker
+    env_file:
+      - .env.local
+    environment:
+      DOCKER_APPLY_MIGRATIONS: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'node.*nest.*worker' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    volumes:
+      - .:/workspace
+      - root_node_modules:/workspace/node_modules
+      - worker_build:/workspace/apps/api/.worker-docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
   email-preview:
     build:
       context: .
@@ -52,6 +80,7 @@ services:
         condition: service_healthy
 
   api:
+    image: bid-hub-api-dev
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -132,8 +161,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -165,6 +192,7 @@ volumes:
   root_node_modules:
   web_next:
   api_build:
+  worker_build:
   email_preview_next:
   postgres_data:
   redis_data:

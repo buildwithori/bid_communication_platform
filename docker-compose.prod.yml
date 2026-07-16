@@ -6,13 +6,18 @@ services:
       target: production
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    env_file:
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''http'').get(''http://127.0.0.1:3000/health'', r => process.exit(r.statusCode === 200 ? 0 : 1)).on(''error'', () => process.exit(1))"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,37 +27,15 @@ services:
         condition: service_healthy
 
   api:
+    image: ${API_IMAGE:-bid-hub-api:latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
       target: production
+    env_file:
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: production
-      PORT: 4000
-      WEB_ORIGIN: ${WEB_ORIGIN}
-      APP_WEB_URL: ${APP_WEB_URL}
-      API_PUBLIC_URL: ${API_PUBLIC_URL}
-      EMAIL_TRANSPORT: resend
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      RESEND_API_KEY: ${RESEND_API_KEY}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
-      GOOGLE_CALENDAR_REDIRECT_URI: ${GOOGLE_CALENDAR_REDIRECT_URI}
-      CALENDAR_TOKEN_ENCRYPTION_KEY: ${CALENDAR_TOKEN_ENCRYPTION_KEY}
-      MAIL_FROM: ${MAIL_FROM}
-      DO_SPACES_BUCKET: ${DO_SPACES_BUCKET}
-      DO_SPACES_ENDPOINT: ${DO_SPACES_ENDPOINT}
-      DO_SPACES_REGION: ${DO_SPACES_REGION}
-      DO_SPACES_ACCESS_KEY_ID: ${DO_SPACES_ACCESS_KEY_ID}
-      DO_SPACES_SECRET_ACCESS_KEY: ${DO_SPACES_SECRET_ACCESS_KEY}
-      DO_SPACES_FORCE_PATH_STYLE: "false"
-      MUX_TOKEN_ID: ${MUX_TOKEN_ID}
-      MUX_TOKEN_SECRET: ${MUX_TOKEN_SECRET}
-      MUX_WEBHOOK_SECRET: ${MUX_WEBHOOK_SECRET}
-      MUX_SIGNING_KEY_ID: ${MUX_SIGNING_KEY_ID}
-      MUX_SIGNING_PRIVATE_KEY: ${MUX_SIGNING_PRIVATE_KEY}
     ports:
       - "4000:4000"
     restart: unless-stopped
@@ -60,8 +43,31 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"require('http').get('http://127.0.0.1:4000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\"",
+          'node -e "require(''http'').get(''http://127.0.0.1:4000/api/health'', r => process.exit(r.statusCode === 200 ? 0 : 1)).on(''error'', () => process.exit(1))"',
         ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: ${API_IMAGE:-bid-hub-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    command: npm run start:worker
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'node.*dist/worker.js' >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,21 +79,21 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - ${ENV_FILE:-.env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    env_file:
+      - ${ENV_FILE:-.env}
     volumes:
       - redis_data:/data
     restart: unless-stopped
