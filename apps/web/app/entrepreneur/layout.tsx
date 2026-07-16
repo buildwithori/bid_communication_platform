@@ -4,10 +4,10 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
-import { EntrepreneurProvider, useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { entrepreneurNav } from '@/lib/nav/entrepreneur-nav';
 import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { routes } from '@/lib/routes';
+import { useEntrepreneurProfileQuery } from '@/lib/api/entrepreneurs';
 
 const titles: Record<string, string> = {
   [routes.entrepreneur.dashboard]: 'Dashboard',
@@ -23,21 +23,35 @@ function useTitle() {
   const pathname = usePathname();
   const exact = titles[pathname];
   if (exact) return exact;
-  if (pathname.startsWith(routes.entrepreneur.training)) return 'Training Library';
-  if (pathname.startsWith(routes.entrepreneur.deliverables)) return 'Deliverables';
+  if (pathname.startsWith(routes.entrepreneur.training))
+    return 'Training Library';
+  if (pathname.startsWith(routes.entrepreneur.deliverables))
+    return 'Deliverables';
   return 'BID Hub';
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { entrepreneur } = useEntrepreneurStore();
+  const entrepreneur = useEntrepreneurProfileQuery().data;
   const title = useTitle();
-
+  const name =
+    entrepreneur?.businessName ||
+    entrepreneur?.representativeName ||
+    'Entrepreneur';
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part: string) => part[0])
+      .join('')
+      .toUpperCase() || 'EN';
+  const context = [entrepreneur?.stage?.name, entrepreneur?.sector?.name]
+    .filter(Boolean)
+    .join(' · ');
   const user = {
-    initials: entrepreneur.initials,
-    name: entrepreneur.businessName,
-    subtitle: `${entrepreneur.metrics.trainingProgress > 0 ? 'Growth stage' : ''} · ${
-      entrepreneur.sector.charAt(0).toUpperCase() + entrepreneur.sector.slice(1)
-    }`,
+    initials,
+    name,
+    subtitle: context || 'Entrepreneur',
     tone: 'brand' as const,
   };
 
@@ -62,9 +76,7 @@ export default function EntrepreneurLayout({
 }) {
   return (
     <WorkspaceGuard allowedRoles={['entrepreneur']}>
-      <EntrepreneurProvider>
-        <Shell>{children}</Shell>
-      </EntrepreneurProvider>
+      <Shell>{children}</Shell>
     </WorkspaceGuard>
   );
 }

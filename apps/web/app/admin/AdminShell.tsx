@@ -7,6 +7,7 @@ import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { adminNav } from '@/lib/nav/admin-nav';
 import { trainerNav } from '@/lib/nav/trainer-nav';
 import { routes } from '@/lib/routes';
+import { useAdminProfileQuery } from '@/lib/api/admins';
 
 interface TrainerSession {
   name?: string;
@@ -42,8 +43,21 @@ function useTitle() {
   return 'BID Admin';
 }
 
+function initialsFor(name: string, fallback: string) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+  return initials || fallback;
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
+  const profile = useAdminProfileQuery().data;
+  const name = profile?.name ?? 'Administrator';
 
   return (
     <AppShell
@@ -52,9 +66,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       role="admin"
       sections={adminNav}
       user={{
-        initials: 'AD',
-        name: 'Ama Darko',
-        subtitle: 'Programme Lead',
+        initials: initialsFor(name, 'AD'),
+        name,
+        subtitle: 'BID administrator',
         tone: 'brand',
       }}
       title={title}
