@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import {
   useCompanySettingsQuery,
   useUpdateCompanySettingsMutation,
+  type CompanyConfig,
 } from "@/lib/api/settings";
 
 const currencyOptions = [
@@ -89,52 +90,12 @@ function isValidDays(value: number | null) {
 
 export default function AdminCompanySettingsPage() {
   const settings = useCompanySettingsQuery();
-  const updateSettings = useUpdateCompanySettingsMutation({
-    onSuccess: () => toast.success("Company settings updated"),
-    onError: (error) => toast.error(error.message),
-  });
-  const companyConfig = settings.data;
-  const [overdueAfterDays, setOverdueAfterDays] = React.useState("30");
-  const [moduleDueDays, setModuleDueDays] = React.useState("");
-  const [currency, setCurrency] = React.useState("USD");
-  const [timezone, setTimezone] = React.useState("Africa/Accra");
-  const [sessionProvider, setSessionProvider] = React.useState("google-meet");
-  const [sessionPolicy, setSessionPolicy] = React.useState({
-    workingDays: [1, 2, 3, 4, 5],
-    workdayStartMinutes: 540,
-    workdayEndMinutes: 1020,
-    slotIntervalMinutes: 30,
-    defaultDurationMinutes: 60,
-  });
-  const [notifications, setNotifications] = React.useState({
-    inAppNotifications: true,
-    emailNotifications: true,
-    reminderNotifications: true,
-    weeklyDigest: false,
-  });
-
-  React.useEffect(() => {
-    if (!companyConfig) return;
-    setOverdueAfterDays(
-      String(companyConfig.reporting.periodicUpdateOverdueAfterDays),
-    );
-    setModuleDueDays(
-      companyConfig.deliverables.moduleCompletionDeliverableDueDays == null
-        ? ""
-        : String(companyConfig.deliverables.moduleCompletionDeliverableDueDays),
-    );
-    setCurrency(companyConfig.defaults.currency);
-    setTimezone(companyConfig.defaults.timezone);
-    setSessionProvider(companyConfig.defaults.sessionProvider);
-    setSessionPolicy(companyConfig.sessions);
-    setNotifications(companyConfig.notifications);
-  }, [companyConfig]);
 
   if (settings.isLoading) {
     return <CompanySettingsSkeleton />;
   }
 
-  if (settings.isError || !companyConfig) {
+  if (settings.isError || !settings.data) {
     return (
       <>
         <PageHeader
@@ -156,6 +117,42 @@ export default function AdminCompanySettingsPage() {
       </>
     );
   }
+
+  return <CompanySettingsForm companyConfig={settings.data} />;
+}
+
+function CompanySettingsForm({
+  companyConfig,
+}: {
+  companyConfig: CompanyConfig;
+}) {
+  const updateSettings = useUpdateCompanySettingsMutation({
+    onSuccess: () => toast.success("Company settings updated"),
+    onError: (error) => toast.error(error.message),
+  });
+  const [overdueAfterDays, setOverdueAfterDays] = React.useState(() =>
+    String(companyConfig.reporting.periodicUpdateOverdueAfterDays),
+  );
+  const [moduleDueDays, setModuleDueDays] = React.useState(() =>
+    companyConfig.deliverables.moduleCompletionDeliverableDueDays == null
+      ? ""
+      : String(companyConfig.deliverables.moduleCompletionDeliverableDueDays),
+  );
+  const [currency, setCurrency] = React.useState(
+    companyConfig.defaults.currency,
+  );
+  const [timezone, setTimezone] = React.useState(
+    companyConfig.defaults.timezone,
+  );
+  const [sessionProvider, setSessionProvider] = React.useState(
+    companyConfig.defaults.sessionProvider,
+  );
+  const [sessionPolicy, setSessionPolicy] = React.useState(
+    companyConfig.sessions,
+  );
+  const [notifications, setNotifications] = React.useState(
+    companyConfig.notifications,
+  );
 
   const overdueValue = Number(overdueAfterDays);
   const moduleDueValue = parseOptionalDays(moduleDueDays);

@@ -94,7 +94,7 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 
 ## Current Important Decisions
 
-- Backend/API folders were removed for now. The app is UI/in-memory-state first. Backend implementation direction is now NestJS, not Next.js route handlers.
+- The backend is the NestJS application in `apps/api`; do not add business API route handlers to Next.js or restore the former UI-only/in-memory architecture.
 - Backend/frontend integration must be feature-sliced, not broad page rewiring. Preserve the existing UI while wiring backend data. Do not remove pages, modals, actions, filters, charts, or customer-facing flows just because the backend endpoint is not ready. For each feature, compare the current UI against the backend design, build that feature end to end, then commit it in reviewable chunks.
 - Follow `docs/feature-build-plan.md` for backend integration order. Start from auth and invite/profile foundations before moving into programmes, content, deliverables, sessions, tools, notifications, and reporting.
 - Seed data should stay minimal: one user per role and essential company/settings lookup data. Do not seed every entity for every feature. Use local scripts, API calls, or temporary commands when a feature needs test records during development.
@@ -213,6 +213,7 @@ Session workflow rules:
 - Feature hooks own server-state behavior: queries, mutations, lazy enablement, cursor/infinite pagination, invalidation, optimistic updates, and cache cleanup. Pages/components own rendering, local UI state, form-to-payload mapping, navigation, and user feedback.
 - API payload, response, and shared domain types must live in feature `types.ts` files, not pages. A page/component may define a type locally only when it is private presentation state for that file, such as its tab union, modal draft, or table-only view row.
 - ESLint enforces the page/component import boundary. See `docs/frontend-api-integration.md` for the canonical structure.
+- Forms whose initial values come from a query must mount their editable form only after the query succeeds and initialize local state from that response. Do not hydrate every field through a synchronous effect, because it adds a blank/fallback render and can overwrite user edits during cache updates.
 
 ## UI Form And Backend Design Reconciliation (2026-07-15)
 
