@@ -1,23 +1,53 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Modal } from '@/components/shared/Modal';
-import { FormAutocomplete, FormField, FormRow2, FormSelect, FormTextarea } from '@/components/shared/FormField';
-import { Button } from '@/components/shared/Button';
-import { DatePicker } from '@/components/shared/DatePicker';
-import { bookingSchema, type BookingForm } from '@/lib/forms/schemas';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { trainers } from '@/lib/mock-data/trainers';
+import * as React from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+import { Modal } from "@/components/shared/Modal";
+import {
+  FormAutocomplete,
+  FormField,
+  FormRow2,
+  FormSelect,
+  FormTextarea,
+} from "@/components/shared/FormField";
+import { Button } from "@/components/shared/Button";
+import { DatePicker } from "@/components/shared/DatePicker";
+import { Notice } from "@/components/shared/PageHeader";
+import { bookingSchema, type BookingForm } from "@/lib/forms/schemas";
+import {
+  useCreateSessionMutation,
+  useLazySessionTeamMembers,
+  useSessionAvailabilityQuery,
+  type SessionAvailability,
+  type SessionType,
+} from "@/lib/api/sessions";
 
 const sessionTypes = [
-  { value: 'mentor-checkin', label: '1:1 Mentor check-in (45 min)' },
-  { value: 'office-hours', label: 'Office Hours – Group (90 min)' },
-  { value: 'investor-prep', label: 'Investor Prep Session (60 min)' },
+  { value: "mentor-checkin", label: "1:1 mentor check-in" },
+  { value: "office-hours", label: "Office hours" },
+  { value: "investor-prep", label: "Investor prep session" },
 ];
 
-const timeSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '14:00', '14:30', '15:00', '15:30', '16:00'];
+const sessionTypeMap: Record<string, SessionType> = {
+  "mentor-checkin": "mentor_checkin",
+  "office-hours": "office_hours",
+  "investor-prep": "investor_prep",
+};
+
+function dateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function initialDate() {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  return dateValue(next);
+}
 
 export function BookingModal({
   open,
@@ -26,92 +56,199 @@ export function BookingModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { bookSession } = useEntrepreneurStore();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const [teamLookupOpen, setTeamLookupOpen] = React.useState(false);
+  const [trainerSearch, setTrainerSearch] = React.useState("");
+  const deferredTrainerSearch = React.useDeferredValue(trainerSearch);
   const form = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
-      sessionType: 'mentor-checkin',
-      recipient: 'general',
-      trainerId: '',
-      topic: '',
-      date: '2026-07-08',
-      time: '10:00',
-      notes: '',
+      sessionType: "mentor-checkin",
+      recipient: "general",
+      trainerId: "",
+      topic: "",
+      date: initialDate(),
+      time: "",
+      notes: "",
     },
   });
+  const recipient = form.watch("recipient");
+  const trainerId = form.watch("trainerId") ?? "";
+  const selectedDate = form.watch("date");
 
-  const recipient = form.watch('recipient');
+  const trainers = useLazySessionTeamMembers({
+    enabled: open && recipient === "specific" && teamLookupOpen,
+    search: deferredTrainerSearch || undefined,
+    take: 20,
+  });
+  const availabilityQuery = {
+    dateFrom: selectedDate,
+    dateTo: selectedDate,
+    timezone,
+    ...(recipient === "specific" && trainerId
+      ? { targetUserId: trainerId }
+      : {}),
+  };
+  const availability = useSessionAvailabilityQuery(
+    availabilityQuery,
+    open &&
+      Boolean(selectedDate) &&
+      (recipient === "general" || Boolean(trainerId)),
+  );
+  const createSession = useCreateSessionMutation({
+    onSuccess: () => {
+      toast.success("Session request sent");
+      onOpenChange(false);
+      form.reset({
+        sessionType: "mentor-checkin",
+        recipient: "general",
+        trainerId: "",
+        topic: "",
+        date: initialDate(),
+        time: "",
+        notes: "",
+      });
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   React.useEffect(() => {
-    if (recipient === 'general' && form.watch('trainerId')) {
-      form.setValue('trainerId', '', { shouldValidate: true });
+    form.setValue("time", "", { shouldValidate: false });
+    if (recipient === "general") {
+      form.setValue("trainerId", "", { shouldValidate: false });
     }
-  }, [form, recipient]);
+  }, [form, recipient, trainerId, selectedDate]);
+
+  const slotOptions = (availability.data?.slots ?? []).map(
+    (slot: SessionAvailability["slots"][number]) => ({
+      value: slot.startAt,
+      label: new Date(slot.startAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      description:
+        recipient === "general"
+          ? slot.availableTeamMemberCount +
+            " BID team member" +
+            (slot.availableTeamMemberCount === 1 ? "" : "s") +
+            " available"
+          : "Selected trainer is available",
+    }),
+  );
 
   const onSubmit = (values: BookingForm) => {
-    bookSession(values);
-    onOpenChange(false);
-    form.reset();
+    if (values.recipient === "specific" && !values.trainerId) {
+      form.setError("trainerId", { message: "Choose a trainer." });
+      return;
+    }
+    const slot = availability.data?.slots.find(
+      (item: SessionAvailability["slots"][number]) =>
+        item.startAt === values.time,
+    );
+    if (!slot) {
+      form.setError("time", {
+        message: "Choose a currently available time.",
+      });
+      return;
+    }
+    createSession.mutate({
+      type: sessionTypeMap[values.sessionType],
+      topic: values.topic,
+      notes: values.notes || undefined,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      timezone,
+      meetingProvider: "google_meet",
+      targetType:
+        values.recipient === "specific" ? "specific_user" : "open_team",
+      targetUserId:
+        values.recipient === "specific" ? values.trainerId : undefined,
+    });
   };
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Book a session" width="wide">
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Book a session"
+      width="wide"
+    >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Session type">
           <FormSelect
-            value={form.watch('sessionType')}
-            onValueChange={(v) => form.setValue('sessionType', v)}
+            value={form.watch("sessionType")}
+            onValueChange={(value) =>
+              form.setValue("sessionType", value, { shouldValidate: true })
+            }
             options={sessionTypes}
           />
         </FormField>
 
         <FormField label="Who would you like to meet?">
           <FormSelect
-            value={form.watch('recipient')}
-            onValueChange={(v) => {
-              form.setValue('recipient', v as 'specific' | 'general', { shouldValidate: true });
-              if (v === 'specific' && !form.watch('trainerId')) {
-                form.setValue('trainerId', trainers[0]?.id ?? '', { shouldValidate: true });
-              }
-            }}
+            value={recipient}
+            onValueChange={(value) =>
+              form.setValue("recipient", value as "specific" | "general", {
+                shouldValidate: true,
+              })
+            }
             options={[
-              { value: 'general', label: 'Any available BID team member' },
-              { value: 'specific', label: 'A specific trainer' },
+              {
+                value: "general",
+                label: "Any available BID team member",
+              },
+              { value: "specific", label: "A specific trainer" },
             ]}
           />
         </FormField>
 
-        {recipient === 'general' && (
+        {recipient === "general" ? (
           <div className="mb-4 rounded-xl border border-line bg-surface-subtle px-4 py-3 text-sm leading-6 text-ink-muted">
-            This request will go to the BID team queue. The first available team member who accepts it will own the session.
+            Only times with at least one available BID team member are shown.
+            The request stays open until an available person accepts it.
           </div>
-        )}
-
-        {recipient === 'specific' && (
-          <FormField label="Trainer">
+        ) : (
+          <FormField
+            label="Trainer"
+            error={form.formState.errors.trainerId?.message}
+          >
             <FormAutocomplete
-              value={form.watch('trainerId') ?? ''}
-              onValueChange={(v) => form.setValue('trainerId', v)}
-              options={trainers.map((t) => ({
-                value: t.id,
-                label: t.fullName,
-                description: t.role,
+              value={trainerId}
+              onValueChange={(value) =>
+                form.setValue("trainerId", value, {
+                  shouldValidate: true,
+                })
+              }
+              options={trainers.rows.map((trainer) => ({
+                value: trainer.id,
+                label: trainer.name,
+                description:
+                  trainer.role === "trainer" ? "Trainer" : "BID admin",
               }))}
               placeholder="Search trainer"
-              searchPlaceholder="Search trainers..."
+              searchPlaceholder="Search connected trainers..."
+              emptyMessage="No connected trainer found."
+              isLoading={trainers.isLoading || trainers.isFetchingNextPage}
+              onOpenChange={setTeamLookupOpen}
+              onSearchChange={setTrainerSearch}
+              hasMore={Boolean(trainers.hasNextPage)}
+              onLoadMore={() => void trainers.fetchNextPage()}
             />
           </FormField>
         )}
 
-        <FormField label="Session topic / goal" error={form.formState.errors.topic?.message}>
+        <FormField
+          label="Session topic / goal"
+          error={form.formState.errors.topic?.message}
+        >
           <FormTextarea
             rows={2}
             placeholder="e.g. Review our pricing model before investor outreach"
-            {...form.register('topic')}
+            {...form.register("topic")}
           />
         </FormField>
 
-        <FormRow2 className="sm:grid-cols-[minmax(0,1fr)_132px]">
+        <FormRow2>
           <FormField label="Date" error={form.formState.errors.date?.message}>
             <Controller
               control={form.control}
@@ -125,31 +262,61 @@ export function BookingModal({
               )}
             />
           </FormField>
-
-          <FormField label="Time">
+          <FormField
+            label="Available time"
+            error={form.formState.errors.time?.message}
+          >
             <FormAutocomplete
-              value={form.watch('time')}
-              onValueChange={(value) => form.setValue('time', value, { shouldValidate: true })}
-              options={timeSlots.map((time) => ({ value: time, label: time }))}
-              placeholder="Select time"
-              searchPlaceholder="Search time..."
-              emptyMessage="No time slot found."
-              className="w-[132px]"
-              popoverClassName="w-[160px]"
-              listClassName="max-h-[176px] overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y"
+              value={form.watch("time")}
+              onValueChange={(value) =>
+                form.setValue("time", value, { shouldValidate: true })
+              }
+              options={slotOptions}
+              placeholder={
+                availability.isLoading
+                  ? "Checking calendars..."
+                  : "Select available time"
+              }
+              searchPlaceholder="Search available times..."
+              emptyMessage="No available times on this date."
+              disabled={
+                !selectedDate ||
+                (recipient === "specific" && !trainerId) ||
+                availability.isError
+              }
+              isLoading={availability.isLoading}
+              loadingMessage="Checking connected calendars..."
+              listClassName="max-h-[220px] overflow-y-auto"
             />
           </FormField>
         </FormRow2>
+
+        {availability.isError ? (
+          <Notice className="mb-4">
+            Availability could not be loaded. {availability.error.message}
+          </Notice>
+        ) : null}
+        {availability.data ? (
+          <p className="mb-4 text-xs text-ink-muted">
+            Times use {availability.data.timezone}. Default duration:{" "}
+            {availability.data.durationMinutes} minutes.
+          </p>
+        ) : null}
 
         <FormField label="Notes" optional>
           <FormTextarea
             rows={3}
             placeholder="Add any extra context, links, or preparation notes."
-            {...form.register('notes')}
+            {...form.register("notes")}
           />
         </FormField>
-
-        <Button type="submit" className="mt-1 w-full">
+        <Button
+          type="submit"
+          className="mt-1 w-full"
+          disabled={!form.watch("time")}
+          isLoading={createSession.isPending}
+          loadingLabel="Sending request"
+        >
           Request session
         </Button>
       </form>

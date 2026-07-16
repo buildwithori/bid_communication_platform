@@ -1,97 +1,113 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, ExternalLink, MapPin } from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { BookingModal } from '@/components/entrepreneur/BookingModal';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { cn } from '@/lib/utils';
-import type { Deliverable, Session } from '@/types';
+import * as React from "react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  ExternalLink,
+  MapPin,
+} from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { BookingModal } from "@/components/entrepreneur/BookingModal";
+import { useEntrepreneurStore } from "@/lib/stores/entrepreneur-store";
+import { cn } from "@/lib/utils";
+import type { Deliverable } from "@/types";
+import {
+  useInfiniteSessionsQuery,
+  type SessionRecord,
+  type SessionStatus,
+} from "@/lib/api/sessions";
 
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-type ScheduleCategory = 'mentoring' | 'group-session' | 'investor-prep' | 'deadline';
+type ScheduleCategory =
+  "mentoring" | "group-session" | "investor-prep" | "deadline";
 
 type CalendarItem = {
   id: string;
-  source: 'session' | 'deliverable';
+  source: "session" | "deliverable";
   title: string;
   date: string;
   startTime?: string;
   endTime?: string;
-  location?: Session['location'];
-  meetingProvider?: Session['meetingProvider'];
+  location?: "virtual" | "in-person";
+  meetingProvider?: string;
   meetingUrl?: string;
-  status?: Session['status'];
+  status?: SessionStatus;
   category: ScheduleCategory;
   description?: string;
 };
 
-const categoryMeta: Record<ScheduleCategory, {
-  label: string;
-  dotClassName: string;
-  borderClassName: string;
-  badgeTone: 'brand' | 'blue' | 'amber' | 'green' | 'neutral';
-}> = {
+const categoryMeta: Record<
+  ScheduleCategory,
+  {
+    label: string;
+    dotClassName: string;
+    borderClassName: string;
+    badgeTone: "brand" | "blue" | "amber" | "green" | "neutral";
+  }
+> = {
   mentoring: {
-    label: 'Mentoring',
-    dotClassName: 'bg-bid',
-    borderClassName: 'border-l-bid',
-    badgeTone: 'brand',
+    label: "Mentoring",
+    dotClassName: "bg-bid",
+    borderClassName: "border-l-bid",
+    badgeTone: "brand",
   },
-  'group-session': {
-    label: 'Group session',
-    dotClassName: 'bg-info',
-    borderClassName: 'border-l-info',
-    badgeTone: 'blue',
+  "group-session": {
+    label: "Group session",
+    dotClassName: "bg-info",
+    borderClassName: "border-l-info",
+    badgeTone: "blue",
   },
   deadline: {
-    label: 'Deliverable deadline',
-    dotClassName: 'bg-warning',
-    borderClassName: 'border-l-warning',
-    badgeTone: 'amber',
+    label: "Deliverable deadline",
+    dotClassName: "bg-warning",
+    borderClassName: "border-l-warning",
+    badgeTone: "amber",
   },
-  'investor-prep': {
-    label: 'Investor prep',
-    dotClassName: 'bg-success',
-    borderClassName: 'border-l-success',
-    badgeTone: 'green',
+  "investor-prep": {
+    label: "Investor prep",
+    dotClassName: "bg-success",
+    borderClassName: "border-l-success",
+    badgeTone: "green",
   },
 };
 
 function parseDate(value: string) {
-  const [year, month, day] = value.split('-').map(Number);
+  const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
 function toDateValue(date: Date) {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function formatMonth(date: Date) {
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 function formatEventDate(value: string) {
-  return parseDate(value).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
+  return parseDate(value).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
   });
 }
 
 function formatFullDate(value: string) {
-  return parseDate(value).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+  return parseDate(value).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -110,51 +126,60 @@ function buildMonthCells(monthDate: Date) {
 }
 
 function getItemLabel(item: CalendarItem) {
-  if (item.source === 'deliverable') return 'Due';
-  if (item.status === 'confirmed') return 'Confirmed';
-  if (item.status === 'cancelled') return 'Cancelled';
-  return 'Pending';
+  if (item.source === "deliverable") return "Due";
+  if (item.status === "confirmed") return "Confirmed";
+  if (item.status === "cancelled") return "Cancelled";
+  return "Pending";
 }
 
-function getSessionCategory(session: Session): ScheduleCategory {
-  if (session.type === 'investor-prep') return 'investor-prep';
-  if (session.type === 'mentor-checkin') return 'mentoring';
-  if (session.type === 'office-hours' || session.type === 'workshop') return 'group-session';
-  return 'group-session';
+function getSessionCategory(session: SessionRecord): ScheduleCategory {
+  if (session.type === "investor_prep") return "investor-prep";
+  if (session.type === "mentor_checkin") return "mentoring";
+  return "group-session";
 }
 
-function sessionToCalendarItem(session: Session): CalendarItem {
+function sessionToCalendarItem(session: SessionRecord): CalendarItem {
+  const startAt = new Date(session.startAt);
+  const endAt = new Date(session.endAt);
   return {
     id: session.id,
-    source: 'session',
-    title: session.title,
-    date: session.date,
-    startTime: session.startTime,
-    endTime: session.endTime,
-    location: session.location,
+    source: "session",
+    title: session.topic,
+    date: toDateValue(startAt),
+    startTime: startAt.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    endTime: endAt.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    location: "virtual",
     meetingProvider: session.meetingProvider,
-    meetingUrl: session.meetingUrl,
+    meetingUrl: session.meetingUrl ?? undefined,
     status: session.status,
     category: getSessionCategory(session),
   };
 }
 
-function deliverableToCalendarItem(deliverable: Deliverable): CalendarItem | null {
-  if (!deliverable.dueDate || deliverable.status === 'reviewed') return null;
+function deliverableToCalendarItem(
+  deliverable: Deliverable,
+): CalendarItem | null {
+  if (!deliverable.dueDate || deliverable.status === "reviewed") return null;
   return {
     id: `deliverable-${deliverable.id}`,
-    source: 'deliverable',
+    source: "deliverable",
     title: `${deliverable.name} due`,
     date: deliverable.dueDate,
-    category: 'deadline',
+    category: "deadline",
     description: deliverable.groupLabel,
   };
 }
 
 function sortCalendarItems(items: CalendarItem[]) {
   return [...items].sort((a, b) => {
-    const aTime = `${a.date} ${a.startTime ?? '00:00'}`;
-    const bTime = `${b.date} ${b.startTime ?? '00:00'}`;
+    const aTime = `${a.date} ${a.startTime ?? "00:00"}`;
+    const bTime = `${b.date} ${b.startTime ?? "00:00"}`;
     return aTime.localeCompare(bTime);
   });
 }
@@ -168,21 +193,46 @@ function isSameMonth(value: string, monthDate: Date) {
 }
 
 export default function SchedulePage() {
-  const { sessions, deliverables } = useEntrepreneurStore();
-  const calendarItems = React.useMemo(
-    () =>
-      sortCalendarItems([
-        ...sessions.map(sessionToCalendarItem),
-        ...deliverables.map(deliverableToCalendarItem).filter((item): item is CalendarItem => Boolean(item)),
-      ]),
-    [deliverables, sessions],
-  );
+  const { deliverables } = useEntrepreneurStore();
   const todayDate = React.useMemo(() => new Date(), []);
   const todayValue = React.useMemo(() => toDateValue(todayDate), [todayDate]);
   const [bookOpen, setBookOpen] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(todayValue);
   const [visibleMonth, setVisibleMonth] = React.useState(todayDate);
   const [nextPage, setNextPage] = React.useState(1);
+  const monthCells = React.useMemo(
+    () => buildMonthCells(visibleMonth),
+    [visibleMonth],
+  );
+  const windowStart = monthCells[0];
+  const windowEnd = monthCells[monthCells.length - 1];
+  const sessionsQuery = useInfiniteSessionsQuery({
+    dateFrom: new Date(
+      windowStart.getFullYear(),
+      windowStart.getMonth(),
+      windowStart.getDate(),
+    ).toISOString(),
+    dateTo: new Date(
+      windowEnd.getFullYear(),
+      windowEnd.getMonth(),
+      windowEnd.getDate(),
+      23,
+      59,
+      59,
+      999,
+    ).toISOString(),
+    take: 100,
+  });
+  const calendarItems = React.useMemo(
+    () =>
+      sortCalendarItems([
+        ...sessionsQuery.rows.map(sessionToCalendarItem),
+        ...deliverables
+          .map(deliverableToCalendarItem)
+          .filter((item): item is CalendarItem => Boolean(item)),
+      ]),
+    [deliverables, sessionsQuery.rows],
+  );
 
   const itemsByDate = React.useMemo(() => {
     return calendarItems.reduce<Record<string, CalendarItem[]>>((acc, item) => {
@@ -196,12 +246,18 @@ export default function SchedulePage() {
     [calendarItems, todayValue],
   );
   const nextPageSize = 3;
-  const nextTotalPages = Math.max(1, Math.ceil(upcomingItems.length / nextPageSize));
-  const nextItems = upcomingItems.slice((nextPage - 1) * nextPageSize, nextPage * nextPageSize);
-  const nextStart = upcomingItems.length === 0 ? 0 : (nextPage - 1) * nextPageSize + 1;
+  const nextTotalPages = Math.max(
+    1,
+    Math.ceil(upcomingItems.length / nextPageSize),
+  );
+  const nextItems = upcomingItems.slice(
+    (nextPage - 1) * nextPageSize,
+    nextPage * nextPageSize,
+  );
+  const nextStart =
+    upcomingItems.length === 0 ? 0 : (nextPage - 1) * nextPageSize + 1;
   const nextEnd = Math.min(nextPage * nextPageSize, upcomingItems.length);
   const selectedItems = itemsByDate[selectedDate] ?? [];
-  const monthCells = React.useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
   const monthItems = React.useMemo(
     () => calendarItems.filter((item) => isSameMonth(item.date, visibleMonth)),
     [calendarItems, visibleMonth],
@@ -215,8 +271,8 @@ export default function SchedulePage() {
         }),
         {
           mentoring: 0,
-          'group-session': 0,
-          'investor-prep': 0,
+          "group-session": 0,
+          "investor-prep": 0,
           deadline: 0,
         },
       ),
@@ -232,7 +288,10 @@ export default function SchedulePage() {
   }, [nextTotalPages]);
 
   const moveMonth = (offset: number) => {
-    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+    setVisibleMonth(
+      (current) =>
+        new Date(current.getFullYear(), current.getMonth() + offset, 1),
+    );
   };
 
   const goToToday = () => {
@@ -240,12 +299,18 @@ export default function SchedulePage() {
     setVisibleMonth(todayDate);
   };
 
+  if (sessionsQuery.isLoading) {
+    return <SchedulePageSkeleton />;
+  }
+
   return (
     <>
       <PageHeader
         title="Schedule"
         description={`Today is ${formatFullDate(todayValue)}. You are viewing ${formatMonth(visibleMonth)}.`}
-        actions={<Button onClick={() => setBookOpen(true)}>+ Book session</Button>}
+        actions={
+          <Button onClick={() => setBookOpen(true)}>+ Book session</Button>
+        }
       />
 
       <Card padding="lg">
@@ -254,7 +319,9 @@ export default function SchedulePage() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="text-base font-semibold text-ink">
-                  {isViewingCurrentMonth ? formatMonth(visibleMonth) : `Viewing ${formatMonth(visibleMonth)}`}
+                  {isViewingCurrentMonth
+                    ? formatMonth(visibleMonth)
+                    : `Viewing ${formatMonth(visibleMonth)}`}
                 </div>
                 <div className="mt-1 text-sm text-ink-muted">
                   Select a date to see its agenda.
@@ -264,10 +331,20 @@ export default function SchedulePage() {
                 <Button variant="outline" size="sm" onClick={goToToday}>
                   Today
                 </Button>
-                <Button variant="outline" size="icon" aria-label="Previous month" onClick={() => moveMonth(-1)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Previous month"
+                  onClick={() => moveMonth(-1)}
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" aria-label="Next month" onClick={() => moveMonth(1)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Next month"
+                  onClick={() => moveMonth(1)}
+                >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -275,7 +352,10 @@ export default function SchedulePage() {
 
             <div className="grid grid-cols-7 gap-1.5">
               {weekDays.map((day) => (
-                <div key={day} className="pb-1 text-center text-[11px] font-medium text-ink-muted">
+                <div
+                  key={day}
+                  className="pb-1 text-center text-[11px] font-medium text-ink-muted"
+                >
                   {day}
                 </div>
               ))}
@@ -284,7 +364,8 @@ export default function SchedulePage() {
                 const dayItems = itemsByDate[dateValue] ?? [];
                 const isSelected = dateValue === selectedDate;
                 const isToday = dateValue === todayValue;
-                const isOutsideMonth = date.getMonth() !== visibleMonth.getMonth();
+                const isOutsideMonth =
+                  date.getMonth() !== visibleMonth.getMonth();
 
                 return (
                   <button
@@ -292,11 +373,19 @@ export default function SchedulePage() {
                     type="button"
                     onClick={() => setSelectedDate(dateValue)}
                     className={cn(
-                      'flex h-10 flex-col items-center justify-center rounded-lg border border-transparent text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-bid/20',
-                      isOutsideMonth && !isSelected && 'bg-surface-subtle text-ink-faint hover:bg-surface-subtle/80',
-                      !isOutsideMonth && !isToday && !isSelected && 'bg-surface-panel text-ink hover:border-bid/20 hover:bg-bid-light/60',
-                      isToday && !isSelected && 'border-info/40 bg-info-light/40 text-info hover:bg-info-light/70',
-                      isSelected && 'border-bid bg-bid text-white shadow-[0_10px_22px_rgba(132,39,81,0.2)] hover:bg-bid-dark',
+                      "flex h-10 flex-col items-center justify-center rounded-lg border border-transparent text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-bid/20",
+                      isOutsideMonth &&
+                        !isSelected &&
+                        "bg-surface-subtle text-ink-faint hover:bg-surface-subtle/80",
+                      !isOutsideMonth &&
+                        !isToday &&
+                        !isSelected &&
+                        "bg-surface-panel text-ink hover:border-bid/20 hover:bg-bid-light/60",
+                      isToday &&
+                        !isSelected &&
+                        "border-info/40 bg-info-light/40 text-info hover:bg-info-light/70",
+                      isSelected &&
+                        "border-bid bg-bid text-white shadow-[0_10px_22px_rgba(132,39,81,0.2)] hover:bg-bid-dark",
                     )}
                   >
                     <span>{date.getDate()}</span>
@@ -306,8 +395,10 @@ export default function SchedulePage() {
                           <span
                             key={item.id}
                             className={cn(
-                              'h-1.5 w-1.5 rounded-full',
-                              isSelected ? 'bg-white' : categoryMeta[item.category].dotClassName,
+                              "h-1.5 w-1.5 rounded-full",
+                              isSelected
+                                ? "bg-white"
+                                : categoryMeta[item.category].dotClassName,
                             )}
                           />
                         ))}
@@ -319,13 +410,30 @@ export default function SchedulePage() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {(['mentoring', 'group-session', 'investor-prep', 'deadline'] as ScheduleCategory[]).map((category) => (
-                <div key={category} className="flex items-center justify-between rounded-lg bg-surface-subtle px-3 py-2">
+              {(
+                [
+                  "mentoring",
+                  "group-session",
+                  "investor-prep",
+                  "deadline",
+                ] as ScheduleCategory[]
+              ).map((category) => (
+                <div
+                  key={category}
+                  className="flex items-center justify-between rounded-lg bg-surface-subtle px-3 py-2"
+                >
                   <span className="inline-flex items-center gap-2 text-sm text-ink-muted">
-                    <span className={cn('h-2 w-2 rounded-full', categoryMeta[category].dotClassName)} />
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        categoryMeta[category].dotClassName,
+                      )}
+                    />
                     {categoryMeta[category].label}
                   </span>
-                  <span className="text-sm font-semibold text-ink">{monthCategoryCounts[category]}</span>
+                  <span className="text-sm font-semibold text-ink">
+                    {monthCategoryCounts[category]}
+                  </span>
                 </div>
               ))}
             </div>
@@ -333,11 +441,12 @@ export default function SchedulePage() {
 
           <section className="self-start rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_12px_28px_rgba(26,26,26,0.035)]">
             <CardHeader
-              title={isSelectedToday ? 'Today' : 'Selected date'}
+              title={isSelectedToday ? "Today" : "Selected date"}
               description={formatFullDate(selectedDate)}
               actions={
-                <Badge tone={selectedItems.length > 0 ? 'brand' : 'neutral'}>
-                  {selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}
+                <Badge tone={selectedItems.length > 0 ? "brand" : "neutral"}>
+                  {selectedItems.length} item
+                  {selectedItems.length === 1 ? "" : "s"}
                 </Badge>
               }
             />
@@ -349,7 +458,9 @@ export default function SchedulePage() {
               ) : (
                 <div className="rounded-xl border border-dashed border-line bg-surface-subtle px-4 py-8 text-center">
                   <CalendarDays className="mx-auto h-6 w-6 text-ink-faint" />
-                  <div className="mt-2 text-sm font-medium text-ink">Nothing planned for this date</div>
+                  <div className="mt-2 text-sm font-medium text-ink">
+                    Nothing planned for this date
+                  </div>
                   <div className="mt-1 text-sm text-ink-muted">
                     Pick another date or book a support session.
                   </div>
@@ -375,7 +486,9 @@ export default function SchedulePage() {
                   size="icon"
                   aria-label="Previous upcoming items"
                   disabled={nextPage === 1}
-                  onClick={() => setNextPage((current) => Math.max(1, current - 1))}
+                  onClick={() =>
+                    setNextPage((current) => Math.max(1, current - 1))
+                  }
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -384,7 +497,11 @@ export default function SchedulePage() {
                   size="icon"
                   aria-label="Next upcoming items"
                   disabled={nextPage === nextTotalPages}
-                  onClick={() => setNextPage((current) => Math.min(nextTotalPages, current + 1))}
+                  onClick={() =>
+                    setNextPage((current) =>
+                      Math.min(nextTotalPages, current + 1),
+                    )
+                  }
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -428,35 +545,45 @@ function ScheduleEventCard({
 }) {
   const meta = categoryMeta[item.category];
   const canJoinMeeting =
-    item.source === 'session' &&
-    item.status === 'confirmed' &&
-    item.location !== 'in-person' &&
+    item.source === "session" &&
+    item.status === "confirmed" &&
+    item.location !== "in-person" &&
     Boolean(item.meetingUrl);
   const content = (
     <>
       <div className="flex items-start gap-3">
-        <span className={cn('mt-1 h-2.5 w-2.5 shrink-0 rounded-full', meta.dotClassName)} />
+        <span
+          className={cn(
+            "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
+            meta.dotClassName,
+          )}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <div className="font-mono text-xs text-ink-muted">
               {formatEventDate(item.date)}
             </div>
-            <Badge tone={meta.badgeTone}>
-              {getItemLabel(item)}
-            </Badge>
+            <Badge tone={meta.badgeTone}>{getItemLabel(item)}</Badge>
           </div>
-          <div className={cn('mt-2 font-semibold text-ink', compact ? 'text-sm' : 'text-base')}>
+          <div
+            className={cn(
+              "mt-2 font-semibold text-ink",
+              compact ? "text-sm" : "text-base",
+            )}
+          >
             {item.title}
           </div>
           {item.description && (
-            <div className="mt-1 text-sm text-ink-muted">{item.description}</div>
+            <div className="mt-1 text-sm text-ink-muted">
+              {item.description}
+            </div>
           )}
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-ink-muted">
             {item.startTime ? (
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="h-4 w-4" />
                 {item.startTime}
-                {item.endTime ? `-${item.endTime}` : ''}
+                {item.endTime ? `-${item.endTime}` : ""}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5">
@@ -464,10 +591,10 @@ function ScheduleEventCard({
                 Due date
               </span>
             )}
-            {item.source === 'session' && (
+            {item.source === "session" && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-4 w-4" />
-                {item.location === 'in-person' ? 'In person' : 'Virtual'}
+                {item.location === "in-person" ? "In person" : "Virtual"}
               </span>
             )}
           </div>
@@ -489,8 +616,8 @@ function ScheduleEventCard({
   );
 
   const className = cn(
-    'rounded-xl border border-black/[0.07] bg-white px-4 py-3 text-left shadow-sm transition',
-    onSelect && 'w-full hover:border-bid/25 hover:bg-surface-subtle',
+    "rounded-xl border border-black/[0.07] bg-white px-4 py-3 text-left shadow-sm transition",
+    onSelect && "w-full hover:border-bid/25 hover:bg-surface-subtle",
   );
 
   if (onSelect) {
@@ -502,4 +629,22 @@ function ScheduleEventCard({
   }
 
   return <div className={className}>{content}</div>;
+}
+
+function SchedulePageSkeleton() {
+  return (
+    <div className="space-y-4" aria-label="Loading schedule" aria-busy="true">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+      </div>
+      <Card>
+        <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <Skeleton className="h-[420px] w-full" />
+          <Skeleton className="h-[420px] w-full" />
+        </div>
+      </Card>
+      <Skeleton className="h-44 w-full" />
+    </div>
+  );
 }
