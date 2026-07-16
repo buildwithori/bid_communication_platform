@@ -351,3 +351,11 @@ Before merging backend work, ask:
 - `video` owns Mux direct uploads, cancellation, status polling, webhook transitions, and signed playback. The only public video route is `POST /webhooks/mux`; all upload and playback routes remain authenticated.
 - Mux callbacks require HMAC verification against the exact raw body, enforce a five-minute replay window, and record event IDs transactionally so duplicate deliveries are safe.
 - Ready/errored events update both `video_assets` and attached `content_items`. Signed-policy playback IDs remain backend metadata; authorized clients receive short-lived RS256 playback tokens.
+
+
+## Entrepreneur Tools Completion (2026-07-16)
+
+- Feature 11 is complete. Tools use scalable authenticated catalogue APIs, backend filters/counts, private PDF assets or embedded URLs, normalized global/programme/entrepreneur audiences, and per-entrepreneur hidden overrides.
+- Admin tool management uses feature-sliced frontend hooks, lazy paginated tool-area/programme/entrepreneur selectors, protected direct uploads, backend aggregate cards, tailored skeletons, guarded async actions, and automatic lifecycle audit events.
+- Entrepreneur tool reads are effective-access scoped and redact admin creator metadata and other audience identities. Trainers are explicitly forbidden from tool catalogue and request endpoints.
+- Tool requests belong to the entrepreneur user. Queues use cursor pagination and backend status aggregates. Declines require a decision note; Built requires a linked published library tool; the backend returns valid next transitions.

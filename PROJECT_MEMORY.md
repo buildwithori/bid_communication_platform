@@ -244,3 +244,11 @@ Session workflow rules:
 - Trainer programme visibility is inferred from trainer-attributed learning assets. Trainer programme lists, summaries, detail, curriculum, readiness, programme entrepreneurs, and content metadata must remain server-scoped; React must not reconstruct trainer scope from broad datasets.
 - Within a programme a trainer is authorized to support, the trainer may preview the full curriculum, including content attributed to other trainers. Signed PDF and Mux access checks must verify shared programme scope and must not expose unrelated programme content.
 - Programme and module lists use cursor pagination and backend search. Module content is fetched only when its modal opens, and signed file/video access is requested only when a preview opens.
+
+
+## Entrepreneur Tools Integration Completion (2026-07-16)
+
+- Feature 11 is complete across /admin/entrepreneur-tools, /admin/tool-requests, and /entrepreneur/tools.
+- Tool and request pages consume only feature integration hooks. Tool areas and growing audience/tool selectors load lazily with infinite pagination; catalogue and request lists use backend search, filtering, counts, and cursor pagination.
+- Admins retain create/edit/details/preview/status/audience flows. PDF resources use the shared private direct-upload flow; embedded tools use validated URLs; hidden entrepreneur exceptions remain supported.
+- Entrepreneur requests require a real business need. Admin actions follow backend-provided transitions, and Built requires selecting the published library tool that fulfills the request.

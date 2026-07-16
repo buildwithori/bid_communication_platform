@@ -1136,6 +1136,17 @@ Backend mapping:
 - Tool visibility uses global, programme, and entrepreneur-level access/hidden-override tables. Do not store a giant selected-audience array on `tools`.
 - Tool request admin decisions are persisted and visible to the entrepreneur.
 
+### Tool Runtime Contract
+
+- GET /tools is restricted to admins and entrepreneurs. Admin responses include management audience metadata; entrepreneur responses contain only usable tool data and redact creator emails and other audience IDs.
+- Tool lists use cursor pagination with backend search, type, tool area, status, and visibility filters. Backend totals and status/visibility aggregates drive the admin metrics.
+- PDF tools attach a verified private tool_pdf file asset. A PDF cannot publish without an asset. Embedded tools cannot publish without a valid URL.
+- Programme and entrepreneur audiences are normalized through access tables. Global/programme tools may also store per-entrepreneur hidden overrides.
+- Tool create, update, status, visibility, and access changes use the audit outbox lifecycle.
+- Tool request reads are restricted to admins and the owning entrepreneur. Request queues use cursor pagination, backend search/filtering, total counts, and status aggregates.
+- Request transitions are under_review -> in_development | built | declined, in_development -> under_review | built | declined, and built | declined -> under_review.
+- Declining requires a decision note. Marking Built requires a linked published, non-archived library tool. The API returns only valid next transitions and the UI renders actions from that response.
+
 ## 11. State Machines
 
 ### Programme Lifecycle
