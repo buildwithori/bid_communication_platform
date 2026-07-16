@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { fileKeys } from "./keys";
 import {
   completeDirectUploadRequest,
   createDirectUploadRequest,
@@ -63,6 +64,14 @@ export function useDirectFileUploadMutation(
     },
   };
 }
+
+export const useSignedFileUrlQuery = (fileId?: string, enabled = true) =>
+  useQuery({
+    queryKey: fileKeys.signedUrl(fileId ?? "none"),
+    queryFn: () => getSignedFileUrlRequest(fileId as string),
+    enabled: Boolean(fileId) && enabled,
+    staleTime: 4 * 60 * 1000,
+  });
 
 export const useSignedFileUrlMutation = (
   handlers?: MutationHandlers<{ file: FileAsset; download: { url: string } }>,

@@ -229,7 +229,34 @@ export class FilesService {
     }
 
     if (user.role === UserRole.trainer) {
-      if (file.contentItem?.trainerId === user.id) return true;
+      if (file.contentItem) {
+        const programme = await this.prisma.programme.findFirst({
+          where: {
+            modules: {
+              some: {
+                module: {
+                  contentItems: {
+                    some: { contentItemId: file.contentItem.id },
+                  },
+                },
+              },
+            },
+            AND: {
+              modules: {
+                some: {
+                  module: {
+                    contentItems: {
+                      some: { contentItem: { trainerId: user.id } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          select: { id: true },
+        });
+        if (programme) return true;
+      }
       return file.deliverableSubmissions.some((submission) => (
         submission.instance.programme.modules.some((programmeModule) => (
           programmeModule.module.contentItems.some((moduleContent) => moduleContent.contentItem.trainerId === user.id)

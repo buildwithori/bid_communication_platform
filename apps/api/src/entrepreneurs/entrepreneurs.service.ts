@@ -52,7 +52,10 @@ export class EntrepreneursService {
 
   async listEntrepreneurs(user: User, query: EntrepreneurQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
-    const where = this.buildMembershipWhere(user, query);
+    const programmeAccessType = query.programmeId
+      ? await this.readableProgrammeAccessType(user, query.programmeId)
+      : undefined;
+    const where = this.buildMembershipWhere(user, query, programmeAccessType);
     const baseWhere = this.buildMembershipWhere(user, {});
     const [rows, totalItems, totalEntrepreneurs, activeEntrepreneurs, withProgrammes] =
       await this.prisma.$transaction([
@@ -472,7 +475,11 @@ export class EntrepreneursService {
     return this.mapPeriodicUpdate(update);
   }
 
-  private buildMembershipWhere(user: User, query: EntrepreneurQueryDto): Prisma.BusinessMembershipWhereInput {
+  private buildMembershipWhere(
+    user: User,
+    query: EntrepreneurQueryDto,
+    programmeAccessType?: 'free' | 'assigned',
+  ): Prisma.BusinessMembershipWhereInput {
     const filters: Prisma.BusinessMembershipWhereInput[] = [
       { isPrimary: true, user: { role: UserRole.entrepreneur } },
     ];
@@ -495,11 +502,64 @@ export class EntrepreneursService {
     if (query.stageId) filters.push({ business: { stageId: query.stageId } });
     if (query.status) filters.push({ business: { status: query.status } });
     if (query.source) filters.push({ business: { source: query.source } });
+    if (query.programmeId && programmeAccessType === 'assigned') {
+      filters.push({
+        user: {
+          entrepreneurProgrammeGrants: {
+            some: { programmeId: query.programmeId, revokedAt: null },
+          },
+        },
+      });
+    }
 
-    const scopeWhere = this.scopeWhere(user);
+    const scopeWhere = query.programmeId
+      ? user.role === UserRole.entrepreneur
+        ? { userId: user.id }
+        : null
+      : this.scopeWhere(user);
     if (scopeWhere) filters.push(scopeWhere);
 
     return { AND: filters };
+  }
+
+  private async readableProgrammeAccessType(user: User, programmeId: string) {
+    const programme = await this.prisma.programme.findFirst({
+      where: {
+        id: programmeId,
+        ...(user.role === UserRole.admin
+          ? {}
+          : user.role === UserRole.entrepreneur
+            ? {
+                OR: [
+                  { accessType: 'free' },
+                  {
+                    accessGrants: {
+                      some: { entrepreneurUserId: user.id, revokedAt: null },
+                    },
+                  },
+                ],
+              }
+            : {
+                modules: {
+                  some: {
+                    module: {
+                      contentItems: {
+                        some: { contentItem: { trainerId: user.id } },
+                      },
+                    },
+                  },
+                },
+              }),
+      },
+      select: { accessType: true },
+    });
+
+    if (!programme) {
+      throw new ForbiddenException(
+        'You do not have access to this programme.',
+      );
+    }
+    return programme.accessType;
   }
 
   private scopeWhere(user: User): Prisma.BusinessMembershipWhereInput | null {

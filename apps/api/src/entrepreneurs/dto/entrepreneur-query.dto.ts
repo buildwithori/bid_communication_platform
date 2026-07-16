@@ -17,6 +17,10 @@ export class EntrepreneurQueryDto {
   stageId?: string;
 
   @IsOptional()
+  @IsString()
+  programmeId?: string;
+
+  @IsOptional()
   @IsIn(Object.values(BusinessStatus))
   status?: BusinessStatus;
 

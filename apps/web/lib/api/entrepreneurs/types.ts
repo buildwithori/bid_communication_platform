@@ -62,6 +62,7 @@ export type EntrepreneurQuery = {
   search?: string;
   sectorId?: string;
   stageId?: string;
+  programmeId?: string;
   status?: EntrepreneurStatus;
   source?: EntrepreneurSource;
   take?: number;

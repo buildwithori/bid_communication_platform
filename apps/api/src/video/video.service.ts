@@ -116,7 +116,7 @@ export class VideoService {
     if (!video || !video.contentItem) {
       throw new NotFoundException("Video was not found.");
     }
-    await this.assertPlaybackAccess(user, video.contentItem.id, video.contentItem.trainerId);
+    await this.assertPlaybackAccess(user, video.contentItem.id);
     if (video.status !== AssetStatus.ready || !video.playbackId) {
       throw new BadRequestException("Video is not ready for playback.");
     }
@@ -269,13 +269,34 @@ export class VideoService {
     return null;
   }
 
-  private async assertPlaybackAccess(
-    user: User,
-    contentItemId: string,
-    trainerId: string | null,
-  ) {
+  private async assertPlaybackAccess(user: User, contentItemId: string) {
     if (user.role === UserRole.admin) return;
-    if (user.role === UserRole.trainer && trainerId === user.id) return;
+    if (user.role === UserRole.trainer) {
+      const programme = await this.prisma.programme.findFirst({
+        where: {
+          modules: {
+            some: {
+              module: {
+                contentItems: { some: { contentItemId } },
+              },
+            },
+          },
+          AND: {
+            modules: {
+              some: {
+                module: {
+                  contentItems: {
+                    some: { contentItem: { trainerId: user.id } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: { id: true },
+      });
+      if (programme) return;
+    }
     if (user.role !== UserRole.entrepreneur) {
       throw new ForbiddenException("You do not have access to this video.");
     }
