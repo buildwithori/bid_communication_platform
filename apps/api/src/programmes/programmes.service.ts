@@ -925,30 +925,28 @@ export class ProgrammesService {
       ? DeliverableInstanceStatus.overdue
       : DeliverableInstanceStatus.not_submitted;
 
-    await Promise.all(
-      entrepreneurIds.map((entrepreneurUserId) =>
-        this.prisma.deliverableInstance.upsert({
-          where: {
-            ruleId_entrepreneurUserId_programmeId: {
-              ruleId: rule.id,
-              entrepreneurUserId,
-              programmeId: rule.programmeId,
-            },
-          },
-          update: {
-            dueDate,
-            status,
-          },
-          create: {
-            ruleId: rule.id,
-            entrepreneurUserId,
-            programmeId: rule.programmeId,
-            dueDate,
-            status,
-          },
-        }),
-      ),
-    );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.deliverableInstance.createMany({
+        data: entrepreneurIds.map((entrepreneurUserId) => ({
+          ruleId: rule.id,
+          entrepreneurUserId,
+          programmeId: rule.programmeId,
+          dueDate,
+          status,
+        })),
+        skipDuplicates: true,
+      });
+
+      await tx.deliverableInstance.updateMany({
+        where: {
+          ruleId: rule.id,
+          entrepreneurUserId: { in: entrepreneurIds },
+          dueUpdatedAt: null,
+          status: { in: [DeliverableInstanceStatus.not_submitted, DeliverableInstanceStatus.overdue] },
+        },
+        data: { dueDate, status },
+      });
+    });
   }
 
   private async eligibleEntrepreneurIdsForRule(rule: {

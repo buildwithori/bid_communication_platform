@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { DeliverableHistoryQueryDto } from './dto/deliverable-history-query.dto';
 import { DeliverableInstanceQueryDto } from './dto/deliverable-instance-query.dto';
 import { DeliverableReviewQueryDto } from './dto/deliverable-review-query.dto';
 import { DeliverablesService } from './deliverables.service';
@@ -25,6 +26,24 @@ export class DeliverablesController {
     return this.deliverablesService.listReviewQueue(user, query);
   }
 
+
+  @Get('deliverable-instances/:id/submissions')
+  listSubmissions(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Query() query: DeliverableHistoryQueryDto,
+  ) {
+    return this.deliverablesService.listSubmissions(user, id, query);
+  }
+
+  @Get('deliverable-instances/:id/feedback')
+  listFeedback(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Query() query: DeliverableHistoryQueryDto,
+  ) {
+    return this.deliverablesService.listFeedback(user, id, query);
+  }
 
   @Post('deliverable-instances/:id/submissions')
   @Roles(UserRole.entrepreneur)
