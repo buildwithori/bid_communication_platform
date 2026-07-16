@@ -74,6 +74,21 @@ const iconOptions = [
   label: value[0].toUpperCase() + value.slice(1),
 }));
 
+function draftForTool(tool: ToolRecord | null): Draft {
+  return tool
+    ? {
+        name: tool.name,
+        description: tool.description,
+        type: tool.type,
+        toolAreaId: tool.toolArea.id,
+        status: tool.status,
+        visibility: tool.visibility,
+        iconKey: tool.iconKey,
+        embeddedUrl: tool.embeddedUrl ?? "",
+      }
+    : emptyDraft;
+}
+
 export function AdminToolEditorModal({
   open,
   tool,
@@ -85,38 +100,21 @@ export function AdminToolEditorModal({
   onOpenChange: (open: boolean) => void;
   onSaved: (tool: ToolRecord) => void;
 }) {
-  const [draft, setDraft] = React.useState<Draft>(emptyDraft);
-  const [programmes, setProgrammes] = React.useState<Choice[]>([]);
-  const [entrepreneurs, setEntrepreneurs] = React.useState<Choice[]>([]);
-  const [hidden, setHidden] = React.useState<Choice[]>([]);
+  const [draft, setDraft] = React.useState<Draft>(() => draftForTool(tool));
+  const [programmes, setProgrammes] = React.useState<Choice[]>(
+    () => tool?.audience.programmes ?? [],
+  );
+  const [entrepreneurs, setEntrepreneurs] = React.useState<Choice[]>(
+    () => tool?.audience.entrepreneurs ?? [],
+  );
+  const [hidden, setHidden] = React.useState<Choice[]>(
+    () => tool?.audience.hiddenEntrepreneurs ?? [],
+  );
   const [file, setFile] = React.useState<File | null>(null);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [areaOpen, setAreaOpen] = React.useState(false);
   const [areaSearch, setAreaSearch] = React.useState("");
   const fileRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    setDraft(
-      tool
-        ? {
-            name: tool.name,
-            description: tool.description,
-            type: tool.type,
-            toolAreaId: tool.toolArea.id,
-            status: tool.status,
-            visibility: tool.visibility,
-            iconKey: tool.iconKey,
-            embeddedUrl: tool.embeddedUrl ?? "",
-          }
-        : emptyDraft,
-    );
-    setProgrammes(tool?.audience.programmes ?? []);
-    setEntrepreneurs(tool?.audience.entrepreneurs ?? []);
-    setHidden(tool?.audience.hiddenEntrepreneurs ?? []);
-    setFile(null);
-    setErrors({});
-  }, [open, tool]);
 
   const areas = useLazyToolAreasQuery({
     enabled: open && areaOpen,

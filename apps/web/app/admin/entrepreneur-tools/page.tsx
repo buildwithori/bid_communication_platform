@@ -440,17 +440,20 @@ export default function AdminEntrepreneurToolsPage() {
         />
       </Card>
 
-      <AdminToolEditorModal
-        open={editorOpen}
-        tool={editingTool}
-        onOpenChange={setEditorOpen}
-        onSaved={(tool) => {
-          setEditingTool(tool);
-          setActiveTool((current) =>
-            current?.id === tool.id ? tool : current,
-          );
-        }}
-      />
+      {editorOpen ? (
+        <AdminToolEditorModal
+          key={editingTool?.id ?? "new-tool"}
+          open
+          tool={editingTool}
+          onOpenChange={setEditorOpen}
+          onSaved={(tool) => {
+            setEditingTool(tool);
+            setActiveTool((current) =>
+              current?.id === tool.id ? tool : current,
+            );
+          }}
+        />
+      ) : null}
       <ToolDetailsModal
         tool={activeTool}
         onClose={() => setActiveTool(null)}

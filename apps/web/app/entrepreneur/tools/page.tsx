@@ -15,7 +15,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
@@ -139,6 +139,8 @@ function RequestToolModal({
     resolver: zodResolver(toolRequestSchema),
     defaultValues: { name: "", category: "", neededBy: "", reason: "" },
   });
+  const category = useWatch({ control: form.control, name: "category" });
+  const neededBy = useWatch({ control: form.control, name: "neededBy" });
   const areaOptions =
     areas.data?.pages.flatMap((page) =>
       page.items.map((area) => ({ value: area.id, label: area.name })),
@@ -163,7 +165,7 @@ function RequestToolModal({
           error={form.formState.errors.category?.message}
         >
           <FormAutocomplete
-            value={form.watch("category")}
+            value={category}
             onValueChange={(value) =>
               form.setValue("category", value, { shouldValidate: true })
             }
@@ -179,7 +181,7 @@ function RequestToolModal({
         </FormField>
         <FormField label="Needed by" optional>
           <DatePicker
-            value={form.watch("neededBy")}
+            value={neededBy}
             onChange={(value) =>
               form.setValue("neededBy", value, { shouldValidate: true })
             }
