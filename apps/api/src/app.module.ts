@@ -32,6 +32,7 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
 import { RequestContextInterceptor } from './common/request-context/request-context.interceptor';
 import { RequestContextModule } from './common/request-context/request-context.module';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
+import { RedisRateLimitGuard } from './common/guards/redis-rate-limit.guard';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
   providers: [
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: RedisRateLimitGuard },
     { provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
     { provide: APP_FILTER, useClass: ApiExceptionFilter },

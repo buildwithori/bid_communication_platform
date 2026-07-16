@@ -20,7 +20,7 @@
     "test:jobs": "node --test -r ts-node/register test/jobs.test.ts",
     "test:dashboards": "node --test -r ts-node/register test/dashboards.test.ts",
     "test:reporting": "node --test -r ts-node/register test/reporting.test.ts",
-    "test:hardening": "node --test -r ts-node/register test/hardening.test.ts"
+    "test:hardening": "node --test -r ts-node/register test/hardening.test.ts test/rate-limit.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",
