@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { X } from 'lucide-react';
 import { NavSidebar, type NavSection, type SidebarUser } from './NavSidebar';
 import { TopBar } from './TopBar';

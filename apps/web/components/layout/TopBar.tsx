@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Menu, Search } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { cn } from '@/lib/utils';

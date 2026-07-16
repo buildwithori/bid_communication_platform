@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Briefcase, Mail, Phone, UserPlus } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { AuthTextField } from '@/components/auth/AuthTextField';
@@ -30,6 +30,7 @@ function OnboardingForm() {
     resolver: zodResolver(entrepreneurOnboardingSchema),
     defaultValues: { businessName: '', representative: '', email: '', country: 'Ghana', phone: '' },
   });
+  const country = useWatch({ control: form.control, name: 'country' });
 
   React.useEffect(() => {
     if (!account.data?.user) return;
@@ -61,7 +62,7 @@ function OnboardingForm() {
         <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" readOnly className="bg-surface-subtle" error={form.formState.errors.email?.message} {...form.register('email')} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block"><span className="mb-1.5 block text-sm font-medium text-ink">Country</span><FormAutocomplete value={form.watch('country')} onValueChange={(value) => form.setValue('country', value as EntrepreneurOnboardingForm['country'], { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11 border-line bg-white', form.formState.errors.country && 'border-danger')} />{form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-danger">{form.formState.errors.country.message}</span> : null}</label>
+        <label className="block"><span className="mb-1.5 block text-sm font-medium text-ink">Country</span><FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value as EntrepreneurOnboardingForm['country'], { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11 border-line bg-white', form.formState.errors.country && 'border-danger')} />{form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-danger">{form.formState.errors.country.message}</span> : null}</label>
         <AuthTextField icon={<Phone className="h-4 w-4" />} label="Phone" type="tel" placeholder="+233 20 000 0000" error={form.formState.errors.phone?.message} {...form.register('phone')} />
       </div>
       <Button type="submit" size="lg" className="h-11 w-full" isLoading={mutation.isPending} loadingLabel="Opening workspace...">Continue to dashboard</Button>

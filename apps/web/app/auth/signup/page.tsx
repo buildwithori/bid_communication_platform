@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Briefcase, Lock, Mail, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,6 +40,7 @@ function SignupForm() {
     resolver: zodResolver(signupSchema),
     defaultValues: { businessName: '', representative: '', email: '', password: '', confirmPassword: '', country: '', phone: '' },
   });
+  const country = useWatch({ control: form.control, name: 'country' });
   const mutation = useSignupMutation({
     onSuccess: ({ user }) => {
       toast.success('Account created. Check your email to verify your account.');
@@ -63,7 +64,7 @@ function SignupForm() {
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink">Country</span>
-          <FormAutocomplete value={form.watch('country')} onValueChange={(value) => form.setValue('country', value, { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11 border-line bg-white', form.formState.errors.country && 'border-danger focus:border-danger focus:ring-danger/10')} />
+          <FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value, { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11 border-line bg-white', form.formState.errors.country && 'border-danger focus:border-danger focus:ring-danger/10')} />
           {form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-danger">{form.formState.errors.country.message}</span> : null}
         </label>
         <AuthTextField label="Phone" type="tel" placeholder="+233 20 000 0000" error={form.formState.errors.phone?.message} {...form.register('phone')} />

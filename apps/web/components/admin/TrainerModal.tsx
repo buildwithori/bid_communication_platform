@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Modal } from "@/components/shared/Modal";
 import {
@@ -54,8 +54,9 @@ export function TrainerModal({
     resolver: zodResolver(trainerSchema),
     defaultValues: defaults(trainer),
   });
-  const accessLevel = form.watch("accessLevel");
-  const selectedSectorIds = form.watch("sectorIds");
+  const accessLevel = useWatch({ control: form.control, name: "accessLevel" });
+  const selectedSectorIds = useWatch({ control: form.control, name: "sectorIds" });
+  const roleLabel = useWatch({ control: form.control, name: "roleLabel" });
   const loadedSectors =
     sectors.data?.pages.flatMap((page) => page.items) ?? [];
   const sectorOptions = uniqueOptions([
@@ -72,8 +73,15 @@ export function TrainerModal({
   React.useEffect(() => {
     if (!open) return;
     form.reset(defaults(trainer));
-    setSpecialismSearch("");
   }, [form, open, trainer]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setSpecialismOpen(false);
+      setSpecialismSearch("");
+    }
+    onOpenChange(nextOpen);
+  };
 
   const selectedOptions = selectedSectorIds.map((sectorId) =>
     sectorOptions.find((option) => option.value === sectorId) ?? {
@@ -85,7 +93,7 @@ export function TrainerModal({
   return (
     <Modal
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       title={isEdit ? `Edit trainer – ${trainer?.name}` : "Invite trainer"}
       width="wide"
     >
@@ -122,7 +130,7 @@ export function TrainerModal({
         <FormRow2>
           <FormField label="Role label" className="mb-0">
             <FormSelect
-              value={form.watch("roleLabel")}
+              value={roleLabel}
               onValueChange={(value) =>
                 form.setValue(
                   "roleLabel",
@@ -218,7 +226,7 @@ export function TrainerModal({
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Modal } from "@/components/shared/Modal";
@@ -72,9 +72,11 @@ export function BookingModal({
       notes: "",
     },
   });
-  const recipient = form.watch("recipient");
-  const trainerId = form.watch("trainerId") ?? "";
-  const selectedDate = form.watch("date");
+  const recipient = useWatch({ control: form.control, name: "recipient" });
+  const trainerId = useWatch({ control: form.control, name: "trainerId" }) ?? "";
+  const selectedDate = useWatch({ control: form.control, name: "date" });
+  const sessionType = useWatch({ control: form.control, name: "sessionType" });
+  const selectedTime = useWatch({ control: form.control, name: "time" });
 
   const trainers = useLazySessionTeamMembers({
     enabled: open && recipient === "specific" && teamLookupOpen,
@@ -177,7 +179,7 @@ export function BookingModal({
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Session type">
           <FormSelect
-            value={form.watch("sessionType")}
+            value={sessionType}
             onValueChange={(value) =>
               form.setValue("sessionType", value, { shouldValidate: true })
             }
@@ -268,7 +270,7 @@ export function BookingModal({
             error={form.formState.errors.time?.message}
           >
             <FormAutocomplete
-              value={form.watch("time")}
+              value={selectedTime}
               onValueChange={(value) =>
                 form.setValue("time", value, { shouldValidate: true })
               }
@@ -314,7 +316,7 @@ export function BookingModal({
         <Button
           type="submit"
           className="mt-1 w-full"
-          disabled={!form.watch("time")}
+          disabled={!selectedTime}
           isLoading={createSession.isPending}
           loadingLabel="Sending request"
         >

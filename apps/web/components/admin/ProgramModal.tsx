@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Modal } from '@/components/shared/Modal';
@@ -52,6 +52,8 @@ export function ProgramModal({
     resolver: zodResolver(programSchema),
     defaultValues: programmeDefaults(program),
   });
+  const accessType = useWatch({ control: form.control, name: 'accessType' });
+  const publishState = useWatch({ control: form.control, name: 'publishState' });
 
   React.useEffect(() => {
     if (open) form.reset(programmeDefaults(program));
@@ -113,7 +115,7 @@ export function ProgramModal({
         </FormField>
         <FormField label="Access">
           <FormSelect
-            value={form.watch('accessType')}
+            value={accessType}
             onValueChange={(value) =>
               form.setValue('accessType', value as ProgramForm['accessType'], {
                 shouldValidate: true,
@@ -179,7 +181,7 @@ export function ProgramModal({
         ) : (
           <FormField label="Publishing">
             <FormSelect
-              value={form.watch('publishState')}
+              value={publishState}
               onValueChange={(value) =>
                 form.setValue(
                   'publishState',
