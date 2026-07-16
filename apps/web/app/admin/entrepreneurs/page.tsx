@@ -76,6 +76,15 @@ export default function AdminEntrepreneursPage() {
   const [detailId, setDetailId] = React.useState<string | null>(null);
   const [programmeId, setProgrammeId] = React.useState<string | null>(null);
   const [toolId, setToolId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const timeout = window.setTimeout(() => {
+      setDetailId(params.get("entrepreneur"));
+      setProgrammeId(params.get("programme"));
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<AllOr<EntrepreneurStatus>>("all");
   const [source, setSource] = React.useState<AllOr<EntrepreneurSource>>("all");

@@ -1,19 +1,9 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import Link from 'next/link';
-import { ArrowRight, CalendarPlus, CheckCircle2, Clock3 } from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { StatCard } from '@/components/shared/StatCard';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { ChartCard } from '@/components/shared/ChartCard';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
-import { recentActivity } from '@/lib/mock-data';
-import { BookingModal } from '@/components/entrepreneur/BookingModal';
-import { routes } from '@/lib/routes';
+import * as React from "react";
+import Link from "next/link";
+import type { Route } from "next";
+import { ArrowRight, CalendarPlus, CheckCircle2, Clock3 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -23,264 +13,121 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from 'recharts';
+} from "recharts";
+import { EntrepreneurDashboardSkeleton } from "@/components/dashboard/DashboardSkeletons";
+import { BookingModal } from "@/components/entrepreneur/BookingModal";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader } from "@/components/shared/Card";
+import { ChartCard } from "@/components/shared/ChartCard";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { StatCard } from "@/components/shared/StatCard";
+import { useEntrepreneurDashboardQuery, type EntrepreneurDashboard } from "@/lib/api/dashboards";
+import { routes } from "@/lib/routes";
 
-const accentDot: Record<string, string> = {
-  bid: 'bg-bid',
-  info: 'bg-info',
-  warning: 'bg-warning',
-  neutral: 'bg-ink-muted',
-};
-
-function toLocalDateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+const severityDot = {
+  info: "bg-info",
+  success: "bg-success",
+  warning: "bg-warning",
+  critical: "bg-danger",
+} as const;
 
 export default function EntrepreneurDashboardPage() {
-  const { entrepreneur, sessions, deliverables } = useEntrepreneurStore();
   const [bookOpen, setBookOpen] = React.useState(false);
-  const greeting = `Good morning, ${entrepreneur.businessName}`;
-  const todayValue = React.useMemo(() => toLocalDateValue(new Date()), []);
-  const upcoming = React.useMemo(
-    () =>
-      [...sessions]
-        .filter((session) => session.date >= todayValue)
-        .sort((a, b) => `${a.date} ${a.startTime ?? '00:00'}`.localeCompare(`${b.date} ${b.startTime ?? '00:00'}`))
-        .slice(0, 3),
-    [sessions, todayValue],
-  );
-  const nextSession = upcoming[0];
-  const pendingDeliverables = deliverables.filter((d) => d.status === 'pending' || d.status === 'overdue').length;
-  const activeDeliverables = deliverables
-    .filter((d) => d.status === 'pending' || d.status === 'overdue' || d.status === 'submitted')
-    .slice(0, 4);
-  const progressTrend = [
-    { date: 'Jun 16', training: 32 },
-    { date: 'Jun 23', training: 44 },
-    { date: 'Jun 30', training: 57 },
-    { date: 'Jul 7', training: entrepreneur.metrics.trainingProgress },
-  ];
+  const dashboard = useEntrepreneurDashboardQuery();
+  if (dashboard.isLoading && !dashboard.data) return <EntrepreneurDashboardSkeleton />;
+  if (dashboard.isError || !dashboard.data) {
+    return (
+      <>
+        <PageHeader title="Your dashboard" description="Learning, deliverables, and upcoming support." />
+        <Notice className="border border-danger/20 bg-danger/5 text-danger">
+          Dashboard data could not be loaded. {dashboard.error?.message}
+          <Button className="ml-3" size="sm" variant="outline" onClick={() => dashboard.refetch()}>Try again</Button>
+        </Notice>
+      </>
+    );
+  }
+  const data: EntrepreneurDashboard = dashboard.data;
+  const nextSession = data.upcomingSessions[0];
 
   return (
     <>
       <PageHeader
-        title={greeting}
+        title={`Welcome back, ${data.entrepreneur.businessName}`}
         description="Your learning progress, deliverables, and upcoming support in one place."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setBookOpen(true)} variant="outline">
-              <CalendarPlus className="h-4 w-4" />
-              Book meeting
-            </Button>
-            <Link href={routes.entrepreneur.training}>
-              <Button>
-                Continue learning
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        }
+        actions={<div className="flex flex-wrap gap-2"><Button onClick={() => setBookOpen(true)} variant="outline"><CalendarPlus className="h-4 w-4" />Book meeting</Button><Link href={routes.entrepreneur.training}><Button>Continue learning<ArrowRight className="h-4 w-4" /></Button></Link></div>}
       />
-
       <MetricGrid columns={3}>
-        <StatCard
-          label="Training progress"
-          value={
-            <>
-              {entrepreneur.metrics.trainingProgress}
-              <span className="text-[13px] text-ink-muted">%</span>
-            </>
-          }
-          subline={`${17} of 25 items`}
-          dotColor="bid"
-          accent="bid"
-        />
-        <StatCard
-          label="Deliverables"
-          value={
-            <>
-              {entrepreneur.metrics.deliverablesDone}
-              <span className="text-[13px] text-ink-muted">/{entrepreneur.metrics.deliverablesTotal}</span>
-            </>
-          }
-          subline={`${pendingDeliverables} pending`}
-          dotColor="warning"
-          accent="warning"
-        />
-        <StatCard
-          label="Next session"
-          value={
-            <span className="mt-0.5 text-sm">
-              {nextSession
-                ? new Date(nextSession.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : 'None'}
-            </span>
-          }
-          subline={nextSession?.title ?? 'No upcoming session'}
-          dotColor="info"
-          accent="info"
-        />
+        <StatCard label="Training progress" value={<>{data.metrics.trainingProgress}<span className="text-[13px] text-ink-muted">%</span></>} subline={`${data.metrics.completedContent} of ${data.metrics.totalContent} items · ${data.metrics.trackedProgrammes} programmes`} dotColor="bid" accent="bid" />
+        <StatCard label="Deliverables" value={<>{data.metrics.deliverablesCompleted}<span className="text-[13px] text-ink-muted">/{data.metrics.deliverablesTotal}</span></>} subline={`${data.metrics.deliverablesPending} pending or overdue`} dotColor="warning" accent="warning" />
+        <StatCard label="Next session" value={<span className="mt-0.5 text-sm">{nextSession ? formatShortDate(nextSession.startsAt) : "None"}</span>} subline={nextSession?.topic ?? "No upcoming session"} dotColor="info" accent="info" />
       </MetricGrid>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <ChartCard
-          title="Training progress trend"
-          description="How your completed training has moved across the month"
-          legend={[
-            { label: 'Training progress', colorClassName: 'bg-bid' },
-          ]}
-        >
+        <ChartCard title="Training progress trend" description="Cumulative content completion over the last six weeks" legend={[{ label: "Training progress", colorClassName: "bg-bid" }]}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={progressTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-              <defs>
-                <linearGradient id="entrepreneurTraining" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#842751" stopOpacity={0.24} />
-                  <stop offset="95%" stopColor="#842751" stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <AreaChart data={data.progressTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+              <defs><linearGradient id="entrepreneurTraining" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#842751" stopOpacity={0.24} /><stop offset="95%" stopColor="#842751" stopOpacity={0} /></linearGradient></defs>
               <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#666', fontSize: 12 }} />
-              <YAxis
-                domain={[0, 100]}
-                tickFormatter={(value) => `${value}%`}
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: '#666', fontSize: 12 }}
-              />
-              <Tooltip
-                formatter={(value) => [`${value}%`, 'Training progress']}
-                contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)' }}
-              />
+              <XAxis dataKey="date" tickFormatter={formatChartDate} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
+              <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
+              <Tooltip labelFormatter={(value) => formatChartDate(String(value))} formatter={(value) => [`${value}%`, "Training progress"]} contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
               <ReferenceLine y={100} stroke="rgba(132,39,81,0.18)" strokeDasharray="4 4" />
-              <Area type="monotone" dataKey="training" name="Training %" stroke="#842751" fill="url(#entrepreneurTraining)" strokeWidth={3} />
+              <Area type="monotone" dataKey="progress" name="Training %" stroke="#842751" fill="url(#entrepreneurTraining)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <Card className="flex min-h-[360px] flex-col">
-          <CardHeader
-            title="Activity feed"
-            description="The latest updates from BID and your programme work"
-            actions={<Badge tone="brand">Live</Badge>}
-          />
+          <CardHeader title="Activity feed" description="Latest updates from BID and your programme work" actions={<Badge tone="brand">Live</Badge>} />
           <div className="flex flex-1 flex-col justify-center">
-            {recentActivity.map((a) => (
-              <div
-                key={a.id}
-                className="flex gap-3 border-b border-line py-3 last:border-b-0"
-              >
-                <span
-                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${accentDot[a.accent]}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm leading-relaxed text-ink">
-                    {a.text}
-                    {a.emphasis && (
-                      <strong>
-                        {a.id === 'act-3'
-                          ? `${a.emphasis} due in 3 days`
-                          : a.emphasis}
-                      </strong>
-                    )}
-                  </div>
-                  <div className="mt-1 font-mono text-xs text-ink-faint">
-                    {a.timestamp}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {data.activity.map((item) => {
+              const content = <><span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${severityDot[item.severity]}`} /><div className="min-w-0 flex-1"><div className="text-sm font-medium leading-relaxed text-ink">{item.title}</div><div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{item.body}</div><div className="mt-1 font-mono text-xs text-ink-faint">{formatRelative(item.createdAt)}</div></div></>;
+              return item.actionUrl ? <Link key={item.id} href={item.actionUrl as Route} className="flex gap-3 border-b border-line py-3 transition hover:text-bid last:border-b-0">{content}</Link> : <div key={item.id} className="flex gap-3 border-b border-line py-3 last:border-b-0">{content}</div>;
+            })}
+            {!data.activity.length && <div className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">New activity and decisions will appear here.</div>}
           </div>
         </Card>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)]">
         <Card className="flex flex-col">
-          <CardHeader
-            title="Upcoming sessions"
-            description="Your next support moments and due dates"
-            actions={
-              <Link href={routes.entrepreneur.schedule}>
-                <Button variant="outline" size="sm">
-                  View all
-                </Button>
-              </Link>
-            }
-          />
+          <CardHeader title="Upcoming sessions" description="Your next support moments" actions={<Link href={routes.entrepreneur.schedule}><Button variant="outline" size="sm">View all</Button></Link>} />
           <div className="grid gap-2">
-            {upcoming.map((s) => {
-              const borderClass =
-                s.accent === 'bid'
-                  ? 'border-l-bid'
-                  : s.accent === 'info'
-                    ? 'border-l-info'
-                    : 'border-l-warning';
-              return (
-                <div
-                  key={s.id}
-                  className={`rounded-md border-l-[3px] ${borderClass} bg-surface-subtle px-3 py-2`}
-                >
-                  <div className="flex items-center gap-1.5 font-mono text-xs text-ink-muted">
-                    <Clock3 className="h-3.5 w-3.5" />
-                    {new Date(s.date).toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                    {s.startTime ? ` · ${s.startTime}` : ''}
-                  </div>
-                  <div className="mt-1 text-sm font-medium">{s.title}</div>
-                </div>
-              );
-            })}
+            {data.upcomingSessions.map((session) => (
+              <Link key={session.id} href={`${routes.entrepreneur.schedule}?session=${encodeURIComponent(session.id)}`} className={`rounded-md border-l-[3px] ${session.status === "confirmed" ? "border-l-info" : "border-l-warning"} bg-surface-subtle px-3 py-2 transition hover:bg-bid-light`}>
+                <div className="flex items-center gap-1.5 font-mono text-xs text-ink-muted"><Clock3 className="h-3.5 w-3.5" />{formatSessionDate(session.startsAt, session.timezone)} · {formatSessionTime(session.startsAt, session.timezone)}</div>
+                <div className="mt-1 flex items-center justify-between gap-3 text-sm font-medium"><span>{session.topic}</span><Badge tone={session.status === "confirmed" ? "green" : "amber"}>{session.status === "confirmed" ? "Confirmed" : "Requested"}</Badge></div>
+              </Link>
+            ))}
+            {!data.upcomingSessions.length && <div className="rounded-lg border border-dashed border-line px-3 py-7 text-center text-sm text-ink-muted">No upcoming sessions. Use “Book meeting” when you need support.</div>}
           </div>
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader
-            title="Active deliverables"
-            description="Open submissions and items waiting for your attention"
-            actions={
-              <Link href={routes.entrepreneur.deliverables}>
-                <Button variant="outline" size="sm">
-                  View all
-                </Button>
-              </Link>
-            }
-          />
+          <CardHeader title="Active deliverables" description="Open submissions and items waiting for your attention" actions={<Link href={routes.entrepreneur.deliverables}><Button variant="outline" size="sm">View all</Button></Link>} />
           <div className="flex flex-col gap-2">
-            {activeDeliverables.map((deliverable) => (
-              <div
-                key={deliverable.id}
-                className="flex items-center gap-3 rounded-md border border-line bg-surface-subtle px-3 py-2.5"
-              >
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-bid shadow-sm">
-                  <CheckCircle2 className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{deliverable.name}</div>
-                  <div className="mt-0.5 text-xs text-ink-muted">
-                    {deliverable.groupLabel}
-                    {deliverable.dueDate
-                      ? ` · Due ${new Date(deliverable.dueDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}`
-                      : ''}
-                  </div>
-                </div>
-                <Badge tone={deliverable.status === 'overdue' ? 'red' : deliverable.status === 'submitted' ? 'blue' : 'amber'}>
-                  {deliverable.status === 'pending' ? 'Due' : deliverable.status.replace('-', ' ')}
-                </Badge>
-              </div>
+            {data.activeDeliverables.map((deliverable) => (
+              <Link key={deliverable.id} href={`${routes.entrepreneur.deliverables}?deliverable=${encodeURIComponent(deliverable.id)}`} className="flex items-center gap-3 rounded-md border border-line bg-surface-subtle px-3 py-2.5 transition hover:border-bid/20 hover:bg-bid-light">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-bid shadow-sm"><CheckCircle2 className="h-4 w-4" /></div>
+                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{deliverable.name}</div><div className="mt-0.5 text-xs text-ink-muted">{deliverable.programmeName} · Due {formatShortDate(deliverable.dueDate)}</div></div>
+                <Badge tone={deliverableTone(deliverable.status)}>{deliverableLabel(deliverable.status)}</Badge>
+              </Link>
             ))}
+            {!data.activeDeliverables.length && <div className="rounded-lg border border-dashed border-line px-3 py-7 text-center text-sm text-ink-muted">You have no active deliverables.</div>}
           </div>
         </Card>
       </div>
-
       <BookingModal open={bookOpen} onOpenChange={setBookOpen} />
     </>
   );
 }
+
+function formatShortDate(value: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric" }); }
+function formatChartDate(value: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" }); }
+function formatSessionDate(value: string, timezone: string) { return new Date(value).toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric", timeZone: timezone }); }
+function formatSessionTime(value: string, timezone: string) { return new Date(value).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit", timeZone: timezone }); }
+function formatRelative(value: string) { const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000)); if (minutes < 60) return minutes <= 1 ? "Just now" : `${minutes} minutes ago`; const hours = Math.round(minutes / 60); if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`; const days = Math.round(hours / 24); return `${days} day${days === 1 ? "" : "s"} ago`; }
+function deliverableTone(status: string): "red" | "blue" | "amber" { return status === "overdue" ? "red" : status === "submitted" ? "blue" : "amber"; }
+function deliverableLabel(status: string) { return status === "not_submitted" ? "Due" : status === "changes_required" ? "Changes required" : status[0]?.toUpperCase() + status.slice(1); }
