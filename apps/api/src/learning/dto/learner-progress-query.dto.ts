@@ -5,7 +5,14 @@ export class LearnerProgressQueryDto {
   @IsString()
   entrepreneurUserId?: string;
 
+  @IsString()
+  programmeId!: string;
+
   @IsOptional()
   @IsString()
-  programmeId?: string;
+  moduleId?: string;
+
+  @IsOptional()
+  @IsString()
+  contentItemId?: string;
 }

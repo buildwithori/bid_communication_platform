@@ -1,5 +1,20 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+
+const progressStatuses = ['not_started', 'in_progress', 'completed'] as const;
+const clientProgressSources = ['player', 'explicit_action'] as const;
 
 export class LearnerContentProgressInputDto {
   @IsString()
@@ -10,6 +25,9 @@ export class LearnerContentProgressInputDto {
 
   @IsString()
   contentItemId!: string;
+
+  @IsIn(progressStatuses)
+  status!: (typeof progressStatuses)[number];
 
   @IsInt()
   @Min(0)
@@ -26,13 +44,17 @@ export class LearnerContentProgressInputDto {
   @Min(1)
   durationSeconds?: number;
 
-  @IsOptional()
-  @IsBoolean()
-  completed?: boolean;
+  @IsDateString()
+  clientEventAt!: string;
+
+  @IsIn(clientProgressSources)
+  source!: (typeof clientProgressSources)[number];
 }
 
 export class SyncLearnerProgressDto {
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => LearnerContentProgressInputDto)
   items!: LearnerContentProgressInputDto[];

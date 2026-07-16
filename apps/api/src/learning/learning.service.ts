@@ -1,18 +1,26 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { DeliverableDueType, DeliverableInstanceStatus, DeliverableRequiredScope, LearnerProgressStatus, Prisma, ProgrammeAccessType, ProgressSource, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { LearnerProgressQueryDto } from './dto/learner-progress-query.dto';
 import { LearnerContentProgressInputDto, SyncLearnerProgressDto } from './dto/sync-learner-progress.dto';
-
-const MAX_SYNC_ITEMS = 50;
 
 @Injectable()
 export class LearningService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProgress(user: User, query: LearnerProgressQueryDto) {
+    if (query.contentItemId && !query.moduleId) {
+      throw new BadRequestException(
+        'moduleId is required when contentItemId is provided.',
+      );
+    }
     const entrepreneurUserId = await this.resolveProgressOwner(user, query);
-    return this.progressPayload(entrepreneurUserId, query.programmeId);
+    return this.progressPayload(entrepreneurUserId, query);
   }
 
   async syncProgress(user: User, input: SyncLearnerProgressDto) {
@@ -20,31 +28,74 @@ export class LearningService {
       throw new ForbiddenException('Only entrepreneurs can sync learner progress.');
     }
 
-    if (!input.items.length) {
-      throw new BadRequestException('At least one progress item is required.');
+    return this.withSerializableRetry(async (tx) => {
+      const touchedProgrammes = new Map<string, Set<string>>();
+      let syncedItems = 0;
+
+      for (const item of input.items) {
+        const clientEventAt = this.clientEventDate(item.clientEventAt);
+        await this.assertCanSyncContent(tx, user.id, item);
+        const applied = await this.upsertContentProgress(
+          tx,
+          user.id,
+          item,
+          clientEventAt,
+        );
+        if (!applied) continue;
+
+        syncedItems += 1;
+        const moduleIds =
+          touchedProgrammes.get(item.programmeId) ?? new Set<string>();
+        moduleIds.add(item.moduleId);
+        touchedProgrammes.set(item.programmeId, moduleIds);
+      }
+
+      for (const [programmeId, moduleIds] of touchedProgrammes) {
+        await this.recomputeProgrammeProgress(
+          tx,
+          user.id,
+          programmeId,
+          moduleIds,
+          new Date(),
+        );
+      }
+
+      return {
+        syncedItems,
+        ignoredItems: input.items.length - syncedItems,
+        programmeIds: [...touchedProgrammes.keys()],
+      };
+    });
+  }
+
+  private async withSerializableRetry<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        const retryable =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2034';
+        if (!retryable || attempt === 3) throw error;
+      }
     }
+    throw new ServiceUnavailableException(
+      'Learner progress could not be saved after concurrent updates.',
+    );
+  }
 
-    if (input.items.length > MAX_SYNC_ITEMS) {
-      throw new BadRequestException(`A progress sync can include at most ${MAX_SYNC_ITEMS} items.`);
+  private clientEventDate(value: string) {
+    const clientEventAt = new Date(value);
+    if (clientEventAt.getTime() > Date.now() + 5 * 60 * 1000) {
+      throw new BadRequestException(
+        'Progress event time cannot be more than five minutes in the future.',
+      );
     }
-
-    const now = new Date();
-    const touchedProgrammes = new Map<string, Set<string>>();
-
-    for (const item of input.items) {
-      await this.assertCanSyncContent(user.id, item);
-      await this.upsertContentProgress(user.id, item, now);
-
-      const moduleIds = touchedProgrammes.get(item.programmeId) ?? new Set<string>();
-      moduleIds.add(item.moduleId);
-      touchedProgrammes.set(item.programmeId, moduleIds);
-    }
-
-    for (const [programmeId, moduleIds] of touchedProgrammes) {
-      await this.recomputeProgrammeProgress(user.id, programmeId, moduleIds, now);
-    }
-
-    return this.progressPayload(user.id);
+    return clientEventAt;
   }
 
   private async resolveProgressOwner(user: User, query: LearnerProgressQueryDto) {
@@ -60,7 +111,11 @@ export class LearningService {
     }
 
     if (user.role === UserRole.trainer) {
-      const canRead = await this.trainerCanReadEntrepreneurProgress(user.id, query.entrepreneurUserId);
+      const canRead = await this.trainerCanReadEntrepreneurProgress(
+        user.id,
+        query.entrepreneurUserId,
+        query.programmeId,
+      );
       if (!canRead) {
         throw new ForbiddenException('You do not have access to this learner progress.');
       }
@@ -69,43 +124,47 @@ export class LearningService {
     return query.entrepreneurUserId;
   }
 
-  private async trainerCanReadEntrepreneurProgress(trainerUserId: string, entrepreneurUserId: string) {
-    const [assignedProgrammeCount, contentProgressCount] = await Promise.all([
-      this.prisma.programmeAccessGrant.count({
-        where: {
-          entrepreneurUserId,
-          revokedAt: null,
-          programme: {
-            modules: {
-              some: {
-                module: {
-                  contentItems: {
-                    some: {
-                      contentItem: { trainerId: trainerUserId },
-                    },
-                  },
-                },
+  private async trainerCanReadEntrepreneurProgress(
+    trainerUserId: string,
+    entrepreneurUserId: string,
+    programmeId: string,
+  ) {
+    const programme = await this.prisma.programme.findFirst({
+      where: {
+        id: programmeId,
+        OR: [
+          { accessType: ProgrammeAccessType.free },
+          {
+            accessGrants: {
+              some: { entrepreneurUserId, revokedAt: null },
+            },
+          },
+        ],
+        modules: {
+          some: {
+            module: {
+              contentItems: {
+                some: { contentItem: { trainerId: trainerUserId } },
               },
             },
           },
         },
-      }),
-      this.prisma.learnerContentProgress.count({
-        where: {
-          entrepreneurUserId,
-          contentItem: { trainerId: trainerUserId },
-        },
-      }),
-    ]);
-
-    return assignedProgrammeCount > 0 || contentProgressCount > 0;
+      },
+      select: { id: true },
+    });
+    return Boolean(programme);
   }
 
-  private async assertCanSyncContent(entrepreneurUserId: string, item: LearnerContentProgressInputDto) {
-    const programme = await this.prisma.programme.findFirst({
+  private async assertCanSyncContent(
+    tx: Prisma.TransactionClient,
+    entrepreneurUserId: string,
+    item: LearnerContentProgressInputDto,
+  ) {
+    const programme = await tx.programme.findFirst({
       where: {
         id: item.programmeId,
         archivedAt: null,
+        publishedAt: { not: null },
         OR: [
           { accessType: ProgrammeAccessType.free },
           { accessGrants: { some: { entrepreneurUserId, revokedAt: null } } },
@@ -115,7 +174,10 @@ export class LearningService {
             moduleId: item.moduleId,
             module: {
               contentItems: {
-                some: { contentItemId: item.contentItemId },
+                some: {
+                  contentItemId: item.contentItemId,
+                  contentItem: { status: 'ready' },
+                },
               },
             },
           },
@@ -125,84 +187,99 @@ export class LearningService {
     });
 
     if (!programme) {
-      throw new ForbiddenException('You do not have access to sync this content progress.');
+      throw new ForbiddenException(
+        'You do not have access to sync this content progress.',
+      );
     }
   }
 
   private async upsertContentProgress(
+    tx: Prisma.TransactionClient,
     entrepreneurUserId: string,
     item: LearnerContentProgressInputDto,
-    syncedAt: Date,
+    clientEventAt: Date,
   ) {
-    const existing = await this.prisma.learnerContentProgress.findUnique({
-      where: {
-        entrepreneurUserId_programmeId_moduleId_contentItemId: {
-          entrepreneurUserId,
-          programmeId: item.programmeId,
-          moduleId: item.moduleId,
-          contentItemId: item.contentItemId,
-        },
-      },
+    const key = {
+      entrepreneurUserId,
+      programmeId: item.programmeId,
+      moduleId: item.moduleId,
+      contentItemId: item.contentItemId,
+    };
+    const existing = await tx.learnerContentProgress.findUnique({
+      where: { entrepreneurUserId_programmeId_moduleId_contentItemId: key },
       select: {
         completedAt: true,
         progressPercent: true,
+        startedAt: true,
         status: true,
+        lastSyncedAt: true,
       },
     });
-    const incomingPercent = item.completed ? 100 : item.progressPercent;
-    const progressPercent = Math.max(existing?.progressPercent ?? 0, incomingPercent);
+
+    if (existing && clientEventAt <= existing.lastSyncedAt) return false;
+
+    const requestedCompleted = item.status === LearnerProgressStatus.completed;
+    const incomingPercent = requestedCompleted ? 100 : item.progressPercent;
+    const progressPercent = Math.max(
+      existing?.progressPercent ?? 0,
+      incomingPercent,
+    );
     const status =
       existing?.status === LearnerProgressStatus.completed
         ? LearnerProgressStatus.completed
-        : this.progressStatus(progressPercent, item.completed);
+        : this.progressStatus(progressPercent, item.status);
+    const startedAt =
+      existing?.startedAt ??
+      (status === LearnerProgressStatus.not_started ? null : clientEventAt);
     const completedAt =
-      existing?.completedAt ?? (status === LearnerProgressStatus.completed ? syncedAt : undefined);
-    const source = item.completed ? ProgressSource.explicit_action : ProgressSource.player;
+      existing?.completedAt ??
+      (status === LearnerProgressStatus.completed ? clientEventAt : null);
+    const source =
+      item.source === ProgressSource.explicit_action
+        ? ProgressSource.explicit_action
+        : ProgressSource.player;
 
-    await this.prisma.learnerContentProgress.upsert({
-      where: {
-        entrepreneurUserId_programmeId_moduleId_contentItemId: {
-          entrepreneurUserId,
-          programmeId: item.programmeId,
-          moduleId: item.moduleId,
-          contentItemId: item.contentItemId,
-        },
-      },
+    await tx.learnerContentProgress.upsert({
+      where: { entrepreneurUserId_programmeId_moduleId_contentItemId: key },
       update: {
         status,
         progressPercent,
-        lastPositionSeconds: item.lastPositionSeconds,
-        durationSeconds: item.durationSeconds,
-        lastOpenedAt: syncedAt,
-        lastSyncedAt: syncedAt,
+        ...(item.lastPositionSeconds !== undefined
+          ? { lastPositionSeconds: item.lastPositionSeconds }
+          : {}),
+        ...(item.durationSeconds !== undefined
+          ? { durationSeconds: item.durationSeconds }
+          : {}),
+        startedAt,
         completedAt,
+        lastOpenedAt: clientEventAt,
+        lastSyncedAt: clientEventAt,
         source,
       },
       create: {
-        entrepreneurUserId,
-        programmeId: item.programmeId,
-        moduleId: item.moduleId,
-        contentItemId: item.contentItemId,
+        ...key,
         status,
         progressPercent,
         lastPositionSeconds: item.lastPositionSeconds,
         durationSeconds: item.durationSeconds,
-        startedAt: status === LearnerProgressStatus.not_started ? null : syncedAt,
-        completedAt: status === LearnerProgressStatus.completed ? syncedAt : null,
-        lastOpenedAt: syncedAt,
-        lastSyncedAt: syncedAt,
+        startedAt,
+        completedAt,
+        lastOpenedAt: clientEventAt,
+        lastSyncedAt: clientEventAt,
         source,
       },
     });
+    return true;
   }
 
   private async recomputeProgrammeProgress(
+    tx: Prisma.TransactionClient,
     entrepreneurUserId: string,
     programmeId: string,
     touchedModuleIds: Set<string>,
     syncedAt: Date,
   ) {
-    const programme = await this.prisma.programme.findUnique({
+    const programme = await tx.programme.findUnique({
       where: { id: programmeId },
       include: {
         modules: {
@@ -210,7 +287,8 @@ export class LearningService {
             module: {
               include: {
                 contentItems: {
-                  include: { contentItem: { select: { id: true, status: true } } },
+                  where: { contentItem: { status: 'ready' } },
+                  include: { contentItem: { select: { id: true } } },
                 },
               },
             },
@@ -218,33 +296,61 @@ export class LearningService {
         },
       },
     });
-
     if (!programme) return;
 
-    const programmeContentIds = programme.modules.flatMap((programmeModule) =>
-      programmeModule.module.contentItems.map((item) => item.contentItem.id),
-    );
-    const progressRows = await this.prisma.learnerContentProgress.findMany({
+    const programmeModuleIds = programme.modules.map((item) => item.moduleId);
+    const progressRows = await tx.learnerContentProgress.findMany({
       where: {
         entrepreneurUserId,
         programmeId,
-        contentItemId: { in: programmeContentIds },
+        moduleId: { in: programmeModuleIds },
       },
       select: {
+        moduleId: true,
         contentItemId: true,
         progressPercent: true,
         status: true,
       },
     });
-    const progressByContentId = new Map(progressRows.map((row) => [row.contentItemId, row]));
+    const progressByContext = new Map(
+      progressRows.map((row) => [
+        this.contentProgressKey(row.moduleId, row.contentItemId),
+        row,
+      ]),
+    );
+    const existingModules = await tx.learnerModuleProgress.findMany({
+      where: {
+        entrepreneurUserId,
+        programmeId,
+        moduleId: { in: [...touchedModuleIds] },
+      },
+    });
+    const existingModuleById = new Map(
+      existingModules.map((item) => [item.moduleId, item]),
+    );
 
     for (const programmeModule of programme.modules) {
       if (!touchedModuleIds.has(programmeModule.moduleId)) continue;
+      const contentIds = programmeModule.module.contentItems.map(
+        (item) => item.contentItem.id,
+      );
+      const moduleProgress = this.aggregateProgress(
+        programmeModule.moduleId,
+        contentIds,
+        progressByContext,
+      );
+      const existing = existingModuleById.get(programmeModule.moduleId);
+      const startedAt =
+        existing?.startedAt ??
+        (moduleProgress.status === LearnerProgressStatus.not_started
+          ? null
+          : syncedAt);
+      const completedAt =
+        moduleProgress.status === LearnerProgressStatus.completed
+          ? existing?.completedAt ?? syncedAt
+          : null;
 
-      const moduleContentIds = programmeModule.module.contentItems.map((item) => item.contentItem.id);
-      const moduleProgress = this.aggregateProgress(moduleContentIds, progressByContentId);
-
-      await this.prisma.learnerModuleProgress.upsert({
+      await tx.learnerModuleProgress.upsert({
         where: {
           entrepreneurUserId_programmeId_moduleId: {
             entrepreneurUserId,
@@ -257,7 +363,8 @@ export class LearningService {
           progressPercent: moduleProgress.percent,
           completedContentCount: moduleProgress.completedCount,
           totalContentCount: moduleProgress.totalCount,
-          completedAt: moduleProgress.status === LearnerProgressStatus.completed ? syncedAt : undefined,
+          startedAt,
+          completedAt,
           lastSyncedAt: syncedAt,
         },
         create: {
@@ -268,14 +375,18 @@ export class LearningService {
           progressPercent: moduleProgress.percent,
           completedContentCount: moduleProgress.completedCount,
           totalContentCount: moduleProgress.totalCount,
-          startedAt: moduleProgress.status === LearnerProgressStatus.not_started ? null : syncedAt,
-          completedAt: moduleProgress.status === LearnerProgressStatus.completed ? syncedAt : null,
+          startedAt,
+          completedAt,
           lastSyncedAt: syncedAt,
         },
       });
 
-      if (moduleProgress.status === LearnerProgressStatus.completed) {
+      if (
+        moduleProgress.status === LearnerProgressStatus.completed &&
+        existing?.status !== LearnerProgressStatus.completed
+      ) {
         await this.createModuleCompletionDeliverableInstances(
+          tx,
           entrepreneurUserId,
           programmeId,
           programmeModule.moduleId,
@@ -284,44 +395,56 @@ export class LearningService {
       }
     }
 
-    const moduleRows = await this.prisma.learnerModuleProgress.findMany({
-      where: {
-        entrepreneurUserId,
-        programmeId,
-      },
-      select: {
-        moduleId: true,
-        progressPercent: true,
-        status: true,
-        completedContentCount: true,
-        totalContentCount: true,
-      },
+    const moduleRows = await tx.learnerModuleProgress.findMany({
+      where: { entrepreneurUserId, programmeId },
     });
-    const moduleProgressById = new Map(moduleRows.map((row) => [row.moduleId, row]));
-    const programmeModuleIds = programme.modules.map((programmeModule) => programmeModule.moduleId);
+    const moduleProgressById = new Map(
+      moduleRows.map((row) => [row.moduleId, row]),
+    );
     const completedModuleCount = programmeModuleIds.filter(
-      (moduleId) => moduleProgressById.get(moduleId)?.status === LearnerProgressStatus.completed,
+      (moduleId) =>
+        moduleProgressById.get(moduleId)?.status ===
+        LearnerProgressStatus.completed,
     ).length;
     const totalContentCount = programme.modules.reduce(
-      (sum, programmeModule) => sum + programmeModule.module.contentItems.length,
+      (sum, item) => sum + item.module.contentItems.length,
       0,
     );
     const completedContentCount = programmeModuleIds.reduce(
-      (sum, moduleId) => sum + (moduleProgressById.get(moduleId)?.completedContentCount ?? 0),
+      (sum, moduleId) =>
+        sum + (moduleProgressById.get(moduleId)?.completedContentCount ?? 0),
       0,
     );
-    const moduleProgressValues = programmeModuleIds.map((moduleId) => moduleProgressById.get(moduleId)?.progressPercent ?? 0);
+    const moduleProgressValues = programmeModuleIds.map(
+      (moduleId) => moduleProgressById.get(moduleId)?.progressPercent ?? 0,
+    );
     const programmePercent = moduleProgressValues.length
-      ? Math.round(moduleProgressValues.reduce((sum, value) => sum + value, 0) / moduleProgressValues.length)
+      ? Math.round(
+          moduleProgressValues.reduce((sum, value) => sum + value, 0) /
+            moduleProgressValues.length,
+        )
       : 0;
-    const programmeStatus = this.aggregateStatus(programmePercent, completedModuleCount, programmeModuleIds.length);
-
-    await this.prisma.learnerProgrammeProgress.upsert({
+    const programmeStatus = this.aggregateStatus(
+      programmePercent,
+      completedModuleCount,
+      programmeModuleIds.length,
+    );
+    const existingProgramme = await tx.learnerProgrammeProgress.findUnique({
       where: {
-        entrepreneurUserId_programmeId: {
-          entrepreneurUserId,
-          programmeId,
-        },
+        entrepreneurUserId_programmeId: { entrepreneurUserId, programmeId },
+      },
+    });
+    const startedAt =
+      existingProgramme?.startedAt ??
+      (programmeStatus === LearnerProgressStatus.not_started ? null : syncedAt);
+    const completedAt =
+      programmeStatus === LearnerProgressStatus.completed
+        ? existingProgramme?.completedAt ?? syncedAt
+        : null;
+
+    await tx.learnerProgrammeProgress.upsert({
+      where: {
+        entrepreneurUserId_programmeId: { entrepreneurUserId, programmeId },
       },
       update: {
         status: programmeStatus,
@@ -330,7 +453,8 @@ export class LearningService {
         totalModuleCount: programmeModuleIds.length,
         completedContentCount,
         totalContentCount,
-        completedAt: programmeStatus === LearnerProgressStatus.completed ? syncedAt : undefined,
+        startedAt,
+        completedAt,
         lastSyncedAt: syncedAt,
       },
       create: {
@@ -342,25 +466,26 @@ export class LearningService {
         totalModuleCount: programmeModuleIds.length,
         completedContentCount,
         totalContentCount,
-        startedAt: programmeStatus === LearnerProgressStatus.not_started ? null : syncedAt,
-        completedAt: programmeStatus === LearnerProgressStatus.completed ? syncedAt : null,
+        startedAt,
+        completedAt,
         lastSyncedAt: syncedAt,
       },
     });
   }
 
   private async createModuleCompletionDeliverableInstances(
+    tx: Prisma.TransactionClient,
     entrepreneurUserId: string,
     programmeId: string,
     moduleId: string,
     completedAt: Date,
   ) {
-    const settings = await this.prisma.companySettings.findUnique({ where: { singletonKey: 'default' } });
+    const settings = await tx.companySettings.findUnique({ where: { singletonKey: 'default' } });
     const dueDays = settings?.moduleCompletionDeliverableDueDays ?? 0;
     const dueDate = new Date(completedAt);
     dueDate.setDate(dueDate.getDate() + dueDays);
 
-    const rules = await this.prisma.programmeDeliverableRule.findMany({
+    const rules = await tx.programmeDeliverableRule.findMany({
       where: {
         programmeId,
         dueType: DeliverableDueType.module_completion,
@@ -377,7 +502,7 @@ export class LearningService {
 
     if (!rules.length) return;
 
-    const entrepreneur = await this.prisma.user.findUnique({
+    const entrepreneur = await tx.user.findUnique({
       where: { id: entrepreneurUserId },
       select: {
         businessMemberships: {
@@ -389,7 +514,7 @@ export class LearningService {
     });
     const stageId = entrepreneur?.businessMemberships[0]?.business.stageId ?? null;
 
-    await this.prisma.deliverableInstance.createMany({
+    await tx.deliverableInstance.createMany({
       data: rules
         .filter((rule) => rule.requiredForScope !== DeliverableRequiredScope.stage || rule.requiredStageId === stageId)
         .map((rule) => ({
@@ -404,8 +529,12 @@ export class LearningService {
   }
 
   private aggregateProgress(
+    moduleId: string,
     contentIds: string[],
-    progressByContentId: Map<string, { progressPercent: number; status: LearnerProgressStatus }>,
+    progressByContext: Map<
+      string,
+      { progressPercent: number; status: LearnerProgressStatus }
+    >,
   ) {
     const totalCount = contentIds.length;
     if (totalCount === 0) {
@@ -417,11 +546,16 @@ export class LearningService {
       };
     }
 
-    const progressValues = contentIds.map((contentId) => progressByContentId.get(contentId)?.progressPercent ?? 0);
-    const completedCount = contentIds.filter(
-      (contentId) => progressByContentId.get(contentId)?.status === LearnerProgressStatus.completed,
+    const rows = contentIds.map((contentItemId) =>
+      progressByContext.get(this.contentProgressKey(moduleId, contentItemId)),
+    );
+    const progressValues = rows.map((row) => row?.progressPercent ?? 0);
+    const completedCount = rows.filter(
+      (row) => row?.status === LearnerProgressStatus.completed,
     ).length;
-    const percent = Math.round(progressValues.reduce((sum, value) => sum + value, 0) / totalCount);
+    const percent = Math.round(
+      progressValues.reduce((sum, value) => sum + value, 0) / totalCount,
+    );
 
     return {
       totalCount,
@@ -431,86 +565,125 @@ export class LearningService {
     };
   }
 
+  private contentProgressKey(moduleId: string | null, contentItemId: string) {
+    return String(moduleId) + ':' + contentItemId;
+  }
+
   private aggregateStatus(percent: number, completedCount: number, totalCount: number) {
     if (totalCount > 0 && completedCount === totalCount) return LearnerProgressStatus.completed;
     if (percent > 0 || completedCount > 0) return LearnerProgressStatus.in_progress;
     return LearnerProgressStatus.not_started;
   }
 
-  private progressStatus(progressPercent: number, completed?: boolean) {
-    if (completed || progressPercent >= 100) return LearnerProgressStatus.completed;
-    if (progressPercent > 0) return LearnerProgressStatus.in_progress;
+  private progressStatus(
+    progressPercent: number,
+    requestedStatus: LearnerProgressStatus,
+  ) {
+    if (
+      requestedStatus === LearnerProgressStatus.completed ||
+      progressPercent >= 100
+    ) {
+      return LearnerProgressStatus.completed;
+    }
+    if (
+      requestedStatus === LearnerProgressStatus.in_progress ||
+      progressPercent > 0
+    ) {
+      return LearnerProgressStatus.in_progress;
+    }
     return LearnerProgressStatus.not_started;
   }
 
-  private async progressPayload(entrepreneurUserId: string, programmeId?: string) {
-    const programmeWhere: Prisma.LearnerProgrammeProgressWhereInput = {
-      entrepreneurUserId,
-      ...(programmeId ? { programmeId } : {}),
-    };
-    const moduleWhere: Prisma.LearnerModuleProgressWhereInput = {
-      entrepreneurUserId,
-      ...(programmeId ? { programmeId } : {}),
-    };
-    const contentWhere: Prisma.LearnerContentProgressWhereInput = {
-      entrepreneurUserId,
-      ...(programmeId ? { programmeId } : {}),
-    };
-
-    const [programmes, modules, content] = await Promise.all([
-      this.prisma.learnerProgrammeProgress.findMany({
-        where: programmeWhere,
-        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+  private async progressPayload(
+    entrepreneurUserId: string,
+    query: LearnerProgressQueryDto,
+  ) {
+    const [programme, module, content] = await Promise.all([
+      this.prisma.learnerProgrammeProgress.findUnique({
+        where: {
+          entrepreneurUserId_programmeId: {
+            entrepreneurUserId,
+            programmeId: query.programmeId,
+          },
+        },
       }),
-      this.prisma.learnerModuleProgress.findMany({
-        where: moduleWhere,
-        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      }),
-      this.prisma.learnerContentProgress.findMany({
-        where: contentWhere,
-        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      }),
+      query.moduleId
+        ? this.prisma.learnerModuleProgress.findUnique({
+            where: {
+              entrepreneurUserId_programmeId_moduleId: {
+                entrepreneurUserId,
+                programmeId: query.programmeId,
+                moduleId: query.moduleId,
+              },
+            },
+          })
+        : Promise.resolve(null),
+      query.moduleId && query.contentItemId
+        ? this.prisma.learnerContentProgress.findUnique({
+            where: {
+              entrepreneurUserId_programmeId_moduleId_contentItemId: {
+                entrepreneurUserId,
+                programmeId: query.programmeId,
+                moduleId: query.moduleId,
+                contentItemId: query.contentItemId,
+              },
+            },
+          })
+        : Promise.resolve(null),
     ]);
 
     return {
       entrepreneurUserId,
-      programmes: programmes.map((item) => ({
-        programmeId: item.programmeId,
-        status: item.status,
-        progressPercent: item.progressPercent,
-        completedModuleCount: item.completedModuleCount,
-        totalModuleCount: item.totalModuleCount,
-        completedContentCount: item.completedContentCount,
-        totalContentCount: item.totalContentCount,
-        startedAt: item.startedAt?.toISOString() ?? null,
-        completedAt: item.completedAt?.toISOString() ?? null,
-        lastSyncedAt: item.lastSyncedAt.toISOString(),
-      })),
-      modules: modules.map((item) => ({
-        programmeId: item.programmeId,
-        moduleId: item.moduleId,
-        status: item.status,
-        progressPercent: item.progressPercent,
-        completedContentCount: item.completedContentCount,
-        totalContentCount: item.totalContentCount,
-        startedAt: item.startedAt?.toISOString() ?? null,
-        completedAt: item.completedAt?.toISOString() ?? null,
-        lastSyncedAt: item.lastSyncedAt.toISOString(),
-      })),
-      content: content.map((item) => ({
-        programmeId: item.programmeId,
-        moduleId: item.moduleId,
-        contentItemId: item.contentItemId,
-        status: item.status,
-        progressPercent: item.progressPercent,
-        lastPositionSeconds: item.lastPositionSeconds,
-        durationSeconds: item.durationSeconds,
-        startedAt: item.startedAt?.toISOString() ?? null,
-        completedAt: item.completedAt?.toISOString() ?? null,
-        lastOpenedAt: item.lastOpenedAt?.toISOString() ?? null,
-        lastSyncedAt: item.lastSyncedAt.toISOString(),
-        source: item.source,
-      })),
+      programme: programme ? this.mapProgrammeProgress(programme) : null,
+      module: module ? this.mapModuleProgress(module) : null,
+      content: content ? this.mapContentProgress(content) : null,
     };
   }
+
+  private mapProgrammeProgress(item: Prisma.LearnerProgrammeProgressGetPayload<object>) {
+    return {
+      programmeId: item.programmeId,
+      status: item.status,
+      progressPercent: item.progressPercent,
+      completedModuleCount: item.completedModuleCount,
+      totalModuleCount: item.totalModuleCount,
+      completedContentCount: item.completedContentCount,
+      totalContentCount: item.totalContentCount,
+      startedAt: item.startedAt?.toISOString() ?? null,
+      completedAt: item.completedAt?.toISOString() ?? null,
+      lastSyncedAt: item.lastSyncedAt.toISOString(),
+    };
+  }
+
+  private mapModuleProgress(item: Prisma.LearnerModuleProgressGetPayload<object>) {
+    return {
+      programmeId: item.programmeId,
+      moduleId: item.moduleId,
+      status: item.status,
+      progressPercent: item.progressPercent,
+      completedContentCount: item.completedContentCount,
+      totalContentCount: item.totalContentCount,
+      startedAt: item.startedAt?.toISOString() ?? null,
+      completedAt: item.completedAt?.toISOString() ?? null,
+      lastSyncedAt: item.lastSyncedAt.toISOString(),
+    };
+  }
+
+  private mapContentProgress(item: Prisma.LearnerContentProgressGetPayload<object>) {
+    return {
+      programmeId: item.programmeId,
+      moduleId: item.moduleId,
+      contentItemId: item.contentItemId,
+      status: item.status,
+      progressPercent: item.progressPercent,
+      lastPositionSeconds: item.lastPositionSeconds,
+      durationSeconds: item.durationSeconds,
+      startedAt: item.startedAt?.toISOString() ?? null,
+      completedAt: item.completedAt?.toISOString() ?? null,
+      lastOpenedAt: item.lastOpenedAt?.toISOString() ?? null,
+      lastSyncedAt: item.lastSyncedAt.toISOString(),
+      source: item.source,
+    };
+  }
+
 }

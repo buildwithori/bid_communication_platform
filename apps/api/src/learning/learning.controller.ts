@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { User } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { LearnerProgressQueryDto } from './dto/learner-progress-query.dto';
 import { SyncLearnerProgressDto } from './dto/sync-learner-progress.dto';
 import { LearningService } from './learning.service';
@@ -17,6 +18,7 @@ export class LearningController {
   }
 
   @Post('progress/sync')
+  @Roles(UserRole.entrepreneur)
   syncProgress(@CurrentUser() user: User, @Body() input: SyncLearnerProgressDto) {
     return this.learningService.syncProgress(user, input);
   }
