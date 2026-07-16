@@ -3,196 +3,188 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, FileText, PlayCircle, Wrench } from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { StatCard } from '@/components/shared/StatCard';
-import { Card, CardHeader } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
-import { ProgressBar } from '@/components/shared/ProgressBar';
+import { Button } from '@/components/shared/Button';
+import { Card, Skeleton, TableSkeleton } from '@/components/shared/Card';
 import {
   DataTable,
   RowActions,
-  TableFilterAutocomplete,
   TableFilterInput,
+  TableFilterSelect,
   TablePagination,
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { contentItems, modulesForProgram } from '@/lib/mock-data/programs';
-import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
-import { entrepreneurHasProgramme } from '@/lib/programme-access';
-import { getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
+import { MetricGrid } from '@/components/shared/MetricGrid';
+import { Notice, PageHeader } from '@/components/shared/PageHeader';
+import { ProgressBar } from '@/components/shared/ProgressBar';
+import { StatCard } from '@/components/shared/StatCard';
+import {
+  useProgrammeSummaryQuery,
+  useProgrammesPage,
+  type ProgrammeLifecycle,
+  type ProgrammeListItem,
+} from '@/lib/api/programmes';
 import { routes } from '@/lib/routes';
-import type { ContentItem, Program, ProgramStatus } from '@/types';
 
-const currentTrainerId = 't-kofi';
-const ALL_FILTER = 'all';
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function getProgramStats(program: Program) {
-  const modules = modulesForProgram(program.id);
-  const items = modules.flatMap((module) =>
-    module.contentItemIds
-      .map((id) => contentItems.find((item) => item.id === id))
-      .filter(Boolean) as ContentItem[],
-  );
-
-  return {
-    modules,
-    items,
-    videos: items.filter((item) => item.type === 'video').length,
-    files: items.filter((item) => item.type === 'pdf').length,
-    tools: items.filter((item) => item.type === 'tool').length,
-    modulesWithoutContent: modules.filter((module) => module.contentItemIds.length === 0).length,
-  };
-}
-
-function StatusBadge({ program }: { program: Program }) {
-  const status = getProgrammeStatus(program);
-
-  return (
-    <Badge tone={getProgrammeStatusTone(status)}>
-      {getProgrammeStatusLabel(status)}
-    </Badge>
-  );
-}
+type StatusFilter = 'current' | 'all' | ProgrammeLifecycle;
 
 export default function TrainerProgrammesPage() {
   const router = useRouter();
-  const assigned = React.useMemo(
-    () => entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)),
-    [],
-  );
-  const programmes = React.useMemo(() => getTrainerProgrammes(currentTrainerId), []);
-
-  const [query, setQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<typeof ALL_FILTER | ProgramStatus>(ALL_FILTER);
-  const [page, setPage] = React.useState(1);
+  const [search, setSearch] = React.useState('');
+  const deferredSearch = React.useDeferredValue(search);
+  const [status, setStatus] = React.useState<StatusFilter>('current');
   const [pageSize, setPageSize] = React.useState(10);
-
-  const openProgramme = React.useCallback((programme: Program) => {
-    router.push(routes.trainer.programme(programme.id));
-  }, [router]);
-
-  const filteredProgrammes = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return programmes.filter((programme) => {
-      const stats = getProgramStats(programme);
-      const derivedStatus = getProgrammeStatus(programme);
-      const assignedCount = assigned.filter((entrepreneur) => entrepreneurHasProgramme(entrepreneur, programme.id)).length;
-      const matchesStatus = statusFilter === ALL_FILTER || derivedStatus === statusFilter;
-      const matchesSearch =
-        !needle ||
-        [
-          programme.name,
-          programme.description,
-          getProgrammeStatusLabel(derivedStatus),
-          String(assignedCount),
-          String(stats.modules.length),
-          ...stats.modules.map((module) => module.title),
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [assigned, programmes, query, statusFilter]);
+  const directory = useProgrammesPage({
+    search: deferredSearch.trim() || undefined,
+    lifecycle: status === 'current' || status === 'all' ? undefined : status,
+    includeArchived: status === 'all' ? true : undefined,
+    take: pageSize,
+  });
+  const summary = useProgrammeSummaryQuery();
+  const resetPagination = directory.resetPagination;
 
   React.useEffect(() => {
-    setPage(1);
-  }, [query, statusFilter, pageSize]);
+    resetPagination();
+  }, [deferredSearch, pageSize, resetPagination, status]);
 
-  const pageRows = React.useMemo(
-    () => filteredProgrammes.slice((page - 1) * pageSize, page * pageSize),
-    [filteredProgrammes, page, pageSize],
+  const openProgramme = React.useCallback(
+    (programme: ProgrammeListItem) => {
+      router.push(routes.trainer.programme(programme.id));
+    },
+    [router],
   );
-  const avgProgress = Math.round(programmes.reduce((sum, programme) => sum + programme.progress, 0) / Math.max(programmes.length, 1));
-  const totalModules = programmes.reduce((sum, programme) => sum + modulesForProgram(programme.id).length, 0);
-  const totalContentAssets = programmes.reduce((sum, programme) => sum + getProgramStats(programme).items.length, 0);
-  const contentOwned = programmes.reduce((sum, programme) => {
-    const stats = getProgramStats(programme);
-    return sum + stats.items.filter((item) => item.trainerId === currentTrainerId).length;
-  }, 0);
 
-  const columns: Column<Program>[] = [
-    {
-      key: 'action',
-      header: 'Action',
-      cell: (programme) => (
-        <RowActions
-          actions={[
-            { label: 'Open programme', onSelect: () => openProgramme(programme) },
-          ]}
-        />
-      ),
-      className: 'w-[84px]',
-    },
-    {
-      key: 'programme',
-      header: 'Programme',
-      cell: (programme) => (
-        <button
-          type="button"
-          onClick={() => openProgramme(programme)}
-          className="block min-w-[320px] max-w-[500px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
-        >
-          <span className="block font-semibold text-ink transition-colors group-hover:text-bid">{programme.name}</span>
-          <span className="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">{programme.description}</span>
-        </button>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      cell: (programme) => <StatusBadge program={programme} />,
-    },
-    {
-      key: 'assigned',
-      header: 'My entrepreneurs',
-      cell: (programme) => assigned.filter((entrepreneur) => entrepreneurHasProgramme(entrepreneur, programme.id)).length,
-    },
-    {
-      key: 'progress',
-      header: 'Programme progress',
-      cell: (programme) => (
-        <div className="min-w-[180px]">
-          <ProgressBar value={programme.progress} width="100%" className="h-2" />
-          <div className="mt-1 text-sm text-ink-muted">{programme.progress}% complete</div>
-        </div>
-      ),
-    },
-    {
-      key: 'curriculum',
-      header: 'Curriculum',
-      cell: (programme) => {
-        const stats = getProgramStats(programme);
-        return (
-          <div className="min-w-[240px] text-sm text-ink-muted">
-            <div className="flex flex-wrap gap-1.5">
-              <Badge tone="neutral"><BookOpen className="h-3.5 w-3.5" /> {stats.modules.length} modules</Badge>
-              <Badge tone="blue"><PlayCircle className="h-3.5 w-3.5" /> {stats.videos} videos</Badge>
-              <Badge tone="neutral"><FileText className="h-3.5 w-3.5" /> {stats.files} files</Badge>
-              <Badge tone="brand"><Wrench className="h-3.5 w-3.5" /> {stats.tools} tools</Badge>
+  const columns = React.useMemo<Column<ProgrammeListItem>[]>(
+    () => [
+      {
+        key: 'action',
+        header: 'Action',
+        cell: (programme) => (
+          <RowActions
+            actions={[
+              {
+                label: 'Open programme',
+                onSelect: () => openProgramme(programme),
+              },
+            ]}
+          />
+        ),
+        className: 'w-[84px]',
+      },
+      {
+        key: 'programme',
+        header: 'Programme',
+        cell: (programme) => (
+          <button
+            type="button"
+            onClick={() => openProgramme(programme)}
+            className="block min-w-[320px] max-w-[500px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+          >
+            <span className="block font-semibold text-ink transition-colors group-hover:text-bid">
+              {programme.name}
+            </span>
+            <span className="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">
+              {programme.description}
+            </span>
+          </button>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        cell: (programme) => (
+          <ProgrammeStatusBadge status={programme.lifecycle} />
+        ),
+      },
+      {
+        key: 'entrepreneurs',
+        header: 'My entrepreneurs',
+        cell: (programme) => programme.enrollment.active,
+      },
+      {
+        key: 'progress',
+        header: 'Programme progress',
+        cell: (programme) => (
+          <div className="min-w-[180px]">
+            <ProgressBar
+              value={programme.learnerProgress.average}
+              width="100%"
+              className="h-2"
+            />
+            <div className="mt-1 text-sm text-ink-muted">
+              {programme.learnerProgress.average}% average completion
             </div>
           </div>
-        );
+        ),
       },
-    },
-    {
-      key: 'timeline',
-      header: 'Timeline',
-      cell: (programme) => (
-        <span className="whitespace-nowrap text-sm text-ink-muted">
-          {formatDate(programme.startDate)} - {formatDate(programme.endDate)}
-        </span>
-      ),
-    },
-  ];
+      {
+        key: 'curriculum',
+        header: 'Curriculum',
+        cell: (programme) => (
+          <div className="min-w-[240px] text-sm text-ink-muted">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge tone="neutral">
+                <BookOpen className="h-3.5 w-3.5" />
+                {programme.modules.total} modules
+              </Badge>
+              <Badge tone="blue">
+                <PlayCircle className="h-3.5 w-3.5" />
+                {programme.content.videos} videos
+              </Badge>
+              <Badge tone="neutral">
+                <FileText className="h-3.5 w-3.5" />
+                {programme.content.pdfs} PDFs
+              </Badge>
+              <Badge tone="brand">
+                <Wrench className="h-3.5 w-3.5" />
+                {programme.content.tools} tools
+              </Badge>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'timeline',
+        header: 'Timeline',
+        cell: (programme) => (
+          <span className="whitespace-nowrap text-sm text-ink-muted">
+            {formatDate(programme.startDate)} - {formatDate(programme.endDate)}
+          </span>
+        ),
+      },
+    ],
+    [openProgramme],
+  );
+
+  if (directory.isLoading && !directory.data) {
+    return <TrainerProgrammesSkeleton />;
+  }
+
+  if (directory.isError) {
+    return (
+      <>
+        <PageHeader
+          title="My programmes"
+          description="Programmes connected to the learning content you support."
+        />
+        <Card>
+          <Notice>
+            Your programmes could not be loaded. {directory.error.message}
+          </Notice>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => void directory.refetch()}
+          >
+            Try again
+          </Button>
+        </Card>
+      </>
+    );
+  }
+
+  const metrics = summary.data;
 
   return (
     <>
@@ -201,69 +193,157 @@ export default function TrainerProgrammesPage() {
         description="Programmes connected to the learning content you support."
       />
       <MetricGrid columns={4}>
-        <StatCard label="Programmes" value={programmes.length} subline="Programmes you support" dotColor="bid" accent="bid" />
-        <StatCard label="My entrepreneurs" value={assigned.length} subline="Inferred from programme access" dotColor="info" accent="info" />
-        <StatCard label="Learning assets" value={totalContentAssets} subline={`${totalModules} modules`} dotColor="warning" accent="warning" />
-        <StatCard label="Content you own" value={contentOwned} subline={`${avgProgress}% average progress`} dotColor="success" accent="success" />
+        <StatCard
+          label="Programmes"
+          value={metricValue(metrics?.programmes.total, summary.isLoading)}
+          subline={`${metrics?.programmes.active ?? 0} active`}
+          dotColor="bid"
+          accent="bid"
+        />
+        <StatCard
+          label="My entrepreneurs"
+          value={metricValue(metrics?.entrepreneurs.active, summary.isLoading)}
+          subline="Across your programme portfolio"
+          dotColor="info"
+          accent="info"
+        />
+        <StatCard
+          label="Learning assets"
+          value={metricValue(metrics?.content.total, summary.isLoading)}
+          subline={`${metrics?.modules.total ?? 0} modules`}
+          dotColor="warning"
+          accent="warning"
+        />
+        <StatCard
+          label="Assets I support"
+          value={metricValue(metrics?.content.owned, summary.isLoading)}
+          subline={`${metrics?.learnerProgress.average ?? 0}% average progress`}
+          dotColor="success"
+          accent="success"
+        />
       </MetricGrid>
 
       <Card className="mt-4">
-        <CardHeader
-          title="Programme directory"
-          description={`${filteredProgrammes.length} programmes in this view`}
-        />
+        <div className="mb-4">
+          <h2 className="text-base font-semibold text-ink">
+            Programme directory
+          </h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Open the read-only curriculum and programme context for the learning
+            assets you support.
+          </p>
+        </div>
         <TableToolbar>
           <div>
-            <div className="text-sm font-medium text-ink">Filter programmes</div>
+            <div className="text-sm font-medium text-ink">
+              Find programmes
+            </div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search by programme, module, status, or entrepreneur count.
+              {directory.totalItems} programme
+              {directory.totalItems === 1 ? '' : 's'} in this view
+              {directory.isFetching ? ' - Updating...' : ''}
             </div>
           </div>
-          <div className="grid w-full gap-2 md:grid-cols-[minmax(220px,1fr)_170px] lg:w-[560px]">
+          <div className="grid w-full gap-2 md:grid-cols-[minmax(220px,1fr)_180px] lg:w-[580px]">
             <TableFilterInput
               icon
-              placeholder="Search programmes..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by name or description..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
             />
-            <TableFilterAutocomplete
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
-              options={[
-                { value: ALL_FILTER, label: 'All statuses' },
-                { value: 'active', label: 'Active' },
-                { value: 'scheduled', label: 'Scheduled' },
-                { value: 'draft', label: 'Draft' },
-                { value: 'completed', label: 'Completed' },
-                { value: 'archived', label: 'Archived' },
-              ]}
-              placeholder="All statuses"
-              searchPlaceholder="Search statuses..."
-            />
+            <TableFilterSelect
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as StatusFilter)
+              }
+            >
+              <option value="current">Current programmes</option>
+              <option value="all">All programmes</option>
+              <option value="active">Active</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="draft">Draft</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
+            </TableFilterSelect>
           </div>
         </TableToolbar>
         <DataTable
           columns={columns}
-          rows={pageRows}
+          rows={directory.rows}
           rowKey={(programme) => programme.id}
           rowProps={(programme) => ({
             onDoubleClick: () => openProgramme(programme),
           })}
-          emptyMessage="No programmes match these filters."
+          emptyMessage="No programmes match this search."
           tableClassName="min-w-[1120px]"
         />
         <TablePagination
-          page={page}
+          page={directory.page}
           pageSize={pageSize}
-          totalItems={filteredProgrammes.length}
+          totalItems={directory.totalItems}
           pageSizeOptions={[10, 25, 50]}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
+          onPageChange={directory.setPage}
+          onPageSizeChange={setPageSize}
         />
       </Card>
     </>
   );
+}
+
+function TrainerProgrammesSkeleton() {
+  return (
+    <>
+      <PageHeader
+        title="My programmes"
+        description="Programmes connected to the learning content you support."
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Card key={index} padding="sm">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="mt-3 h-4 w-36" />
+          </Card>
+        ))}
+      </div>
+      <div className="mt-4">
+        <TableSkeleton columns={7} rows={8} />
+      </div>
+    </>
+  );
+}
+
+function ProgrammeStatusBadge({
+  status,
+}: {
+  status: ProgrammeLifecycle;
+}) {
+  const tones = {
+    draft: 'neutral',
+    scheduled: 'blue',
+    active: 'green',
+    completed: 'amber',
+    archived: 'red',
+  } as const;
+  const labels = {
+    draft: 'Draft',
+    scheduled: 'Scheduled',
+    active: 'Active',
+    completed: 'Completed',
+    archived: 'Archived',
+  };
+
+  return <Badge tone={tones[status]}>{labels[status]}</Badge>;
+}
+
+function metricValue(value: number | undefined, loading: boolean) {
+  if (loading) return '...';
+  return value ?? 0;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
