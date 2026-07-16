@@ -26,7 +26,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
-    "docker:dev": "docker compose up --build",
+    "docker:dev": "docker compose --env-file .env.local up --build",
     "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d"
   },
   "devDependencies": {

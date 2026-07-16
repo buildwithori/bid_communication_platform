@@ -40,7 +40,12 @@ if [ "$current_checksum" != "$saved_checksum" ]; then
 fi
 
 
-if [ "${DOCKER_PRISMA_SETUP:-false}" = "true" ]; then
+is_api_command="false"
+case " $* " in
+  *" @bid/api "*) is_api_command="true" ;;
+esac
+
+if [ "$is_api_command" = "true" ] && [ "${DOCKER_PRISMA_SETUP:-false}" = "true" ]; then
   prisma_checksum_file="node_modules/.prisma-schema.sha256"
   prisma_checksum="$(sha256sum prisma/schema.prisma | awk '{print $1}')"
   saved_prisma_checksum=""

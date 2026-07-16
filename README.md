@@ -67,11 +67,14 @@ Local Docker runs the application as a small system:
 - `mailpit`: local email catcher on `http://localhost:8025`
 - `pgadmin`: local PostgreSQL admin UI on `http://localhost:5050`
 
-Start the local stack:
+Create the ignored local environment file once, then start the stack:
 
 ```bash
+cp .env.docker.example .env.local
 npm run docker:dev
 ```
+
+The development Compose file injects `.env.local` into the relevant containers. The npm script also passes it to Compose for host-port interpolation.
 
 Local pgAdmin account:
 
@@ -91,7 +94,7 @@ Production compose is intentionally separate:
 npm run docker:prod
 ```
 
-Use `.env.docker.example` as the local compose baseline. Production should provide real environment variables for database credentials, app origins, Resend, DigitalOcean Spaces, Mux, and Google OAuth.
+Use `.env.docker.example` as the only local environment template. Production Compose intentionally reads the root `.env` that will be provisioned for deployment; it does not use `.env.local`.
 
 Seed local data after the database is running:
 
