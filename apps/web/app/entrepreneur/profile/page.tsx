@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Mail } from "lucide-react";
+import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import {
   FundraisingRoundRecordModal,
   PeriodicUpdateRecordModal,
@@ -406,12 +407,15 @@ export default function EntrepreneurProfilePage() {
       </section>
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {tab === "business" ? (
-        <BusinessTab
-          record={record}
-          programmes={programmes}
-          isPending={updateProfile.isPending}
-          onSubmit={(values) => updateProfile.mutate(values)}
-        />
+        <>
+          <BusinessTab
+            record={record}
+            programmes={programmes}
+            isPending={updateProfile.isPending}
+            onSubmit={(values) => updateProfile.mutate(values)}
+          />
+          <NotificationPreferencesCard />
+        </>
       ) : null}
       {tab === "goals" ? (
         <RecordsCard

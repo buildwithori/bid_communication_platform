@@ -1,13 +1,14 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { FileText, MessageSquareText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
-import { Card, CardHeader } from '@/components/shared/Card';
+import { Card, CardHeader, Skeleton } from '@/components/shared/Card';
 import { DataTable, RowActions, TableEmptyState, TableFilterAutocomplete, TableFilterInput, TableFilterSelect, TablePagination, TableToolbar, type Column } from '@/components/shared/DataTable';
 import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { MetricGrid } from '@/components/shared/MetricGrid';
@@ -18,11 +19,13 @@ import { DeliverableFilePreviewModal } from '@/components/deliverables/Deliverab
 import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
 import {
   useDeliverableFeedbackQuery,
+  useDeliverableInstanceQuery,
   useDeliverableReviewQueuePage,
   useDeliverableSubmissionsQuery,
   useReviewDeliverableMutation,
   useUpdateDeliverableDueDateMutation,
   type DeliverableFeedback,
+  type DeliverableReviewQueueItem,
   type DeliverableStatus,
 } from '@/lib/api/deliverables';
 import { useLazyProgrammesLookup } from '@/lib/api/programmes';
@@ -45,7 +48,18 @@ function apiFilters(status: ReviewStatusFilter): { status?: DeliverableStatus; o
 }
 
 export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer' }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedDeliverableId = searchParams.get('deliverableId');
+  const linkedDeliverable = useDeliverableInstanceQuery(linkedDeliverableId);
   const [active, setActive] = React.useState<DeliverableReviewRow | null>(null);
+  const linkedItem = linkedDeliverable.data as DeliverableReviewQueueItem | undefined;
+  const linkedRow = linkedItem ? mapDeliverableReviewRow(linkedItem) : null;
+  const displayedReview = active ?? linkedRow;
+  function closeActive() {
+    setActive(null);
+    if (linkedDeliverableId) router.replace(role === 'admin' ? '/admin/deliverable-reviews' : '/trainer/deliverable-reviews');
+  }
   const [previewTarget, setPreviewTarget] = React.useState<DeliverableReviewRow | null>(null);
   const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReviewRow | null>(null);
   const [query, setQuery] = React.useState('');
@@ -69,7 +83,7 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
   const reviewMutation = useReviewDeliverableMutation({
     onSuccess: (review) => {
       toast.success(review.decision === 'approved' ? 'Deliverable approved' : 'Feedback sent to entrepreneur');
-      setActive(null);
+      closeActive();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -166,7 +180,11 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
         <TablePagination page={queue.page} pageSize={pageSize} totalItems={queue.totalItems} onPageChange={queue.setPage} onPageSizeChange={(next) => { setPageSize(next); queue.resetPagination(); }} />
       </Card>
 
-      <ReviewDeliverableModal key={active?.id ?? 'review'} review={active} isSaving={reviewMutation.isPending} onClose={() => !reviewMutation.isPending && setActive(null)} onReview={(submissionId, decision, feedback) => reviewMutation.mutate({ submissionId, decision, feedback })} />
+      <Modal open={Boolean(linkedDeliverableId) && !displayedReview} onOpenChange={(open) => !open && closeActive()} title="Deliverable details" width="wide">
+        {linkedDeliverable.isLoading ? <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-36 w-full" /></div> : null}
+        {linkedDeliverable.isError ? <Notice>This deliverable is unavailable or outside your review scope.</Notice> : null}
+      </Modal>
+      <ReviewDeliverableModal key={displayedReview?.id ?? 'review'} review={displayedReview} isSaving={reviewMutation.isPending} onClose={() => !reviewMutation.isPending && closeActive()} onReview={(submissionId, decision, feedback) => reviewMutation.mutate({ submissionId, decision, feedback })} />
       <DeliverableFilePreviewModal review={previewTarget} onClose={() => setPreviewTarget(null)} />
       <UpdateDeliverableDueDateModal key={dueDateTarget?.id ?? 'due-date'} review={dueDateTarget} isSaving={dueDateMutation.isPending} onClose={() => !dueDateMutation.isPending && setDueDateTarget(null)} onSave={(instanceId, dueDate, reason) => dueDateMutation.mutate({ instanceId, dueDate, reason })} />
     </>

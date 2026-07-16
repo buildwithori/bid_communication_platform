@@ -1,2 +1,15 @@
-export { useMarkAllNotificationsReadMutation, useMarkNotificationReadMutation, useNotificationsQuery } from './hooks';
-export type { NotificationRecord, NotificationSeverity } from './types';
+export {
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationPreferencesQuery,
+  useNotificationsInfiniteQuery,
+  useNotificationSummaryQuery,
+  useUpdateNotificationPreferenceMutation,
+} from './hooks';
+export type {
+  NotificationPreference,
+  NotificationRecord,
+  NotificationSeverity,
+  NotificationSummary,
+  NotificationType,
+} from './types';

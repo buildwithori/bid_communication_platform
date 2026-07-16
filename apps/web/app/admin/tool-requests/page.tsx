@@ -1,11 +1,11 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
+import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -27,8 +27,10 @@ import { Modal } from "@/components/shared/Modal";
 import { Notice, PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import {
+  useToolRequestDetailQuery,
   useToolRequestsPage,
   useUpdateToolRequestMutation,
+  type ToolRequestRecord,
 } from "@/lib/api/tool-requests";
 import { useLazyToolsQuery } from "@/lib/api/tools";
 import { useLazyToolAreasQuery } from "@/lib/api/settings";
@@ -53,6 +55,9 @@ function formatDate(value?: string) {
 
 export default function AdminToolRequestsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedRequestId = searchParams.get("requestId");
+  const linkedRequest = useToolRequestDetailQuery(linkedRequestId);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [statusFilter, setStatusFilter] = useState<"all" | ToolRequestStatus>(
@@ -63,6 +68,15 @@ export default function AdminToolRequestsPage() {
   const [activeRequest, setActiveRequest] = useState<ToolRequest | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
   const [linkedToolId, setLinkedToolId] = useState("");
+  const linkedRecord = linkedRequest.data as ToolRequestRecord | undefined;
+  const linkedRequestView = linkedRecord ? mapToolRequestRecordToUi(linkedRecord) : null;
+  const displayedRequest = activeRequest ?? linkedRequestView;
+
+
+  function closeRequest() {
+    setActiveRequest(null);
+    if (linkedRequestId) router.replace(routes.admin.toolRequests);
+  }
   const [areaOpen, setAreaOpen] = useState(false);
   const [areaSearch, setAreaSearch] = useState("");
 
@@ -99,7 +113,7 @@ export default function AdminToolRequestsPage() {
         description:
           toolRequestStatusMeta[apiToUiToolRequestStatus[record.status]].label,
       });
-      setActiveRequest(null);
+      closeRequest();
     },
     onError: (error) =>
       toast.error("Could not update tool request", {
@@ -123,8 +137,8 @@ export default function AdminToolRequestsPage() {
         id: request.id,
         payload: {
           status: uiToApiToolRequestStatus[status],
-          adminDecisionNote: decisionNote.trim() || null,
-          ...(status === "built" ? { linkedToolId } : {}),
+          adminDecisionNote: decisionNote.trim() || request.adminNote || null,
+          ...(status === "built" ? { linkedToolId: linkedToolId || request.linkedToolId } : {}),
         },
       },
       { onSuccess: () => options?.close !== false && setActiveRequest(null) },
@@ -362,16 +376,20 @@ export default function AdminToolRequestsPage() {
         />
       </Card>
 
+      <Modal open={Boolean(linkedRequestId) && !displayedRequest} onOpenChange={(open) => !open && closeRequest()} title="Tool request details" width="wide">
+        {linkedRequest.isLoading ? <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-36 w-full" /></div> : null}
+        {linkedRequest.isError ? <Notice>This tool request is unavailable or outside your access scope.</Notice> : null}
+      </Modal>
       <ToolRequestReviewModal
-        request={activeRequest}
-        decisionNote={decisionNote}
-        linkedToolId={linkedToolId}
+        request={displayedRequest}
+        decisionNote={activeRequest ? decisionNote : displayedRequest?.adminNote ?? ""}
+        linkedToolId={activeRequest ? linkedToolId : displayedRequest?.linkedToolId ?? ""}
         busy={update.isPending}
-        onDecisionNoteChange={setDecisionNote}
-        onLinkedToolChange={setLinkedToolId}
-        onClose={() => setActiveRequest(null)}
+        onDecisionNoteChange={(value) => { if (!activeRequest && displayedRequest) setActiveRequest(displayedRequest); setDecisionNote(value); }}
+        onLinkedToolChange={(value) => { if (!activeRequest && displayedRequest) setActiveRequest(displayedRequest); setLinkedToolId(value); }}
+        onClose={closeRequest}
         onDecide={(status) =>
-          activeRequest && decideRequest(activeRequest, status)
+          displayedRequest && decideRequest(displayedRequest, status)
         }
         onViewLibrary={() => router.push(routes.admin.entrepreneurTools)}
       />

@@ -2,11 +2,9 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import { Bell } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
-import { Button } from '@/components/shared/Button';
-import { NotificationsModal, type AppNotification } from '@/components/shared/NotificationsModal';
+import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { trainerNav } from '@/lib/nav/trainer-nav';
 import { trainerById } from '@/lib/mock-data/trainers';
 import { routes } from '@/lib/routes';
@@ -25,31 +23,9 @@ function useTitle() {
   return titles[pathname] ?? 'Trainer Workspace';
 }
 
-const trainerNotifications: AppNotification[] = [
-  {
-    id: 'tn-session-accept',
-    title: 'Session request awaiting your response',
-    meta: 'PayBridge Africa Ltd · Pricing model review · Jul 17, 2026',
-    unread: true,
-  },
-  {
-    id: 'tn-feedback',
-    title: 'Financial Model feedback is still open',
-    meta: 'PayBridge Africa Ltd · Changes required',
-    unread: true,
-  },
-  {
-    id: 'tn-office-hours',
-    title: 'Office hours starts soon',
-    meta: 'BID Office Hours · Jul 10, 2026',
-  },
-];
-
 export default function TrainerLayout({ children }: { children: React.ReactNode }) {
   const title = useTitle();
   const trainer = trainerById('t-kofi');
-  const [notifOpen, setNotifOpen] = React.useState(false);
-  const unreadCount = trainerNotifications.filter((notification) => notification.unread).length;
 
   return (
     <WorkspaceGuard allowedRoles={['trainer']}>
@@ -65,25 +41,9 @@ export default function TrainerLayout({ children }: { children: React.ReactNode 
         tone: 'blue',
       }}
       title={title}
-      topRightSlot={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setNotifOpen(true)}
-          className="flex items-center gap-1.5"
-          aria-label={`Notifications (${unreadCount} unread)`}
-        >
-          <Bell className="h-3 w-3" />
-          {unreadCount}
-        </Button>
-      }
+      topRightSlot={<NotificationCenter />}
     >
       {children}
-      <NotificationsModal
-        open={notifOpen}
-        onOpenChange={setNotifOpen}
-        notifications={trainerNotifications}
-      />
       </AppShell>
     </WorkspaceGuard>
   );

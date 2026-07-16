@@ -13,6 +13,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { FormField, FormInput } from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
+import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import {
   useTrainerProfileQuery,
   useUpdateTrainerProfileMutation,
@@ -200,6 +201,7 @@ export default function TrainerSettingsPage() {
           onDisconnect={() => disconnectCalendar.mutate()}
         />
       </div>
+      <NotificationPreferencesCard />
     </>
   );
 }

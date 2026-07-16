@@ -1,0 +1,147 @@
+'use client';
+
+import * as React from 'react';
+import { CalendarDays, Clock3, ExternalLink, UserRound } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Badge } from '@/components/shared/Badge';
+import { Button } from '@/components/shared/Button';
+import { Skeleton } from '@/components/shared/Card';
+import { Modal } from '@/components/shared/Modal';
+import { Notice } from '@/components/shared/PageHeader';
+import { useSessionDetailQuery, type SessionRecord, type SessionStatus, type SessionType } from '@/lib/api/sessions';
+
+const statusMeta: Record<SessionStatus, { label: string; tone: 'amber' | 'green' | 'red' | 'neutral' }> = {
+  requested: { label: 'Awaiting team', tone: 'amber' },
+  confirmed: { label: 'Confirmed', tone: 'green' },
+  declined: { label: 'Declined', tone: 'red' },
+  cancelled: { label: 'Cancelled', tone: 'red' },
+  completed: { label: 'Completed', tone: 'neutral' },
+};
+
+const typeLabels: Record<SessionType, string> = {
+  mentor_checkin: 'Mentor check-in',
+  office_hours: 'Office hours',
+  investor_prep: 'Investor prep',
+};
+
+export function LinkedSessionDetailModal() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const sessionId = searchParams.get('sessionId');
+  const session = useSessionDetailQuery(sessionId);
+  const detail = session.data as SessionRecord | undefined;
+
+  const close = React.useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('sessionId');
+    const query = params.toString();
+    router.replace((query ? `${pathname}?${query}` : pathname) as never, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  return (
+    <Modal open={Boolean(sessionId)} onOpenChange={(next) => !next && close()} title="Session details" width="wide">
+      {session.isLoading ? <SessionDetailSkeleton /> : null}
+      {session.isError ? (
+        <div>
+          <Notice>This session is unavailable or is outside your workspace access.</Notice>
+          <div className="mt-4 flex justify-end"><Button variant="outline" onClick={close}>Close</Button></div>
+        </div>
+      ) : null}
+      {detail ? (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-bid/15 bg-bid-light/45 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-bid-dark">{typeLabels[detail.type]}</p>
+                <h3 className="mt-1 text-lg font-semibold text-ink">{detail.topic}</h3>
+                <p className="mt-1 text-sm text-ink-muted">{detail.entrepreneur.businessName}</p>
+              </div>
+              <Badge tone={statusMeta[detail.status].tone}>{statusMeta[detail.status].label}</Badge>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Detail icon={<CalendarDays className="h-4 w-4" />} label="Date" value={formatDate(detail.startAt)} />
+            <Detail icon={<Clock3 className="h-4 w-4" />} label="Time" value={formatTimeRange(detail.startAt, detail.endAt, detail.timezone)} />
+            <Detail icon={<UserRound className="h-4 w-4" />} label="Session owner" value={detail.owner?.name ?? detail.target?.name ?? 'Any available BID team member'} />
+            <Detail icon={<UserRound className="h-4 w-4" />} label="Requested by" value={detail.createdBy.name} />
+          </div>
+
+          {detail.programme ? (
+            <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
+              <p className="text-xs font-medium text-ink-muted">Programme</p>
+              <p className="mt-1 text-sm font-medium text-ink">{detail.programme.name}</p>
+            </div>
+          ) : null}
+
+          {detail.declinedReason || detail.cancelledReason ? (
+            <Notice>{detail.declinedReason ?? detail.cancelledReason}</Notice>
+          ) : null}
+
+          {detail.reschedules.length ? (
+            <section>
+              <h4 className="text-sm font-semibold text-ink">Reschedule history</h4>
+              <div className="mt-2 max-h-36 space-y-2 overflow-y-auto">
+                {detail.reschedules.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-line px-3 py-2 text-xs text-ink-muted">
+                    <span className="font-medium text-ink">{formatDate(item.newStartAt)} at {formatTime(item.newStartAt)}</span>
+                    {item.reason ? ` · ${item.reason}` : ''}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {detail.notesHistory.length ? (
+            <section>
+              <h4 className="text-sm font-semibold text-ink">Session notes</h4>
+              <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                {detail.notesHistory.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-line bg-surface-subtle px-3 py-2">
+                    <p className="text-sm text-ink">{item.note}</p>
+                    <p className="mt-1 text-xs text-ink-muted">{item.author.name} · {formatDate(item.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <div className="flex justify-end gap-2 border-t border-line pt-4">
+            {detail.status === 'confirmed' && detail.meetingUrl ? (
+              <Button asChild>
+                <a href={detail.meetingUrl} target="_blank" rel="noreferrer">Open Google Meet <ExternalLink className="h-4 w-4" /></a>
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={close}>Close</Button>
+          </div>
+        </div>
+      ) : null}
+    </Modal>
+  );
+}
+
+function Detail({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="flex gap-3 rounded-xl border border-line px-3 py-3">
+    <span className="mt-0.5 text-bid">{icon}</span>
+    <div><p className="text-xs text-ink-muted">{label}</p><p className="mt-1 text-sm font-medium text-ink">{value}</p></div>
+  </div>;
+}
+
+function SessionDetailSkeleton() {
+  return <div aria-label="Loading session details" aria-busy="true" className="space-y-3">
+    <Skeleton className="h-28 w-full" />
+    <div className="grid gap-3 sm:grid-cols-2">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-20 w-full" />)}</div>
+    <Skeleton className="h-24 w-full" />
+  </div>;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function formatTimeRange(start: string, end: string, timezone: string) {
+  return `${formatTime(start)} – ${formatTime(end)} · ${timezone}`;
+}

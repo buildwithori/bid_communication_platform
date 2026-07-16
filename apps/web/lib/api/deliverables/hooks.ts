@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deliverableKeys } from "./keys";
 import {
+  getDeliverableInstanceRequest,
   listDeliverableFeedbackRequest,
   listDeliverableGroupsRequest,
   listDeliverableInstancesRequest,
@@ -132,6 +133,13 @@ export function useDeliverableInstancesPage(query: PageQuery) {
     resetPagination,
   };
 }
+
+export const useDeliverableInstanceQuery = (id: string | null) =>
+  useQuery({
+    queryKey: deliverableKeys.instance(id ?? "none"),
+    queryFn: () => getDeliverableInstanceRequest(id as string),
+    enabled: Boolean(id),
+  });
 
 export function useDeliverableReviewQueuePage(query: PageQuery) {
   const [page, setCurrentPage] = useState(1);

@@ -7,6 +7,7 @@ import type {
   DeliverableInstancePage,
   DeliverableQuery,
   DeliverableReview,
+  DeliverableReviewQueueItem,
   DeliverableReviewQueuePage,
   DeliverableSubmissionPage,
   ReviewDeliverableVariables,
@@ -36,6 +37,9 @@ export const listDeliverableInstancesRequest = (query?: DeliverableQuery) =>
   apiRequest<DeliverableInstancePage>(
     "/deliverable-instances" + toQueryString(query),
   );
+
+export const getDeliverableInstanceRequest = (id: string) =>
+  apiRequest<DeliverableReviewQueueItem>("/deliverable-instances/" + id);
 
 export const listDeliverableReviewQueueRequest = (query?: DeliverableQuery) =>
   apiRequest<DeliverableReviewQueuePage>(

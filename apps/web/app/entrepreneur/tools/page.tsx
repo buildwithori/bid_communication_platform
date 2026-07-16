@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CalendarDays,
@@ -47,7 +48,9 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Tabs } from "@/components/shared/Tabs";
 import {
   useCreateToolRequestMutation,
+  useToolRequestDetailQuery,
   useToolRequestsPage,
+  type ToolRequestRecord,
 } from "@/lib/api/tool-requests";
 import { useLazyToolAreasQuery } from "@/lib/api/settings";
 import { useToolsPage } from "@/lib/api/tools";
@@ -420,6 +423,10 @@ function RequestInfoPanel({ title, text }: { title: string; text: string }) {
 }
 
 export default function ToolsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedRequestId = searchParams.get("requestId");
+  const linkedRequest = useToolRequestDetailQuery(linkedRequestId);
   const [tab, setTab] = React.useState<ToolTab>("all");
   const [query, setQuery] = React.useState("");
   const deferredQuery = React.useDeferredValue(query);
@@ -436,12 +443,22 @@ export default function ToolsPage() {
     null,
   );
   const [activeTool, setActiveTool] = React.useState<Tool | null>(null);
+  const linkedRecord = linkedRequest.data as ToolRequestRecord | undefined;
+  const linkedRequestView = linkedRecord ? mapToolRequestRecordToUi(linkedRecord) : null;
+  const displayedRequest = activeRequest ?? linkedRequestView;
+  const displayedTab: ToolTab = linkedRequestId ? "requests" : tab;
+
+
+  function closeRequest() {
+    setActiveRequest(null);
+    if (linkedRequestId) router.replace("/entrepreneur/tools");
+  }
   const [areaOpen, setAreaOpen] = React.useState(false);
   const [areaSearch, setAreaSearch] = React.useState("");
 
   const toolPage = useToolsPage({
     search: deferredQuery || undefined,
-    type: tab === "pdf" ? "pdf" : tab === "embed" ? "embedded_tool" : undefined,
+    type: displayedTab === "pdf" ? "pdf" : displayedTab === "embed" ? "embedded_tool" : undefined,
     take: pageSize,
   });
   const requestPage = useToolRequestsPage({
@@ -555,7 +572,7 @@ export default function ToolsPage() {
         }
       />
       <Tabs
-        value={tab}
+        value={displayedTab}
         onChange={setTab}
         tabs={[
           { value: "all", label: "All tools" },
@@ -565,7 +582,7 @@ export default function ToolsPage() {
         ]}
       />
 
-      {tab === "requests" ? (
+      {displayedTab === "requests" ? (
         <Card>
           <CardHeader
             title="Your tool requests"
@@ -725,9 +742,13 @@ export default function ToolsPage() {
           })
         }
       />
+      <Modal open={Boolean(linkedRequestId) && !displayedRequest} onOpenChange={(open) => !open && closeRequest()} title="Tool request details" width="wide">
+        {linkedRequest.isLoading ? <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-36 w-full" /></div> : null}
+        {linkedRequest.isError ? <div className="rounded-xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger">This tool request is unavailable or outside your access scope.</div> : null}
+      </Modal>
       <ViewToolRequestModal
-        request={activeRequest}
-        onClose={() => setActiveRequest(null)}
+        request={displayedRequest}
+        onClose={closeRequest}
         onBrowseTools={() => {
           setActiveRequest(null);
           setTab("all");

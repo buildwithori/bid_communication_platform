@@ -17,6 +17,7 @@ import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { BookingModal } from "@/components/entrepreneur/BookingModal";
+import { LinkedSessionDetailModal } from "@/components/sessions/LinkedSessionDetailModal";
 import { useEntrepreneurStore } from "@/lib/stores/entrepreneur-store";
 import { cn } from "@/lib/utils";
 import type { Deliverable } from "@/types";
@@ -552,6 +553,7 @@ export default function SchedulePage() {
         </div>
       </Card>
 
+      <LinkedSessionDetailModal />
       <BookingModal open={bookOpen} onOpenChange={setBookOpen} />
       <Modal
         open={Boolean(cancelTarget)}

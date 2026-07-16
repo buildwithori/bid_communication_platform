@@ -1,6 +1,7 @@
 export {
   useDeliverableFeedbackQuery,
   useDeliverableGroupsPage,
+  useDeliverableInstanceQuery,
   useDeliverableInstancesPage,
   useLazyDeliverableGroups,
   useLazyDeliverableInstances,

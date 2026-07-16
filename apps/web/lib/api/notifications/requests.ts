@@ -1,5 +1,5 @@
 import { apiRequest } from '../client';
-import type { NotificationPreference, NotificationQuery, NotificationRecord, NotificationType } from './types';
+import type { NotificationPage, NotificationPreference, NotificationQuery, NotificationRecord, NotificationSummary, NotificationType } from './types';
 
 function toQueryString(query?: NotificationQuery) {
   const params = new URLSearchParams();
@@ -12,7 +12,11 @@ function toQueryString(query?: NotificationQuery) {
 }
 
 export function listNotificationsRequest(query?: NotificationQuery) {
-  return apiRequest<{ items: NotificationRecord[]; nextCursor: string | null }>(`/notifications${toQueryString(query)}`);
+  return apiRequest<NotificationPage>(`/notifications${toQueryString(query)}`);
+}
+
+export function notificationSummaryRequest() {
+  return apiRequest<NotificationSummary>('/notifications/summary');
 }
 
 export function markNotificationReadRequest(id: string) {

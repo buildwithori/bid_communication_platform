@@ -6,9 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceGuard } from '@/components/auth/WorkspaceGuard';
 import { EntrepreneurProvider, useEntrepreneurStore } from '@/lib/stores/entrepreneur-store';
 import { entrepreneurNav } from '@/lib/nav/entrepreneur-nav';
-import { Bell } from 'lucide-react';
-import { Button } from '@/components/shared/Button';
-import { NotificationsModal } from '@/components/shared/NotificationsModal';
+import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { routes } from '@/lib/routes';
 
 const titles: Record<string, string> = {
@@ -31,9 +29,8 @@ function useTitle() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { entrepreneur, notifications } = useEntrepreneurStore();
+  const { entrepreneur } = useEntrepreneurStore();
   const title = useTitle();
-  const [notifOpen, setNotifOpen] = React.useState(false);
 
   const user = {
     initials: entrepreneur.initials,
@@ -51,29 +48,9 @@ function Shell({ children }: { children: React.ReactNode }) {
       sections={entrepreneurNav}
       user={user}
       title={title}
-      topRightSlot={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setNotifOpen(true)}
-          className="flex items-center gap-1.5"
-          aria-label={`Notifications (${notifications.length} unread)`}
-        >
-          <Bell className="h-3 w-3" />
-          {notifications.length}
-        </Button>
-      }
+      topRightSlot={<NotificationCenter />}
     >
       {children}
-      <NotificationsModal
-        open={notifOpen}
-        onOpenChange={setNotifOpen}
-        notifications={notifications.map((notification) => ({
-          ...notification,
-          unread: true,
-          tone: 'danger',
-        }))}
-      />
     </AppShell>
   );
 }

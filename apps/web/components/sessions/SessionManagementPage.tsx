@@ -11,6 +11,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Modal } from "@/components/shared/Modal";
 import { MessageModal } from "@/components/shared/MessageModal";
+import { LinkedSessionDetailModal } from "@/components/sessions/LinkedSessionDetailModal";
 import {
   SessionEditorModal,
   type SessionEditorValues,
@@ -499,6 +500,7 @@ export function SessionManagementPage({
         />
       </Card>
 
+      <LinkedSessionDetailModal />
       <MessageModal
         open={Boolean(messageTarget)}
         onOpenChange={(next) => !next && setMessageTarget(null)}

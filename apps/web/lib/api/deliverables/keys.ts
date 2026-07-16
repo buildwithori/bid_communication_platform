@@ -8,6 +8,7 @@ export const deliverableKeys = {
   instances: () => [...deliverableKeys.all, "instances"] as const,
   instanceList: (query?: DeliverableQuery) =>
     [...deliverableKeys.instances(), query ?? {}] as const,
+  instance: (id: string) => [...deliverableKeys.instances(), id] as const,
   reviewQueues: () => [...deliverableKeys.all, "review-queues"] as const,
   reviewQueue: (query?: DeliverableQuery) =>
     [...deliverableKeys.reviewQueues(), query ?? {}] as const,

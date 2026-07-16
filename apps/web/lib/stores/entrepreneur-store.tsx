@@ -21,7 +21,6 @@ interface EntrepreneurStore {
   entrepreneur: Entrepreneur;
   sessions: Session[];
   deliverables: Deliverable[];
-  notifications: { id: string; title: string; meta: string }[];
   bookSession: (input: BookingForm) => void;
   submitDeliverable: (input: DeliverableForm) => void;
   markDeliverableFeedbackRead: (deliverableId: string, feedbackIds: string[]) => void;
@@ -34,17 +33,11 @@ interface EntrepreneurStore {
 
 const EntrepreneurContext = React.createContext<EntrepreneurStore | null>(null);
 
-const seedNotifications = [
-  { id: 'n1', title: 'BID team reviewed your Q1 Report', meta: 'Feedback added · 2 hours ago' },
-  { id: 'n2', title: 'Business Model Canvas due in 3 days', meta: 'Apr 18 · Reminder' },
-  { id: 'n3', title: 'New module added to your programme', meta: 'Legal Structures for Startups' },
-];
 
 export function EntrepreneurProvider({ children }: { children: React.ReactNode }) {
   const [entrepreneur, setEntrepreneur] = React.useState<Entrepreneur>(seedEntrepreneur);
   const [sessions, setSessions] = React.useState<Session[]>(seedSessions);
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>(seedDeliverables);
-  const [notifications] = React.useState(seedNotifications);
 
   const updateProfile: EntrepreneurStore['updateProfile'] = React.useCallback((patch) => {
     setEntrepreneur((curr) => ({ ...curr, ...patch }));
@@ -205,7 +198,6 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
       entrepreneur,
       sessions,
       deliverables,
-      notifications,
       bookSession,
       submitDeliverable,
       markDeliverableFeedbackRead,
@@ -215,7 +207,7 @@ export function EntrepreneurProvider({ children }: { children: React.ReactNode }
       requestTool,
       updateProfile,
     }),
-    [entrepreneur, sessions, deliverables, notifications, bookSession, submitDeliverable, markDeliverableFeedbackRead, addFundingRound, updateFundingRound, submitPeriodicUpdate, requestTool, updateProfile],
+    [entrepreneur, sessions, deliverables, bookSession, submitDeliverable, markDeliverableFeedbackRead, addFundingRound, updateFundingRound, submitPeriodicUpdate, requestTool, updateProfile],
   );
 
   return (

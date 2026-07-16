@@ -33,7 +33,7 @@ export type NotificationRecord = {
   actor: { id: string; name: string; email: string; role: 'admin' | 'trainer' | 'entrepreneur' } | null;
   deliveries: Array<{
     channel: 'in_app' | 'email';
-    status: 'pending' | 'sent' | 'failed' | 'skipped';
+    status: 'pending' | 'processing' | 'sent' | 'failed' | 'skipped';
     sentAt: string | null;
     failedAt: string | null;
   }>;
@@ -47,6 +47,16 @@ export type NotificationPreference = {
   emailEnabled: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+export type NotificationSummary = {
+  unreadCount: number;
+  totalCount: number;
+};
+
+export type NotificationPage = {
+  items: NotificationRecord[];
+  nextCursor: string | null;
 };
 
 export type NotificationQuery = {

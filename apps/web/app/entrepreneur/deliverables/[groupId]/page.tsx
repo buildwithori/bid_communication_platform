@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Breadcrumb } from '@/components/shared/Breadcrumb';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader } from '@/components/shared/Card';
+import { Card, CardHeader, Skeleton } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { DataTable, RowActions, TableFilterInput, TableFilterSelect, TablePagination, TableToolbar, type Column } from '@/components/shared/DataTable';
@@ -13,6 +14,7 @@ import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDelivera
 import { Modal } from '@/components/shared/Modal';
 import {
   useDeliverableFeedbackQuery,
+  useDeliverableInstanceQuery,
   useDeliverableInstancesPage,
   useDeliverableSubmissionsQuery,
   useMarkDeliverableReviewReadMutation,
@@ -44,10 +46,20 @@ function isActionable(item: DeliverableInstance) {
 
 export default function DeliverableListPage({ params }: { params: { groupId: string } }) {
   const programmeId = params.groupId;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedDeliverableId = searchParams.get('deliverableId');
+  const linkedDeliverable = useDeliverableInstanceQuery(linkedDeliverableId);
   const programme = useProgrammeDetailQuery(programmeId);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [uploadTarget, setUploadTarget] = React.useState<DeliverableInstance | null>(null);
   const [historyTarget, setHistoryTarget] = React.useState<DeliverableInstance | null>(null);
+  const linkedHistory = linkedDeliverable.data as DeliverableInstance | undefined;
+  const displayedHistory = historyTarget ?? linkedHistory ?? null;
+  function closeHistory() {
+    setHistoryTarget(null);
+    if (linkedDeliverableId) router.replace(`/entrepreneur/deliverables/${programmeId}`);
+  }
   const [query, setQuery] = React.useState('');
   const deferredQuery = React.useDeferredValue(query.trim());
   const [statusFilter, setStatusFilter] = React.useState<typeof ALL | DeliverableStatus>(ALL);
@@ -167,8 +179,12 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
         <TablePagination page={instances.page} pageSize={pageSize} totalItems={instances.totalItems} onPageChange={instances.setPage} onPageSizeChange={(next) => { setPageSize(next); instances.resetPagination(); }} />
       </Card>
 
+      <Modal open={Boolean(linkedDeliverableId) && !displayedHistory} onOpenChange={(open) => !open && closeHistory()} title="Deliverable details" width="wide">
+        {linkedDeliverable.isLoading ? <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-36 w-full" /></div> : null}
+        {linkedDeliverable.isError ? <div className="rounded-xl border border-danger/20 bg-danger-light p-4 text-sm text-danger">This deliverable is unavailable or outside your access scope.</div> : null}
+      </Modal>
       <UploadDeliverableModal key={uploadTarget?.id ?? 'new-deliverable'} open={uploadOpen} onOpenChange={setUploadOpen} deliverable={uploadTarget} programmeId={programmeId} />
-      <DeliverableHistoryModal deliverable={historyTarget} onClose={() => setHistoryTarget(null)} onResubmit={(item) => { setHistoryTarget(null); openUpload(item); }} />
+      <DeliverableHistoryModal deliverable={displayedHistory} onClose={closeHistory} onResubmit={(item) => { closeHistory(); openUpload(item); }} />
     </>
   );
 }

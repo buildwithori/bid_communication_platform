@@ -20,6 +20,7 @@ import {
   FormRow2,
 } from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
+import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import {
   useAdminProfileQuery,
   useUpdateAdminProfileMutation,
@@ -217,6 +218,7 @@ export default function AdminSettingsPage() {
           />
         </div>
       </div>
+      <NotificationPreferencesCard />
     </>
   );
 }
