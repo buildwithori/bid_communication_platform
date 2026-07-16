@@ -15,6 +15,16 @@ export type EmailMessage = {
 export class EmailService {
   constructor(private readonly config: ConfigService) {}
 
+  appUrl(path = '') {
+    const root = this.config.getOrThrow<string>('APP_WEB_URL').replace(/\/$/, '');
+    if (!path) return root;
+    return root + (path.startsWith('/') ? path : '/' + path);
+  }
+
+  logoUrl() {
+    return this.appUrl('/bid-logo.png');
+  }
+
   async renderTemplate(template: React.ReactElement) {
     const html = await render(template);
     return { html, text: toPlainText(html) };

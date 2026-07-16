@@ -203,6 +203,7 @@ enum NotificationChannel {
 
 enum NotificationDeliveryStatus {
   pending
+  processing
   sent
   failed
   skipped
@@ -1307,13 +1308,15 @@ model NotificationDelivery {
   sentAt         DateTime?                  @map("sent_at")
   failedAt       DateTime?                  @map("failed_at")
   failureReason  String?                    @map("failure_reason")
+  attemptCount   Int                        @default(0) @map("attempt_count")
+  nextAttemptAt  DateTime?                  @map("next_attempt_at")
   createdAt      DateTime                   @default(now()) @map("created_at")
   updatedAt      DateTime                   @updatedAt @map("updated_at")
 
   notification Notification @relation(fields: [notificationId], references: [id])
 
   @@unique([notificationId, channel])
-  @@index([channel, status])
+  @@index([channel, status, nextAttemptAt])
   @@map("notification_deliveries")
 }
 

@@ -16,6 +16,11 @@ export class NotificationsController {
     return this.notificationsService.listNotifications(user, query);
   }
 
+  @Get('notifications/summary')
+  summary(@CurrentUser() user: User) {
+    return this.notificationsService.getSummary(user);
+  }
+
   @Post('notifications/:id/read')
   markRead(@CurrentUser() user: User, @Param('id') id: string) {
     return this.notificationsService.markRead(user, id);

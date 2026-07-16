@@ -12,7 +12,8 @@
     "test:audit": "node --test -r ts-node/register test/audit-redaction.test.ts",
     "test:files": "node --test -r ts-node/register test/file-signature.test.ts",
     "test:video": "node --test -r ts-node/register test/mux-signature.test.ts",
-    "test:sessions": "node --test -r ts-node/register test/session-*.test.ts"
+    "test:sessions": "node --test -r ts-node/register test/session-*.test.ts",
+    "test:notifications": "node --test -r ts-node/register test/notifications.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",

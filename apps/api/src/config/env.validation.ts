@@ -10,6 +10,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).optional(),
   REDIS_URL: z.string().min(1).optional(),
   AUDIT_PROCESS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(5_000),
+  NOTIFICATION_DELIVERY_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(5_000),
   DELIVERABLE_RECURRENCE_INTERVAL_MS: z.coerce
     .number()
     .int()
