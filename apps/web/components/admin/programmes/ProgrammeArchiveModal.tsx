@@ -34,22 +34,24 @@ export function ProgrammeArchiveModal({
   const [submitting, setSubmitting] = React.useState(false);
   const busy = isPending || submitting;
 
-  React.useEffect(() => {
-    if (!open) {
-      setReason('');
-      setSubmitting(false);
-    }
-  }, [open]);
-
   if (!program) return null;
 
   const status =
     'lifecycle' in program ? program.lifecycle : getProgrammeStatus(program);
 
+  const closeModal = () => {
+    if (busy) return;
+    setReason('');
+    setSubmitting(false);
+    onOpenChange(false);
+  };
+
   const handleArchive = async () => {
     setSubmitting(true);
     try {
       await onArchive(program, reason.trim());
+      setSubmitting(false);
+      setReason('');
       onOpenChange(false);
     } catch {
       setSubmitting(false);
@@ -60,7 +62,7 @@ export function ProgrammeArchiveModal({
     <Modal
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!busy) onOpenChange(nextOpen);
+        if (!nextOpen) closeModal();
       }}
       title="Archive programme"
       width="wide"
@@ -94,7 +96,7 @@ export function ProgrammeArchiveModal({
             variant="outline"
             type="button"
             disabled={busy}
-            onClick={() => onOpenChange(false)}
+            onClick={closeModal}
           >
             Cancel
           </Button>
