@@ -61,10 +61,13 @@ Known note: the build may show an outdated Browserslist warning. It is not curre
 Local Docker runs the application as a small system:
 
 - `web`: Next.js frontend on `http://localhost:3000`
-- `api`: NestJS backend on `http://localhost:4000/api`
+- `api`: NestJS HTTP backend on `http://localhost:4000/api`
+- `worker`: dedicated NestJS BullMQ consumer for email, notifications, audit, and scheduled workflows
 - `postgres`: PostgreSQL on `localhost:5433` by default
-- `redis`: Redis on `localhost:6379`
+- `redis`: internal-only Redis queue backend
+- `email-preview`: React Email template preview on `http://localhost:3001`
 - `mailpit`: local email catcher on `http://localhost:8025`
+- `minio`: private local object storage on `http://localhost:9001`
 - `pgadmin`: local PostgreSQL admin UI on `http://localhost:5050`
 
 Create the ignored local environment file once, then start the stack:
@@ -74,7 +77,7 @@ cp .env.docker.example .env.local
 npm run docker:dev
 ```
 
-The development Compose file injects `.env.local` into the relevant containers. The npm script also passes it to Compose for host-port interpolation.
+The development Compose file injects `.env.local` into the relevant containers. The API registers BullMQ Job Schedulers while the separate worker consumes jobs; Redis is intentionally not published to the host. API health includes Redis connectivity, queue counts, and a TTL-backed worker heartbeat.
 
 Local pgAdmin account:
 

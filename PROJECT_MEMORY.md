@@ -269,3 +269,12 @@ Session workflow rules:
 - Lifecycle fanout resolves company defaults and user preferences in batches, creates per-channel delivery rows, and never performs business summaries in React. User notification preferences live in each role settings/profile experience.
 - All runtime email action links and brand assets must derive their absolute root from APP_WEB_URL through the shared EmailService helpers. Feature modules own their templates and orchestration; preview props may use illustrative local values only for the React Email preview runtime.
 - Notification email delivery is asynchronous and retryable, with atomic claims, stale-processing recovery, capped exponential backoff, attempt metadata, and persisted pending/processing/sent/failed/skipped states.
+
+## BullMQ Background Job Runtime (2026-07-16)
+
+- Background execution is split from the HTTP API. `AppModule` registers BullMQ queues and idempotent Job Schedulers; `WorkerModule` is bootstrapped through `src/worker.ts` as a separate local and production Compose service and owns all processors. Never reintroduce processor providers or polling timers into the API process.
+- Redis is an internal-only Compose dependency. `REDIS_URL` is required and supports authenticated `redis://` and TLS `rediss://` URLs. The shared queue prefix is `bid-hub`.
+- Named queues currently cover audit outbox processing, notification email delivery, recurring deliverable synchronization, and transactional auth/invitation email. Scheduled scan jobs use BullMQ Job Schedulers; processors drain bounded batches and rely on database claims/unique constraints for idempotency.
+- BullMQ jobs use bounded attempts, exponential backoff, and capped completed/failed retention. Transactional email jobs containing short-lived tokens are deleted immediately after success and retained for at most one day on terminal failure. Templates remain owned by their feature modules and are rendered only in the worker.
+- Audit and notification database rows remain the durable business source of truth. Both recover stale processing locks; audit failures now persist `nextAttemptAt` and bounded delayed retries. BullMQ controls execution but does not replace transactional outbox guarantees.
+- API health must validate Redis connectivity and the TTL-backed worker heartbeat. A reachable Redis server without a live consumer is unhealthy. Local and production Compose both run a dedicated worker; local API and worker watch output use separate named volumes.

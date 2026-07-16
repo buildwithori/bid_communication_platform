@@ -51,7 +51,7 @@ Scope:
 
 Done when:
 
-- `docker compose up` starts web, api, the React Email preview service, postgres, redis, Mailpit, and pgAdmin locally.
+- `docker compose up` starts web, api, the dedicated BullMQ worker, the React Email preview service, postgres, internal-only redis, Mailpit, MinIO, and pgAdmin locally.
 - Web and API health routes are reachable.
 - Protected endpoints reject unauthenticated requests.
 - pgAdmin can connect to the local Postgres database.
@@ -430,7 +430,7 @@ Done when:
 - Dev emails are visible in Mailpit.
 - Delivery status and read state are persisted.
 
-Implementation status (2026-07-16): Complete. Durable recipient-scoped notifications now power the shared admin, trainer, and entrepreneur notification centre with cursor pagination, backend unread/total counts, persisted read state, lazy loading, and safe internal action URLs that open the exact session, deliverable, or tool-request detail context. Session, deliverable, and tool lifecycles emit batched in-app and email fanout with company defaults and user overrides. Email deliveries run through a retrying worker with atomic claims, stale-job recovery, attempt metadata, and persisted pending/processing/sent/failed/skipped status. Module-owned React Email templates use the shared BID brand and every runtime action/logo URL is built from APP_WEB_URL through EmailService. Mailpit delivery and env-rooted links were verified in Docker. Transactional auth/invitation email remains owned by those modules because recipients may not yet have an active notification account; reporting/system emitters will attach to this foundation when their owning lifecycle features are implemented.
+Implementation status (2026-07-16): Complete. Durable recipient-scoped notifications now power the shared admin, trainer, and entrepreneur notification centre with cursor pagination, backend unread/total counts, persisted read state, lazy loading, and safe internal action URLs that open the exact session, deliverable, or tool-request detail context. Session, deliverable, and tool lifecycles emit batched in-app and email fanout with company defaults and user overrides. BullMQ now separates API producers/schedulers from a dedicated worker runtime. Notification delivery, audit outbox processing, recurring deliverable generation, auth email, and all role invitations run through named Redis queues with bounded concurrency, exponential retry, retained failures, scheduler deduplication, stale database-lock recovery, and idempotent persistence. Successful secret-bearing transactional email jobs are removed immediately. API health verifies Redis, queue counts, and a TTL-backed worker heartbeat. Module-owned React Email templates retain the shared BID brand and every runtime action/logo URL comes from APP_WEB_URL. Migration, scheduler/worker failure recovery, queue removal, and Mailpit delivery were verified in Docker. Reporting/system emitters will attach to this foundation when their owning lifecycle features are implemented.
 
 ### 14. Dashboards And Operational Aggregates
 

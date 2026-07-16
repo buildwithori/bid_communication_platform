@@ -18,7 +18,7 @@ The backend should support the product for years, not just make the current scre
 - Passwords: hash with Argon2.
 - Frontend data fetching: TanStack Query.
 - Runtime setup: Docker and Docker Compose, with separate local and production Compose configurations.
-- Compose services: Next.js frontend, NestJS API, PostgreSQL, Redis, Mailpit for development email catching, and supporting local tooling.
+- Compose services: Next.js frontend, NestJS HTTP API, a separate NestJS BullMQ worker, PostgreSQL, internal-only Redis, Mailpit for development email catching, and supporting local tooling.
 - File storage: DigitalOcean Spaces for PDFs, deliverables, images, downloadable tool files, and report exports.
 - Background jobs: BullMQ with Redis.
 - Video platform: Mux Video.
@@ -377,3 +377,14 @@ Before merging backend work, ask:
 - Notification actionUrl accepts only application-relative paths beginning with one slash. Frontend routing ignores unsafe values and exact-detail routes refetch the resource through a role-scoped endpoint.
 - Session, deliverable, and tool-request lifecycles currently emit in-app and email notifications. Auth and invitation messages remain direct module-owned transactional email where the recipient may not have an active user record; reporting and system producers should reuse the notification service when their owning features are built.
 - Every runtime email URL, including CTA and logo URLs, must use EmailService.appUrl()/logoUrl(), which read APP_WEB_URL. Do not assemble roots inside feature email services.
+
+## BullMQ Worker Topology (2026-07-16)
+
+- `JobsModule` owns the Redis connection and named queue registrations. `JobSchedulingModule` belongs only to the HTTP API and upserts BullMQ Job Schedulers. `WorkerModule`, started from `worker.ts`, belongs only to the dedicated worker process and registers processors.
+- Do not import processors into `AppModule` or add `setInterval` polling back to feature services. API replicas may safely upsert the same scheduler IDs; database claims and unique constraints remain the final idempotency boundary.
+- Current queues are `bid-audit`, `bid-notification-delivery`, `bid-recurring-deliverables`, and `bid-transactional-email`, under the `bid-hub` Redis prefix. Processor concurrency is intentionally bounded; periodic processors drain at most twenty database batches per job so they make progress without unbounded work.
+- Auth verification, password reset, welcome, and admin/trainer/entrepreneur invitations enqueue typed jobs. The worker imports module-owned templates, builds all absolute links through `EmailService.appUrl()/logoUrl()`, and sends through SMTP/Mailpit or Resend.
+- Queue defaults are five attempts with exponential backoff and capped retention. Secret-bearing transactional email jobs override successful retention to immediate removal and terminal-failure retention to one day.
+- Audit outbox processing recovers five-minute stale locks, uses atomic claims, creates logs idempotently, stores safe failure text, and schedules database-level retry time. Notification delivery retains its own claim/attempt/delivery status model beneath BullMQ.
+- The worker refreshes a Redis heartbeat with a TTL. Public API health returns unhealthy when Redis is unavailable or the heartbeat is stale, and exposes bounded queue state counts for operations.
+- Local Compose keeps Redis internal, shares the API development image, isolates API/worker watch output into separate named volumes, and runs migrations only from the API container. Production Compose loads the provisioned root `.env` and runs API and worker as separate services from the same production image.
