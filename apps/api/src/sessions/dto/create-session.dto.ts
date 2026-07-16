@@ -1,5 +1,13 @@
-import { IsDateString, IsEnum, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { SessionType } from '@prisma/client';
+import {
+  IsDateString,
+  IsEnum,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { SessionTargetType, SessionType } from "@prisma/client";
 
 export class CreateSessionDto {
   @IsOptional()
@@ -13,6 +21,14 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   ownerUserId?: string;
+
+  @IsOptional()
+  @IsEnum(SessionTargetType)
+  targetType?: SessionTargetType;
+
+  @IsOptional()
+  @IsString()
+  targetUserId?: string;
 
   @IsEnum(SessionType)
   type!: SessionType;
@@ -39,6 +55,6 @@ export class CreateSessionDto {
   timezone?: string;
 
   @IsOptional()
-  @IsIn(['google_meet'])
+  @IsIn(["google_meet"])
   meetingProvider?: string;
 }

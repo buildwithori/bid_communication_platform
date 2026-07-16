@@ -10,6 +10,13 @@ export interface CompanyConfig {
     timezone: string;
     sessionProvider: string;
   };
+  sessions: {
+    workingDays: number[];
+    workdayStartMinutes: number;
+    workdayEndMinutes: number;
+    slotIntervalMinutes: number;
+    defaultDurationMinutes: number;
+  };
   notifications: {
     inAppNotifications: boolean;
     emailNotifications: boolean;
@@ -22,6 +29,7 @@ export type CompanyConfigPatch = {
   reporting?: Partial<CompanyConfig["reporting"]>;
   deliverables?: Partial<CompanyConfig["deliverables"]>;
   defaults?: Partial<CompanyConfig["defaults"]>;
+  sessions?: Partial<CompanyConfig["sessions"]>;
   notifications?: Partial<CompanyConfig["notifications"]>;
 };
 
@@ -31,6 +39,11 @@ export type CompanySettingsResponse = {
   defaultCurrency: string;
   defaultTimezone: string;
   defaultSessionProvider: string;
+  sessionWorkingDays: number[];
+  sessionWorkdayStartMinutes: number;
+  sessionWorkdayEndMinutes: number;
+  sessionSlotIntervalMinutes: number;
+  defaultSessionDurationMinutes: number;
   inAppNotificationsEnabledByDefault: boolean;
   emailNotificationsEnabledByDefault: boolean;
   reminderNotificationsEnabledByDefault: boolean;

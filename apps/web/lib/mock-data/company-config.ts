@@ -6,9 +6,16 @@ export const companyConfig = {
     moduleCompletionDeliverableDueDays: 7,
   },
   defaults: {
-    currency: 'USD',
-    timezone: 'Africa/Accra',
-    sessionProvider: 'google-meet',
+    currency: "USD",
+    timezone: "Africa/Accra",
+    sessionProvider: "google-meet",
+  },
+  sessions: {
+    workingDays: [1, 2, 3, 4, 5],
+    workdayStartMinutes: 540,
+    workdayEndMinutes: 1020,
+    slotIntervalMinutes: 30,
+    defaultDurationMinutes: 60,
   },
   notifications: {
     inAppNotifications: true,

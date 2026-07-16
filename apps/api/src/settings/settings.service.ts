@@ -41,7 +41,26 @@ export class SettingsService {
     });
   }
 
-  updateCompanySettings(dto: UpdateCompanySettingsDto) {
+  async updateCompanySettings(dto: UpdateCompanySettingsDto) {
+    const current = await this.getCompanySettings();
+    const start =
+      dto.sessionWorkdayStartMinutes ?? current.sessionWorkdayStartMinutes;
+    const end =
+      dto.sessionWorkdayEndMinutes ?? current.sessionWorkdayEndMinutes;
+    if (start >= end) {
+      throw new BadRequestException(
+        "Session working hours must end after they start.",
+      );
+    }
+    const duration =
+      dto.defaultSessionDurationMinutes ??
+      current.defaultSessionDurationMinutes;
+    if (duration > end - start) {
+      throw new BadRequestException(
+        "Default session duration must fit inside the working day.",
+      );
+    }
+
     return this.audit.capture(
       {
         action: "settings.company.updated",

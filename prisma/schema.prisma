@@ -156,6 +156,11 @@ enum SessionSource {
   team_created
 }
 
+enum SessionTargetType {
+  open_team
+  specific_user
+}
+
 enum SessionNoteVisibility {
   internal
   participant
@@ -303,8 +308,11 @@ model User {
   updatedDeliverableDueDates  DeliverableInstance[]      @relation("DeliverableDueDateUpdatedBy")
   requestedSessions           Session[]                  @relation("SessionEntrepreneur")
   ownedSessions               Session[]                  @relation("SessionOwner")
+  targetedSessions            Session[]                  @relation("SessionTarget")
   createdSessions             Session[]                  @relation("SessionCreatedBy")
   sessionNotes                SessionNote[]              @relation("SessionNoteAuthor")
+  sessionReschedules          SessionReschedule[]        @relation("SessionRescheduleActor")
+  declinedSessionRequests     SessionRequestDecline[]    @relation("SessionRequestDeclineUser")
   receivedNotifications       Notification[]             @relation("NotificationRecipient")
   actedNotifications          Notification[]             @relation("NotificationActor")
   notificationPreferences     NotificationPreference[]
@@ -313,8 +321,8 @@ model User {
   contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
   moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
   programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
-  uploadedFiles               FileAsset[]                 @relation("FileAssetUploadedBy")
-  uploadedVideos              VideoAsset[]                @relation("VideoAssetUploadedBy")
+  uploadedFiles               FileAsset[]                @relation("FileAssetUploadedBy")
+  uploadedVideos              VideoAsset[]               @relation("VideoAssetUploadedBy")
 
   @@index([role, status])
   @@index([invitedById])
@@ -436,6 +444,11 @@ model CompanySettings {
   defaultCurrency                       String   @default("USD") @map("default_currency")
   defaultTimezone                       String   @default("UTC") @map("default_timezone")
   defaultSessionProvider                String   @default("google_meet") @map("default_session_provider")
+  sessionWorkingDays                    Int[]    @default([1, 2, 3, 4, 5]) @map("session_working_days")
+  sessionWorkdayStartMinutes            Int      @default(540) @map("session_workday_start_minutes")
+  sessionWorkdayEndMinutes              Int      @default(1020) @map("session_workday_end_minutes")
+  sessionSlotIntervalMinutes            Int      @default(30) @map("session_slot_interval_minutes")
+  defaultSessionDurationMinutes         Int      @default(60) @map("default_session_duration_minutes")
   inAppNotificationsEnabledByDefault    Boolean  @default(true) @map("in_app_notifications_enabled_by_default")
   emailNotificationsEnabledByDefault    Boolean  @default(true) @map("email_notifications_enabled_by_default")
   reminderNotificationsEnabledByDefault Boolean  @default(true) @map("reminder_notifications_enabled_by_default")
@@ -779,19 +792,19 @@ model ModuleContentItem {
 }
 
 model VideoAsset {
-  id            String      @id @default(cuid())
-  contentItemId String?     @unique @map("content_item_id")
-  muxAssetId    String?     @unique @map("mux_asset_id")
-  muxUploadId   String?     @unique @map("mux_upload_id")
-  playbackId    String?     @map("playback_id")
-  duration      Int?
-  status        AssetStatus @default(pending)
+  id             String      @id @default(cuid())
+  contentItemId  String?     @unique @map("content_item_id")
+  muxAssetId     String?     @unique @map("mux_asset_id")
+  muxUploadId    String?     @unique @map("mux_upload_id")
+  playbackId     String?     @map("playback_id")
+  duration       Int?
+  status         AssetStatus @default(pending)
   playbackPolicy String?     @map("playback_policy")
-  uploadedById  String?     @map("uploaded_by_id")
-  readyAt       DateTime?   @map("ready_at")
-  failureReason String?     @map("failure_reason")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  uploadedById   String?     @map("uploaded_by_id")
+  readyAt        DateTime?   @map("ready_at")
+  failureReason  String?     @map("failure_reason")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   contentItem   ContentItem?        @relation(fields: [contentItemId], references: [id])
   uploadedBy    User?               @relation("VideoAssetUploadedBy", fields: [uploadedById], references: [id])
@@ -817,19 +830,19 @@ model VideoWebhookEvent {
 }
 
 model FileAsset {
-  id               String      @id @default(cuid())
-  contentItemId    String?     @map("content_item_id")
-  storageKey       String      @unique @map("storage_key")
-  originalFilename String      @map("original_filename")
-  mimeType         String      @map("mime_type")
-  sizeBytes        BigInt      @map("size_bytes")
-  status           AssetStatus @default(pending)
+  id               String          @id @default(cuid())
+  contentItemId    String?         @map("content_item_id")
+  storageKey       String          @unique @map("storage_key")
+  originalFilename String          @map("original_filename")
+  mimeType         String          @map("mime_type")
+  sizeBytes        BigInt          @map("size_bytes")
+  status           AssetStatus     @default(pending)
   usage            FileAssetUsage?
-  uploadedById     String?     @map("uploaded_by_id")
-  verifiedAt       DateTime?   @map("verified_at")
-  failureReason    String?     @map("failure_reason")
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
+  uploadedById     String?         @map("uploaded_by_id")
+  verifiedAt       DateTime?       @map("verified_at")
+  failureReason    String?         @map("failure_reason")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
 
   contentItem            ContentItem?            @relation(fields: [contentItemId], references: [id])
   toolPdfAsset           Tool?                   @relation("ToolPdfAsset")
@@ -1169,39 +1182,80 @@ model DeliverableReview {
 }
 
 model Session {
-  id                 String        @id @default(cuid())
-  entrepreneurUserId String        @map("entrepreneur_user_id")
-  programmeId        String?       @map("programme_id")
-  ownerUserId        String?       @map("owner_user_id")
-  createdById        String        @map("created_by_id")
+  id                 String            @id @default(cuid())
+  entrepreneurUserId String            @map("entrepreneur_user_id")
+  programmeId        String?           @map("programme_id")
+  ownerUserId        String?           @map("owner_user_id")
+  targetType         SessionTargetType @default(open_team) @map("target_type")
+  targetUserId       String?           @map("target_user_id")
+  createdById        String            @map("created_by_id")
   type               SessionType
   topic              String
   notes              String?
-  source             SessionSource @default(entrepreneur_request)
-  status             SessionStatus @default(requested)
-  startAt            DateTime      @map("start_at")
-  endAt              DateTime      @map("end_at")
-  timezone           String        @default("UTC")
-  meetingProvider    String        @default("google_meet") @map("meeting_provider")
-  meetingUrl         String?       @map("meeting_url")
-  declinedReason     String?       @map("declined_reason")
-  cancelledReason    String?       @map("cancelled_reason")
-  completedAt        DateTime?     @map("completed_at")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
+  source             SessionSource     @default(entrepreneur_request)
+  status             SessionStatus     @default(requested)
+  startAt            DateTime          @map("start_at")
+  endAt              DateTime          @map("end_at")
+  timezone           String            @default("UTC")
+  meetingProvider    String            @default("google_meet") @map("meeting_provider")
+  meetingUrl         String?           @map("meeting_url")
+  calendarEventId    String?           @map("calendar_event_id")
+  declinedReason     String?           @map("declined_reason")
+  cancelledReason    String?           @map("cancelled_reason")
+  completedAt        DateTime?         @map("completed_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
 
-  entrepreneur User          @relation("SessionEntrepreneur", fields: [entrepreneurUserId], references: [id])
-  programme    Programme?    @relation(fields: [programmeId], references: [id])
-  owner        User?         @relation("SessionOwner", fields: [ownerUserId], references: [id])
-  createdBy    User          @relation("SessionCreatedBy", fields: [createdById], references: [id])
-  notesHistory SessionNote[]
+  entrepreneur    User                    @relation("SessionEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  programme       Programme?              @relation(fields: [programmeId], references: [id])
+  owner           User?                   @relation("SessionOwner", fields: [ownerUserId], references: [id])
+  target          User?                   @relation("SessionTarget", fields: [targetUserId], references: [id])
+  createdBy       User                    @relation("SessionCreatedBy", fields: [createdById], references: [id])
+  notesHistory    SessionNote[]
+  reschedules     SessionReschedule[]
+  requestDeclines SessionRequestDecline[]
 
   @@index([entrepreneurUserId, status])
   @@index([ownerUserId, status])
+  @@index([targetUserId, status])
   @@index([programmeId])
   @@index([status, startAt])
   @@index([source, status])
   @@map("sessions")
+}
+
+model SessionRequestDecline {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  reason    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation("SessionRequestDeclineUser", fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+  @@index([userId, createdAt])
+  @@map("session_request_declines")
+}
+
+model SessionReschedule {
+  id              String   @id @default(cuid())
+  sessionId       String   @map("session_id")
+  requestedById   String   @map("requested_by_id")
+  previousStartAt DateTime @map("previous_start_at")
+  previousEndAt   DateTime @map("previous_end_at")
+  newStartAt      DateTime @map("new_start_at")
+  newEndAt        DateTime @map("new_end_at")
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  session     Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  requestedBy User    @relation("SessionRescheduleActor", fields: [requestedById], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([requestedById])
+  @@map("session_reschedules")
 }
 
 model SessionNote {

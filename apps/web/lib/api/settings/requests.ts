@@ -41,6 +41,13 @@ function mapCompanySettings(settings: CompanySettingsResponse): CompanyConfig {
       timezone,
       sessionProvider: toClientSessionProvider(settings.defaultSessionProvider),
     },
+    sessions: {
+      workingDays: settings.sessionWorkingDays,
+      workdayStartMinutes: settings.sessionWorkdayStartMinutes,
+      workdayEndMinutes: settings.sessionWorkdayEndMinutes,
+      slotIntervalMinutes: settings.sessionSlotIntervalMinutes,
+      defaultDurationMinutes: settings.defaultSessionDurationMinutes,
+    },
     notifications: {
       inAppNotifications: settings.inAppNotificationsEnabledByDefault,
       emailNotifications: settings.emailNotificationsEnabledByDefault,
@@ -63,6 +70,11 @@ function toCompanySettingsPatch(
     defaultSessionProvider: toApiSessionProvider(
       patch.defaults?.sessionProvider,
     ),
+    sessionWorkingDays: patch.sessions?.workingDays,
+    sessionWorkdayStartMinutes: patch.sessions?.workdayStartMinutes,
+    sessionWorkdayEndMinutes: patch.sessions?.workdayEndMinutes,
+    sessionSlotIntervalMinutes: patch.sessions?.slotIntervalMinutes,
+    defaultSessionDurationMinutes: patch.sessions?.defaultDurationMinutes,
     inAppNotificationsEnabledByDefault: patch.notifications?.inAppNotifications,
     emailNotificationsEnabledByDefault: patch.notifications?.emailNotifications,
     reminderNotificationsEnabledByDefault:

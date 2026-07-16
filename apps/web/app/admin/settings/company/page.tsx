@@ -37,6 +37,44 @@ const timezoneOptions = [
 
 const sessionProviderOptions = [{ value: "google-meet", label: "Google Meet" }];
 
+const weekdayOptions = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
+
+const slotIntervalOptions = [
+  { value: "15", label: "15 minutes" },
+  { value: "30", label: "30 minutes" },
+  { value: "45", label: "45 minutes" },
+  { value: "60", label: "60 minutes" },
+];
+
+const sessionDurationOptions = [
+  { value: "30", label: "30 minutes" },
+  { value: "45", label: "45 minutes" },
+  { value: "60", label: "60 minutes" },
+  { value: "90", label: "90 minutes" },
+  { value: "120", label: "120 minutes" },
+];
+
+function minutesToTime(minutes: number) {
+  const hours = Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, "0");
+  const remainder = (minutes % 60).toString().padStart(2, "0");
+  return hours + ":" + remainder;
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 function parseOptionalDays(value: string) {
   if (!value.trim()) return null;
   const parsed = Number(value);
@@ -61,6 +99,13 @@ export default function AdminCompanySettingsPage() {
   const [currency, setCurrency] = React.useState("USD");
   const [timezone, setTimezone] = React.useState("Africa/Accra");
   const [sessionProvider, setSessionProvider] = React.useState("google-meet");
+  const [sessionPolicy, setSessionPolicy] = React.useState({
+    workingDays: [1, 2, 3, 4, 5],
+    workdayStartMinutes: 540,
+    workdayEndMinutes: 1020,
+    slotIntervalMinutes: 30,
+    defaultDurationMinutes: 60,
+  });
   const [notifications, setNotifications] = React.useState({
     inAppNotifications: true,
     emailNotifications: true,
@@ -81,6 +126,7 @@ export default function AdminCompanySettingsPage() {
     setCurrency(companyConfig.defaults.currency);
     setTimezone(companyConfig.defaults.timezone);
     setSessionProvider(companyConfig.defaults.sessionProvider);
+    setSessionPolicy(companyConfig.sessions);
     setNotifications(companyConfig.notifications);
   }, [companyConfig]);
 
@@ -120,7 +166,22 @@ export default function AdminCompanySettingsPage() {
   const moduleDueError = !isValidDays(moduleDueValue)
     ? "Leave blank or enter a whole number between 1 and 365."
     : undefined;
-  const hasError = Boolean(overdueError || moduleDueError);
+  const sessionHoursError =
+    sessionPolicy.workdayStartMinutes >= sessionPolicy.workdayEndMinutes
+      ? "End time must be after the start time."
+      : undefined;
+  const sessionDurationError =
+    sessionPolicy.defaultDurationMinutes >
+    sessionPolicy.workdayEndMinutes - sessionPolicy.workdayStartMinutes
+      ? "Duration must fit inside the working day."
+      : undefined;
+  const hasError = Boolean(
+    overdueError ||
+    moduleDueError ||
+    sessionHoursError ||
+    sessionDurationError ||
+    sessionPolicy.workingDays.length === 0,
+  );
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -130,6 +191,7 @@ export default function AdminCompanySettingsPage() {
       reporting: { periodicUpdateOverdueAfterDays: overdueValue },
       deliverables: { moduleCompletionDeliverableDueDays: moduleDueValue },
       defaults: { currency, timezone, sessionProvider },
+      sessions: sessionPolicy,
       notifications,
     });
   };
@@ -281,6 +343,114 @@ export default function AdminCompanySettingsPage() {
 
         <Card>
           <CardHeader
+            title="Session booking hours"
+            description="Control when entrepreneurs can request sessions against connected BID team calendars."
+            actions={<CalendarClock className="h-5 w-5 text-ink-faint" />}
+          />
+          <Notice>
+            Availability still comes from each team member&apos;s live Google
+            Calendar. These rules define the bookable window and slot spacing.
+          </Notice>
+          <div className="mt-4 space-y-5">
+            <FormField
+              label="Working days"
+              error={
+                sessionPolicy.workingDays.length === 0
+                  ? "Choose at least one working day."
+                  : undefined
+              }
+            >
+              <div className="flex flex-wrap gap-2">
+                {weekdayOptions.map((day) => {
+                  const selected = sessionPolicy.workingDays.includes(
+                    day.value,
+                  );
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() =>
+                        setSessionPolicy((current) => ({
+                          ...current,
+                          workingDays: selected
+                            ? current.workingDays.filter(
+                                (value) => value !== day.value,
+                              )
+                            : [...current.workingDays, day.value],
+                        }))
+                      }
+                      className={cn(
+                        "min-w-14 rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                        selected
+                          ? "border-bid bg-bid text-white"
+                          : "border-line bg-surface text-ink-muted hover:border-bid/40 hover:text-ink",
+                      )}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FormField>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FormField label="Working day starts">
+                <FormInput
+                  type="time"
+                  value={minutesToTime(sessionPolicy.workdayStartMinutes)}
+                  onChange={(event) =>
+                    setSessionPolicy((current) => ({
+                      ...current,
+                      workdayStartMinutes: timeToMinutes(event.target.value),
+                    }))
+                  }
+                />
+              </FormField>
+              <FormField label="Working day ends" error={sessionHoursError}>
+                <FormInput
+                  type="time"
+                  value={minutesToTime(sessionPolicy.workdayEndMinutes)}
+                  onChange={(event) =>
+                    setSessionPolicy((current) => ({
+                      ...current,
+                      workdayEndMinutes: timeToMinutes(event.target.value),
+                    }))
+                  }
+                />
+              </FormField>
+              <FormField label="Slot interval">
+                <FormSelect
+                  value={String(sessionPolicy.slotIntervalMinutes)}
+                  onValueChange={(value) =>
+                    setSessionPolicy((current) => ({
+                      ...current,
+                      slotIntervalMinutes: Number(value),
+                    }))
+                  }
+                  options={slotIntervalOptions}
+                />
+              </FormField>
+              <FormField
+                label="Default session duration"
+                error={sessionDurationError}
+              >
+                <FormSelect
+                  value={String(sessionPolicy.defaultDurationMinutes)}
+                  onValueChange={(value) =>
+                    setSessionPolicy((current) => ({
+                      ...current,
+                      defaultDurationMinutes: Number(value),
+                    }))
+                  }
+                  options={sessionDurationOptions}
+                />
+              </FormField>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader
             title="Notification defaults"
             description="Set the default notification channels and reminder behavior for users."
             actions={<Bell className="h-5 w-5 text-ink-faint" />}
@@ -351,6 +521,13 @@ export default function AdminCompanySettingsPage() {
               setCurrency("USD");
               setTimezone("Africa/Accra");
               setSessionProvider("google-meet");
+              setSessionPolicy({
+                workingDays: [1, 2, 3, 4, 5],
+                workdayStartMinutes: 540,
+                workdayEndMinutes: 1020,
+                slotIntervalMinutes: 30,
+                defaultDurationMinutes: 60,
+              });
               setNotifications({
                 inAppNotifications: true,
                 emailNotifications: true,
@@ -384,7 +561,7 @@ function CompanySettingsSkeleton() {
           <Skeleton key={index} className="h-28 w-full" />
         ))}
       </div>
-      {Array.from({ length: 4 }, (_, index) => (
+      {Array.from({ length: 5 }, (_, index) => (
         <Card key={index} className="space-y-4">
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-full max-w-xl" />

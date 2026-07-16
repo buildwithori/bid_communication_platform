@@ -1,24 +1,55 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-import { User } from '@prisma/client';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { CreateSessionDto } from './dto/create-session.dto';
-import { AddSessionNoteDto, CompleteSessionDto, RescheduleSessionDto, SessionReasonDto } from './dto/session-action.dto';
-import { SessionQueryDto } from './dto/session-query.dto';
-import { SessionsService } from './sessions.service';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
+import { User } from "@prisma/client";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CreateSessionDto } from "./dto/create-session.dto";
+import {
+  AddSessionNoteDto,
+  CompleteSessionDto,
+  RescheduleSessionDto,
+  SessionReasonDto,
+} from "./dto/session-action.dto";
+import { SessionQueryDto } from "./dto/session-query.dto";
+import {
+  SessionAvailabilityQueryDto,
+  SessionTeamMemberQueryDto,
+} from "./dto/session-availability.dto";
+import { SessionAvailabilityService } from "./session-availability.service";
+import { SessionsService } from "./sessions.service";
 
-@ApiTags('sessions')
-@Controller('sessions')
+@ApiTags("sessions")
+@Controller("sessions")
 export class SessionsController {
-  constructor(private readonly sessionsService: SessionsService) {}
+  constructor(
+    private readonly sessionsService: SessionsService,
+    private readonly availabilityService: SessionAvailabilityService,
+  ) {}
 
   @Get()
   listSessions(@CurrentUser() user: User, @Query() query: SessionQueryDto) {
     return this.sessionsService.listSessions(user, query);
   }
 
-  @Get(':id')
-  getSession(@CurrentUser() user: User, @Param('id') id: string) {
+  @Get("team-members")
+  listTeamMembers(@Query() query: SessionTeamMemberQueryDto) {
+    return this.availabilityService.listTeamMembers(query);
+  }
+
+  @Get("availability")
+  getAvailability(@Query() query: SessionAvailabilityQueryDto) {
+    return this.availabilityService.getAvailability(query);
+  }
+
+  @Get(":id")
+  getSession(@CurrentUser() user: User, @Param("id") id: string) {
     return this.sessionsService.getSession(user, id);
   }
 
@@ -27,33 +58,53 @@ export class SessionsController {
     return this.sessionsService.createSession(user, dto);
   }
 
-  @Post(':id/accept')
-  acceptSession(@CurrentUser() user: User, @Param('id') id: string) {
+  @Post(":id/accept")
+  acceptSession(@CurrentUser() user: User, @Param("id") id: string) {
     return this.sessionsService.acceptSession(user, id);
   }
 
-  @Post(':id/decline')
-  declineSession(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: SessionReasonDto) {
+  @Post(":id/decline")
+  declineSession(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: SessionReasonDto,
+  ) {
     return this.sessionsService.declineSession(user, id, dto);
   }
 
-  @Post(':id/cancel')
-  cancelSession(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: SessionReasonDto) {
+  @Post(":id/cancel")
+  cancelSession(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: SessionReasonDto,
+  ) {
     return this.sessionsService.cancelSession(user, id, dto);
   }
 
-  @Patch(':id/reschedule')
-  rescheduleSession(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: RescheduleSessionDto) {
+  @Patch(":id/reschedule")
+  rescheduleSession(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: RescheduleSessionDto,
+  ) {
     return this.sessionsService.rescheduleSession(user, id, dto);
   }
 
-  @Post(':id/complete')
-  completeSession(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: CompleteSessionDto) {
+  @Post(":id/complete")
+  completeSession(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: CompleteSessionDto,
+  ) {
     return this.sessionsService.completeSession(user, id, dto);
   }
 
-  @Post(':id/notes')
-  addNote(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: AddSessionNoteDto) {
+  @Post(":id/notes")
+  addNote(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: AddSessionNoteDto,
+  ) {
     return this.sessionsService.addNote(user, id, dto);
   }
 }
