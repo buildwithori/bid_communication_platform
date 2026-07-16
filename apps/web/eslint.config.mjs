@@ -2,12 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 import nextTypeScript from "eslint-config-next/typescript";
 
-const rawApiModules = [
-  "@/lib/api/client",
-  "@/lib/api/sessions",
-  "@/lib/api/tool-requests",
-  "@/lib/api/tools",
-];
+const rawApiModules = ["@/lib/api/client", "@/lib/api/sessions"];
 
 export default defineConfig([
   ...nextCoreWebVitals,

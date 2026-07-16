@@ -1,16 +1,11 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
-import { PageHeader, Notice } from '@/components/shared/PageHeader';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { StatCard } from '@/components/shared/StatCard';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Modal } from '@/components/shared/Modal';
-import { FormField, FormTextarea } from '@/components/shared/FormField';
+import { useDeferredValue, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -21,204 +16,219 @@ import {
   TableToolbar,
   type Column,
   type RowAction,
-} from '@/components/shared/DataTable';
-import { routes } from '@/lib/routes';
-import { toolAreaOptions } from '@/lib/tool-areas';
+} from "@/components/shared/DataTable";
 import {
-  toolRequests,
+  FormAutocomplete,
+  FormField,
+  FormTextarea,
+} from "@/components/shared/FormField";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { Modal } from "@/components/shared/Modal";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { StatCard } from "@/components/shared/StatCard";
+import {
+  useToolRequestsPage,
+  useUpdateToolRequestMutation,
+} from "@/lib/api/tool-requests";
+import { useLazyToolsQuery } from "@/lib/api/tools";
+import { useLazyToolAreasQuery } from "@/lib/api/settings";
+import {
+  apiToUiToolRequestStatus,
+  mapToolRequestRecordToUi,
   toolRequestStatusMeta,
+  uiToApiToolRequestStatus,
   type ToolRequest,
   type ToolRequestStatus,
-} from '@/lib/mock-data/admin-workflows';
+} from "@/lib/tool-requests";
+import { routes } from "@/lib/routes";
 
 function formatDate(value?: string) {
-  if (!value) return 'Not specified';
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+  if (!value) return "Not specified";
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
-
 export default function AdminToolRequestsPage() {
   const router = useRouter();
-  const [requests, setRequests] = useState<ToolRequest[]>(toolRequests);
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | ToolRequestStatus>('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const [statusFilter, setStatusFilter] = useState<"all" | ToolRequestStatus>(
+    "all",
+  );
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [pageSize, setPageSize] = useState(10);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [decisionNote, setDecisionNote] = useState('');
+  const [activeRequest, setActiveRequest] = useState<ToolRequest | null>(null);
+  const [decisionNote, setDecisionNote] = useState("");
+  const [linkedToolId, setLinkedToolId] = useState("");
+  const [areaOpen, setAreaOpen] = useState(false);
+  const [areaSearch, setAreaSearch] = useState("");
 
-  const activeRequest = requests.find((request) => request.id === activeId) ?? null;
+  const requests = useToolRequestsPage({
+    search: deferredQuery || undefined,
+    status:
+      statusFilter === "all"
+        ? undefined
+        : uiToApiToolRequestStatus[statusFilter],
+    toolAreaId: categoryFilter === "all" ? undefined : categoryFilter,
+    take: pageSize,
+  });
+  const areas = useLazyToolAreasQuery({
+    enabled: areaOpen,
+    search: areaSearch || undefined,
+    active: true,
+    take: 20,
+  });
+  const areaOptions = [
+    { value: "all", label: "All tool areas" },
+    ...(areas.data?.pages.flatMap((page) => page.items) ?? []).map((area) => ({
+      value: area.id,
+      label: area.name,
+    })),
+  ];
+  const rows = useMemo(
+    () => requests.rows.map(mapToolRequestRecordToUi),
+    [requests.rows],
+  );
+
+  const update = useUpdateToolRequestMutation({
+    onSuccess: (record) => {
+      toast.success("Tool request updated", {
+        description:
+          toolRequestStatusMeta[apiToUiToolRequestStatus[record.status]].label,
+      });
+      setActiveRequest(null);
+    },
+    onError: (error) =>
+      toast.error("Could not update tool request", {
+        description: error.message,
+      }),
+  });
 
   const openRequest = (request: ToolRequest) => {
-    setActiveId(request.id);
-    setDecisionNote(request.adminNote ?? '');
+    setActiveRequest(request);
+    setDecisionNote(request.adminNote ?? "");
+    setLinkedToolId(request.linkedToolId ?? "");
   };
 
-  const updateRequest = (id: string, patch: Partial<ToolRequest>, msg: string) => {
-    setRequests((current) =>
-      current.map((request) => (request.id === id ? { ...request, ...patch } : request)),
+  const decideRequest = (
+    request: ToolRequest,
+    status: ToolRequestStatus,
+    options?: { close?: boolean },
+  ) => {
+    update.mutate(
+      {
+        id: request.id,
+        payload: {
+          status: uiToApiToolRequestStatus[status],
+          adminDecisionNote: decisionNote.trim() || null,
+          ...(status === "built" ? { linkedToolId } : {}),
+        },
+      },
+      { onSuccess: () => options?.close !== false && setActiveRequest(null) },
     );
-    toast.success(msg);
   };
 
-  const decideRequest = (status: ToolRequestStatus, msg: string) => {
-    if (!activeRequest) return;
-    updateRequest(activeRequest.id, { status, adminNote: decisionNote.trim() || undefined }, msg);
-    setActiveId(null);
-  };
-
-  const getRowActions = (request: ToolRequest): Array<RowAction | 'separator'> => {
-    const actions: Array<RowAction | 'separator'> = [
-      { label: 'View request', onSelect: () => openRequest(request) },
+  const getRowActions = (
+    request: ToolRequest,
+  ): Array<RowAction | "separator"> => {
+    const actions: Array<RowAction | "separator"> = [
+      { label: "View request", onSelect: () => openRequest(request) },
     ];
-
-    if (request.status === 'under-review') {
-      actions.push(
-        'separator',
-        {
-          label: 'Approve for development',
-          onSelect: () =>
-            updateRequest(request.id, { status: 'in-development' }, 'Tool request approved for development'),
-        },
-        {
-          label: 'Decline request',
-          destructive: true,
-          onSelect: () =>
-            updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
-        },
-      );
+    if (request.availableTransitions.includes("in-development")) {
+      actions.push("separator", {
+        label: "Approve for development",
+        disabled: update.isPending,
+        onSelect: () =>
+          decideRequest(request, "in-development", { close: false }),
+      });
     }
-
-    if (request.status === 'in-development') {
-      actions.push(
-        'separator',
-        {
-          label: 'Mark as built',
-          onSelect: () =>
-            updateRequest(request.id, { status: 'built' }, 'Tool marked as built and ready for the library'),
-        },
-        {
-          label: 'Decline request',
-          destructive: true,
-          onSelect: () =>
-            updateRequest(request.id, { status: 'declined' }, 'Tool request declined'),
-        },
-      );
+    if (
+      request.availableTransitions.includes("built") ||
+      request.availableTransitions.includes("declined")
+    ) {
+      actions.push({
+        label: "Review decision",
+        onSelect: () => openRequest(request),
+      });
     }
-
-    if (request.status === 'built') {
-      actions.push(
-        'separator',
-        { label: 'View in library', onSelect: () => router.push(routes.admin.content) },
-      );
+    if (request.availableTransitions.includes("under-review")) {
+      actions.push("separator", {
+        label: "Reopen review",
+        disabled: update.isPending,
+        onSelect: () =>
+          decideRequest(request, "under-review", { close: false }),
+      });
     }
-
-    if (request.status === 'declined') {
-      actions.push(
-        'separator',
-        {
-          label: 'Reopen review',
-          onSelect: () =>
-            updateRequest(request.id, { status: 'under-review' }, 'Tool request reopened for review'),
-        },
-      );
+    if (request.status === "built") {
+      actions.push("separator", {
+        label: "View linked tool",
+        onSelect: () => router.push(routes.admin.entrepreneurTools),
+      });
     }
-
     return actions;
   };
 
-  const filteredRequests = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return requests.filter((request) => {
-      const matchesQuery =
-        !needle ||
-        [
-          request.businessName,
-          request.requesterName,
-          request.programme,
-          request.toolName,
-          request.category,
-          request.reason,
-          request.requestedAgo,
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle);
-      const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-      const matchesCategory = categoryFilter === 'all' || request.category === categoryFilter;
-      return matchesQuery && matchesStatus && matchesCategory;
-    });
-  }, [categoryFilter, query, requests, statusFilter]);
-
-  const pageRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredRequests.slice(start, start + pageSize);
-  }, [filteredRequests, page, pageSize]);
-
-  const underReview = requests.filter((request) => request.status === 'under-review').length;
-  const inDevelopment = requests.filter((request) => request.status === 'in-development').length;
-  const built = requests.filter((request) => request.status === 'built').length;
-  const declined = requests.filter((request) => request.status === 'declined').length;
-
   const columns: Column<ToolRequest>[] = [
     {
-      key: 'actions',
-      header: 'Action',
-      cell: (request) => (
-        <RowActions actions={getRowActions(request)} />
-      ),
-      className: 'w-[84px]',
+      key: "actions",
+      header: "Action",
+      cell: (request) => <RowActions actions={getRowActions(request)} />,
+      className: "w-[84px]",
     },
     {
-      key: 'request',
-      header: 'Request',
+      key: "request",
+      header: "Request",
       cell: (request) => (
         <button
           type="button"
           onClick={() => openRequest(request)}
           className="block min-w-[260px] max-w-[420px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
         >
-          <span className="block truncate font-semibold text-ink transition-colors group-hover:text-bid">{request.toolName}</span>
-          <span className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">{request.reason}</span>
+          <span className="block truncate font-semibold text-ink">
+            {request.toolName}
+          </span>
+          <span className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">
+            {request.reason}
+          </span>
         </button>
       ),
     },
     {
-      key: 'business',
-      header: 'Business',
+      key: "business",
+      header: "Business",
       cell: (request) => (
         <div className="min-w-[190px]">
           <div className="font-medium text-ink">{request.businessName}</div>
-          <div className="mt-1 text-sm text-ink-muted">{request.requesterName}</div>
+          <div className="mt-1 text-sm text-ink-muted">
+            {request.requesterName}
+          </div>
           <div className="mt-1 text-sm text-ink-muted">{request.programme}</div>
         </div>
       ),
     },
     {
-      key: 'category',
-      header: 'Tool area',
-      cell: (request) => (
-        <Badge tone="blue">{request.category}</Badge>
-      ),
+      key: "category",
+      header: "Tool area",
+      cell: (request) => <Badge tone="blue">{request.category}</Badge>,
     },
     {
-      key: 'timeline',
-      header: 'Timeline',
+      key: "timeline",
+      header: "Timeline",
       cell: (request) => (
         <div className="min-w-[150px] text-sm text-ink-muted">
           <div>Requested {request.requestedAgo}</div>
-          {request.neededBy && <div>Needed by {formatDate(request.neededBy)}</div>}
+          {request.neededBy ? (
+            <div>Needed by {formatDate(request.neededBy)}</div>
+          ) : null}
         </div>
       ),
     },
     {
-      key: 'status',
-      header: 'Status',
+      key: "status",
+      header: "Status",
       cell: (request) => {
         const meta = toolRequestStatusMeta[request.status];
         return <Badge tone={meta.tone}>{meta.label}</Badge>;
@@ -226,6 +236,7 @@ export default function AdminToolRequestsPage() {
     },
   ];
 
+  const counts = requests.statusCounts;
   return (
     <>
       <PageHeader
@@ -233,28 +244,54 @@ export default function AdminToolRequestsPage() {
         description="Review entrepreneur requests for new platform tools and move approved ideas into the build pipeline."
       />
       <Notice>
-        Tool requests are product proposals from entrepreneurs. Admins should review the business need,
-        decide whether the tool belongs in BID Hub, capture the decision note, and then move approved
-        requests through Under review, In development, and Built.
+        Tool requests are product proposals from entrepreneurs. Capture the
+        decision note and link the finished library tool before marking a
+        request as built.
       </Notice>
 
       <MetricGrid className="mb-4">
-        <StatCard label="Under review" value={underReview} subline="Needs admin decision" dotColor="warning" accent="warning" />
-        <StatCard label="In development" value={inDevelopment} subline="Approved for build" dotColor="info" accent="info" />
-        <StatCard label="Built" value={built} subline="Added to library" dotColor="success" accent="success" />
-        <StatCard label="Declined" value={declined} subline="Not moving forward" dotColor="neutral" accent="neutral" />
+        <StatCard
+          label="Under review"
+          value={counts?.under_review ?? 0}
+          subline="Needs admin decision"
+          dotColor="warning"
+          accent="warning"
+        />
+        <StatCard
+          label="In development"
+          value={counts?.in_development ?? 0}
+          subline="Approved for build"
+          dotColor="info"
+          accent="info"
+        />
+        <StatCard
+          label="Built"
+          value={counts?.built ?? 0}
+          subline="Added to library"
+          dotColor="success"
+          accent="success"
+        />
+        <StatCard
+          label="Declined"
+          value={counts?.declined ?? 0}
+          subline="Not moving forward"
+          dotColor="neutral"
+          accent="neutral"
+        />
       </MetricGrid>
 
       <Card>
         <CardHeader
           title="Request queue"
-          description={`${filteredRequests.length} request${filteredRequests.length === 1 ? '' : 's'} in this view`}
+          description={`${requests.totalItems} request${requests.totalItems === 1 ? "" : "s"} in this view`}
         />
         <TableToolbar>
           <div>
-            <div className="text-sm font-medium text-ink">Filter tool requests</div>
+            <div className="text-sm font-medium text-ink">
+              Filter tool requests
+            </div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search by business, requester, programme, tool area, or business need.
+              Search by business, requester, tool area, or business need.
             </div>
           </div>
           <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[280px_190px_190px]">
@@ -264,48 +301,63 @@ export default function AdminToolRequestsPage() {
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
-                setPage(1);
+                requests.resetPagination();
               }}
             />
             <TableFilterSelect
               value={statusFilter}
               onChange={(event) => {
                 setStatusFilter(event.target.value as typeof statusFilter);
-                setPage(1);
+                requests.resetPagination();
               }}
             >
               <option value="all">All statuses</option>
               {Object.entries(toolRequestStatusMeta).map(([value, meta]) => (
-                <option key={value} value={value}>{meta.label}</option>
+                <option key={value} value={value}>
+                  {meta.label}
+                </option>
               ))}
             </TableFilterSelect>
             <TableFilterAutocomplete
               value={categoryFilter}
               onValueChange={(value) => {
                 setCategoryFilter(value);
-                setPage(1);
+                requests.resetPagination();
               }}
-              options={[{ value: 'all', label: 'All tool areas' }, ...toolAreaOptions]}
+              options={areaOptions}
               placeholder="All tool areas"
               searchPlaceholder="Search tool areas..."
               emptyMessage="No tool area found."
+              onOpenChange={setAreaOpen}
+              onSearchChange={setAreaSearch}
+              isLoading={areas.isLoading || areas.isFetchingNextPage}
+              hasMore={Boolean(areas.hasNextPage)}
+              onLoadMore={() => void areas.fetchNextPage()}
             />
           </div>
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={pageRows}
-          rowKey={(request) => request.id}
-          emptyMessage="No tool requests match this view."
-        />
+        {requests.isLoading ? (
+          <TableSkeleton rows={6} columns={6} />
+        ) : requests.isError ? (
+          <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">
+            {requests.error.message}
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(request) => request.id}
+            emptyMessage="No tool requests match this view."
+          />
+        )}
         <TablePagination
-          page={page}
+          page={requests.page}
           pageSize={pageSize}
-          totalItems={filteredRequests.length}
-          onPageChange={setPage}
+          totalItems={requests.totalItems}
+          onPageChange={requests.setPage}
           onPageSizeChange={(next) => {
             setPageSize(next);
-            setPage(1);
+            requests.resetPagination();
           }}
         />
       </Card>
@@ -313,12 +365,15 @@ export default function AdminToolRequestsPage() {
       <ToolRequestReviewModal
         request={activeRequest}
         decisionNote={decisionNote}
+        linkedToolId={linkedToolId}
+        busy={update.isPending}
         onDecisionNoteChange={setDecisionNote}
-        onClose={() => setActiveId(null)}
-        onMoveToDevelopment={() => decideRequest('in-development', 'Tool request approved for development')}
-        onMarkBuilt={() => decideRequest('built', 'Tool marked as built and ready for the library')}
-        onDecline={() => decideRequest('declined', 'Tool request declined')}
-        onViewLibrary={() => router.push(routes.admin.content)}
+        onLinkedToolChange={setLinkedToolId}
+        onClose={() => setActiveRequest(null)}
+        onDecide={(status) =>
+          activeRequest && decideRequest(activeRequest, status)
+        }
+        onViewLibrary={() => router.push(routes.admin.entrepreneurTools)}
       />
     </>
   );
@@ -327,53 +382,101 @@ export default function AdminToolRequestsPage() {
 function ToolRequestReviewModal({
   request,
   decisionNote,
+  linkedToolId,
+  busy,
   onDecisionNoteChange,
+  onLinkedToolChange,
   onClose,
-  onMoveToDevelopment,
-  onMarkBuilt,
-  onDecline,
+  onDecide,
   onViewLibrary,
 }: {
   request: ToolRequest | null;
   decisionNote: string;
+  linkedToolId: string;
+  busy: boolean;
   onDecisionNoteChange: (value: string) => void;
+  onLinkedToolChange: (value: string) => void;
   onClose: () => void;
-  onMoveToDevelopment: () => void;
-  onMarkBuilt: () => void;
-  onDecline: () => void;
+  onDecide: (status: ToolRequestStatus) => void;
   onViewLibrary: () => void;
 }) {
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolSearch, setToolSearch] = useState("");
+  const tools = useLazyToolsQuery({
+    enabled: toolsOpen && Boolean(request),
+    search: toolSearch || undefined,
+    status: "published",
+    take: 20,
+  });
+  const toolOptions = tools.rows.map((tool) => ({
+    value: tool.id,
+    label: tool.name,
+    description: tool.toolArea.name,
+  }));
+  if (
+    request?.linkedToolId &&
+    !toolOptions.some((option) => option.value === request.linkedToolId)
+  ) {
+    toolOptions.unshift({
+      value: request.linkedToolId,
+      label: request.linkedToolName ?? "Linked tool",
+      description: "Currently linked",
+    });
+  }
+
   return (
     <Modal
-      open={!!request}
+      open={Boolean(request)}
       onOpenChange={(open) => !open && onClose()}
-      title={request ? `Review tool request - ${request.toolName}` : 'Review tool request'}
+      title={
+        request
+          ? `Review tool request  ${request.toolName}`
+          : "Review tool request"
+      }
       width="wide"
     >
-      {request && (
+      {request ? (
         <div>
           <div className="mb-4 rounded-xl border border-line bg-surface-subtle p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="text-sm text-ink-muted">Requested by</div>
-                <div className="mt-1 font-semibold text-ink">{request.businessName}</div>
-                <div className="mt-1 text-sm text-ink-muted">{request.requesterName} · {request.programme}</div>
+                <div className="mt-1 font-semibold text-ink">
+                  {request.businessName}
+                </div>
+                <div className="mt-1 text-sm text-ink-muted">
+                  {request.requesterName} � {request.programme}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge tone={toolRequestStatusMeta[request.status].tone}>{toolRequestStatusMeta[request.status].label}</Badge>
-              </div>
+              <Badge tone={toolRequestStatusMeta[request.status].tone}>
+                {toolRequestStatusMeta[request.status].label}
+              </Badge>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoBlock label="Tool area" value={request.category} />
-            {request.neededBy && <InfoBlock label="Needed by" value={formatDate(request.neededBy)} />}
-            <InfoBlock label="Requested" value={`${formatDate(request.requestedAt)} (${request.requestedAgo})`} />
-            <InfoBlock label="Status" value={toolRequestStatusMeta[request.status].label} />
+            <InfoBlock
+              label="Requested"
+              value={`${formatDate(request.requestedAt)} (${request.requestedAgo})`}
+            />
+            {request.neededBy ? (
+              <InfoBlock
+                label="Needed by"
+                value={formatDate(request.neededBy)}
+              />
+            ) : null}
+            <InfoBlock
+              label="Status"
+              value={toolRequestStatusMeta[request.status].label}
+            />
           </div>
 
-          <div className="mt-4 grid gap-3">
-            <InfoPanel title="Why the entrepreneur wants this" text={request.reason} />
+          <div className="mt-4">
+            <InfoPanel
+              title="Why the entrepreneur wants this"
+              text={request.reason}
+            />
           </div>
 
           <FormField label="Admin decision note" optional className="mt-4">
@@ -385,26 +488,80 @@ function ToolRequestReviewModal({
             />
           </FormField>
 
+          {request.availableTransitions.includes("built") ? (
+            <FormField label="Finished library tool" className="mt-4">
+              <FormAutocomplete
+                value={linkedToolId}
+                onValueChange={onLinkedToolChange}
+                options={toolOptions}
+                placeholder="Select the published tool"
+                searchPlaceholder="Search published tools..."
+                emptyMessage="No published tool found."
+                onOpenChange={setToolsOpen}
+                onSearchChange={setToolSearch}
+                isLoading={tools.isLoading || tools.isFetchingNextPage}
+                hasMore={Boolean(tools.hasNextPage)}
+                onLoadMore={() => void tools.fetchNextPage()}
+              />
+            </FormField>
+          ) : null}
+
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose}>Close</Button>
-            {request.status === 'under-review' && (
-              <>
-                <Button type="button" variant="destructive" onClick={onDecline}>Decline</Button>
-                <Button type="button" onClick={onMoveToDevelopment}>Approve for development</Button>
-              </>
-            )}
-            {request.status === 'in-development' && (
-              <>
-                <Button type="button" variant="destructive" onClick={onDecline}>Decline</Button>
-                <Button type="button" onClick={onMarkBuilt}>Mark as built</Button>
-              </>
-            )}
-            {request.status === 'built' && (
-              <Button type="button" onClick={onViewLibrary}>View content library</Button>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={busy}
+            >
+              Close
+            </Button>
+            {request.availableTransitions.includes("declined") ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => onDecide("declined")}
+                isLoading={busy}
+                disabled={!decisionNote.trim()}
+              >
+                Decline
+              </Button>
+            ) : null}
+            {request.availableTransitions.includes("in-development") ? (
+              <Button
+                type="button"
+                onClick={() => onDecide("in-development")}
+                isLoading={busy}
+              >
+                Approve for development
+              </Button>
+            ) : null}
+            {request.availableTransitions.includes("built") ? (
+              <Button
+                type="button"
+                onClick={() => onDecide("built")}
+                isLoading={busy}
+                disabled={!linkedToolId}
+              >
+                Mark as built
+              </Button>
+            ) : null}
+            {request.availableTransitions.includes("under-review") ? (
+              <Button
+                type="button"
+                onClick={() => onDecide("under-review")}
+                isLoading={busy}
+              >
+                Reopen review
+              </Button>
+            ) : null}
+            {request.status === "built" ? (
+              <Button type="button" onClick={onViewLibrary}>
+                View linked tool
+              </Button>
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </Modal>
   );
 }
@@ -412,7 +569,9 @@ function ToolRequestReviewModal({
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-line bg-white px-3 py-2">
-      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">
+        {label}
+      </div>
       <div className="mt-1 text-sm font-medium text-ink">{value}</div>
     </div>
   );
