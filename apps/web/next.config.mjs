@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
-const path = require("node:path");
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig = {
   turbopack: {
@@ -9,4 +12,4 @@ const nextConfig = {
   typedRoutes: true,
 };
 
-module.exports = nextConfig;
+export default nextConfig;

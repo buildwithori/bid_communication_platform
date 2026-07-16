@@ -38,7 +38,7 @@ RUN npm ci --omit=dev --workspace @bid/web --workspace @bid/shared
 
 COPY --from=builder /workspace/apps/web/.next apps/web/.next
 COPY --from=builder /workspace/apps/web/public apps/web/public
-COPY --from=builder /workspace/apps/web/next.config.js apps/web/next.config.js
+COPY --from=builder /workspace/apps/web/next.config.mjs apps/web/next.config.mjs
 COPY --from=builder /workspace/packages/shared/dist packages/shared/dist
 
 EXPOSE 3000
