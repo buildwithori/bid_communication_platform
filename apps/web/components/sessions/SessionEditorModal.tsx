@@ -1,93 +1,65 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { DatePicker } from '@/components/shared/DatePicker';
+import * as React from "react";
+import { DatePicker } from "@/components/shared/DatePicker";
 import {
   FormAutocomplete,
   FormField,
   FormRow2,
   FormSelect,
   FormTextarea,
-} from '@/components/shared/FormField';
-import { Button } from '@/components/shared/Button';
-import { Modal } from '@/components/shared/Modal';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { trainers } from '@/lib/mock-data/trainers';
-import type { AdminSession } from '@/lib/mock-data/admin-workflows';
+} from "@/components/shared/FormField";
+import { Button } from "@/components/shared/Button";
+import { Modal } from "@/components/shared/Modal";
+import { Notice } from "@/components/shared/PageHeader";
+import { useCurrentUserQuery } from "@/lib/api/auth";
+import { useLazyEntrepreneursLookup } from "@/lib/api/entrepreneurs";
+import {
+  useLazySessionTeamMembers,
+  useSessionAvailabilityQuery,
+  type SessionAvailability,
+  type SessionRecord,
+  type SessionType,
+} from "@/lib/api/sessions";
 
-const sessionTypes: Array<{ value: AdminSession['sessionType']; label: string }> = [
-  { value: 'Mentoring', label: 'Mentoring' },
-  { value: 'Group session', label: 'Group session' },
-  { value: 'Investor prep', label: 'Investor prep' },
-];
-
-const meetingProviders = [
-  { value: 'google-meet', label: 'Google Meet' },
-];
-
-const timeSlots = [
-  '09:00',
-  '09:30',
-  '10:00',
-  '10:30',
-  '11:00',
-  '11:30',
-  '12:00',
-  '12:30',
-  '13:00',
-  '13:30',
-  '14:00',
-  '14:30',
-  '15:00',
-  '15:30',
-  '16:00',
-  '16:30',
+const sessionTypes = [
+  { value: "mentor_checkin", label: "Mentor check-in" },
+  { value: "office_hours", label: "Office hours" },
+  { value: "investor_prep", label: "Investor prep" },
 ];
 
 export type SessionEditorValues = {
-  entrepreneurId: string;
-  trainerId?: string;
-  trainerName: string;
-  sessionType: AdminSession['sessionType'];
+  entrepreneurUserId: string;
+  ownerUserId: string;
+  type: SessionType;
   topic: string;
-  date: string;
-  startTime: string;
-  endTime?: string;
-  meetingProvider?: AdminSession['meetingProvider'];
-  meetingUrl?: string;
+  startAt: string;
+  endAt: string;
+  timezone: string;
   reason?: string;
 };
 
-type SessionEditorModalProps = {
+type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: 'create' | 'reschedule';
-  actor: 'admin' | 'trainer';
-  initialSession?: AdminSession | null;
-  defaultTrainerId?: string;
-  defaultTrainerName?: string;
+  mode: "create" | "reschedule";
+  actor: "admin" | "trainer";
+  initialSession?: SessionRecord | null;
   onSubmit: (values: SessionEditorValues) => void;
+  isSubmitting?: boolean;
 };
 
-function addMinutes(time: string, minutes: number) {
-  const [hour = '0', minute = '0'] = time.split(':');
-  const date = new Date(2026, 0, 1, Number(hour), Number(minute));
-  date.setMinutes(date.getMinutes() + minutes);
-  return date.toTimeString().slice(0, 5);
+function dateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
 }
 
-function defaultEndTime(sessionType: AdminSession['sessionType'], startTime: string) {
-  if (sessionType === 'Group session') return addMinutes(startTime, 90);
-  if (sessionType === 'Investor prep') return addMinutes(startTime, 60);
-  return addMinutes(startTime, 45);
-}
-
-function createDefaultMeetingUrl(topic: string, date: string) {
-  const slug = `${topic || 'bid-session'}-${date || 'date'}`
-    .replace(/[^a-z0-9]+/gi, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase();
-  return `https://meet.google.com/${slug.slice(0, 32) || 'bid-session'}`;
+function initialDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return dateValue(date);
 }
 
 export function SessionEditorModal({
@@ -96,77 +68,151 @@ export function SessionEditorModal({
   mode,
   actor,
   initialSession,
-  defaultTrainerId,
-  defaultTrainerName,
   onSubmit,
-}: SessionEditorModalProps) {
-  const defaultEntrepreneur = entrepreneurs[0];
-  const [entrepreneurId, setEntrepreneurId] = React.useState(defaultEntrepreneur.id);
-  const [trainerId, setTrainerId] = React.useState(defaultTrainerId ?? trainers[0]?.id ?? '');
-  const [sessionType, setSessionType] = React.useState<AdminSession['sessionType']>('Mentoring');
-  const [topic, setTopic] = React.useState('');
-  const [date, setDate] = React.useState('2026-07-20');
-  const [startTime, setStartTime] = React.useState('10:00');
-  const [endTime, setEndTime] = React.useState('10:45');
-  const [meetingProvider, setMeetingProvider] = React.useState<NonNullable<AdminSession['meetingProvider']>>('google-meet');
-  const [reason, setReason] = React.useState('');
-  const [error, setError] = React.useState('');
+  isSubmitting = false,
+}: Props) {
+  const currentUser = useCurrentUserQuery();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const [entrepreneurId, setEntrepreneurId] = React.useState("");
+  const [ownerId, setOwnerId] = React.useState("");
+  const [sessionType, setSessionType] =
+    React.useState<SessionType>("mentor_checkin");
+  const [topic, setTopic] = React.useState("");
+  const [date, setDate] = React.useState(initialDate());
+  const [slotStartAt, setSlotStartAt] = React.useState("");
+  const [reason, setReason] = React.useState("");
+  const [error, setError] = React.useState("");
+  const [entrepreneurOpen, setEntrepreneurOpen] = React.useState(false);
+  const [ownerOpen, setOwnerOpen] = React.useState(false);
+  const [entrepreneurSearch, setEntrepreneurSearch] = React.useState("");
+  const [ownerSearch, setOwnerSearch] = React.useState("");
+  const deferredEntrepreneurSearch = React.useDeferredValue(entrepreneurSearch);
+  const deferredOwnerSearch = React.useDeferredValue(ownerSearch);
+
+  const entrepreneurs = useLazyEntrepreneursLookup({
+    enabled: open && entrepreneurOpen && mode === "create",
+    search: deferredEntrepreneurSearch || undefined,
+    take: 20,
+  });
+  const owners = useLazySessionTeamMembers({
+    enabled: open && ownerOpen && actor === "admin" && mode === "create",
+    search: deferredOwnerSearch || undefined,
+    take: 20,
+  });
+  const effectiveOwnerId =
+    mode === "reschedule"
+      ? (initialSession?.ownerUserId ?? "")
+      : actor === "trainer"
+        ? (currentUser.data?.user?.id ?? "")
+        : ownerId;
+  const availability = useSessionAvailabilityQuery(
+    {
+      dateFrom: date,
+      dateTo: date,
+      timezone,
+      targetUserId: effectiveOwnerId,
+    },
+    open && Boolean(date) && Boolean(effectiveOwnerId),
+  );
 
   React.useEffect(() => {
     if (!open) return;
-
-    const trainerName = defaultTrainerName ?? trainers.find((trainer) => trainer.id === defaultTrainerId)?.fullName;
-    setEntrepreneurId(initialSession?.entrepreneurId ?? defaultEntrepreneur.id);
-    setTrainerId(initialSession?.trainerId ?? defaultTrainerId ?? trainers[0]?.id ?? '');
-    setSessionType(initialSession?.sessionType ?? 'Mentoring');
-    setTopic(initialSession?.topic ?? '');
-    setDate(initialSession?.date ?? '2026-07-20');
-    setStartTime(initialSession?.startTime ?? '10:00');
-    setEndTime(initialSession?.endTime ?? defaultEndTime(initialSession?.sessionType ?? 'Mentoring', initialSession?.startTime ?? '10:00'));
-    setMeetingProvider(initialSession?.meetingProvider ?? 'google-meet');
-    setReason('');
-    setError('');
-  }, [defaultTrainerId, defaultTrainerName, defaultEntrepreneur.id, initialSession, open]);
+    const startAt = initialSession ? new Date(initialSession.startAt) : null;
+    setEntrepreneurId(initialSession?.entrepreneurUserId ?? "");
+    setOwnerId(initialSession?.ownerUserId ?? "");
+    setSessionType(initialSession?.type ?? "mentor_checkin");
+    setTopic(initialSession?.topic ?? "");
+    setDate(startAt ? dateValue(startAt) : initialDate());
+    setSlotStartAt("");
+    setReason("");
+    setError("");
+  }, [initialSession, open]);
 
   React.useEffect(() => {
-    if (mode === 'create') {
-      setEndTime(defaultEndTime(sessionType, startTime));
-    }
-  }, [mode, sessionType, startTime]);
+    setSlotStartAt("");
+  }, [date, effectiveOwnerId]);
 
-  const selectedTrainer = trainers.find((trainer) => trainer.id === trainerId);
-  const lockedToTrainer = actor === 'trainer' && Boolean(defaultTrainerId);
+  const entrepreneurOptions = [
+    ...(initialSession
+      ? [
+          {
+            value: initialSession.entrepreneurUserId,
+            label: initialSession.entrepreneur.businessName,
+            description: initialSession.entrepreneur.name,
+          },
+        ]
+      : []),
+    ...entrepreneurs.rows
+      .filter(
+        (entry) =>
+          entry.entrepreneurUserId !== initialSession?.entrepreneurUserId,
+      )
+      .map((entry) => ({
+        value: entry.entrepreneurUserId,
+        label: entry.businessName,
+        description: entry.representativeName,
+      })),
+  ];
+  const ownerOptions = [
+    ...(initialSession?.owner
+      ? [
+          {
+            value: initialSession.owner.id,
+            label: initialSession.owner.name,
+            description:
+              initialSession.owner.role === "trainer" ? "Trainer" : "BID admin",
+          },
+        ]
+      : []),
+    ...owners.rows
+      .filter((entry) => entry.id !== initialSession?.ownerUserId)
+      .map((entry) => ({
+        value: entry.id,
+        label: entry.name,
+        description: entry.role === "trainer" ? "Trainer" : "BID admin",
+      })),
+  ];
+  const slotOptions = (availability.data?.slots ?? []).map(
+    (slot: SessionAvailability["slots"][number]) => ({
+      value: slot.startAt,
+      label: new Date(slot.startAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    }),
+  );
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!entrepreneurId) {
-      setError('Select an entrepreneur.');
+    const slot = availability.data?.slots.find(
+      (entry: SessionAvailability["slots"][number]) =>
+        entry.startAt === slotStartAt,
+    );
+    if (!entrepreneurId || !effectiveOwnerId) {
+      setError("Choose an entrepreneur and a calendar-connected owner.");
       return;
     }
     if (!topic.trim()) {
-      setError('Add the session topic or goal.');
+      setError("Add the session topic or goal.");
       return;
     }
-    if (!date || !startTime || !endTime) {
-      setError('Pick the session date and time.');
+    if (!slot) {
+      setError("Choose a currently available calendar slot.");
       return;
     }
-    if (mode === 'reschedule' && reason.trim().length < 5) {
-      setError('Add a short reason for the reschedule.');
+    if (mode === "reschedule" && reason.trim().length < 5) {
+      setError("Add a short reason for the reschedule.");
       return;
     }
-
+    setError("");
     onSubmit({
-      entrepreneurId,
-      trainerId: trainerId || undefined,
-      trainerName: selectedTrainer?.fullName ?? defaultTrainerName ?? 'BID programme team',
-      sessionType,
+      entrepreneurUserId: entrepreneurId,
+      ownerUserId: effectiveOwnerId,
+      type: sessionType,
       topic: topic.trim(),
-      date,
-      startTime,
-      endTime,
-      meetingProvider,
-      meetingUrl: initialSession?.meetingUrl ?? createDefaultMeetingUrl(topic, date),
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      timezone,
       reason: reason.trim() || undefined,
     });
   };
@@ -175,7 +221,7 @@ export function SessionEditorModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={mode === 'create' ? 'Create session' : 'Reschedule session'}
+      title={mode === "create" ? "Create session" : "Reschedule session"}
       width="wide"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -183,13 +229,17 @@ export function SessionEditorModal({
           <FormAutocomplete
             value={entrepreneurId}
             onValueChange={setEntrepreneurId}
-            options={entrepreneurs.map((entrepreneur) => ({
-              value: entrepreneur.id,
-              label: entrepreneur.businessName,
-              description: entrepreneur.representative,
-            }))}
+            options={entrepreneurOptions}
+            disabled={mode === "reschedule"}
             placeholder="Search entrepreneur"
             searchPlaceholder="Search entrepreneurs..."
+            isLoading={
+              entrepreneurs.isLoading || entrepreneurs.isFetchingNextPage
+            }
+            onOpenChange={setEntrepreneurOpen}
+            onSearchChange={setEntrepreneurSearch}
+            hasMore={Boolean(entrepreneurs.hasNextPage)}
+            onLoadMore={() => void entrepreneurs.fetchNextPage()}
           />
         </FormField>
 
@@ -197,23 +247,31 @@ export function SessionEditorModal({
           <FormField label="Session type">
             <FormSelect
               value={sessionType}
-              onValueChange={(value) => setSessionType(value as AdminSession['sessionType'])}
+              onValueChange={(value) => setSessionType(value as SessionType)}
               options={sessionTypes}
+              disabled={mode === "reschedule"}
             />
           </FormField>
-          <FormField label="Trainer / owner">
-            <FormAutocomplete
-              value={trainerId}
-              onValueChange={setTrainerId}
-              options={trainers.map((trainer) => ({
-                value: trainer.id,
-                label: trainer.fullName,
-                description: trainer.role,
-              }))}
-              disabled={lockedToTrainer}
-              placeholder="Search trainer"
-              searchPlaceholder="Search trainers..."
-            />
+          <FormField label="Calendar owner">
+            {actor === "trainer" ? (
+              <div className="flex h-10 items-center rounded-lg border border-line bg-surface-subtle px-3 text-sm text-ink-muted">
+                You will own this session
+              </div>
+            ) : (
+              <FormAutocomplete
+                value={effectiveOwnerId}
+                onValueChange={setOwnerId}
+                options={ownerOptions}
+                disabled={mode === "reschedule"}
+                placeholder="Search connected team members"
+                searchPlaceholder="Search team members..."
+                isLoading={owners.isLoading || owners.isFetchingNextPage}
+                onOpenChange={setOwnerOpen}
+                onSearchChange={setOwnerSearch}
+                hasMore={Boolean(owners.hasNextPage)}
+                onLoadMore={() => void owners.fetchNextPage()}
+              />
+            )}
           </FormField>
         </FormRow2>
 
@@ -222,71 +280,72 @@ export function SessionEditorModal({
             rows={2}
             value={topic}
             onChange={(event) => setTopic(event.target.value)}
+            disabled={mode === "reschedule"}
             placeholder="e.g. Prepare investor Q&A and next steps"
           />
         </FormField>
 
-        <FormRow2 className="sm:grid-cols-[minmax(0,1fr)_132px_132px]">
+        <FormRow2>
           <FormField label="Date">
             <DatePicker value={date} onChange={setDate} />
           </FormField>
-          <FormField label="Start">
+          <FormField label="Available time">
             <FormAutocomplete
-              value={startTime}
-              onValueChange={setStartTime}
-              options={timeSlots.map((time) => ({ value: time, label: time }))}
-              searchPlaceholder="Search time..."
-              className="w-[132px]"
-              popoverClassName="w-[160px]"
-              listClassName="max-h-[176px] overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y"
-            />
-          </FormField>
-          <FormField label="End">
-            <FormAutocomplete
-              value={endTime}
-              onValueChange={setEndTime}
-              options={timeSlots.map((time) => ({ value: time, label: time }))}
-              searchPlaceholder="Search time..."
-              className="w-[132px]"
-              popoverClassName="w-[160px]"
-              listClassName="max-h-[176px] overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y"
+              value={slotStartAt}
+              onValueChange={setSlotStartAt}
+              options={slotOptions}
+              placeholder={
+                availability.isLoading
+                  ? "Checking calendar..."
+                  : "Select available time"
+              }
+              searchPlaceholder="Search available times..."
+              emptyMessage="No available times on this date."
+              disabled={!effectiveOwnerId || availability.isError}
+              isLoading={availability.isLoading}
+              loadingMessage="Checking connected calendar..."
             />
           </FormField>
         </FormRow2>
 
-        <div className="grid gap-2 sm:max-w-[280px]">
-          <FormField label="Meeting provider">
-            <FormSelect
-              value={meetingProvider}
-              onValueChange={(value) => setMeetingProvider(value as NonNullable<AdminSession['meetingProvider']>)}
-              options={meetingProviders}
-              className="pointer-events-none bg-surface-subtle text-ink-muted"
-            />
-          </FormField>
-          <p className="-mt-3 text-sm text-ink-muted">
-            The meeting link is generated automatically after the session is saved.
+        {availability.data ? (
+          <p className="text-sm text-ink-muted">
+            Google Meet is created automatically. Default duration:{" "}
+            {availability.data.durationMinutes} minutes.
           </p>
-        </div>
+        ) : null}
+        {availability.isError ? (
+          <Notice>{availability.error.message}</Notice>
+        ) : null}
 
-        {mode === 'reschedule' && (
+        {mode === "reschedule" ? (
           <FormField label="Reason for rescheduling">
             <FormTextarea
               rows={3}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Explain why the date or time changed. This note is visible in the session history."
+              placeholder="Explain why the date or time changed."
             />
           </FormField>
-        )}
+        ) : null}
 
-        {error && <p className="text-sm text-danger">{error}</p>}
-
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <div className="flex justify-end gap-2 border-t border-line pt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button type="submit">
-            {mode === 'create' ? 'Create session' : 'Save reschedule'}
+          <Button
+            type="submit"
+            isLoading={isSubmitting}
+            loadingLabel={
+              mode === "create" ? "Creating session" : "Updating Calendar"
+            }
+          >
+            {mode === "create" ? "Create session" : "Save reschedule"}
           </Button>
         </div>
       </form>

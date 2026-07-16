@@ -10,6 +10,9 @@ import {
   MapPin,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { Modal } from "@/components/shared/Modal";
+import { FormField, FormTextarea } from "@/components/shared/FormField";
+import { toast } from "sonner";
 import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
@@ -18,6 +21,7 @@ import { useEntrepreneurStore } from "@/lib/stores/entrepreneur-store";
 import { cn } from "@/lib/utils";
 import type { Deliverable } from "@/types";
 import {
+  useCancelSessionMutation,
   useInfiniteSessionsQuery,
   type SessionRecord,
   type SessionStatus,
@@ -200,6 +204,18 @@ export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = React.useState(todayValue);
   const [visibleMonth, setVisibleMonth] = React.useState(todayDate);
   const [nextPage, setNextPage] = React.useState(1);
+  const [cancelTarget, setCancelTarget] = React.useState<CalendarItem | null>(
+    null,
+  );
+  const [cancelReason, setCancelReason] = React.useState("");
+  const cancelSession = useCancelSessionMutation({
+    onSuccess: () => {
+      toast.success("Session cancelled");
+      setCancelTarget(null);
+      setCancelReason("");
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const monthCells = React.useMemo(
     () => buildMonthCells(visibleMonth),
     [visibleMonth],
@@ -453,7 +469,14 @@ export default function SchedulePage() {
             <div className="grid gap-2">
               {selectedItems.length > 0 ? (
                 selectedItems.map((item) => (
-                  <ScheduleEventCard key={item.id} item={item} />
+                  <ScheduleEventCard
+                    key={item.id}
+                    item={item}
+                    onCancel={() => {
+                      setCancelTarget(item);
+                      setCancelReason("");
+                    }}
+                  />
                 ))
               ) : (
                 <div className="rounded-xl border border-dashed border-line bg-surface-subtle px-4 py-8 text-center">
@@ -530,6 +553,61 @@ export default function SchedulePage() {
       </Card>
 
       <BookingModal open={bookOpen} onOpenChange={setBookOpen} />
+      <Modal
+        open={Boolean(cancelTarget)}
+        onOpenChange={(next) => !next && setCancelTarget(null)}
+        title="Cancel session"
+        width="wide"
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (cancelTarget) {
+              cancelSession.mutate({
+                id: cancelTarget.id,
+                reason: cancelReason,
+              });
+            }
+          }}
+        >
+          <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3 text-sm font-medium text-ink">
+            {cancelTarget?.title}
+          </div>
+          <FormField
+            label="Cancellation reason"
+            error={
+              cancelReason.length > 0 && cancelReason.trim().length < 5
+                ? "Add a short reason."
+                : undefined
+            }
+          >
+            <FormTextarea
+              rows={4}
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+            />
+          </FormField>
+          <div className="flex justify-end gap-2 border-t border-line pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelTarget(null)}
+            >
+              Keep session
+            </Button>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={cancelReason.trim().length < 5}
+              isLoading={cancelSession.isPending}
+              loadingLabel="Cancelling"
+            >
+              Cancel session
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }
@@ -538,12 +616,17 @@ function ScheduleEventCard({
   item,
   compact = false,
   onSelect,
+  onCancel,
 }: {
   item: CalendarItem;
   compact?: boolean;
   onSelect?: () => void;
+  onCancel?: () => void;
 }) {
   const meta = categoryMeta[item.category];
+  const canCancel =
+    item.source === "session" &&
+    (item.status === "requested" || item.status === "confirmed");
   const canJoinMeeting =
     item.source === "session" &&
     item.status === "confirmed" &&
@@ -598,6 +681,17 @@ function ScheduleEventCard({
               </span>
             )}
           </div>
+          {canCancel && onCancel && !onSelect ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={onCancel}
+            >
+              Cancel session
+            </Button>
+          ) : null}
           {canJoinMeeting && (
             <a
               href={item.meetingUrl}
