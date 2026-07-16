@@ -148,7 +148,9 @@ export class ToolsService {
 
     const nextCursor = rows.length > take ? (rows[take - 1]?.id ?? null) : null;
     return {
-      items: rows.slice(0, take).map((tool) => this.mapTool(tool)),
+      items: rows
+        .slice(0, take)
+        .map((tool) => this.mapTool(tool, user.role === UserRole.admin)),
       nextCursor,
       totalItems,
       summary: {
@@ -169,7 +171,7 @@ export class ToolsService {
     });
 
     if (!tool) throw new NotFoundException("Tool was not found.");
-    return this.mapTool(tool);
+    return this.mapTool(tool, user.role === UserRole.admin);
   }
 
   async listEntrepreneurTools(entrepreneurUserId: string, query: ToolQueryDto) {
@@ -760,7 +762,7 @@ export class ToolsService {
     } satisfies Prisma.ToolUpdateInput;
   }
 
-  private mapTool(tool: ToolWithInclude) {
+  private mapTool(tool: ToolWithInclude, includeManagement: boolean) {
     return {
       id: tool.id,
       name: tool.name,
@@ -789,44 +791,61 @@ export class ToolsService {
                 : null,
           }
         : null,
-      audience: {
-        programmeIds: tool.programmeAccess.map((access) => access.programmeId),
-        entrepreneurUserIds: tool.entrepreneurAccess.map(
-          (access) => access.entrepreneurUserId,
-        ),
-        hiddenEntrepreneurUserIds: tool.hiddenEntrepreneurs.map(
-          (access) => access.entrepreneurUserId,
-        ),
-        programmes: tool.programmeAccess.map((access) => ({
-          id: access.programmeId,
-          name: access.programme.name,
-        })),
-        entrepreneurs: tool.entrepreneurAccess.map((access) => ({
-          id: access.entrepreneurUserId,
-          name:
-            access.entrepreneur.businessMemberships[0]?.business.name ??
-            [access.entrepreneur.firstName, access.entrepreneur.lastName]
-              .filter(Boolean)
-              .join(" ") ??
-            access.entrepreneur.email,
-        })),
-        hiddenEntrepreneurs: tool.hiddenEntrepreneurs.map((access) => ({
-          id: access.entrepreneurUserId,
-          name:
-            access.entrepreneur.businessMemberships[0]?.business.name ??
-            [access.entrepreneur.firstName, access.entrepreneur.lastName]
-              .filter(Boolean)
-              .join(" ") ??
-            access.entrepreneur.email,
-        })),
-      },
-      createdBy: this.mapUser(tool.createdBy),
-      updatedBy: tool.updatedBy ? this.mapUser(tool.updatedBy) : null,
+      audience: includeManagement
+        ? {
+            programmeIds: tool.programmeAccess.map(
+              (access) => access.programmeId,
+            ),
+            entrepreneurUserIds: tool.entrepreneurAccess.map(
+              (access) => access.entrepreneurUserId,
+            ),
+            hiddenEntrepreneurUserIds: tool.hiddenEntrepreneurs.map(
+              (access) => access.entrepreneurUserId,
+            ),
+            programmes: tool.programmeAccess.map((access) => ({
+              id: access.programmeId,
+              name: access.programme.name,
+            })),
+            entrepreneurs: tool.entrepreneurAccess.map((access) => ({
+              id: access.entrepreneurUserId,
+              name: this.audienceName(access.entrepreneur),
+            })),
+            hiddenEntrepreneurs: tool.hiddenEntrepreneurs.map((access) => ({
+              id: access.entrepreneurUserId,
+              name: this.audienceName(access.entrepreneur),
+            })),
+          }
+        : {
+            programmeIds: [],
+            entrepreneurUserIds: [],
+            hiddenEntrepreneurUserIds: [],
+            programmes: [],
+            entrepreneurs: [],
+            hiddenEntrepreneurs: [],
+          },
+      createdBy: includeManagement ? this.mapUser(tool.createdBy) : null,
+      updatedBy:
+        includeManagement && tool.updatedBy
+          ? this.mapUser(tool.updatedBy)
+          : null,
       publishedAt: tool.publishedAt?.toISOString() ?? null,
       archivedAt: tool.archivedAt?.toISOString() ?? null,
       createdAt: tool.createdAt.toISOString(),
       updatedAt: tool.updatedAt.toISOString(),
     };
+  }
+
+  private audienceName(user: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    businessMemberships: Array<{ business: { name: string } }>;
+  }) {
+    return (
+      (user.businessMemberships[0]?.business.name ??
+        [user.firstName, user.lastName].filter(Boolean).join(" ")) ||
+      user.email
+    );
   }
 
   private mapUser(user: {

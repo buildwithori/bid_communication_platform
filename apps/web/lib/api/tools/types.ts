@@ -30,7 +30,7 @@ export type ToolRecord = {
     entrepreneurs: Array<{ id: string; name: string }>;
     hiddenEntrepreneurs: Array<{ id: string; name: string }>;
   };
-  createdBy: { id: string; name: string; email: string };
+  createdBy: { id: string; name: string; email: string } | null;
   updatedBy: { id: string; name: string; email: string } | null;
   publishedAt: string | null;
   archivedAt: string | null;
