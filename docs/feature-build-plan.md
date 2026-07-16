@@ -275,6 +275,8 @@ Done when:
 - Progress APIs are efficient and idempotent.
 - Trainer learner views are inferred from content ownership and are paginated/searchable.
 
+Implementation status (2026-07-16): Complete. The entrepreneur catalogue, programme path, module route, and in-page content player use authenticated backend read models with personal programme/module/content progress, cursor pagination, server-side search and filters, lazy module content loading, page-specific skeletons, signed PDF and Mux access, checkpointed idempotent progress syncing, explicit completion, and trainer-attributed ratings. Free resources are represented as backend-managed free programmes using the standard module/content model; unsupported mock-only topic, chapter, durationMin, and accent data were removed. Trainer learner impact is inferred from trainer-owned content, scopes free-programme learners by actual engagement, keeps programme lookups lazy, and returns backend-computed progress, completion, and rating aggregates.
+
 ### 10. Deliverables
 
 Scope:

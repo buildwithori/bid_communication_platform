@@ -149,6 +149,13 @@ export function useEntrepreneursPage(query: PageQuery) {
         activeEntrepreneurs: 0,
         unassignedEntrepreneurs: 0,
         withProgrammes: 0,
+        learnerImpact: {
+          averageProgrammeProgress: 0,
+          trackedProgrammeProgress: 0,
+          completedContent: 0,
+          averageRating: 0,
+          ratingCount: 0,
+        },
       } satisfies EntrepreneurPage["summary"]),
     setPage,
     resetPagination,

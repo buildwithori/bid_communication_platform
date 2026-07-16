@@ -1,220 +1,454 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { MetricGrid } from '@/components/shared/MetricGrid';
-import { StatCard } from '@/components/shared/StatCard';
-import { Card, CardHeader } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { ProgrammeAccessList } from '@/components/shared/ProgrammeAccessList';
-import { ToolAccessList, getVisibleToolsForEntrepreneur } from '@/components/shared/ToolAccessList';
-import { Avatar } from '@/components/shared/Avatar';
-import { ProgressBar } from '@/components/shared/ProgressBar';
+import * as React from "react";
+import { Eye, GraduationCap, Star, Target } from "lucide-react";
+import { Avatar } from "@/components/shared/Avatar";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
+  TableEmptyState,
   TableFilterAutocomplete,
   TableFilterInput,
-  TableFilterSelect,
   TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
-import { ViewEntrepreneurModal } from '@/components/admin/ViewEntrepreneurModal';
-import { entrepreneurs } from '@/lib/mock-data/entrepreneurs';
-import { sectorById, stageById } from '@/lib/mock-data/definitions';
-import { getDaysWithoutPeriodicReport } from '@/lib/reporting/overdue-updates';
-import { useCompanyConfigStore } from '@/lib/stores/company-config-store';
+} from "@/components/shared/DataTable";
+import { MetricGrid } from "@/components/shared/MetricGrid";
+import { Modal } from "@/components/shared/Modal";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { ProgressBar } from "@/components/shared/ProgressBar";
+import { StatCard } from "@/components/shared/StatCard";
 import {
-  entrepreneurHasProgramme,
-  getEntrepreneurProgrammes,
-} from '@/lib/programme-access';
-import { getTrainerProgrammes, trainerSupportsEntrepreneur } from '@/lib/content-trainer-access';
-import type { Entrepreneur } from '@/types';
+  useEntrepreneurDetailQuery,
+  useEntrepreneursPage,
+  useProgrammeAccessQuery,
+  type EntrepreneurRecord,
+} from "@/lib/api/entrepreneurs";
+import { useLazyProgrammesLookup } from "@/lib/api/programmes";
 
-const currentTrainerId = 't-kofi';
-const today = new Date('2026-07-07');
-const ALL = 'all';
-
-function getFollowUp(entrepreneur: Entrepreneur, overdueAfterDays: number) {
-  const updateAge = getDaysWithoutPeriodicReport(entrepreneur, today);
-  if (entrepreneur.metrics.trainingProgress < 50) return { label: 'Low progress', tone: 'amber' as const };
-  if (updateAge > overdueAfterDays) return { label: 'Update overdue', tone: 'red' as const };
-  return { label: 'On track', tone: 'green' as const };
-}
+const ALL = "all";
 
 export default function TrainerEntrepreneursPage() {
-  const { companyConfig } = useCompanyConfigStore();
-  const overdueAfterDays = companyConfig.reporting.periodicUpdateOverdueAfterDays;
-  const [query, setQuery] = React.useState('');
-  const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
-  const [followUpFilter, setFollowUpFilter] = React.useState(ALL);
-  const [page, setPage] = React.useState(1);
+  const [search, setSearch] = React.useState("");
+  const deferredSearch = React.useDeferredValue(search);
+  const [programmeId, setProgrammeId] = React.useState(ALL);
+  const [programmeOpen, setProgrammeOpen] = React.useState(false);
+  const [programmeSearch, setProgrammeSearch] = React.useState("");
+  const deferredProgrammeSearch = React.useDeferredValue(programmeSearch);
   const [pageSize, setPageSize] = React.useState(10);
-  const [viewTarget, setViewTarget] = React.useState<Entrepreneur | null>(null);
-
-  const assigned = React.useMemo(
-    () => entrepreneurs.filter((entrepreneur) => trainerSupportsEntrepreneur(currentTrainerId, entrepreneur)),
-    [],
-  );
-  const programmeOptions = React.useMemo(
-    () => getTrainerProgrammes(currentTrainerId),
-    [],
-  );
-  const needsAttention = assigned.filter((entrepreneur) => getFollowUp(entrepreneur, overdueAfterDays).tone !== 'green').length;
-  const avgTraining = Math.round(assigned.reduce((sum, entrepreneur) => sum + entrepreneur.metrics.trainingProgress, 0) / Math.max(assigned.length, 1));
-  const submittedDeliverables = assigned.reduce((sum, entrepreneur) => sum + entrepreneur.metrics.deliverablesDone, 0);
-
-  const filtered = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return assigned.filter((entrepreneur) => {
-      const followUp = getFollowUp(entrepreneur, overdueAfterDays);
-      const matchesQuery = !needle || [
-        entrepreneur.businessName,
-        entrepreneur.representative,
-        entrepreneur.email,
-        sectorById[entrepreneur.sector]?.label ?? entrepreneur.sector,
-        stageById[entrepreneur.stage]?.label ?? entrepreneur.stage,
-        getEntrepreneurProgrammes(entrepreneur).map((programme) => programme.name).join(' '),
-        getVisibleToolsForEntrepreneur(entrepreneur).map((tool) => tool.name).join(' '),
-      ].join(' ').toLowerCase().includes(needle);
-      const matchesProgramme = programmeFilter === ALL || entrepreneurHasProgramme(entrepreneur, programmeFilter);
-      const matchesFollowUp = followUpFilter === ALL || followUp.label === followUpFilter;
-      return matchesQuery && matchesProgramme && matchesFollowUp;
-    });
-  }, [assigned, followUpFilter, overdueAfterDays, programmeFilter, query]);
+  const [viewId, setViewId] = React.useState<string | null>(null);
+  const entrepreneurs = useEntrepreneursPage({
+    search: deferredSearch.trim() || undefined,
+    programmeId: programmeId === ALL ? undefined : programmeId,
+    take: pageSize,
+  });
+  const programmes = useLazyProgrammesLookup({
+    enabled: programmeOpen,
+    search: deferredProgrammeSearch.trim() || undefined,
+    take: 20,
+  });
+  const resetPagination = entrepreneurs.resetPagination;
 
   React.useEffect(() => {
-    setPage(1);
-  }, [query, programmeFilter, followUpFilter, pageSize]);
+    resetPagination();
+  }, [deferredSearch, pageSize, programmeId, resetPagination]);
 
-  const pageRows = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
-
-  const columns: Column<Entrepreneur>[] = [
-    {
-      key: 'action',
-      header: 'Action',
-      cell: (entrepreneur) => <RowActions actions={[{ label: 'View profile', onSelect: () => setViewTarget(entrepreneur) }]} />,
-      className: 'w-[84px]',
-    },
-    {
-      key: 'business',
-      header: 'Business',
-      cell: (entrepreneur) => (
-        <button type="button" onClick={() => setViewTarget(entrepreneur)} className="flex min-w-[250px] items-center gap-3 rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20">
-          <Avatar initials={entrepreneur.initials} size={32} />
-          <span className="min-w-0">
-            <span className="block font-medium text-ink transition-colors group-hover:text-bid">{entrepreneur.businessName}</span>
-            <span className="mt-1 block text-sm text-ink-muted">{entrepreneur.representative}</span>
-          </span>
-        </button>
-      ),
-    },
-    {
-      key: 'programme',
-      header: 'Programme access',
-      cell: (entrepreneur) => (
-        <ProgrammeAccessList
-          programmes={getEntrepreneurProgrammes(entrepreneur)}
-          maxVisible={2}
-          modalTitle={`${entrepreneur.businessName} programme access`}
-          className="min-w-[240px] max-w-[340px]"
-        />
-      ),
-    },
-    {
-      key: 'tools',
-      header: 'Tools',
-      cell: (entrepreneur) => (
-        <ToolAccessList
-          entrepreneur={entrepreneur}
-          className="min-w-[230px] max-w-[320px]"
-          chipClassName="max-w-[155px]"
-        />
-      ),
-    },
-    {
-      key: 'stage',
-      header: 'Stage / sector',
-      cell: (entrepreneur) => (
-        <div className="flex min-w-[180px] flex-wrap gap-1.5">
-          <Badge tone={stageById[entrepreneur.stage]?.color ?? 'neutral'}>{stageById[entrepreneur.stage]?.label ?? entrepreneur.stage}</Badge>
-          <Badge tone={sectorById[entrepreneur.sector]?.color ?? 'neutral'}>{sectorById[entrepreneur.sector]?.label ?? entrepreneur.sector}</Badge>
-        </div>
-      ),
-    },
-    {
-      key: 'progress',
-      header: 'Training',
-      cell: (entrepreneur) => (
-        <div className="min-w-[180px]">
-          <ProgressBar value={entrepreneur.metrics.trainingProgress} width="100%" className="h-2" />
-          <div className="mt-1 text-sm text-ink-muted">{entrepreneur.metrics.trainingProgress}% complete</div>
-        </div>
-      ),
-    },
-    {
-      key: 'deliverables',
-      header: 'Deliverables',
-      cell: (entrepreneur) => `${entrepreneur.metrics.deliverablesDone}/${entrepreneur.metrics.deliverablesTotal}`,
-    },
-    {
-      key: 'followup',
-      header: 'Follow-up',
-      cell: (entrepreneur) => {
-        const followUp = getFollowUp(entrepreneur, overdueAfterDays);
-        return <Badge tone={followUp.tone}>{followUp.label}</Badge>;
+  const columns = React.useMemo<Column<EntrepreneurRecord>[]>(
+    () => [
+      {
+        key: "action",
+        header: "Action",
+        cell: (entrepreneur) => (
+          <RowActions
+            actions={[
+              {
+                label: "View learner impact",
+                onSelect: () => setViewId(entrepreneur.entrepreneurUserId),
+              },
+            ]}
+          />
+        ),
+        className: "w-[84px]",
       },
-    },
-  ];
+      {
+        key: "business",
+        header: "Business",
+        cell: (entrepreneur) => (
+          <button
+            type="button"
+            onClick={() => setViewId(entrepreneur.entrepreneurUserId)}
+            className="flex min-w-[260px] items-center gap-3 rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+          >
+            <Avatar initials={initials(entrepreneur)} size={36} />
+            <span className="min-w-0">
+              <span className="block font-semibold text-ink">{entrepreneur.businessName}</span>
+              <span className="mt-1 block text-sm text-ink-muted">
+                {entrepreneur.representativeName + " · " + entrepreneur.email}
+              </span>
+            </span>
+          </button>
+        ),
+      },
+      {
+        key: "programmes",
+        header: "Supported programmes",
+        cell: (entrepreneur) => (
+          <ProgrammePreview entrepreneur={entrepreneur} />
+        ),
+      },
+      {
+        key: "stage",
+        header: "Stage / sector",
+        cell: (entrepreneur) => (
+          <div className="flex min-w-[190px] flex-wrap gap-1.5">
+            <Badge tone="neutral">{entrepreneur.stage?.name ?? "Stage not set"}</Badge>
+            <Badge tone="blue">{entrepreneur.sector?.name ?? "Sector not set"}</Badge>
+          </div>
+        ),
+      },
+      {
+        key: "progress",
+        header: "Learning impact",
+        cell: (entrepreneur) => (
+          <div className="min-w-[200px]">
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+              <span className="text-ink-muted">
+                {entrepreneur.learnerProgress.trackedProgrammes} tracked
+              </span>
+              <span className="font-medium text-ink">
+                {entrepreneur.learnerProgress.average}%
+              </span>
+            </div>
+            <ProgressBar
+              value={entrepreneur.learnerProgress.average}
+              width="100%"
+              className="h-2"
+            />
+          </div>
+        ),
+      },
+      {
+        key: "followup",
+        header: "Coaching signal",
+        cell: (entrepreneur) => (
+          <CoachingSignal
+            progress={entrepreneur.learnerProgress.average}
+            tracked={entrepreneur.learnerProgress.trackedProgrammes}
+          />
+        ),
+      },
+    ],
+    [],
+  );
+
+  if (entrepreneurs.isLoading && !entrepreneurs.data) {
+    return <TrainerEntrepreneursSkeleton />;
+  }
+
+  if (entrepreneurs.isError) {
+    return (
+      <>
+        <PageHeader
+          title="My Entrepreneurs"
+          description="Learners connected to programmes containing your training content."
+        />
+        <Card>
+          <Notice>
+            Your learner impact view could not be loaded. {entrepreneurs.error.message}
+          </Notice>
+          <Button type="button" variant="outline" className="mt-4" onClick={() => void entrepreneurs.refetch()}>
+            Try again
+          </Button>
+        </Card>
+      </>
+    );
+  }
+
+  const impact = entrepreneurs.summary.learnerImpact;
 
   return (
     <>
-      <PageHeader title="My Entrepreneurs" description="Entrepreneurs you support, with progress and coaching follow-ups." />
+      <PageHeader
+        title="My Entrepreneurs"
+        description="Learners connected to programmes containing your training content."
+      />
 
       <MetricGrid columns={4}>
-        <StatCard label="My entrepreneurs" value={assigned.length} subline="Entrepreneurs you support" dotColor="bid" accent="bid" />
-        <StatCard label="Need attention" value={needsAttention} subline="Low progress or overdue updates" dotColor="warning" accent="warning" />
-        <StatCard label="Avg. progress" value={`${avgTraining}%`} subline="Training completion" dotColor="success" accent="success" />
-        <StatCard label="Deliverables approved" value={submittedDeliverables} subline="Across my entrepreneurs" dotColor="info" accent="info" />
+        <StatCard
+          label="Supported entrepreneurs"
+          value={entrepreneurs.summary.totalEntrepreneurs}
+          subline="In your content-owned programmes"
+          dotColor="bid"
+          accent="bid"
+        />
+        <StatCard
+          label="Average progress"
+          value={impact.averageProgrammeProgress + "%"}
+          subline={impact.trackedProgrammeProgress + " tracked programme records"}
+          dotColor="success"
+          accent="success"
+        />
+        <StatCard
+          label="Content completions"
+          value={impact.completedContent}
+          subline="Completed trainer-attributed assets"
+          dotColor="info"
+          accent="info"
+        />
+        <StatCard
+          label="Content rating"
+          value={impact.ratingCount ? impact.averageRating.toFixed(1) + "/5" : "—"}
+          subline={impact.ratingCount + " learner ratings"}
+          dotColor="warning"
+          accent="warning"
+        />
       </MetricGrid>
 
       <Card className="mt-4">
-        <CardHeader title="My entrepreneurs" description={`${filtered.length} entrepreneur${filtered.length === 1 ? '' : 's'} in this view`} />
+        <CardHeader
+          title="Learner impact"
+          description={
+            entrepreneurs.totalItems + " entrepreneur" +
+            (entrepreneurs.totalItems === 1 ? "" : "s") +
+            " in this view" +
+            (entrepreneurs.isFetching ? " · Updating..." : "")
+          }
+        />
         <TableToolbar>
           <div>
-            <div className="text-sm font-medium text-ink">Filter entrepreneurs</div>
-            <div className="mt-0.5 text-sm text-ink-muted">Search by business, representative, programme, tool, stage, or sector.</div>
+            <div className="text-sm font-medium text-ink">Find supported entrepreneurs</div>
+            <div className="mt-0.5 text-sm text-ink-muted">
+              Search business or representative details and filter by a programme you support.
+            </div>
           </div>
-          <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[280px_220px_180px]">
-            <TableFilterInput icon placeholder="Search entrepreneurs..." value={query} onChange={(event) => setQuery(event.target.value)} />
-            <TableFilterAutocomplete
-              value={programmeFilter}
-              onValueChange={setProgrammeFilter}
-              options={[
-                { value: ALL, label: 'All programmes' },
-                ...programmeOptions.map((programme) => ({ value: programme.id, label: programme.name })),
-              ]}
-              placeholder="All programmes"
-              searchPlaceholder="Search programmes..."
-              emptyMessage="No programme found."
+          <div className="grid w-full gap-2 lg:w-[560px] lg:grid-cols-[minmax(240px,1fr)_250px]">
+            <TableFilterInput
+              icon
+              placeholder="Search entrepreneurs..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
             />
-            <TableFilterSelect value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)}>
-              <option value={ALL}>All follow-ups</option>
-              <option value="On track">On track</option>
-              <option value="Low progress">Low progress</option>
-              <option value="Update overdue">Update overdue</option>
-            </TableFilterSelect>
+            <TableFilterAutocomplete
+              value={programmeId}
+              onValueChange={setProgrammeId}
+              options={[
+                { value: ALL, label: "All supported programmes" },
+                ...programmes.rows.map((programme) => ({
+                  value: programme.id,
+                  label: programme.name,
+                })),
+              ]}
+              placeholder="All supported programmes"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No supported programme found."
+              onOpenChange={setProgrammeOpen}
+              onSearchChange={setProgrammeSearch}
+              isLoading={programmes.isLoading}
+              hasMore={Boolean(programmes.hasNextPage)}
+              onLoadMore={() => void programmes.fetchNextPage()}
+            />
           </div>
         </TableToolbar>
-        <DataTable columns={columns} rows={pageRows} rowKey={(entrepreneur) => entrepreneur.id} emptyMessage="No entrepreneurs match this view." tableClassName="min-w-[1340px]" />
-        <TablePagination page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} onPageSizeChange={(next) => { setPageSize(next); setPage(1); }} />
+
+        {entrepreneurs.rows.length > 0 ? (
+          <DataTable
+            columns={columns}
+            rows={entrepreneurs.rows}
+            rowKey={(entrepreneur) => entrepreneur.entrepreneurUserId}
+            rowProps={(entrepreneur) => ({
+              onDoubleClick: () => setViewId(entrepreneur.entrepreneurUserId),
+            })}
+            emptyMessage="No supported entrepreneurs match this view."
+            tableClassName="min-w-[1120px]"
+          />
+        ) : (
+          <TableEmptyState
+            title="No supported entrepreneurs found"
+            description="Try changing the search or programme filter."
+          />
+        )}
+        <TablePagination
+          page={entrepreneurs.page}
+          pageSize={pageSize}
+          totalItems={entrepreneurs.totalItems}
+          pageSizeOptions={[10, 25, 50]}
+          onPageChange={entrepreneurs.setPage}
+          onPageSizeChange={setPageSize}
+        />
       </Card>
 
-      {viewTarget && <ViewEntrepreneurModal open={!!viewTarget} onOpenChange={(open) => !open && setViewTarget(null)} entrepreneur={viewTarget} />}
+      <TrainerLearnerImpactModal
+        entrepreneurId={viewId}
+        onClose={() => setViewId(null)}
+      />
     </>
   );
+}
+
+function ProgrammePreview({ entrepreneur }: { entrepreneur: EntrepreneurRecord }) {
+  const programmes = entrepreneur.programmeAccess.assignedProgrammes;
+  if (programmes.length === 0) {
+    return (
+      <div className="min-w-[230px] text-sm text-ink-muted">
+        Learning activity inferred from trainer-owned content
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-w-[230px] max-w-[340px] flex-wrap gap-1.5">
+      {programmes.map((programme) => (
+        <Badge key={programme.id} tone="brand">{programme.name}</Badge>
+      ))}
+      {entrepreneur.programmeAccess.assignedProgrammeCount > programmes.length ? (
+        <Badge tone="neutral">
+          +{entrepreneur.programmeAccess.assignedProgrammeCount - programmes.length} more
+        </Badge>
+      ) : null}
+    </div>
+  );
+}
+
+function CoachingSignal({ progress, tracked }: { progress: number; tracked: number }) {
+  if (tracked === 0) return <Badge tone="neutral">Not started</Badge>;
+  if (progress < 50) return <Badge tone="amber">Needs coaching</Badge>;
+  if (progress >= 100) return <Badge tone="green">Completed</Badge>;
+  return <Badge tone="blue">On track</Badge>;
+}
+
+function TrainerLearnerImpactModal({
+  entrepreneurId,
+  onClose,
+}: {
+  entrepreneurId: string | null;
+  onClose: () => void;
+}) {
+  const detail = useEntrepreneurDetailQuery(entrepreneurId);
+  const programmes = useProgrammeAccessQuery(entrepreneurId, { take: 10 }, Boolean(entrepreneurId));
+
+  return (
+    <Modal
+      open={Boolean(entrepreneurId)}
+      onOpenChange={(open) => !open && onClose()}
+      title="Learner impact"
+      width="xl"
+    >
+      {detail.isLoading && !detail.data ? (
+        <div className="space-y-4">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : detail.isError || !detail.data ? (
+        <div className="rounded-xl border border-danger/20 bg-danger-light p-4 text-sm text-danger-dark">
+          Learner details could not be loaded.
+          <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void detail.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface-subtle p-4 sm:flex-row sm:items-center">
+            <Avatar initials={initials(detail.data)} size={48} />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xl font-semibold text-ink">{detail.data.businessName}</h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                {detail.data.representativeName + " · " + detail.data.email}
+              </p>
+            </div>
+            <div className="w-full sm:w-[220px]">
+              <div className="mb-1 flex justify-between text-sm">
+                <span className="text-ink-muted">Average progress</span>
+                <span className="font-medium text-ink">{detail.data.learnerProgress.average}%</span>
+              </div>
+              <ProgressBar value={detail.data.learnerProgress.average} width="100%" className="h-2" />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ImpactCard icon={GraduationCap} label="Tracked programmes" value={detail.data.learnerProgress.trackedProgrammes} />
+            <ImpactCard icon={Target} label="Stage" value={detail.data.stage?.name ?? "Not set"} />
+            <ImpactCard icon={Star} label="Sector" value={detail.data.sector?.name ?? "Not set"} />
+          </div>
+
+          <div className="rounded-xl border border-line bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-ink">Programme progress</div>
+                <div className="mt-1 text-sm text-ink-muted">Programmes visible through your content ownership.</div>
+              </div>
+              <Eye className="h-5 w-5 text-bid" />
+            </div>
+            <div className="mt-4 space-y-2">
+              {programmes.rows.map((programme) => (
+                <div key={programme.id} className="rounded-xl border border-line bg-surface-subtle p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-ink">{programme.name}</span>
+                    <Badge tone={programme.progress?.status === "completed" ? "green" : programme.progress?.status === "in_progress" ? "amber" : "neutral"}>
+                      {programme.progress?.percent ?? 0}%
+                    </Badge>
+                  </div>
+                  <ProgressBar value={programme.progress?.percent ?? 0} width="100%" className="mt-2 h-2" />
+                </div>
+              ))}
+              {programmes.isLoading ? <Skeleton className="h-20 w-full" /> : null}
+              {!programmes.isLoading && programmes.rows.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-line-strong p-6 text-center text-sm text-ink-muted">
+                  No assigned programme records are available in this trainer scope.
+                </div>
+              ) : null}
+              {programmes.hasNextPage ? (
+                <Button type="button" variant="outline" className="w-full" isLoading={programmes.isFetchingNextPage} loadingLabel="Loading more..." onClick={() => void programmes.fetchNextPage()}>
+                  Load more programmes
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function ImpactCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-line bg-white p-4">
+      <div className="flex items-center gap-2 text-sm text-ink-muted">
+        <Icon className="h-4 w-4 text-bid" />
+        {label}
+      </div>
+      <div className="mt-2 text-xl font-semibold text-ink">{value}</div>
+    </div>
+  );
+}
+
+function TrainerEntrepreneursSkeleton() {
+  return (
+    <>
+      <PageHeader title="My Entrepreneurs" description="Learners connected to your training content." />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-28 w-full" />)}
+      </div>
+      <div className="mt-4">
+        <TableSkeleton columns={6} rows={8} />
+      </div>
+    </>
+  );
+}
+
+function initials(entrepreneur: EntrepreneurRecord) {
+  return (
+    (entrepreneur.firstName[0] ?? "") +
+    (entrepreneur.lastName[0] ?? entrepreneur.businessName[0] ?? "")
+  ).toUpperCase();
 }

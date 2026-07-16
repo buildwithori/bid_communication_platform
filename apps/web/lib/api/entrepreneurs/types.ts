@@ -49,6 +49,13 @@ export type EntrepreneurSummary = {
   activeEntrepreneurs: number;
   unassignedEntrepreneurs: number;
   withProgrammes: number;
+  learnerImpact: {
+    averageProgrammeProgress: number;
+    trackedProgrammeProgress: number;
+    completedContent: number;
+    averageRating: number;
+    ratingCount: number;
+  };
 };
 
 export type EntrepreneurPage = {

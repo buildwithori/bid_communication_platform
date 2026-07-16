@@ -64,7 +64,7 @@ export class EntrepreneursService {
           orderBy: [{ joinedAt: 'desc' }, { id: 'desc' }],
           take: take + 1,
           ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-          include: this.membershipInclude(),
+          include: this.membershipInclude(user),
         }),
         this.prisma.businessMembership.count({ where }),
         this.prisma.businessMembership.count({ where: baseWhere }),
@@ -88,7 +88,10 @@ export class EntrepreneursService {
       ]);
 
     const visibleRows = rows.slice(0, take);
-    const progress = await this.progressAggregates(visibleRows.map((row) => row.user.id));
+    const [progress, learnerImpact] = await Promise.all([
+      this.progressAggregates(visibleRows.map((row) => row.user.id), user),
+      this.learnerImpactSummary(user, baseWhere),
+    ]);
     return {
       items: visibleRows.map((row) =>
         this.mapEntrepreneur(row, progress.get(row.user.id)),
@@ -103,6 +106,7 @@ export class EntrepreneursService {
         activeEntrepreneurs,
         unassignedEntrepreneurs: totalEntrepreneurs - withProgrammes,
         withProgrammes,
+        learnerImpact,
       },
     };
   }
@@ -113,14 +117,14 @@ export class EntrepreneursService {
         ...this.buildMembershipWhere(user, {}),
         userId: entrepreneurUserId,
       },
-      include: this.membershipInclude(),
+      include: this.membershipInclude(user),
     });
 
     if (!membership) {
       throw new NotFoundException('Entrepreneur was not found.');
     }
 
-    const progress = await this.progressAggregates([membership.user.id]);
+    const progress = await this.progressAggregates([membership.user.id], user);
     return this.mapEntrepreneur(membership, progress.get(membership.user.id));
   }
 
@@ -134,13 +138,37 @@ export class EntrepreneursService {
     const where: Prisma.ProgrammeAccessGrantWhereInput = {
       entrepreneurUserId,
       revokedAt: null,
-      ...(query.search?.trim()
-        ? {
-            programme: {
-              name: { contains: query.search.trim(), mode: 'insensitive' },
-            },
-          }
-        : {}),
+      AND: [
+        ...(user.role === UserRole.trainer
+          ? [
+              {
+                programme: {
+                  modules: {
+                    some: {
+                      module: {
+                        contentItems: {
+                          some: { contentItem: { trainerId: user.id } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ]
+          : []),
+        ...(query.search?.trim()
+          ? [
+              {
+                programme: {
+                  name: {
+                    contains: query.search.trim(),
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
+            ]
+          : []),
+      ],
     };
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.programmeAccessGrant.findMany({
@@ -511,12 +539,19 @@ export class EntrepreneursService {
         },
       });
     }
+    if (
+      query.programmeId &&
+      programmeAccessType === 'free' &&
+      user.role === UserRole.trainer
+    ) {
+      filters.push({
+        user: {
+          programmeProgress: { some: { programmeId: query.programmeId } },
+        },
+      });
+    }
 
-    const scopeWhere = query.programmeId
-      ? user.role === UserRole.entrepreneur
-        ? { userId: user.id }
-        : null
-      : this.scopeWhere(user);
+    const scopeWhere = this.scopeWhere(user);
     if (scopeWhere) filters.push(scopeWhere);
 
     return { AND: filters };
@@ -566,28 +601,31 @@ export class EntrepreneursService {
     if (user.role === UserRole.admin) return null;
     if (user.role === UserRole.entrepreneur) return { userId: user.id };
 
-    return {
-      user: {
-        entrepreneurProgrammeGrants: {
-          some: {
-            revokedAt: null,
-            programme: {
-              modules: {
-                some: {
-                  module: {
-                    contentItems: {
-                      some: {
-                        contentItem: {
-                          trainerId: user.id,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
+    const trainerProgramme = {
+      modules: {
+        some: {
+          module: {
+            contentItems: {
+              some: { contentItem: { trainerId: user.id } },
             },
           },
         },
+      },
+    };
+    return {
+      user: {
+        OR: [
+          {
+            entrepreneurProgrammeGrants: {
+              some: { revokedAt: null, programme: trainerProgramme },
+            },
+          },
+          {
+            programmeProgress: {
+              some: { programme: trainerProgramme },
+            },
+          },
+        ],
       },
     };
   }
@@ -715,7 +753,23 @@ export class EntrepreneursService {
     } satisfies Prisma.PeriodicUpdateInclude;
   }
 
-  private membershipInclude() {
+  private membershipInclude(user: User) {
+    const trainerProgrammeWhere =
+      user.role === UserRole.trainer
+        ? {
+            programme: {
+              modules: {
+                some: {
+                  module: {
+                    contentItems: {
+                      some: { contentItem: { trainerId: user.id } },
+                    },
+                  },
+                },
+              },
+            },
+          }
+        : {};
     return {
       user: {
         select: {
@@ -727,7 +781,7 @@ export class EntrepreneursService {
           status: true,
           createdAt: true,
           entrepreneurProgrammeGrants: {
-            where: { revokedAt: null },
+            where: { revokedAt: null, ...trainerProgrammeWhere },
             orderBy: { grantedAt: 'desc' as const },
             take: 3,
             select: {
@@ -746,7 +800,9 @@ export class EntrepreneursService {
           },
           _count: {
             select: {
-              entrepreneurProgrammeGrants: { where: { revokedAt: null } },
+              entrepreneurProgrammeGrants: {
+                where: { revokedAt: null, ...trainerProgrammeWhere },
+              },
             },
           },
         },
@@ -862,13 +918,33 @@ export class EntrepreneursService {
     };
   }
 
-  private async progressAggregates(entrepreneurUserIds: string[]) {
+  private async progressAggregates(
+    entrepreneurUserIds: string[],
+    user: User,
+  ) {
     if (!entrepreneurUserIds.length) {
       return new Map<string, { average: number; trackedProgrammes: number }>();
     }
     const rows = await this.prisma.learnerProgrammeProgress.groupBy({
       by: ['entrepreneurUserId'],
-      where: { entrepreneurUserId: { in: entrepreneurUserIds } },
+      where: {
+        entrepreneurUserId: { in: entrepreneurUserIds },
+        ...(user.role === UserRole.trainer
+          ? {
+              programme: {
+                modules: {
+                  some: {
+                    module: {
+                      contentItems: {
+                        some: { contentItem: { trainerId: user.id } },
+                      },
+                    },
+                  },
+                },
+              },
+            }
+          : {}),
+      },
       _avg: { progressPercent: true },
       _count: { _all: true },
     });
@@ -882,6 +958,67 @@ export class EntrepreneursService {
         },
       ]),
     );
+  }
+
+  private async learnerImpactSummary(
+    user: User,
+    membershipWhere: Prisma.BusinessMembershipWhereInput,
+  ) {
+    const entrepreneurScope = {
+      businessMemberships: { some: membershipWhere },
+    };
+    const trainerProgrammeScope =
+      user.role === UserRole.trainer
+        ? {
+            programme: {
+              modules: {
+                some: {
+                  module: {
+                    contentItems: {
+                      some: { contentItem: { trainerId: user.id } },
+                    },
+                  },
+                },
+              },
+            },
+          }
+        : {};
+    const [programmeProgress, completedContent, ratings] = await Promise.all([
+      this.prisma.learnerProgrammeProgress.aggregate({
+        where: {
+          entrepreneur: entrepreneurScope,
+          ...trainerProgrammeScope,
+        },
+        _avg: { progressPercent: true },
+        _count: { _all: true },
+      }),
+      this.prisma.learnerContentProgress.count({
+        where: {
+          entrepreneur: entrepreneurScope,
+          status: "completed",
+          ...(user.role === UserRole.trainer
+            ? { contentItem: { trainerId: user.id } }
+            : {}),
+        },
+      }),
+      this.prisma.contentRating.aggregate({
+        where: {
+          entrepreneur: entrepreneurScope,
+          ...(user.role === UserRole.trainer ? { trainerId: user.id } : {}),
+        },
+        _avg: { rating: true },
+        _count: { _all: true },
+      }),
+    ]);
+    return {
+      averageProgrammeProgress: Math.round(
+        programmeProgress._avg.progressPercent ?? 0,
+      ),
+      trackedProgrammeProgress: programmeProgress._count._all,
+      completedContent,
+      averageRating: Number((ratings._avg.rating ?? 0).toFixed(1)),
+      ratingCount: ratings._count._all,
+    };
   }
 
   private mapEntrepreneur(
