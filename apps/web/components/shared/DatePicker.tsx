@@ -85,12 +85,6 @@ export function DatePicker({
     selectedDate ?? new Date(),
   );
 
-  React.useEffect(() => {
-    if (selectedDate) {
-      setVisibleMonth(selectedDate);
-    }
-  }, [value]);
-
   const visibleDays = React.useMemo(
     () => getCalendarDays(visibleMonth),
     [visibleMonth],
@@ -106,7 +100,13 @@ export function DatePicker({
   const displayValue = formatDisplayDate(value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen: boolean) => {
+        if (nextOpen) setVisibleMonth(parseDate(value) ?? new Date());
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -198,12 +198,6 @@ export function DateRangePicker({
   const [visibleMonth, setVisibleMonth] = React.useState<Date>(
     startDate ?? new Date(),
   );
-
-  React.useEffect(() => {
-    if (startDate) {
-      setVisibleMonth(startDate);
-    }
-  }, [startValue]);
 
   const moveMonth = (offset: number) => {
     setVisibleMonth((current) => (
@@ -308,7 +302,13 @@ export function DateRangePicker({
   const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen: boolean) => {
+        if (nextOpen) setVisibleMonth(parseDate(startValue) ?? new Date());
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"

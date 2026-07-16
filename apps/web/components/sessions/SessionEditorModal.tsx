@@ -62,7 +62,18 @@ function initialDate() {
   return dateValue(date);
 }
 
-export function SessionEditorModal({
+export function SessionEditorModal(props: Props) {
+  const formKey = [
+    props.open ? "open" : "closed",
+    props.mode,
+    props.actor,
+    props.initialSession?.id ?? "new",
+    props.initialSession?.startAt ?? "",
+  ].join(":");
+  return <SessionEditorModalForm key={formKey} {...props} />;
+}
+
+function SessionEditorModalForm({
   open,
   onOpenChange,
   mode,
@@ -73,12 +84,22 @@ export function SessionEditorModal({
 }: Props) {
   const currentUser = useCurrentUserQuery();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const [entrepreneurId, setEntrepreneurId] = React.useState("");
-  const [ownerId, setOwnerId] = React.useState("");
-  const [sessionType, setSessionType] =
-    React.useState<SessionType>("mentor_checkin");
-  const [topic, setTopic] = React.useState("");
-  const [date, setDate] = React.useState(initialDate());
+  const initialStartAt = initialSession
+    ? new Date(initialSession.startAt)
+    : null;
+  const [entrepreneurId, setEntrepreneurId] = React.useState(
+    initialSession?.entrepreneurUserId ?? "",
+  );
+  const [ownerId, setOwnerId] = React.useState(
+    initialSession?.ownerUserId ?? "",
+  );
+  const [sessionType, setSessionType] = React.useState<SessionType>(
+    initialSession?.type ?? "mentor_checkin",
+  );
+  const [topic, setTopic] = React.useState(initialSession?.topic ?? "");
+  const [date, setDate] = React.useState(
+    initialStartAt ? dateValue(initialStartAt) : initialDate(),
+  );
   const [slotStartAt, setSlotStartAt] = React.useState("");
   const [reason, setReason] = React.useState("");
   const [error, setError] = React.useState("");
@@ -114,23 +135,6 @@ export function SessionEditorModal({
     },
     open && Boolean(date) && Boolean(effectiveOwnerId),
   );
-
-  React.useEffect(() => {
-    if (!open) return;
-    const startAt = initialSession ? new Date(initialSession.startAt) : null;
-    setEntrepreneurId(initialSession?.entrepreneurUserId ?? "");
-    setOwnerId(initialSession?.ownerUserId ?? "");
-    setSessionType(initialSession?.type ?? "mentor_checkin");
-    setTopic(initialSession?.topic ?? "");
-    setDate(startAt ? dateValue(startAt) : initialDate());
-    setSlotStartAt("");
-    setReason("");
-    setError("");
-  }, [initialSession, open]);
-
-  React.useEffect(() => {
-    setSlotStartAt("");
-  }, [date, effectiveOwnerId]);
 
   const entrepreneurOptions = [
     ...(initialSession
@@ -260,7 +264,10 @@ export function SessionEditorModal({
             ) : (
               <FormAutocomplete
                 value={effectiveOwnerId}
-                onValueChange={setOwnerId}
+                onValueChange={(nextOwnerId) => {
+                  setOwnerId(nextOwnerId);
+                  setSlotStartAt("");
+                }}
                 options={ownerOptions}
                 disabled={mode === "reschedule"}
                 placeholder="Search connected team members"
@@ -287,7 +294,13 @@ export function SessionEditorModal({
 
         <FormRow2>
           <FormField label="Date">
-            <DatePicker value={date} onChange={setDate} />
+            <DatePicker
+              value={date}
+              onChange={(nextDate) => {
+                setDate(nextDate);
+                setSlotStartAt("");
+              }}
+            />
           </FormField>
           <FormField label="Available time">
             <FormAutocomplete
