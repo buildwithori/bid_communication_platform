@@ -409,3 +409,12 @@ Before merging backend work, ask:
 - `ReportExport` is the durable requester-scoped export aggregate with queued/processing/ready/failed states, attempt/failure metadata, private `FileAsset`, completion time, and expiry. Status and download endpoints always include `requestedById` scope.
 - `bid-report-exports` runs only in the dedicated worker with bounded concurrency and retry. It builds CSV/XLSX from backend aggregates, iterates the complete cursor-paged overdue queue in fixed batches, writes to private S3-compatible storage, and marks the record ready only after the file asset exists.
 - Export downloads use short-lived signed reads after requester ownership and ready-state checks. Redis job state is operational coordination; the database export record is the durable business source of truth.
+
+## Operational Health And Trace Contracts (2026-07-16)
+
+- Request IDs and correlation IDs accept only 1–128 safe trace characters. Reject header arrays, control characters, whitespace inside IDs, and oversized values; invalid request IDs become UUIDs and invalid correlations inherit the request ID.
+- Responses echo `x-request-id` and `x-correlation-id`. Audit metadata and structured 5xx logs carry both, so operations can correlate a client error with the durable audit trail.
+- The global exception logger records only request context, HTTP status, and exception class. It intentionally excludes exception messages and stacks from HTTP-boundary logs to avoid leaking tokens, provider URLs, SQL values, or credentials.
+- `OperationalHealthService` treats PostgreSQL, BullMQ/Redis worker and queue state, object storage, and email transport as required dependencies. Calendar and Mux configuration are reported separately because Calendar can be intentionally unconfigured in local environments.
+- Storage readiness signs a non-mutating HEAD request and accepts a missing sentinel object as proof of authenticated connectivity. SMTP readiness verifies the connection without sending mail; Resend readiness validates required configuration.
+- Feature 16 is not complete until distributed rate limiting and the final security-action audit review are implemented and verified.

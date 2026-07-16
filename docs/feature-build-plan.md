@@ -510,6 +510,8 @@ Done when:
 - Operational failures are visible during local development and production deployment.
 - Completed endpoints have tests around auth, validation, and scope.
 
+Implementation status (2026-07-16): In progress. The immutable audit outbox already has atomic lifecycle capture, recursive sensitive-field redaction, stale-lock recovery, idempotent log creation, bounded attempts, database retry timing, a dedicated BullMQ processor, and an append-only database trigger. Request and correlation IDs are now bounded to safe characters/length, echoed in response headers, attached to audit metadata, and included in structured 5xx logs without logging exception messages. Public readiness now actively checks PostgreSQL, Redis/worker heartbeat and every queue, private object storage, and email transport, while reporting Calendar/Mux configuration readiness without exposing credentials. Report-export requests now create their audit event in the same transaction. The production API build, live Docker health response, and 41 focused backend tests pass. Remaining before completion: distributed rate limiting for auth/upload/public/expensive routes and the final security-action audit review.
+
 ## Integration Checklist For Every Feature
 
 Before starting:

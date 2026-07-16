@@ -296,3 +296,11 @@ Session workflow rules:
 - Report exports are durable requester-owned records. A dedicated bounded BullMQ processor builds CSV or XLSX, pages through all overdue rows, stores the result privately, and exposes it only through an expiring signed download URL.
 - Reporting reminder actions recheck current overdue eligibility before creating a recipient-scoped notification. The reporting flow supports email or in-app delivery and links to `/entrepreneur/profile`; it does not expose the unsupported generic message-priority field.
 - The reporting view has a page-specific skeleton, explicit source/range/currency notes, error and empty states, lazy programme autocompletes, inline export/reminder spinners, polling, and duplicate-submit protection.
+
+## Operational Hardening Foundation (2026-07-16)
+
+- Inbound request/correlation IDs must match the bounded trace-ID character set; invalid or injection-shaped request IDs are replaced with UUIDs and invalid correlation IDs fall back to the request ID. Both IDs are returned as headers and flow into audit context.
+- Global 5xx logs are structured around method, path, status, request ID, correlation ID, and exception class. Do not log exception messages or stack traces at the HTTP boundary because provider/database errors can contain sensitive values.
+- Public API readiness actively checks PostgreSQL, BullMQ/Redis plus the worker heartbeat and every named queue, private object storage, and email delivery. Calendar and video report configuration readiness without revealing which credential is missing.
+- Report-export creation is an audited lifecycle mutation; the export record and audit outbox event share one transaction before the BullMQ job is enqueued.
+- Feature 16 remains in progress until distributed rate limiting and the final security-action audit review are complete.
