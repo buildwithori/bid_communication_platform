@@ -245,6 +245,8 @@ Done when:
 - Module and content lists paginate or cap visually with full pagination/infinite scrolling available.
 - Drag and drop reorder exists where order matters, with a fallback move-to-position action for paginated lists.
 
+Implementation status (2026-07-16): Complete. Admin programme directory, lifecycle, detail workspace, module create/edit/reuse/reorder, content library, module content management, direct asset-backed content creation, and reusable content attachment use authenticated APIs with backend search, cursor pagination, aggregate metrics, tailored skeletons, and guarded mutations. Trainer programme directory and detail are read-only and scoped through trainer-attributed learning assets; curriculum, readiness, programme-filtered entrepreneurs, deliverable context, and module content are backend-backed. Trainer PDF and Mux previews request short-lived signed access only when opened, and trainers may preview the full curriculum of an authorized programme without gaining access to unrelated programmes.
+
 ### 9. Learner Progress And Training Library
 
 Scope:

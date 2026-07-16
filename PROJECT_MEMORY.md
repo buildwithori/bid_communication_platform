@@ -236,3 +236,10 @@ Session workflow rules:
 - File consumers pass an explicit usage and internal `fileAssetId`; storage keys and private provider URLs stay server-only. Reads use short-lived signed URLs after role/domain access checks.
 - Video consumers pass an internal `videoAssetId`, never a user-entered Mux upload, asset, or playback ID. Mux callbacks use the explicit public `POST /webhooks/mux` exception, raw-body HMAC verification, and durable event IDs for idempotency.
 - Ready videos use short-lived RS256 Mux playback tokens after programme/content authorization. Frontend file/video feature hooks own direct-upload progress, cancellation, status polling, failures, and TanStack calls.
+
+## Programmes And Content Library Completion (2026-07-16)
+
+- Feature 8 is complete. Admin programme lifecycle, curriculum/module management, content library, module content sequencing, and trainer attribution use authenticated NestJS APIs and feature-owned frontend hooks.
+- Trainer programme visibility is inferred from trainer-attributed learning assets. Trainer programme lists, summaries, detail, curriculum, readiness, programme entrepreneurs, and content metadata must remain server-scoped; React must not reconstruct trainer scope from broad datasets.
+- Within a programme a trainer is authorized to support, the trainer may preview the full curriculum, including content attributed to other trainers. Signed PDF and Mux access checks must verify shared programme scope and must not expose unrelated programme content.
+- Programme and module lists use cursor pagination and backend search. Module content is fetched only when its modal opens, and signed file/video access is requested only when a preview opens.
