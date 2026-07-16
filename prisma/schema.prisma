@@ -1359,26 +1359,27 @@ model AuditLog {
 }
 
 model AuditOutbox {
-  id          String            @id @default(cuid())
-  eventKey    String            @unique @map("event_key")
-  actorUserId String?           @map("actor_user_id")
-  action      String
-  entityType  String            @map("entity_type")
-  entityId    String?           @map("entity_id")
-  summary     String?
-  payload     Json?
-  status      AuditOutboxStatus @default(pending)
-  attempts    Int               @default(0)
-  lockedAt    DateTime?         @map("locked_at")
-  processedAt DateTime?         @map("processed_at")
-  error       String?
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id            String            @id @default(cuid())
+  eventKey      String            @unique @map("event_key")
+  actorUserId   String?           @map("actor_user_id")
+  action        String
+  entityType    String            @map("entity_type")
+  entityId      String?           @map("entity_id")
+  summary       String?
+  payload       Json?
+  status        AuditOutboxStatus @default(pending)
+  attempts      Int               @default(0)
+  lockedAt      DateTime?         @map("locked_at")
+  processedAt   DateTime?         @map("processed_at")
+  nextAttemptAt DateTime?         @map("next_attempt_at")
+  error         String?
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
   actor    User?     @relation("AuditOutboxActor", fields: [actorUserId], references: [id])
   auditLog AuditLog?
 
-  @@index([status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
   @@index([actorUserId, createdAt])
   @@index([entityType, entityId])
   @@map("audit_outbox")

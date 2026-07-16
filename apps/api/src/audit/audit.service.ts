@@ -83,38 +83,55 @@ export class AuditService {
   }
 
   async processPending(limit = 50) {
+    const now = new Date();
+    await this.prisma.auditOutbox.updateMany({
+      where: {
+        status: AuditOutboxStatus.processing,
+        lockedAt: { lt: new Date(now.getTime() - 5 * 60_000) },
+      },
+      data: {
+        status: AuditOutboxStatus.failed,
+        lockedAt: null,
+        nextAttemptAt: now,
+        error: "Audit worker stopped before completion.",
+      },
+    });
+
     const events = await this.prisma.auditOutbox.findMany({
       where: {
-        status: {
-          in: [AuditOutboxStatus.pending, AuditOutboxStatus.failed],
-        },
+        status: { in: [AuditOutboxStatus.pending, AuditOutboxStatus.failed] },
         attempts: { lt: 10 },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: limit,
     });
 
     let processed = 0;
+    let failed = 0;
     for (const event of events) {
+      const attemptNumber = event.attempts + 1;
+      const locked = await this.prisma.auditOutbox.updateMany({
+        where: {
+          id: event.id,
+          status: {
+            in: [AuditOutboxStatus.pending, AuditOutboxStatus.failed],
+          },
+          attempts: { lt: 10 },
+          OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+        },
+        data: {
+          status: AuditOutboxStatus.processing,
+          lockedAt: new Date(),
+          attempts: { increment: 1 },
+          nextAttemptAt: null,
+          error: null,
+        },
+      });
+      if (locked.count === 0) continue;
+
       await this.prisma
         .$transaction(async (tx) => {
-          const locked = await tx.auditOutbox.updateMany({
-            where: {
-              id: event.id,
-              status: {
-                in: [AuditOutboxStatus.pending, AuditOutboxStatus.failed],
-              },
-              attempts: { lt: 10 },
-            },
-            data: {
-              status: AuditOutboxStatus.processing,
-              lockedAt: new Date(),
-              attempts: { increment: 1 },
-              error: null,
-            },
-          });
-          if (locked.count === 0) return;
-
           const existingLog = await tx.auditLog.findUnique({
             where: { outboxId: event.id },
             select: { id: true },
@@ -145,26 +162,41 @@ export class AuditService {
               status: AuditOutboxStatus.processed,
               processedAt: new Date(),
               lockedAt: null,
+              nextAttemptAt: null,
             },
           });
           processed += 1;
         })
         .catch(async (error: unknown) => {
-          await this.prisma.auditOutbox.update({
-            where: { id: event.id },
+          failed += 1;
+          const exhausted = attemptNumber >= 10;
+          const delayMinutes = Math.min(2 ** attemptNumber, 60);
+          await this.prisma.auditOutbox.updateMany({
+            where: { id: event.id, status: AuditOutboxStatus.processing },
             data: {
               status: AuditOutboxStatus.failed,
               lockedAt: null,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Unknown audit processing error",
+              nextAttemptAt: exhausted
+                ? null
+                : new Date(Date.now() + delayMinutes * 60_000),
+              error: this.processingError(error),
             },
           });
         });
     }
 
-    return { processed, total: events.length };
+    return {
+      processed,
+      failed,
+      total: events.length,
+      hasMore: events.length === limit,
+    };
+  }
+
+  private processingError(error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown audit processing error";
+    return message.slice(0, 500);
   }
 
   private buildPayload(input: AuditEventInput): Prisma.InputJsonObject {

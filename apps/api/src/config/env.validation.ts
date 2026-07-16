@@ -8,7 +8,7 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
   APP_WEB_URL: z.string().url().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1).optional(),
-  REDIS_URL: z.string().min(1).optional(),
+  REDIS_URL: z.string().url(),
   AUDIT_PROCESS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(5_000),
   NOTIFICATION_DELIVERY_INTERVAL_MS: z.coerce
     .number()

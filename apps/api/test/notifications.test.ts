@@ -193,7 +193,6 @@ test("email worker claims a pending delivery and persists successful delivery", 
   const worker = new NotificationDeliveryService(
     prisma as never,
     email as never,
-    config as never,
   );
 
   const result = await worker.processPending();

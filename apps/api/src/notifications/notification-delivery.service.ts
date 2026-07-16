@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  OnModuleDestroy,
-} from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { Injectable } from "@nestjs/common";
 import {
   NotificationChannel,
   NotificationDeliveryStatus,
@@ -36,82 +30,52 @@ type ClaimedDelivery = Prisma.NotificationDeliveryGetPayload<{
 }>;
 
 @Injectable()
-export class NotificationDeliveryService
-  implements OnApplicationBootstrap, OnModuleDestroy
-{
-  private readonly logger = new Logger(NotificationDeliveryService.name);
-  private timer?: NodeJS.Timeout;
-  private processing = false;
-
+export class NotificationDeliveryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
-    private readonly config: ConfigService,
   ) {}
 
-  onApplicationBootstrap() {
-    const intervalMs = this.config.getOrThrow<number>(
-      "NOTIFICATION_DELIVERY_INTERVAL_MS",
-    );
-    this.timer = setInterval(() => void this.processPending(), intervalMs);
-    this.timer.unref();
-    void this.processPending();
-  }
-
-  onModuleDestroy() {
-    if (this.timer) clearInterval(this.timer);
-  }
-
   async processPending() {
-    if (this.processing) return { processed: 0 };
-    this.processing = true;
-
-    try {
-      const now = new Date();
-      await this.prisma.notificationDelivery.updateMany({
-        where: {
-          status: NotificationDeliveryStatus.processing,
-          updatedAt: { lt: new Date(now.getTime() - 5 * 60_000) },
+    const now = new Date();
+    await this.prisma.notificationDelivery.updateMany({
+      where: {
+        status: NotificationDeliveryStatus.processing,
+        updatedAt: { lt: new Date(now.getTime() - 5 * 60_000) },
+      },
+      data: {
+        status: NotificationDeliveryStatus.failed,
+        failedAt: now,
+        failureReason: "Delivery worker stopped before completion.",
+        nextAttemptAt: now,
+      },
+    });
+    const candidates = await this.prisma.notificationDelivery.findMany({
+      where: {
+        channel: NotificationChannel.email,
+        status: {
+          in: [
+            NotificationDeliveryStatus.pending,
+            NotificationDeliveryStatus.failed,
+          ],
         },
-        data: {
-          status: NotificationDeliveryStatus.failed,
-          failedAt: now,
-          failureReason: "Delivery worker stopped before completion.",
-          nextAttemptAt: now,
-        },
-      });
-      const candidates = await this.prisma.notificationDelivery.findMany({
-        where: {
-          channel: NotificationChannel.email,
-          status: {
-            in: [
-              NotificationDeliveryStatus.pending,
-              NotificationDeliveryStatus.failed,
-            ],
-          },
-          attemptCount: { lt: MAX_ATTEMPTS },
-          OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
-        },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        take: BATCH_SIZE,
-        select: { id: true, status: true },
-      });
+        attemptCount: { lt: MAX_ATTEMPTS },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: BATCH_SIZE,
+      select: { id: true, status: true },
+    });
 
-      let processed = 0;
-      for (const candidate of candidates) {
-        const claimed = await this.claim(candidate.id, candidate.status);
-        if (!claimed) continue;
-        await this.deliverEmail(claimed);
-        processed += 1;
-      }
-
-      if (processed > 0) {
-        this.logger.log(`Processed ${processed} notification email(s)`);
-      }
-      return { processed };
-    } finally {
-      this.processing = false;
+    let processed = 0;
+    for (const candidate of candidates) {
+      const claimed = await this.claim(candidate.id, candidate.status);
+      if (!claimed) continue;
+      await this.deliverEmail(claimed);
+      processed += 1;
     }
+
+    return { processed, hasMore: candidates.length === BATCH_SIZE };
   }
 
   private async claim(
@@ -142,8 +106,9 @@ export class NotificationDeliveryService
     const recipientName =
       [recipient.firstName, recipient.lastName].filter(Boolean).join(" ") ||
       recipient.email;
-    const relativeAction =
-      notification.actionUrl?.startsWith("/") ? notification.actionUrl : "";
+    const relativeAction = notification.actionUrl?.startsWith("/")
+      ? notification.actionUrl
+      : "";
     const actionUrl = this.email.appUrl(relativeAction);
 
     try {
@@ -182,9 +147,6 @@ export class NotificationDeliveryService
             : new Date(Date.now() + delayMinutes * 60_000),
         },
       });
-      this.logger.warn(
-        `Notification email ${delivery.id} failed on attempt ${delivery.attemptCount}`,
-      );
     }
   }
 

@@ -21,6 +21,8 @@ import { FilesModule } from './files/files.module';
 import { VideoModule } from './video/video.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
+import { JobsModule } from './jobs/jobs.module';
+import { JobSchedulingModule } from './jobs/job-scheduling.module';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { SessionAuthGuard } from './auth/guards/session-auth.guard';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
@@ -55,6 +57,8 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     VideoModule,
     NotificationsModule,
     AuditModule,
+    JobsModule,
+    JobSchedulingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SessionAuthGuard },

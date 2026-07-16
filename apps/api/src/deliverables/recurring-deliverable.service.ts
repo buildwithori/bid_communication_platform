@@ -1,44 +1,18 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  OnModuleDestroy,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../database/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../database/prisma.service";
 
 type RecurringSyncClient = Pick<
   Prisma.TransactionClient,
-  '$executeRaw' | '$queryRaw'
+  "$executeRaw" | "$queryRaw"
 >;
 
 @Injectable()
-export class RecurringDeliverableService
-  implements OnApplicationBootstrap, OnModuleDestroy
-{
-  private readonly logger = new Logger(RecurringDeliverableService.name);
-  private timer?: NodeJS.Timeout;
+export class RecurringDeliverableService {
   private fullSync?: Promise<number>;
   private lastFullSyncAt = 0;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {}
-
-  onApplicationBootstrap() {
-    const intervalMs = this.config.getOrThrow<number>(
-      'DELIVERABLE_RECURRENCE_INTERVAL_MS',
-    );
-    this.timer = setInterval(() => void this.runBackgroundSync(), intervalMs);
-    this.timer.unref();
-    void this.runBackgroundSync();
-  }
-
-  onModuleDestroy() {
-    if (this.timer) clearInterval(this.timer);
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async ensureCurrent(maxAgeMs = 60_000) {
     if (Date.now() - this.lastFullSyncAt < maxAgeMs) return 0;
@@ -72,21 +46,5 @@ export class RecurringDeliverableService
     const created = Number(rows[0]?.created ?? 0);
     if (!entrepreneurUserId) this.lastFullSyncAt = Date.now();
     return created;
-  }
-
-  private async runBackgroundSync() {
-    try {
-      const created = await this.ensureCurrent(0);
-      if (created > 0) {
-        this.logger.log(
-          `Generated ${created} recurring deliverable occurrence(s)`,
-        );
-      }
-    } catch (error: unknown) {
-      this.logger.error(
-        'Recurring deliverable generation failed',
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
   }
 }

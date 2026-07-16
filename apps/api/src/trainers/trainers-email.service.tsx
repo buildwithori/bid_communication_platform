@@ -1,25 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { EmailService } from '../email/email.service';
-import { TrainerInvitationEmail } from './emails/trainer-invitation-email';
+import { Injectable } from "@nestjs/common";
+import { JOB_NAMES } from "../jobs/jobs.constants";
+import { TransactionalEmailQueueService } from "../jobs/transactional-email-queue.service";
 
 @Injectable()
 export class TrainersEmailService {
-  constructor(private readonly email: EmailService) {}
+  constructor(private readonly emailQueue: TransactionalEmailQueueService) {}
 
   sendInvitation(to: string, name: string, inviterName: string, token: string) {
-    const url = `${this.email.appUrl()}/auth/accept-invitation?role=trainer&token=${encodeURIComponent(token)}`;
-    return this.email.send({
+    return this.emailQueue.enqueue(JOB_NAMES.trainerInvitationEmail, {
       to,
-      subject: 'You are invited to the BID Hub trainer team',
-      template: (
-        <TrainerInvitationEmail
-          name={name}
-          inviterName={inviterName}
-          url={url}
-          logoUrl={this.email.logoUrl()}
-        />
-      ),
+      name,
+      inviterName,
+      token,
     });
   }
-
 }

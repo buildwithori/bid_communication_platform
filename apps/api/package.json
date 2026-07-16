@@ -13,10 +13,15 @@
     "test:files": "node --test -r ts-node/register test/file-signature.test.ts",
     "test:video": "node --test -r ts-node/register test/mux-signature.test.ts",
     "test:sessions": "node --test -r ts-node/register test/session-*.test.ts",
-    "test:notifications": "node --test -r ts-node/register test/notifications.test.ts"
+    "test:notifications": "node --test -r ts-node/register test/notifications.test.ts",
+    "start:worker": "node dist/worker.js",
+    "start:worker:dev": "nest start --watch --entryFile worker",
+    "start:worker:dev:docker": "nest start --watch --entryFile worker --path tsconfig.worker-docker.json",
+    "test:jobs": "node --test -r ts-node/register test/jobs.test.ts"
   },
   "dependencies": {
     "@bid/shared": "0.1.0",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^10.4.7",
     "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^10.4.7",
@@ -24,6 +29,7 @@
     "@nestjs/swagger": "^7.4.2",
     "@prisma/client": "^6.19.3",
     "argon2": "^0.44.0",
+    "bullmq": "^5.80.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "google-auth-library": "^10.9.0",

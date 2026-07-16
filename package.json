@@ -27,7 +27,9 @@
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
     "docker:dev": "docker compose --env-file .env.local up --build",
-    "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d"
+    "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
+    "dev:worker": "npm --workspace @bid/api run start:worker:dev",
+    "start:worker": "npm --workspace @bid/api run start:worker"
   },
   "devDependencies": {
     "prisma": "^6.19.3",
