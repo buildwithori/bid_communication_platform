@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FileText, LayoutGrid, Plus, Search, Timer, Wrench, X } from 'lucide-react';
+import { FileText, LayoutGrid, Plus, Search, Timer, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/shared/Modal';
 import { Badge } from '@/components/shared/Badge';
@@ -23,7 +23,6 @@ import {
   describeToolAudience,
   getEntrepreneurToolAccessSource,
   getToolStatus,
-  getToolVisibility,
   type EntrepreneurToolAccessSource,
 } from '@/lib/tool-access';
 import { cn } from '@/lib/utils';
@@ -84,7 +83,10 @@ export function ManageEntrepreneurToolsModal({
   const [pageSize, setPageSize] = React.useState(5);
   const [addToolId, setAddToolId] = React.useState('');
 
-  const blockedToolIds = currentEntrepreneur.toolAccess?.blockedToolIds ?? [];
+  const blockedToolIds = React.useMemo(
+    () => currentEntrepreneur.toolAccess?.blockedToolIds ?? [],
+    [currentEntrepreneur.toolAccess?.blockedToolIds],
+  );
   const addedToolIds = currentEntrepreneur.toolAccess?.addedToolIds ?? [];
   const publishedTools = React.useMemo(() => tools.filter((tool) => getToolStatus(tool) === 'published'), []);
 
@@ -121,18 +123,18 @@ export function ManageEntrepreneurToolsModal({
     });
   }, [currentEntrepreneur, entrepreneurs, query, sourceFilter, typeFilter, visibleTools]);
 
-  React.useEffect(() => {
-    setPage(1);
-  }, [query, sourceFilter, typeFilter, pageSize]);
-
-  React.useEffect(() => {
-    if (!open) return;
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
     setQuery('');
     setTypeFilter('all');
     setSourceFilter('all');
     setPage(1);
     setAddToolId('');
-  }, [open]);
+    onOpenChange(false);
+  };
 
   const pageRows = React.useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -228,7 +230,7 @@ export function ManageEntrepreneurToolsModal({
   ];
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Manage entrepreneur tools" width="xl">
+    <Modal open={open} onOpenChange={handleOpenChange} title="Manage entrepreneur tools" width="xl">
       <div className="space-y-4">
         <div className="rounded-2xl border border-line bg-surface-subtle p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -274,10 +276,21 @@ export function ManageEntrepreneurToolsModal({
               <div className="mt-0.5 text-sm text-ink-muted">Search, filter, or remove tools from this entrepreneur’s workspace.</div>
             </div>
             <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[240px_170px_190px]">
-              <TableFilterInput icon placeholder="Search tools..." value={query} onChange={(event) => setQuery(event.target.value)} />
+              <TableFilterInput
+                icon
+                placeholder="Search tools..."
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+              />
               <TableFilterAutocomplete
                 value={typeFilter}
-                onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}
+                onValueChange={(value) => {
+                  setTypeFilter(value as typeof typeFilter);
+                  setPage(1);
+                }}
                 options={[
                   { value: 'all', label: 'All types' },
                   { value: 'pdf', label: 'PDF resources' },
@@ -288,7 +301,10 @@ export function ManageEntrepreneurToolsModal({
               />
               <TableFilterAutocomplete
                 value={sourceFilter}
-                onValueChange={(value) => setSourceFilter(value as typeof sourceFilter)}
+                onValueChange={(value) => {
+                  setSourceFilter(value as typeof sourceFilter);
+                  setPage(1);
+                }}
                 options={[
                   { value: 'all', label: 'All sources' },
                   { value: 'global', label: 'Global' },
@@ -343,7 +359,7 @@ export function ManageEntrepreneurToolsModal({
         )}
 
         <div className="flex justify-end border-t border-line pt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Done</Button>
+          <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Done</Button>
         </div>
       </div>
     </Modal>

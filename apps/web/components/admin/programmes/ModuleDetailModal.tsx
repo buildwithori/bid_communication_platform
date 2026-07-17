@@ -26,15 +26,7 @@ const contentTypeMeta: Record<
   tool: { label: 'Tool', icon: Wrench, tone: 'green', bg: 'bg-success-light', fg: 'text-success-dark' },
 };
 
-export function ModuleDetailModal({
-  open,
-  onOpenChange,
-  module,
-  program,
-  onManageContent,
-  onAddContent,
-  readOnly = false,
-}: {
+type ModuleDetailModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   module?: Module;
@@ -42,7 +34,21 @@ export function ModuleDetailModal({
   onManageContent: (module: Module) => void;
   onAddContent: (module: Module) => void;
   readOnly?: boolean;
-}) {
+};
+
+export function ModuleDetailModal(props: ModuleDetailModalProps) {
+  return <ModuleDetailModalContent key={props.module?.id ?? 'empty'} {...props} />;
+}
+
+function ModuleDetailModalContent({
+  open,
+  onOpenChange,
+  module,
+  program,
+  onManageContent,
+  onAddContent,
+  readOnly = false,
+}: ModuleDetailModalProps) {
   const { contentItems, programs, trainers } = useAdminStore();
   const [contentQuery, setContentQuery] = React.useState('');
   const [contentPage, setContentPage] = React.useState(1);
@@ -96,14 +102,6 @@ export function ModuleDetailModal({
         .includes(needle),
     );
   }, [program?.id, usageQuery, usedInPrograms]);
-
-  React.useEffect(() => {
-    setContentPage(1);
-  }, [contentQuery, contentPageSize, module?.id]);
-
-  React.useEffect(() => {
-    setUsagePage(1);
-  }, [usageQuery, usagePageSize, module?.id]);
 
   const contentPageRows = React.useMemo(() => {
     const start = (contentPage - 1) * contentPageSize;
@@ -291,7 +289,10 @@ export function ModuleDetailModal({
                     icon
                     placeholder="Search title, type, trainer, or link..."
                     value={contentQuery}
-                    onChange={(event) => setContentQuery(event.target.value)}
+                    onChange={(event) => {
+                      setContentQuery(event.target.value);
+                      setContentPage(1);
+                    }}
                   />
                 </div>
               </TableToolbar>
@@ -356,7 +357,10 @@ export function ModuleDetailModal({
                   icon
                   placeholder="Search programme, access, or status..."
                   value={usageQuery}
-                  onChange={(event) => setUsageQuery(event.target.value)}
+                  onChange={(event) => {
+                    setUsageQuery(event.target.value);
+                    setUsagePage(1);
+                  }}
                 />
               </div>
             </TableToolbar>

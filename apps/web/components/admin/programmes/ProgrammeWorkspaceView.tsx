@@ -101,10 +101,6 @@ export function ProgrammeWorkspaceView({
     });
   }, [moduleQuery, programModules]);
 
-  React.useEffect(() => {
-    setModulePage(1);
-  }, [moduleQuery, modulePageSize, program.id]);
-
   const modulePageRows = React.useMemo(() => {
     const start = (modulePage - 1) * modulePageSize;
     return filteredProgramModules.slice(start, start + modulePageSize);
@@ -366,7 +362,10 @@ export function ProgrammeWorkspaceView({
                     icon
                     placeholder="Search modules, content, or order..."
                     value={moduleQuery}
-                    onChange={(event) => setModuleQuery(event.target.value)}
+                    onChange={(event) => {
+                      setModuleQuery(event.target.value);
+                      setModulePage(1);
+                    }}
                   />
                 </div>
               </TableToolbar>
