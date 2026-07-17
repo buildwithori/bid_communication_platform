@@ -17,6 +17,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 60s
     volumes:
       - .:/workspace
       - root_node_modules:/workspace/node_modules
@@ -41,6 +42,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 8
+      start_period: 90s
     volumes:
       - .:/workspace
       - root_node_modules:/workspace/node_modules
@@ -71,6 +73,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 8
+      start_period: 60s
     volumes:
       - .:/workspace
       - root_node_modules:/workspace/node_modules
@@ -98,6 +101,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 90s
     volumes:
       - .:/workspace
       - root_node_modules:/workspace/node_modules
