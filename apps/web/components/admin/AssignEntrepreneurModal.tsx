@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField, FormInput } from '@/components/shared/FormField';
@@ -34,6 +34,7 @@ export function AssignEntrepreneurModal({
       programmeId: nextProgrammeId,
     },
   });
+  const programmeId = useWatch({ control: form.control, name: 'programmeId' });
 
   React.useEffect(() => {
     form.setValue('entrepreneurId', currentEntrepreneur.id);
@@ -99,7 +100,7 @@ export function AssignEntrepreneurModal({
 
         <FormField label="Add programme">
           <FormAutocomplete
-            value={form.watch('programmeId')}
+            value={programmeId}
             onValueChange={(v) => form.setValue('programmeId', v)}
             options={availableProgrammes.map((p) => ({ value: p.id, label: p.name }))}
             placeholder="Search programme"

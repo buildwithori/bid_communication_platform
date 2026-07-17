@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField } from '@/components/shared/FormField';
@@ -12,7 +12,6 @@ import { reuseModuleSchema, type ReuseModuleForm } from '@/lib/forms/schemas';
 export function ReuseModuleModal({
   open,
   onOpenChange,
-  programId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,6 +22,7 @@ export function ReuseModuleModal({
     resolver: zodResolver(reuseModuleSchema),
     defaultValues: { moduleId: '' },
   });
+  const moduleId = useWatch({ control: form.control, name: 'moduleId' });
   const reusable = modules;
 
   return (
@@ -36,7 +36,7 @@ export function ReuseModuleModal({
       >
         <FormField label="Select module to add into this programme" error={form.formState.errors.moduleId?.message}>
           <FormAutocomplete
-            value={form.watch('moduleId')}
+            value={moduleId}
             onValueChange={(value) => form.setValue('moduleId', value, { shouldValidate: true })}
             options={reusable.map((m) => ({
               value: m.id,

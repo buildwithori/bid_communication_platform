@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField, FormInput, FormRow2, FormTextarea } from '@/components/shared/FormField';
@@ -35,6 +35,9 @@ export function PeriodicUpdateModal({
       notes: '',
     },
   });
+  const programmeId = useWatch({ control: form.control, name: 'programmeId' });
+  const periodStart = useWatch({ control: form.control, name: 'periodStart' });
+  const periodEnd = useWatch({ control: form.control, name: 'periodEnd' });
 
   const attributionOptions = [
     {
@@ -69,7 +72,7 @@ export function PeriodicUpdateModal({
         </div>
         <FormField label="Reporting scope" error={form.formState.errors.programmeId?.message}>
           <FormAutocomplete
-            value={form.watch('programmeId')}
+            value={programmeId}
             onValueChange={(value) => form.setValue('programmeId', value, { shouldValidate: true })}
             options={attributionOptions}
             placeholder="Choose reporting scope"
@@ -82,8 +85,8 @@ export function PeriodicUpdateModal({
           error={form.formState.errors.periodStart?.message ?? form.formState.errors.periodEnd?.message}
         >
           <DateRangePicker
-            startValue={form.watch('periodStart')}
-            endValue={form.watch('periodEnd')}
+            startValue={periodStart}
+            endValue={periodEnd}
             onChange={(value) => {
               form.setValue('periodStart', value.start, { shouldValidate: true });
               form.setValue('periodEnd', value.end, { shouldValidate: true });

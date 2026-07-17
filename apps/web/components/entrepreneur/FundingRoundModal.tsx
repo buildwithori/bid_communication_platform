@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import { FormAutocomplete, FormField, FormInput } from '@/components/shared/FormField';
@@ -36,6 +36,8 @@ export function FundingRoundModal({
       goalId: round?.goalId ?? 'none',
     },
   });
+  const programmeId = useWatch({ control: form.control, name: 'programmeId' });
+  const goalId = useWatch({ control: form.control, name: 'goalId' });
 
   React.useEffect(() => {
     if (!open) return;
@@ -89,7 +91,7 @@ export function FundingRoundModal({
         </FormField>
         <FormField label="Programme attribution" optional>
           <FormAutocomplete
-            value={form.watch('programmeId') ?? 'unattributed'}
+            value={programmeId ?? 'unattributed'}
             onValueChange={(value) => form.setValue('programmeId', value, { shouldValidate: true })}
             options={[
               {
@@ -106,7 +108,7 @@ export function FundingRoundModal({
         </FormField>
         <FormField label="Linked fundraising goal" optional>
           <FormAutocomplete
-            value={form.watch('goalId') ?? 'none'}
+            value={goalId ?? 'none'}
             onValueChange={(value) => form.setValue('goalId', value, { shouldValidate: true })}
             options={[
               { value: 'none', label: 'Not linked to a goal' },

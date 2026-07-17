@@ -6,8 +6,8 @@ import type { ContentItem, Entrepreneur, Program, Trainer } from '@/types';
 export function getProgrammeContentItems(programme: Program, items: ContentItem[] = contentItems) {
   const moduleIds = new Set(programme.moduleIds);
   return items.filter((item) => {
-    const module = modules.find((candidate) => candidate.id === item.moduleId);
-    return module ? moduleIds.has(module.id) : false;
+    const programmeModule = modules.find((candidate) => candidate.id === item.moduleId);
+    return programmeModule ? moduleIds.has(programmeModule.id) : false;
   });
 }
 

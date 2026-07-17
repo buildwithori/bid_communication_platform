@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/shared/Modal';
 import {
@@ -57,7 +57,11 @@ export function EntrepreneurModal({
     },
   });
 
-  const goalType = form.watch('goalType');
+  const country = useWatch({ control: form.control, name: 'country' });
+  const sector = useWatch({ control: form.control, name: 'sector' });
+  const stage = useWatch({ control: form.control, name: 'stage' });
+  const goalType = useWatch({ control: form.control, name: 'goalType' });
+  const programmeId = useWatch({ control: form.control, name: 'programmeId' });
 
   const onSubmit = (values: EntrepreneurForm) => {
     if (isEdit && entrepreneur) {
@@ -102,7 +106,7 @@ export function EntrepreneurModal({
           </FormField>
           <FormField label="Country">
             <FormAutocomplete
-              value={form.watch('country')}
+              value={country}
               onValueChange={(v) => form.setValue('country', v as EntrepreneurForm['country'])}
               options={countries.map((country) => ({ value: country, label: country }))}
               placeholder="Select country"
@@ -114,7 +118,7 @@ export function EntrepreneurModal({
         <FormRow2>
           <FormField label="Sector">
             <FormAutocomplete
-              value={form.watch('sector')}
+              value={sector}
               onValueChange={(v) => form.setValue('sector', v)}
               options={sectors.map((s) => ({ value: s.id, label: s.label }))}
               placeholder="Select sector"
@@ -124,7 +128,7 @@ export function EntrepreneurModal({
           </FormField>
           <FormField label="Stage">
             <FormAutocomplete
-              value={form.watch('stage')}
+              value={stage}
               onValueChange={(v) => form.setValue('stage', v)}
               options={stages.map((stage) => ({
                 value: stage.id,
@@ -141,7 +145,7 @@ export function EntrepreneurModal({
           <>
             <FormField label="Primary goal type">
               <FormAutocomplete
-                value={form.watch('goalType')}
+                value={goalType}
                 onValueChange={(v) => form.setValue('goalType', v, { shouldValidate: true })}
                 options={activeGoalTypes.map((goalTypeOption) => ({
                   value: goalTypeOption.id,
@@ -163,7 +167,7 @@ export function EntrepreneurModal({
         {!isEdit && (
           <FormField label="Initial programme" optional>
             <FormAutocomplete
-              value={form.watch('programmeId') ?? ''}
+              value={programmeId ?? ''}
               onValueChange={(v) => form.setValue('programmeId', v)}
               options={assignableProgrammes.map((p) => ({ value: p.id, label: p.name }))}
               placeholder="Select programme"

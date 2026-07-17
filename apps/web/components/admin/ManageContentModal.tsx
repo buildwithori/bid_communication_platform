@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronLeft, ChevronRight, FileText, GripVertical, PlayCircle, Wrench } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
@@ -427,11 +427,14 @@ export function AddContentItemModal({
       toolUrl: '',
     },
   });
+  const contentType = useWatch({ control: form.control, name: 'type' });
+  const toolSource = useWatch({ control: form.control, name: 'toolSource' }) ?? 'library';
+  const trainerId = useWatch({ control: form.control, name: 'trainerId' });
+  const videoFileName = useWatch({ control: form.control, name: 'videoFileName' });
+  const pdfFileName = useWatch({ control: form.control, name: 'pdfFileName' });
+  const linkedToolId = useWatch({ control: form.control, name: 'linkedToolId' });
 
   if (!module) return null;
-
-  const contentType = form.watch('type');
-  const toolSource = form.watch('toolSource') ?? 'library';
 
   const handleSubmit = (values: ContentItemForm) => {
     addContentItem(module.id, values);
@@ -485,7 +488,7 @@ export function AddContentItemModal({
         </FormField>
         <FormField label="Trainer" error={form.formState.errors.trainerId?.message}>
           <FormAutocomplete
-            value={form.watch('trainerId')}
+            value={trainerId}
             onValueChange={(value) => form.setValue('trainerId', value, { shouldValidate: true })}
             options={trainers.map((trainer) => ({
               value: trainer.id,
@@ -520,7 +523,7 @@ export function AddContentItemModal({
               aria-label="Upload video file"
             >
               <span className="text-sm font-medium text-ink">
-                {form.watch('videoFileName') || 'Upload or select a video file'}
+                {videoFileName || 'Upload or select a video file'}
               </span>
               <span className="mt-1 text-sm text-ink-muted">
                 MP4 or MOV files are supported.
@@ -549,7 +552,7 @@ export function AddContentItemModal({
             >
               <FileText className="mb-2 h-6 w-6 text-info" />
               <span className="text-sm font-medium text-ink">
-                {form.watch('pdfFileName') || 'Attach PDF learning file'}
+                {pdfFileName || 'Attach PDF learning file'}
               </span>
               <span className="mt-1 text-sm text-ink-muted">
                 This file will appear as a PDF resource in the module.
@@ -578,7 +581,7 @@ export function AddContentItemModal({
             {toolSource === 'library' ? (
               <FormField label="Entrepreneur tool" error={form.formState.errors.linkedToolId?.message} className="mb-0">
                 <FormAutocomplete
-                  value={form.watch('linkedToolId') ?? ''}
+                  value={linkedToolId ?? ''}
                   onValueChange={(value) => {
                     const selectedTool = embeddedToolOptions.find((tool) => tool.id === value);
                     form.setValue('linkedToolId', value, { shouldValidate: true });
@@ -619,4 +622,3 @@ export function AddContentItemModal({
     </Modal>
   );
 }
-

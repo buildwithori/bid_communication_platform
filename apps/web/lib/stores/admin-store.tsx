@@ -250,7 +250,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   }, [programs]);
 
   const addExistingModuleToProgram: AdminStore['addExistingModuleToProgram'] = React.useCallback((programId, moduleId) => {
-    const module = modules.find((item) => item.id === moduleId);
+    const existingModule = modules.find((item) => item.id === moduleId);
 
     setPrograms((curr) =>
       curr.map((p) => {
@@ -265,7 +265,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           : item,
       ),
     );
-    toast.success(module ? `${module.title} added to programme` : 'Module added to programme');
+    toast.success(existingModule ? `${existingModule.title} added to programme` : 'Module added to programme');
   }, [modules]);
 
   const reorderProgramModule: AdminStore['reorderProgramModule'] = React.useCallback((programId, activeModuleId, overModuleId) => {
