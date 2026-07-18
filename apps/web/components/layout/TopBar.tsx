@@ -1,6 +1,6 @@
 'use client';
 
-import { Menu, Search } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { cn } from '@/lib/utils';
 
@@ -15,25 +15,6 @@ export interface TopBarProps {
   onMenuClick?: () => void;
   rightSlot?: React.ReactNode;
   className?: string;
-}
-
-function SearchBox() {
-  return (
-    <label
-      className={cn(
-        'hidden h-10 items-center gap-2 rounded-lg border border-black/[0.08] bg-surface-subtle px-3 shadow-sm',
-        'w-[240px] md:flex',
-      )}
-    >
-      <Search className="h-4 w-4 text-ink-faint" aria-hidden="true" />
-      <span className="sr-only">Search</span>
-      <input
-        type="text"
-        placeholder="Search…"
-        className="h-full w-full border-0 bg-transparent text-sm font-normal text-ink outline-none placeholder:font-normal placeholder:text-ink-faint"
-      />
-    </label>
-  );
 }
 
 export function TopBar({ title, actions, onMenuClick, rightSlot, className }: TopBarProps) {
@@ -56,7 +37,6 @@ export function TopBar({ title, actions, onMenuClick, rightSlot, className }: To
         </Button>
       )}
       <div className="flex-1 truncate text-lg font-semibold">{title}</div>
-      <SearchBox />
       {rightSlot}
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </header>
