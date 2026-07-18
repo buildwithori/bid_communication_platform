@@ -15,6 +15,10 @@ import {
 import { PrismaService } from "../database/prisma.service";
 import { NotificationQueryDto } from "./dto/notification-query.dto";
 import { UpdateNotificationPreferenceDto } from "./dto/update-notification-preference.dto";
+import {
+  isNotificationPreferenceGroupName,
+  notificationPreferenceGroupsForRole,
+} from "./notification-preference-groups";
 
 const DEFAULT_TAKE = 20;
 
@@ -218,6 +222,87 @@ export class NotificationsService {
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     };
+  }
+
+  async listPreferenceGroups(user: User) {
+    const preferences = await this.listPreferences(user);
+    const byType = new Map(
+      preferences.map((preference) => [preference.type, preference]),
+    );
+
+    return notificationPreferenceGroupsForRole(user.role).map(
+      ({ group, types }) => {
+        const entries = types.map((type) => byType.get(type)!);
+        return {
+          group,
+          types,
+          inAppEnabled: this.groupedChannelState(
+            entries.map((entry) => entry.inAppEnabled),
+          ),
+          emailEnabled: this.groupedChannelState(
+            entries.map((entry) => entry.emailEnabled),
+          ),
+        };
+      },
+    );
+  }
+
+  async updatePreferenceGroup(
+    user: User,
+    group: string,
+    dto: UpdateNotificationPreferenceDto,
+  ) {
+    if (!isNotificationPreferenceGroupName(group)) {
+      throw new BadRequestException(
+        "Choose a valid notification preference group.",
+      );
+    }
+    if (dto.inAppEnabled === undefined && dto.emailEnabled === undefined) {
+      throw new BadRequestException(
+        "Choose at least one notification channel.",
+      );
+    }
+
+    const definition = notificationPreferenceGroupsForRole(user.role).find(
+      (item) => item.group === group,
+    );
+    if (!definition) {
+      throw new BadRequestException(
+        "This notification preference group is not available for your role.",
+      );
+    }
+
+    const defaults = await this.channelDefaults();
+    await this.prisma.$transaction(
+      definition.types.map((type) =>
+        this.prisma.notificationPreference.upsert({
+          where: { userId_type: { userId: user.id, type } },
+          create: {
+            userId: user.id,
+            type,
+            inAppEnabled: dto.inAppEnabled ?? defaults.inAppEnabled,
+            emailEnabled: dto.emailEnabled ?? defaults.emailEnabled,
+          },
+          update: {
+            ...(dto.inAppEnabled === undefined
+              ? {}
+              : { inAppEnabled: dto.inAppEnabled }),
+            ...(dto.emailEnabled === undefined
+              ? {}
+              : { emailEnabled: dto.emailEnabled }),
+          },
+        }),
+      ),
+    );
+
+    const groups = await this.listPreferenceGroups(user);
+    return groups.find((item) => item.group === group)!;
+  }
+
+  private groupedChannelState(values: boolean[]) {
+    if (values.every(Boolean)) return true;
+    if (values.every((value) => !value)) return false;
+    return null;
   }
 
   async createNotification(input: CreateNotificationInput) {

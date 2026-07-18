@@ -141,6 +141,94 @@ test("notification list and read mutations are recipient and visible-channel sco
   assert.equal(readWhere.deliveries.some.channel, NotificationChannel.in_app);
 });
 
+test("grouped notification preferences are role-scoped and preserve mixed channel state", async () => {
+  const prisma = {
+    notificationPreference: {
+      findMany: async () => [
+        {
+          type: NotificationType.session_confirmed,
+          inAppEnabled: false,
+          emailEnabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    },
+    companySettings: {
+      findUnique: async () => ({
+        inAppNotificationsEnabledByDefault: true,
+        emailNotificationsEnabledByDefault: true,
+      }),
+    },
+  };
+  const service = new NotificationsService(prisma as never);
+
+  const groups = await service.listPreferenceGroups(user as never);
+
+  assert.deepEqual(
+    groups.map((group) => group.group),
+    ["sessions", "deliverables", "tools", "product"],
+  );
+  assert.equal(groups[0]?.inAppEnabled, null);
+  assert.equal(groups[0]?.emailEnabled, true);
+  assert.equal(
+    groups.some((group) => group.group === "coaching"),
+    false,
+  );
+});
+
+test("group updates atomically upsert only notification types relevant to the user role", async () => {
+  const upserts: any[] = [];
+  const prisma = {
+    notificationPreference: {
+      upsert: (args: any) => {
+        upserts.push(args);
+        return Promise.resolve(args.create);
+      },
+      findMany: async () =>
+        upserts.map((item) => ({
+          ...item.create,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+    },
+    companySettings: {
+      findUnique: async () => ({
+        inAppNotificationsEnabledByDefault: true,
+        emailNotificationsEnabledByDefault: true,
+      }),
+    },
+    $transaction: async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+  };
+  const service = new NotificationsService(prisma as never);
+
+  const result = await service.updatePreferenceGroup(
+    user as never,
+    "sessions",
+    { emailEnabled: false },
+  );
+
+  assert.equal(upserts.length, 5);
+  assert.equal(
+    upserts.some(
+      (item) => item.create.type === NotificationType.session_request,
+    ),
+    false,
+  );
+  assert.equal(
+    upserts.every((item) => item.update.emailEnabled === false),
+    true,
+  );
+  assert.equal(
+    upserts.every((item) => !("inAppEnabled" in item.update)),
+    true,
+  );
+  assert.equal(result.group, "sessions");
+  assert.equal(result.inAppEnabled, true);
+  assert.equal(result.emailEnabled, false);
+});
+
 test("email worker claims a pending delivery and persists successful delivery", async () => {
   const updates: any[] = [];
   let updateManyCalls = 0;
