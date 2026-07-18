@@ -140,7 +140,7 @@ export function NotificationPreferencesCard({
       {groups ? (
         <div className="overflow-x-auto rounded-xl border border-line">
           <div className="min-w-[620px]">
-            <div className="grid grid-cols-[minmax(0,1fr)_88px_88px] items-center gap-2 bg-surface-subtle px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            <div className="grid grid-cols-[minmax(0,1fr)_68px_68px] items-center gap-1 bg-surface-subtle px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
               <span>Notification group</span>
               <span className="text-center">In app</span>
               <span className="text-center">Email</span>
@@ -162,7 +162,7 @@ export function NotificationPreferencesCard({
                 return (
                   <div
                     key={preference.group}
-                    className="grid grid-cols-[minmax(0,1fr)_88px_88px] items-center gap-2 px-4 py-4"
+                    className="grid grid-cols-[minmax(0,1fr)_68px_68px] items-center gap-1 px-4 py-4"
                   >
                     <div className="min-w-0 pr-3">
                       <p className="text-sm font-semibold text-ink">
@@ -254,7 +254,7 @@ function PreferencesSkeleton() {
       aria-busy="true"
       className="overflow-hidden rounded-xl border border-line"
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_88px_88px] gap-2 bg-surface-subtle px-4 py-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_68px_68px] gap-1 bg-surface-subtle px-4 py-3">
         <Skeleton className="h-3 w-36" />
         <Skeleton className="mx-auto h-3 w-12" />
         <Skeleton className="mx-auto h-3 w-10" />
@@ -263,7 +263,7 @@ function PreferencesSkeleton() {
         {Array.from({ length: 5 }, (_, index) => (
           <div
             key={index}
-            className="grid min-h-20 grid-cols-[minmax(0,1fr)_88px_88px] items-center gap-2 px-4 py-3"
+            className="grid min-h-20 grid-cols-[minmax(0,1fr)_68px_68px] items-center gap-1 px-4 py-3"
           >
             <div className="space-y-2 pr-4">
               <Skeleton className="h-4 w-40" />
