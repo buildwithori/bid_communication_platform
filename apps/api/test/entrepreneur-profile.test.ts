@@ -3,8 +3,9 @@ import test from 'node:test';
 import { UserRole } from '@prisma/client';
 import { EntrepreneurManagementService } from '../src/entrepreneurs/entrepreneur-management.service';
 
-test('self-profile updates persist the entrepreneur timezone', async () => {
+test('self-profile updates persist entrepreneur and business identity fields', async () => {
   const userUpdates: unknown[] = [];
+  const businessUpdates: unknown[] = [];
   const entrepreneur = {
     id: 'entrepreneur-1',
     email: 'owner@example.com',
@@ -20,7 +21,12 @@ test('self-profile updates persist the entrepreneur timezone', async () => {
         return entrepreneur;
       },
     },
-    business: { update: async () => ({ id: 'business-1' }) },
+    business: {
+      update: async (args: unknown) => {
+        businessUpdates.push(args);
+        return { id: 'business-1' };
+      },
+    },
   };
   const prisma = {
     user: { findFirst: async () => entrepreneur },
@@ -62,6 +68,17 @@ test('self-profile updates persist the entrepreneur timezone', async () => {
         lastName: 'Atebisun',
         phone: '+2347025918463',
         timezone: 'Africa/Lagos',
+      },
+    },
+  ]);
+  assert.deepEqual(businessUpdates, [
+    {
+      where: { id: 'business-1' },
+      data: {
+        name: 'Flowsoft',
+        country: 'Ghana',
+        sectorId: null,
+        stageId: null,
       },
     },
   ]);

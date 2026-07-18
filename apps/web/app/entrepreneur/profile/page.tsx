@@ -595,7 +595,6 @@ function BusinessTab({
     useWatch({ control: form.control, name: "timezone" }) ||
     record.timezone ||
     "UTC";
-  React.useEffect(() => form.reset(profileDefaults(record)), [form, record]);
   return (
     <div className="space-y-4">
       <Card>
@@ -604,7 +603,7 @@ function BusinessTab({
           description="Keep your business identity and representative contact accurate."
         />
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={form.handleSubmit((values) => onSubmit({ ...values }))}
           className="max-w-[780px] space-y-4"
         >
           <FormField
