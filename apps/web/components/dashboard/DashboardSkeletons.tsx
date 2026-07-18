@@ -69,10 +69,10 @@ function PanelSkeleton({ className, rows = 0 }: { className?: string; rows?: num
           ))}
         </div>
       ) : (
-        <div className="relative mt-5 h-[250px] overflow-hidden rounded-lg border border-border/60 bg-muted/30 px-4 pb-4 pt-6">
-          <div className="absolute inset-x-4 top-1/4 h-px bg-border/60" />
-          <div className="absolute inset-x-4 top-2/4 h-px bg-border/60" />
-          <div className="absolute inset-x-4 top-3/4 h-px bg-border/60" />
+        <div className="relative mt-5 h-[250px] overflow-hidden rounded-lg bg-muted/30 px-4 pb-4 pt-6">
+          <div className="absolute inset-x-4 top-1/4 h-px bg-line/60" />
+          <div className="absolute inset-x-4 top-2/4 h-px bg-line/60" />
+          <div className="absolute inset-x-4 top-3/4 h-px bg-line/60" />
           <div className="flex h-full items-end gap-3">
             {[42, 68, 54, 82, 62, 88, 72].map((height, index) => (
               <Skeleton key={index} className="flex-1 rounded-b-none rounded-t-md" style={{ height: `${height}%` }} />
