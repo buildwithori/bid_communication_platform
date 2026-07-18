@@ -122,7 +122,7 @@ export default function DeliverablesPage() {
               const completion = group.total ? Math.round((group.counts.approved / group.total) * 100) : 0;
               const accent = index % 3 === 0 ? 'bg-bid-light text-bid' : index % 3 === 1 ? 'bg-info-light text-info' : 'bg-success-light text-success';
               return (
-                <button key={group.id} type="button" onClick={() => router.push(routes.entrepreneur.deliverableGroup(group.id))} className="group rounded-2xl border border-line bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-bid/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/30">
+                <button key={group.id} type="button" onClick={() => router.push(routes.entrepreneur.deliverableGroup(group.id))} className="group rounded-2xl border border-line bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-bid/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/30">
                   <div className="flex items-start justify-between gap-3">
                     <span className={'grid h-11 w-11 place-items-center rounded-xl ' + accent}><FileText className="h-5 w-5" /></span>
                     <Badge tone={badge.tone}>{badge.label}</Badge>

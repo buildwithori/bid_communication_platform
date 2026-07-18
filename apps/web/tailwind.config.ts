@@ -83,45 +83,45 @@ const config: Config = {
         },
         // BID brand palette
         bid: {
-          DEFAULT: '#842751',
-          dark: '#5c1a38',
-          mid: '#a8346a',
-          light: '#f5e8ef',
+          DEFAULT: 'hsl(var(--bid) / <alpha-value>)',
+          dark: 'hsl(var(--bid-dark) / <alpha-value>)',
+          mid: 'hsl(var(--bid-mid) / <alpha-value>)',
+          light: 'hsl(var(--bid-light) / <alpha-value>)',
         },
-        // App surface colors (mirroring the mockups)
+        // Legacy app aliases backed by the same light/dark theme tokens.
         surface: {
-          DEFAULT: '#f7f6f3',
-          panel: '#ffffff',
-          subtle: '#f1efe8',
+          DEFAULT: 'hsl(var(--background) / <alpha-value>)',
+          panel: 'hsl(var(--card) / <alpha-value>)',
+          subtle: 'hsl(var(--muted) / <alpha-value>)',
         },
         ink: {
-          DEFAULT: '#1a1a1a',
-          muted: '#666666',
-          faint: '#999999',
+          DEFAULT: 'hsl(var(--foreground) / <alpha-value>)',
+          muted: 'hsl(var(--muted-foreground) / <alpha-value>)',
+          faint: 'hsl(var(--faint-foreground) / <alpha-value>)',
         },
         line: {
-          DEFAULT: 'rgba(0,0,0,0.12)',
-          strong: 'rgba(0,0,0,0.22)',
+          DEFAULT: 'hsl(var(--legacy-line) / <alpha-value>)',
+          strong: 'hsl(var(--legacy-line-strong) / <alpha-value>)',
         },
-        // Semantic accents (from mockup badges / chart bars)
+        // Semantic accents used by badges, alerts, and charts.
         info: {
-          DEFAULT: '#185FA5',
-          dark: '#0C447C',
-          light: '#E6F1FB',
+          DEFAULT: 'hsl(var(--info) / <alpha-value>)',
+          dark: 'hsl(var(--info-dark) / <alpha-value>)',
+          light: 'hsl(var(--info-light) / <alpha-value>)',
         },
         success: {
-          DEFAULT: '#1D9E75',
-          dark: '#085041',
-          light: '#EAF3DE',
+          DEFAULT: 'hsl(var(--success) / <alpha-value>)',
+          dark: 'hsl(var(--success-dark) / <alpha-value>)',
+          light: 'hsl(var(--success-light) / <alpha-value>)',
         },
         warning: {
-          DEFAULT: '#BA7517',
-          dark: '#633806',
-          light: '#FAEEDA',
+          DEFAULT: 'hsl(var(--warning) / <alpha-value>)',
+          dark: 'hsl(var(--warning-dark) / <alpha-value>)',
+          light: 'hsl(var(--warning-light) / <alpha-value>)',
         },
         danger: {
-          DEFAULT: '#A32D2D',
-          light: '#FCEBEB',
+          DEFAULT: 'hsl(var(--danger) / <alpha-value>)',
+          light: 'hsl(var(--danger-light) / <alpha-value>)',
         },
       },
       ringColor: {

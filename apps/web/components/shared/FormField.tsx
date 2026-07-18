@@ -59,10 +59,10 @@ export function FieldLabel({
 }
 
 const inputClass =
-  'h-10 w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none';
+  'h-10 w-full rounded-lg border border-border bg-surface-panel px-3 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none';
 
 const textareaClass =
-  'w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 py-2.5 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none';
+  'w-full rounded-lg border border-border bg-surface-panel px-3 py-2.5 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none';
 
 /** Field that owns its own label + error slot (simplest API for modals). */
 export interface FormFieldProps {
@@ -148,7 +148,7 @@ export function FormSelect({
         id={id}
         className={cn(
           'h-10 rounded-[7px] border border-line-strong bg-surface-panel px-3 text-sm text-ink focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
-          'h-10 w-full rounded-lg border-black/[0.1] font-normal shadow-sm focus-visible:ring-2 focus-visible:ring-bid/10 [&>span]:truncate',
+          'h-10 w-full rounded-lg border-border font-normal shadow-sm focus-visible:ring-2 focus-visible:ring-bid/10 [&>span]:truncate',
           className,
         )}
       >

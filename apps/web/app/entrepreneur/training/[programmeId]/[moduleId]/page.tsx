@@ -311,7 +311,7 @@ function ContentLessonRow({
     <button
       type="button"
       onClick={onOpen}
-      className="group flex w-full items-start gap-3 rounded-xl border border-line bg-white p-4 text-left transition hover:border-bid/20 hover:bg-surface-subtle/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+      className="group flex w-full items-start gap-3 rounded-xl border border-line bg-card p-4 text-left transition hover:border-bid/20 hover:bg-surface-subtle/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-subtle text-sm font-semibold text-ink-muted">
         {index + 1}

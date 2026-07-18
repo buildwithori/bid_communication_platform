@@ -81,7 +81,7 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-black/[0.08] bg-white',
+        'overflow-hidden rounded-xl border border-border bg-card',
         className,
       )}
     >
@@ -108,7 +108,7 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white">
+          <tbody className="bg-card">
             {rows.length === 0 ? (
               <tr>
                 <td
@@ -183,7 +183,7 @@ function DataTableRow<T>({
         {...restRowProps}
         className={cn(
           'group transition-colors hover:bg-surface-subtle/70',
-          isDragging && 'relative z-10 bg-white shadow-xl',
+          isDragging && 'relative z-10 bg-card shadow-xl',
           rowClassName?.(row),
           extraRowClassName,
         )}
@@ -230,7 +230,7 @@ export function TableToolbar({
   return (
     <div
       className={cn(
-        'table-toolbar mb-4 flex flex-wrap items-start gap-3 rounded-xl border border-black/[0.08] bg-surface-subtle/70 p-3',
+        'table-toolbar mb-4 flex flex-wrap items-start gap-3 rounded-xl border border-border bg-surface-subtle/70 p-3',
         className,
       )}
     >
@@ -255,7 +255,7 @@ export const TableFilterInput = React.forwardRef<
     <input
       ref={ref}
       className={cn(
-        'h-9 w-full rounded-lg border border-black/[0.1] bg-white px-3 text-sm font-normal text-ink shadow-sm outline-none transition placeholder:font-normal placeholder:text-ink-faint focus:border-bid focus:ring-2 focus:ring-bid/10',
+        'h-9 w-full rounded-lg border border-border bg-card px-3 text-sm font-normal text-ink shadow-sm outline-none transition placeholder:font-normal placeholder:text-ink-faint focus:border-bid focus:ring-2 focus:ring-bid/10',
         icon && 'pl-9',
         className,
       )}
@@ -314,7 +314,7 @@ export const TableFilterSelect = React.forwardRef<
         ref={ref}
         id={id}
         className={cn(
-          'h-9 w-full rounded-lg border border-black/[0.1] bg-white px-3 text-sm font-normal text-ink shadow-sm outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/10 focus:ring-offset-0 [&>span]:truncate',
+          'h-9 w-full rounded-lg border border-border bg-card px-3 text-sm font-normal text-ink shadow-sm outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/10 focus:ring-offset-0 [&>span]:truncate',
           className,
         )}
         aria-label={props['aria-label']}
@@ -323,7 +323,7 @@ export const TableFilterSelect = React.forwardRef<
           {currentOption?.label ?? placeholder ?? 'Select'}
         </span>
       </SelectTrigger>
-      <SelectContent className="rounded-xl border-black/[0.08] bg-white p-1.5 text-sm shadow-xl">
+      <SelectContent className="rounded-xl border-border bg-card p-1.5 text-sm shadow-xl">
         {options.map((option) => (
           <SelectItem
             key={option.value}
@@ -348,7 +348,7 @@ export function TableFilterAutocomplete({
 }: FormAutocompleteProps) {
   return (
     <FormAutocomplete
-      className={cn('h-9 bg-white', className)}
+      className={cn('h-9 bg-card', className)}
       popoverClassName={cn('min-w-[220px]', popoverClassName)}
       listClassName={cn('max-h-64', listClassName)}
       {...props}
@@ -388,13 +388,13 @@ export function RowActions({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted shadow-sm transition hover:bg-surface-subtle hover:text-ink focus:outline-none focus:ring-2 focus:ring-bid/20"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-ink-muted shadow-sm transition hover:bg-surface-subtle hover:text-ink focus:outline-none focus:ring-2 focus:ring-bid/20"
           aria-label={label}
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[180px] rounded-xl border-black/[0.08] p-1.5 shadow-xl">
+      <DropdownMenuContent align="start" className="min-w-[180px] rounded-xl border-border p-1.5 shadow-xl">
         {actions.map((action, index) =>
           action === 'separator' ? (
             <DropdownMenuSeparator key={`separator-${index}`} />
@@ -442,7 +442,7 @@ export function TablePagination({
   return (
     <div
       className={cn(
-        'mt-4 flex flex-col gap-3 rounded-xl border border-black/[0.08] bg-white px-4 py-3 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between',
+        'mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between',
         className,
       )}
     >
@@ -470,7 +470,7 @@ export function TablePagination({
             type="button"
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage <= 1}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted transition hover:bg-surface-subtle disabled:pointer-events-none disabled:opacity-45"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-ink-muted transition hover:bg-surface-subtle disabled:pointer-events-none disabled:opacity-45"
             aria-label="Previous page"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -482,7 +482,7 @@ export function TablePagination({
             type="button"
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage >= totalPages}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted transition hover:bg-surface-subtle disabled:pointer-events-none disabled:opacity-45"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-ink-muted transition hover:bg-surface-subtle disabled:pointer-events-none disabled:opacity-45"
             aria-label="Next page"
           >
             <ChevronRight className="h-4 w-4" />

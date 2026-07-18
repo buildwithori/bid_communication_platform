@@ -54,7 +54,7 @@ export function Modal({
         <DialogPrimitive.Overlay className="modal-overlay fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
         <DialogPrimitive.Content
           className={cn(
-            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto rounded-2xl border border-black/[0.08] bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
+            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
             widthClass[width],
           )}
         >

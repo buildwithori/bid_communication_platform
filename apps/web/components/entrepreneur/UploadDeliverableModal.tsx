@@ -137,7 +137,7 @@ export function UploadDeliverableModal({
                 </div>
               </div>
               {selected.latestSubmission && (
-                <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-muted">
+                <div className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink-muted">
                   <div className="font-medium text-ink">Latest upload</div>
                   <div className="max-w-[230px] truncate">{selected.latestSubmission.file.originalFilename}</div>
                   <div>{formatDate(selected.latestSubmission.submittedAt)}</div>

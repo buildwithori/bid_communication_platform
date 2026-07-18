@@ -453,7 +453,7 @@ export default function SchedulePage() {
                             className={cn(
                               "h-1.5 w-1.5 rounded-full",
                               isSelected
-                                ? "bg-white"
+                                ? "bg-primary-foreground"
                                 : categoryMeta[item.category].dotClassName,
                             )}
                           />
@@ -495,7 +495,7 @@ export default function SchedulePage() {
             </div>
           </section>
 
-          <section className="self-start rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_12px_28px_rgba(26,26,26,0.035)]">
+          <section className="self-start rounded-2xl border border-border bg-card p-4 shadow-[0_12px_28px_rgba(26,26,26,0.035)]">
             <CardHeader
               title={isSelectedToday ? "Today" : "Selected date"}
               description={formatFullDate(selectedDate)}
@@ -749,7 +749,7 @@ function ScheduleEventCard({
   );
 
   const className = cn(
-    "rounded-xl border border-black/[0.07] bg-white px-4 py-3 text-left shadow-sm transition",
+    "rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm transition",
     onSelect && "w-full hover:border-bid/25 hover:bg-surface-subtle",
   );
 

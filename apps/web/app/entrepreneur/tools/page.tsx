@@ -90,7 +90,7 @@ function ToolCard({ tool, onClick }: { tool: Tool; onClick: () => void }) {
   return (
     <Card
       onClick={onClick}
-      className="group relative flex min-h-[150px] cursor-pointer flex-col transition-colors hover:border-bid hover:bg-white"
+      className="group relative flex min-h-[150px] cursor-pointer flex-col transition-colors hover:border-bid hover:bg-card"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div
@@ -240,7 +240,7 @@ function ToolPreviewModal({
       width="media"
     >
       <div className="space-y-4">
-        <div className="rounded-2xl border border-black/[0.08] bg-surface-subtle p-4">
+        <div className="rounded-2xl border border-border bg-surface-subtle p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span
@@ -258,7 +258,7 @@ function ToolPreviewModal({
                   <Badge tone={isOnline ? "green" : "blue"}>
                     {isOnline ? "Online tool" : "PDF resource"}
                   </Badge>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
+                  <span className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
                     {currentIndex + 1} of {tools.length}
                   </span>
                 </div>
@@ -299,7 +299,7 @@ function ToolPreviewModal({
             </div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           {previewUrl ? (
             <iframe
               title={`${tool.name} preview`}
@@ -309,7 +309,7 @@ function ToolPreviewModal({
                   ? "allow-forms allow-popups allow-same-origin allow-scripts"
                   : undefined
               }
-              className="h-[56vh] min-h-[430px] w-full bg-white"
+              className="h-[56vh] min-h-[430px] w-full bg-card"
             />
           ) : (
             <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">
@@ -404,7 +404,7 @@ function ViewToolRequestModal({
 
 function RequestInfoBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2">
+    <div className="rounded-lg border border-line bg-card px-3 py-2">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">
         {label}
       </div>
@@ -415,7 +415,7 @@ function RequestInfoBlock({ label, value }: { label: string; value: string }) {
 
 function RequestInfoPanel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white px-4 py-3">
+    <div className="rounded-xl border border-line bg-card px-4 py-3">
       <div className="text-sm font-semibold text-ink">{title}</div>
       <p className="mt-2 text-sm leading-6 text-ink-muted">{text}</p>
     </div>

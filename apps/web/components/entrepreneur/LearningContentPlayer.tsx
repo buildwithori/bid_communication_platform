@@ -288,7 +288,7 @@ export function LearningContentPlayer({
         </div>
 
         <aside className="flex min-h-0 flex-col gap-4">
-          <div className="rounded-xl border border-line bg-white p-4">
+          <div className="rounded-xl border border-line bg-card p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-ink">Learning progress</div>
               <span className="text-xs text-ink-muted">
@@ -309,7 +309,7 @@ export function LearningContentPlayer({
             </Button>
           </div>
 
-          <div className="rounded-xl border border-line bg-white p-4">
+          <div className="rounded-xl border border-line bg-card p-4">
             <div className="text-sm font-semibold text-ink">Up next</div>
             <div className="mt-3 max-h-[260px] space-y-2 overflow-y-auto pr-1">
               {playlist.map((candidate, index) => {
@@ -327,7 +327,7 @@ export function LearningContentPlayer({
                       "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
                       active
                         ? "border-bid/30 bg-bid-light/40"
-                        : "border-line bg-white hover:bg-surface-subtle",
+                        : "border-line bg-card hover:bg-surface-subtle",
                     )}
                   >
                     <span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg", candidateMeta.iconClass)}>
@@ -421,7 +421,7 @@ function ContentFrame({
       );
     }
     return (
-      <div className="overflow-hidden rounded-xl border border-line bg-white">
+      <div className="overflow-hidden rounded-xl border border-line bg-card">
         <iframe title={item.title} src={signedFile.data.download.url} className="h-[560px] w-full" />
       </div>
     );
@@ -438,7 +438,7 @@ function ContentFrame({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-white">
+    <div className="overflow-hidden rounded-xl border border-line bg-card">
       <iframe
         title={item.title}
         src={item.toolLink.url}
@@ -471,7 +471,7 @@ function AssetError({
   return (
     <div className="grid min-h-[420px] place-items-center rounded-xl border border-dashed border-line-strong bg-surface-subtle p-8 text-center">
       <div>
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-xl bg-white text-ink-muted">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-xl bg-card text-ink-muted">
           <Icon className="h-6 w-6" />
         </span>
         <div className="mt-4 text-base font-semibold text-ink">{title}</div>

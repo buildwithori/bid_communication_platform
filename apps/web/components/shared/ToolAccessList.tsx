@@ -95,7 +95,7 @@ export function ToolAccessList({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search tools..."
-              className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm text-ink outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/15"
+              className="h-10 w-full rounded-lg border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/15"
             />
           </label>
 
@@ -104,7 +104,7 @@ export function ToolAccessList({
               const source = getEntrepreneurToolAccessSource(tool, entrepreneur) as Exclude<EntrepreneurToolAccessSource, 'none'>;
               const meta = accessSourceMeta[source];
               return (
-                <div key={tool.id} className="rounded-xl border border-line bg-white px-4 py-3">
+                <div key={tool.id} className="rounded-xl border border-line bg-card px-4 py-3">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="font-semibold text-ink">{tool.name}</div>

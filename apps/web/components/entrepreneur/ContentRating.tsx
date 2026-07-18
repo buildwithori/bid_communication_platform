@@ -145,7 +145,7 @@ function RatingForm({
         }}
         placeholder="What was useful or could be clearer?"
         rows={3}
-        className="mt-1 w-full resize-none rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-bid focus:outline-none focus:ring-2 focus:ring-bid/20"
+        className="mt-1 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-bid focus:outline-none focus:ring-2 focus:ring-bid/20"
       />
 
       <div className="mt-3 flex items-center justify-between gap-3">

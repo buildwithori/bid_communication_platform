@@ -399,7 +399,7 @@ function LearnerModuleAccordion({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-line bg-white">
+    <section className="overflow-hidden rounded-xl border border-line bg-card">
       <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
         <button
           type="button"
@@ -480,7 +480,7 @@ function LearnerModuleAccordion({
               ) : null}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-line-strong bg-white px-4 py-8 text-center text-sm text-ink-muted">
+            <div className="rounded-xl border border-dashed border-line-strong bg-card px-4 py-8 text-center text-sm text-ink-muted">
               No ready learning content is available in this module yet.
             </div>
           )}
@@ -505,7 +505,7 @@ function ContentRow({
     <button
       type="button"
       onClick={onOpen}
-      className="group flex w-full items-start gap-3 rounded-xl border border-line bg-white p-3 text-left transition hover:border-bid/20 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
+      className="group flex w-full items-start gap-3 rounded-xl border border-line bg-card p-3 text-left transition hover:border-bid/20 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20"
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-subtle text-sm font-semibold text-ink-muted">
         {index + 1}

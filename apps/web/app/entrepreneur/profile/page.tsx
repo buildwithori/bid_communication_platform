@@ -900,7 +900,7 @@ function PeriodicUpdateDetails({
 }
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-3">
+    <div className="rounded-xl border border-line bg-card p-3">
       <div className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
         {label}
       </div>

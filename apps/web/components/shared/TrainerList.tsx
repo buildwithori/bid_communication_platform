@@ -88,13 +88,13 @@ export function TrainerList({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search trainers..."
-              className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm text-ink outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/15"
+              className="h-10 w-full rounded-lg border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none transition focus:border-bid focus:ring-2 focus:ring-bid/15"
             />
           </label>
 
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {filteredTrainers.map((trainer) => (
-              <div key={trainer.id} className="rounded-xl border border-line bg-white px-4 py-3">
+              <div key={trainer.id} className="rounded-xl border border-line bg-card px-4 py-3">
                 <div className="flex items-start gap-3">
                   <Avatar initials={trainer.initials} size={34} />
                   <div className="min-w-0 flex-1">

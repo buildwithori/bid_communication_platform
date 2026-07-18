@@ -69,13 +69,13 @@ export default function EntrepreneurDashboardPage() {
         <ChartCard title="Training progress trend" description="Cumulative content completion over the last six weeks" legend={[{ label: "Training progress", colorClassName: "bg-bid" }]}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.progressTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-              <defs><linearGradient id="entrepreneurTraining" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#842751" stopOpacity={0.24} /><stop offset="95%" stopColor="#842751" stopOpacity={0} /></linearGradient></defs>
-              <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-              <XAxis dataKey="date" tickFormatter={formatChartDate} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-              <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-              <Tooltip labelFormatter={(value) => formatChartDate(String(value))} formatter={(value) => [`${value}%`, "Training progress"]} contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
-              <ReferenceLine y={100} stroke="rgba(132,39,81,0.18)" strokeDasharray="4 4" />
-              <Area type="monotone" dataKey="progress" name="Training %" stroke="#842751" fill="url(#entrepreneurTraining)" strokeWidth={3} />
+              <defs><linearGradient id="entrepreneurTraining" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.24} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient></defs>
+              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="date" tickFormatter={formatChartDate} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <Tooltip labelFormatter={(value) => formatChartDate(String(value))} formatter={(value) => [`${value}%`, "Training progress"]} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+              <ReferenceLine y={100} stroke="hsl(var(--primary) / 0.22)" strokeDasharray="4 4" />
+              <Area type="monotone" dataKey="progress" name="Training %" stroke="hsl(var(--primary))" fill="url(#entrepreneurTraining)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -119,7 +119,7 @@ export default function EntrepreneurDashboardPage() {
           <div className="flex flex-col gap-2">
             {data.activeDeliverables.map((deliverable) => (
               <Link key={deliverable.id} href={`${routes.entrepreneur.deliverables}?deliverable=${encodeURIComponent(deliverable.id)}`} className="flex items-center gap-3 rounded-md border border-line bg-surface-subtle px-3 py-2.5 transition hover:border-bid/20 hover:bg-bid-light">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-bid shadow-sm"><CheckCircle2 className="h-4 w-4" /></div>
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card text-bid shadow-sm"><CheckCircle2 className="h-4 w-4" /></div>
                 <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{deliverable.name}</div><div className="mt-0.5 text-xs text-ink-muted">{deliverable.programmeName} · Due {formatShortDate(deliverable.dueDate)}</div></div>
                 <Badge tone={deliverableTone(deliverable.status)}>{deliverableLabel(deliverable.status)}</Badge>
               </Link>

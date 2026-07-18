@@ -29,6 +29,25 @@
     --chart-3: 159deg 57% 37%; /* success */
     --chart-4: 36deg 75% 41%; /* warning */
     --chart-5: 0 0% 40%;
+    /* Legacy BID utilities share the global theme contract. */
+    --bid: 335deg 56% 34%;
+    --bid-dark: 335deg 56% 22%;
+    --bid-mid: 333deg 53% 43%;
+    --bid-light: 335deg 67% 94%;
+    --faint-foreground: 0 0% 60%;
+    --legacy-line: 0 0% 88%;
+    --legacy-line-strong: 0 0% 78%;
+    --info: 207deg 79% 37%;
+    --info-dark: 207deg 82% 27%;
+    --info-light: 207deg 62% 94%;
+    --success: 159deg 69% 37%;
+    --success-dark: 168deg 82% 17%;
+    --success-light: 84deg 45% 91%;
+    --warning: 36deg 78% 41%;
+    --warning-dark: 32deg 89% 21%;
+    --warning-light: 38deg 78% 92%;
+    --danger: 0deg 57% 41%;
+    --danger-light: 0deg 74% 95%;
     --radius: 0.625rem; /* 10px */
   }
 
@@ -52,6 +71,24 @@
     --border: 0 0% 100% / 12%;
     --input: 0 0% 100% / 20%;
     --ring: 335deg 62% 56%;
+    --bid: 335deg 62% 56%;
+    --bid-dark: 335deg 60% 46%;
+    --bid-mid: 335deg 58% 62%;
+    --bid-light: 335deg 32% 19%;
+    --faint-foreground: 330 5% 52%;
+    --legacy-line: 330 8% 20%;
+    --legacy-line-strong: 330 7% 29%;
+    --info: 207deg 66% 58%;
+    --info-dark: 207deg 80% 76%;
+    --info-light: 207deg 34% 18%;
+    --success: 159deg 55% 48%;
+    --success-dark: 159deg 58% 74%;
+    --success-light: 159deg 28% 16%;
+    --warning: 36deg 80% 58%;
+    --warning-dark: 36deg 84% 74%;
+    --warning-light: 36deg 32% 17%;
+    --danger: 0deg 70% 60%;
+    --danger-light: 0deg 31% 18%;
   }
 }
 

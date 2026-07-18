@@ -2,6 +2,7 @@
 
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { cn } from '@/lib/utils';
 
 /**
@@ -21,7 +22,7 @@ export function TopBar({ title, actions, onMenuClick, rightSlot, className }: To
   return (
     <header
       className={cn(
-        'flex h-16 shrink-0 items-center gap-3 border-b border-black/[0.08] bg-surface-panel/95 px-4 backdrop-blur lg:px-6',
+        'flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface-panel/95 px-4 backdrop-blur lg:px-6',
         className,
       )}
     >
@@ -37,6 +38,7 @@ export function TopBar({ title, actions, onMenuClick, rightSlot, className }: To
         </Button>
       )}
       <div className="flex-1 truncate text-lg font-semibold">{title}</div>
+      <ThemeToggle className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-ink-muted shadow-sm transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/25" />
       {rightSlot}
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </header>

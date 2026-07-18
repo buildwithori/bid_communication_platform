@@ -32,7 +32,7 @@ export function Card({
         padding === 'lg' && 'p-6',
         dashed
           ? 'border-[1.5px] border-dashed border-line-strong'
-          : 'border border-black/[0.08]',
+          : 'border border-border',
         accent && accentBorder[accent],
         className,
       )}
@@ -122,7 +122,7 @@ export function TableSkeleton({
   className?: string;
 }) {
   return (
-    <div aria-label="Loading table" aria-busy="true" className={cn('overflow-hidden rounded-xl border border-black/[0.08] bg-white', className)}>
+    <div aria-label="Loading table" aria-busy="true" className={cn('overflow-hidden rounded-xl border border-border bg-card', className)}>
       <div className="grid gap-4 border-b border-line bg-surface-subtle/80 p-4" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
         {Array.from({ length: columns }, (_, index) => <Skeleton key={index} className="h-3 w-20" />)}
       </div>

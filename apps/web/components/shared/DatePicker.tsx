@@ -113,7 +113,7 @@ export function DatePicker({
           disabled={disabled}
           onBlur={onBlur}
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
+            'flex h-10 w-full items-center justify-between rounded-lg border border-border bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
             displayValue ? 'text-ink' : 'text-ink-faint',
             className,
           )}
@@ -122,7 +122,7 @@ export function DatePicker({
           <CalendarDays className="h-4 w-4 text-ink-muted" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[292px] rounded-xl border-black/[0.08] bg-surface-panel p-3 shadow-xl">
+      <PopoverContent align="start" className="w-[292px] rounded-xl border-border bg-surface-panel p-3 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <button
             type="button"
@@ -315,7 +315,7 @@ export function DateRangePicker({
           disabled={disabled}
           onBlur={onBlur}
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
+            'flex h-10 w-full items-center justify-between rounded-lg border border-border bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
             displayValue ? 'text-ink' : 'text-ink-faint',
             className,
           )}
@@ -324,7 +324,7 @@ export function DateRangePicker({
           <CalendarDays className="h-4 w-4 text-ink-muted" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(640px,calc(100vw-2rem))] rounded-xl border-black/[0.08] bg-surface-panel p-3 shadow-xl">
+      <PopoverContent align="start" className="w-[min(640px,calc(100vw-2rem))] rounded-xl border-border bg-surface-panel p-3 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <button
             type="button"

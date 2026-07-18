@@ -146,7 +146,7 @@ function SignOutButton() {
       type="button"
       disabled={mutation.isPending}
       onClick={() => mutation.mutate()}
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20 disabled:cursor-not-allowed disabled:opacity-60"
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-sm font-medium text-ink-muted shadow-sm transition hover:border-danger/30 hover:bg-danger-light hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/20 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {mutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <LogOut className="h-4 w-4" aria-hidden="true" />}
       {mutation.isPending ? 'Signing out...' : 'Sign out'}
