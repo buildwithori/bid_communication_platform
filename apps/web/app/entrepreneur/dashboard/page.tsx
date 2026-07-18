@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { ArrowRight, CalendarPlus, CheckCircle2, Clock3 } from "lucide-react";
+import { ArrowRight, BellRing, CalendarPlus, CheckCircle2, Clock3 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -20,6 +20,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader } from "@/components/shared/Card";
 import { ChartCard } from "@/components/shared/ChartCard";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { Notice, PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
@@ -81,13 +82,21 @@ export default function EntrepreneurDashboardPage() {
 
         <Card className="flex min-h-[360px] flex-col">
           <CardHeader title="Activity feed" description="Latest updates from BID and your programme work" actions={<Badge tone="brand">Live</Badge>} />
-          <div className="flex flex-1 flex-col justify-center">
-            {data.activity.map((item) => {
-              const content = <><span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${severityDot[item.severity]}`} /><div className="min-w-0 flex-1"><div className="text-sm font-medium leading-relaxed text-ink">{item.title}</div><div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{item.body}</div><div className="mt-1 font-mono text-xs text-ink-faint">{formatRelative(item.createdAt)}</div></div></>;
-              return item.actionUrl ? <Link key={item.id} href={item.actionUrl as Route} className="flex gap-3 border-b border-line py-3 transition hover:text-bid last:border-b-0">{content}</Link> : <div key={item.id} className="flex gap-3 border-b border-line py-3 last:border-b-0">{content}</div>;
-            })}
-            {!data.activity.length && <div className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">New activity and decisions will appear here.</div>}
-          </div>
+          {data.activity.length ? (
+            <div className="flex flex-1 flex-col justify-center">
+              {data.activity.map((item) => {
+                const content = <><span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${severityDot[item.severity]}`} /><div className="min-w-0 flex-1"><div className="text-sm font-medium leading-relaxed text-ink">{item.title}</div><div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{item.body}</div><div className="mt-1 font-mono text-xs text-ink-faint">{formatRelative(item.createdAt)}</div></div></>;
+                return item.actionUrl ? <Link key={item.id} href={item.actionUrl as Route} className="flex gap-3 border-b border-line py-3 transition hover:text-bid last:border-b-0">{content}</Link> : <div key={item.id} className="flex gap-3 border-b border-line py-3 last:border-b-0">{content}</div>;
+              })}
+            </div>
+          ) : (
+            <EmptyState
+              className="min-h-[240px] flex-1"
+              icon={<BellRing className="h-5 w-5" />}
+              title="No activity yet"
+              description="Programme updates, review decisions, session changes, and other BID activity will appear here automatically."
+            />
+          )}
         </Card>
       </div>
 
