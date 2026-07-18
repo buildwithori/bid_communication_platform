@@ -19,7 +19,7 @@ const buttonVariants = cva(
         primary: 'bg-bid text-white hover:bg-bid-dark',
         // .bo — outline / ghost button
         outline:
-          'border-[0.5px] border-line-strong bg-transparent text-ink-muted hover:bg-surface-subtle hover:text-ink',
+          'border-[0.5px] border-line-strong bg-transparent text-ink-muted hover:border-bid/45 hover:bg-bid-light hover:text-bid',
         // .bd — info / blue button (download, add-to-programme)
         info: 'bg-info text-white hover:bg-info-dark',
         // .bg2 — success / green button (reports)
