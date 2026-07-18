@@ -11,6 +11,7 @@ import {
 } from '@/components/dashboard/DashboardSkeletons';
 import { WorkspaceShellSkeleton } from '@/components/layout/WorkspaceShellSkeleton';
 import { PageSkeleton } from '@/components/shared/Card';
+import { authenticatedDestination, workspaceRouteForRole } from '@/lib/auth-navigation';
 import { routes } from '@/lib/routes';
 
 type WorkspaceRole = AuthUser['role'];
@@ -29,18 +30,22 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
       router.replace(loginUrl as Route);
       return;
     }
+    if (user.status === 'inactive') {
+      router.replace(routes.auth.login);
+      return;
+    }
     if (!user.emailVerifiedAt || user.status === 'pending') {
-      router.replace(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);
+      router.replace(authenticatedDestination(user));
       return;
     }
     if (user.onboardingRequired) {
-      router.replace(routes.auth.onboarding);
+      router.replace(authenticatedDestination(user));
       return;
     }
     if (!isAllowed) router.replace(workspaceRouteForRole(user.role));
   }, [currentUserQuery.isLoading, isAllowed, pathname, router, user]);
 
-  if (currentUserQuery.isLoading || !user || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !isAllowed) {
+  if (currentUserQuery.isLoading || !user || user.status !== 'active' || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !isAllowed) {
     return <WorkspaceGuardFallback role={allowedRoles[0] ?? 'entrepreneur'} pathname={pathname} />;
   }
   return <>{children}</>;
@@ -61,10 +66,4 @@ function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathn
       {content}
     </WorkspaceShellSkeleton>
   );
-}
-
-export function workspaceRouteForRole(role: WorkspaceRole) {
-  if (role === 'admin') return routes.admin.dashboard;
-  if (role === 'trainer') return routes.trainer.dashboard;
-  return routes.entrepreneur.dashboard;
 }

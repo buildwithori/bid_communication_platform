@@ -16,6 +16,7 @@ import { AuthTextField } from '@/components/auth/AuthTextField';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { getGoogleAuthUrl, useLoginMutation, type AuthUser } from '@/lib/api/auth';
+import { workspaceRouteForRole } from '@/lib/auth-navigation';
 import { loginSchema, type LoginForm as LoginFormValues } from '@/lib/forms/schemas';
 import { routes } from '@/lib/routes';
 
@@ -73,7 +74,7 @@ function LoginFormSkeleton() {
 }
 
 function safePostLoginRoute(user: AuthUser, nextPath: string | null): Route {
-  const fallback = workspaceRoute(user);
+  const fallback = workspaceRouteForRole(user.role);
   if (!nextPath || !nextPath.startsWith(`${workspacePrefix(user.role)}/`)) return fallback;
   return nextPath as Route;
 }
@@ -82,10 +83,4 @@ function workspacePrefix(role: AuthUser['role']) {
   if (role === 'admin') return '/admin';
   if (role === 'trainer') return '/trainer';
   return '/entrepreneur';
-}
-
-function workspaceRoute(user: AuthUser) {
-  if (user.role === 'admin') return routes.admin.dashboard;
-  if (user.role === 'trainer') return routes.trainer.dashboard;
-  return routes.entrepreneur.dashboard;
 }

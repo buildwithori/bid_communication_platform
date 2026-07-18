@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const SESSION_COOKIE = 'bid_session';
+import { SESSION_COOKIE_NAME } from './lib/auth-session';
 
 /**
  * Optimistic network boundary for authenticated web routes.
  * NestJS remains authoritative for session validation and authorization.
  */
 export function proxy(request: NextRequest) {
-  if (request.cookies.has(SESSION_COOKIE)) {
+  if (request.cookies.has(SESSION_COOKIE_NAME)) {
     return NextResponse.next();
   }
 
