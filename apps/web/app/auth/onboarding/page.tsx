@@ -59,7 +59,7 @@ function OnboardingForm() {
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
       <div className="grid gap-3 sm:grid-cols-2">
         <AuthTextField icon={<UserPlus className="h-4 w-4" />} label="Representative name" placeholder="Jane Doe" error={form.formState.errors.representative?.message} {...form.register('representative')} />
-        <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" readOnly className="bg-secondary" error={form.formState.errors.email?.message} {...form.register('email')} />
+        <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" readOnly error={form.formState.errors.email?.message} {...form.register('email')} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block"><span className="mb-1.5 block text-sm font-medium text-foreground">Country</span><FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value as EntrepreneurOnboardingForm['country'], { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11', form.formState.errors.country && 'border-destructive')} />{form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-destructive">{form.formState.errors.country.message}</span> : null}</label>
