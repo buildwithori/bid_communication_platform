@@ -8,9 +8,11 @@ export type WorkspaceSkeletonRole = 'admin' | 'trainer' | 'entrepreneur';
 
 export function WorkspaceShellSkeleton({
   role,
+  pathname,
   children,
 }: {
   role: WorkspaceSkeletonRole;
+  pathname?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -20,7 +22,7 @@ export function WorkspaceShellSkeleton({
       className="flex h-screen h-[100dvh] w-full overflow-hidden bg-surface"
     >
       <aside className="hidden w-[260px] shrink-0 border-r border-line bg-surface-panel lg:block">
-        <SidebarSkeleton role={role} />
+        <SidebarSkeleton role={role} pathname={pathname} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -38,7 +40,7 @@ export function WorkspaceShellSkeleton({
   );
 }
 
-function SidebarSkeleton({ role }: { role: WorkspaceSkeletonRole }) {
+function SidebarSkeleton({ role, pathname }: { role: WorkspaceSkeletonRole; pathname?: string }) {
   const sections = role === 'admin' ? adminNav : role === 'trainer' ? trainerNav : entrepreneurNav;
 
   return (
@@ -61,7 +63,7 @@ function SidebarSkeleton({ role }: { role: WorkspaceSkeletonRole }) {
             {section.items.map((item, itemIndex) => (
               <div
                 key={item.href}
-                className={itemIndex === 0 && sectionIndex === 0
+                className={pathname === item.href || (!pathname && itemIndex === 0 && sectionIndex === 0)
                   ? 'mb-1 flex h-10 items-center gap-3 rounded-lg bg-muted/70 px-3'
                   : 'mb-1 flex h-10 items-center gap-3 rounded-lg px-3'}
               >

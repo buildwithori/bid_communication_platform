@@ -11,6 +11,7 @@ import {
 } from '@/components/dashboard/DashboardSkeletons';
 import { WorkspaceShellSkeleton } from '@/components/layout/WorkspaceShellSkeleton';
 import { PageSkeleton } from '@/components/shared/Card';
+import { ProfilePageSkeleton } from '@/components/entrepreneur/profile/ProfileLoadingSkeletons';
 import { authenticatedDestination, workspaceRouteForRole } from '@/lib/auth-navigation';
 import { routes } from '@/lib/routes';
 
@@ -53,8 +54,10 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
 
 function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathname: string }) {
   const isDashboard = pathname === workspaceRouteForRole(role);
-  const content = isDashboard
-    ? role === 'admin'
+  const content = pathname === routes.entrepreneur.profile
+    ? <ProfilePageSkeleton />
+    : isDashboard
+      ? role === 'admin'
       ? <AdminDashboardSkeleton />
       : role === 'trainer'
         ? <TrainerDashboardSkeleton />
@@ -62,7 +65,7 @@ function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathn
     : <PageSkeleton />;
 
   return (
-    <WorkspaceShellSkeleton role={role}>
+    <WorkspaceShellSkeleton role={role} pathname={pathname}>
       {content}
     </WorkspaceShellSkeleton>
   );
