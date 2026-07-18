@@ -16,7 +16,7 @@ export const AuthTextField = React.forwardRef<
       <span className="mb-1.5 block text-sm font-medium text-foreground">{label}</span>
       <span
         className={cn(
-          "flex h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 transition-[background-color,border-color,box-shadow] duration-150 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15",
+          "flex h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 transition-[background-color,border-color,box-shadow] duration-150 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
           error &&
             "border-destructive focus-within:border-destructive focus-within:ring-destructive/10",
         )}

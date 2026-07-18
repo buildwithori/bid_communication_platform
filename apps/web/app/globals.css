@@ -79,7 +79,6 @@
 @layer base {
   * {
     @apply border-border;
-    --tw-ring-color: hsl(var(--ring) / 0.35);
   }
 
   ::selection {

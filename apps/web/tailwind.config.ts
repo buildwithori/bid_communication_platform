@@ -124,6 +124,9 @@ const config: Config = {
           light: '#FCEBEB',
         },
       },
+      ringColor: {
+        DEFAULT: 'hsl(var(--ring))',
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
