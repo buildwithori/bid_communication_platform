@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { BidLogo } from '@/components/shared/BidLogo';
-import { AuthThemeToggle } from '@/components/auth/AuthThemeToggle';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { cn } from '@/lib/utils';
 
 export function AuthShell({
@@ -24,7 +24,7 @@ export function AuthShell({
   return (
     <main className="h-screen h-[100dvh] overflow-y-auto bg-background text-foreground transition-colors duration-200">
       <section className="flex min-h-full items-center justify-center px-5 py-8 sm:px-8">
-        <div className={cn('w-full max-w-[500px]', className)}>
+        <div className={cn('auth-panel-enter w-full max-w-[500px]', className)}>
           <div className="mb-6 flex flex-col items-center text-center">
             <BidLogo size={76} variant="full" />
           </div>
@@ -40,7 +40,7 @@ export function AuthShell({
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure BID Hub access
               </div>
-              <AuthThemeToggle />
+              <ThemeToggle className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card" />
             </div>
 
             <div className="mb-6">
