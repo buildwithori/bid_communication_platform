@@ -36,7 +36,6 @@ import {
   useEntrepreneurProfileQuery,
   useFundraisingRoundsQuery,
   usePeriodicUpdatesQuery,
-  useProgrammeAccessQuery,
   useProgrammeGoalsQuery,
   useSaveFundraisingRoundMutation,
   useSavePeriodicUpdateMutation,
@@ -91,11 +90,6 @@ export default function EntrepreneurProfilePage() {
   const [viewUpdate, setViewUpdate] = React.useState<PeriodicUpdateRecord>();
   const profile = useEntrepreneurProfileQuery();
   const entrepreneurId = profile.data?.entrepreneurUserId ?? null;
-  const programmes = useProgrammeAccessQuery(
-    entrepreneurId,
-    { take: 10 },
-    Boolean(entrepreneurId),
-  );
   const goals = useProgrammeGoalsQuery(
     entrepreneurId,
     { search: React.useDeferredValue(goalSearch) || undefined, take: 10 },
@@ -410,7 +404,6 @@ export default function EntrepreneurProfilePage() {
         <>
           <BusinessTab
             record={record}
-            programmes={programmes}
             isPending={updateProfile.isPending}
             onSubmit={(values) => updateProfile.mutate(values)}
           />
@@ -558,12 +551,10 @@ export default function EntrepreneurProfilePage() {
 
 function BusinessTab({
   record,
-  programmes,
   isPending,
   onSubmit,
 }: {
   record: NonNullable<ReturnType<typeof useEntrepreneurProfileQuery>["data"]>;
-  programmes: ReturnType<typeof useProgrammeAccessQuery>;
   isPending: boolean;
   onSubmit: (values: ProfileForm) => void;
 }) {
@@ -596,7 +587,7 @@ function BusinessTab({
   const stageId = useWatch({ control: form.control, name: "stageId" });
   React.useEffect(() => form.reset(profileDefaults(record)), [form, record]);
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="space-y-4">
       <Card>
         <CardHeader
           title="Business details"
@@ -733,47 +724,6 @@ function BusinessTab({
             Save changes
           </Button>
         </form>
-      </Card>
-      <Card>
-        <CardHeader
-          title="Programme access"
-          description={`${programmes.totalItems} assigned programme${programmes.totalItems === 1 ? "" : "s"}, plus free resources`}
-        />
-        <div className="space-y-2">
-          {programmes.rows.map((item) => (
-            <div
-              key={item.grantId}
-              className="rounded-xl border border-line bg-surface-subtle p-3"
-            >
-              <div className="font-semibold text-ink">{item.name}</div>
-              <div className="mt-1 text-sm text-ink-muted">
-                {formatDate(item.startDate)} – {formatDate(item.endDate)}
-              </div>
-              {item.progress ? (
-                <div className="mt-2 text-sm font-medium text-bid">
-                  {item.progress.percent}% complete
-                </div>
-              ) : (
-                <div className="mt-2 text-sm text-ink-faint">Not started</div>
-              )}
-            </div>
-          ))}
-          {!programmes.isLoading && programmes.rows.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-ink-muted">
-              You currently have free resources only.
-            </div>
-          ) : null}
-        </div>
-        {programmes.hasNextPage ? (
-          <Button
-            className="mt-3 w-full"
-            variant="outline"
-            isLoading={programmes.isFetchingNextPage}
-            onClick={() => void programmes.fetchNextPage()}
-          >
-            Load more programmes
-          </Button>
-        ) : null}
       </Card>
     </div>
   );
