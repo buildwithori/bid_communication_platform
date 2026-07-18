@@ -113,7 +113,7 @@ export function DatePicker({
           disabled={disabled}
           onBlur={onBlur}
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:pointer-events-none disabled:opacity-55',
+            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
             displayValue ? 'text-ink' : 'text-ink-faint',
             className,
           )}
@@ -315,7 +315,7 @@ export function DateRangePicker({
           disabled={disabled}
           onBlur={onBlur}
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:pointer-events-none disabled:opacity-55',
+            'flex h-10 w-full items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
             displayValue ? 'text-ink' : 'text-ink-faint',
             className,
           )}

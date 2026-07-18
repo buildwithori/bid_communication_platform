@@ -59,10 +59,10 @@ export function FieldLabel({
 }
 
 const inputClass =
-  'h-10 w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0';
+  'h-10 w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none';
 
 const textareaClass =
-  'w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 py-2.5 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0';
+  'w-full rounded-lg border border-black/[0.1] bg-surface-panel px-3 py-2.5 text-sm font-normal text-ink shadow-sm placeholder:font-normal placeholder:text-ink-faint focus-visible:border-bid focus-visible:ring-2 focus-visible:ring-bid/10 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none';
 
 /** Field that owns its own label + error slot (simplest API for modals). */
 export interface FormFieldProps {
@@ -147,7 +147,7 @@ export function FormSelect({
       <SelectTrigger
         id={id}
         className={cn(
-          'h-10 rounded-[7px] border border-line-strong bg-surface-panel px-3 text-sm text-ink focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0',
+          'h-10 rounded-[7px] border border-line-strong bg-surface-panel px-3 text-sm text-ink focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
           'h-10 w-full rounded-lg border-black/[0.1] font-normal shadow-sm focus-visible:ring-2 focus-visible:ring-bid/10 [&>span]:truncate',
           className,
         )}
@@ -223,7 +223,7 @@ export function FormAutocomplete({
           type="button"
           disabled={disabled}
           className={cn(
-            'flex h-10 w-full min-w-0 items-center justify-between rounded-lg border border-border bg-popover px-3 text-left text-sm font-normal text-popover-foreground shadow-sm outline-none transition hover:bg-accent focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:pointer-events-none disabled:opacity-55',
+            'flex h-10 w-full min-w-0 items-center justify-between rounded-lg border border-border bg-popover px-3 text-left text-sm font-normal text-popover-foreground shadow-sm outline-none transition hover:bg-accent focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
             !selected && 'text-muted-foreground',
             className,
           )}

@@ -134,6 +134,17 @@
     box-shadow: 0 0 0 1000px
       hsl(var(--autofill-background, var(--card))) inset;
   }
+
+  :where(input:not([type='hidden']), textarea, select):disabled,
+  :where(input:not([type='hidden']), textarea)[readonly] {
+    cursor: not-allowed;
+    border-color: hsl(var(--border));
+    background-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    -webkit-text-fill-color: hsl(var(--muted-foreground));
+    box-shadow: none;
+    opacity: 1;
+  }
 }
 
 @layer components {
