@@ -23,6 +23,7 @@ FROM base AS builder
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 
+RUN test -n "$NEXT_PUBLIC_API_BASE_URL"
 RUN npm run build:shared && npm run build:web
 
 FROM node:20-bookworm-slim AS production
@@ -36,10 +37,11 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci --omit=dev --workspace @bid/web --workspace @bid/shared
 
-COPY --from=builder /workspace/apps/web/.next apps/web/.next
-COPY --from=builder /workspace/apps/web/public apps/web/public
-COPY --from=builder /workspace/apps/web/next.config.mjs apps/web/next.config.mjs
-COPY --from=builder /workspace/packages/shared/dist packages/shared/dist
+COPY --chown=node:node --from=builder /workspace/apps/web/.next apps/web/.next
+COPY --chown=node:node --from=builder /workspace/apps/web/public apps/web/public
+COPY --chown=node:node --from=builder /workspace/apps/web/next.config.mjs apps/web/next.config.mjs
+COPY --chown=node:node --from=builder /workspace/packages/shared/dist packages/shared/dist
 
 EXPOSE 3000
+USER node
 CMD ["npm", "run", "start:web", "--", "--hostname", "0.0.0.0"]

@@ -2,7 +2,7 @@
 
 BID Hub is a full-stack application for managing entrepreneur support programmes. It gives entrepreneurs a workspace for learning, deliverables, profile updates, sessions, and tools, while giving programme teams and trainers an operational workspace for programme delivery, content, reporting, sessions, and reviews.
 
-The project started UI-first and is now entering backend integration. The frontend still uses mock data in many areas while the NestJS backend, database, jobs, files, email, and calendar integrations are introduced behind the product flows.
+The product flows are integrated with the NestJS API. PostgreSQL owns business state, BullMQ workers handle background work, and the web application consumes role-scoped API modules through its frontend integration layer.
 
 > Before making product, UI, routing, or frontend architecture changes, read [PROJECT_MEMORY.md](./PROJECT_MEMORY.md). It captures the standing decisions and long-running context for this application.
 >
@@ -11,7 +11,7 @@ The project started UI-first and is now entering backend integration. The fronte
 ## Tech Stack
 
 - Monorepo: `apps/web`, `apps/api`, `packages/shared`, root `prisma`
-- Frontend: Next.js 13 App Router, React 18, TypeScript, Tailwind CSS, Radix UI/shadcn primitives
+- Frontend: Next.js 16 App Router, React 19, TypeScript, Tailwind CSS, Radix UI/shadcn primitives
 - Forms/data UI: React Hook Form, Zod, TanStack Query, Recharts, Lucide React icons, Sonner
 - Backend: NestJS, PostgreSQL, Prisma
 - Jobs/cache: BullMQ + Redis
@@ -79,6 +79,8 @@ npm run docker:dev
 
 The development Compose file injects `.env.local` into the relevant containers. The API registers BullMQ Job Schedulers while the separate worker consumes jobs; Redis is intentionally not published to the host. API health includes Redis connectivity, queue counts, and a TTL-backed worker heartbeat.
 
+`DATABASE_URL` uses the Docker hostname `postgres`. Host-run Prisma commands use `DATABASE_HOST_URL` from the same file so migrations, seed, and Studio connect through the published Postgres port.
+
 Local pgAdmin account:
 
 - Email: `admin@example.com`
@@ -91,13 +93,15 @@ The local Postgres server is pre-registered as `BID Hub Local Postgres`. If you 
 - Database: `bid_hub`
 - Username/password: `bid` / `bid`
 
-Production compose is intentionally separate:
+Production Compose is intentionally separate and includes Caddy-managed HTTPS, automatic migrations, durable Redis queues, bounded logs, non-root application containers, and health-gated startup:
 
 ```bash
 npm run docker:prod
 ```
 
 Use `.env.docker.example` as the only local environment template. Production Compose intentionally reads the root `.env` that will be provisioned for deployment; it does not use `.env.local`.
+
+Read [docs/production-deployment.md](./docs/production-deployment.md) before a production deployment. It documents required secrets and integrations, DNS/TLS, deployment, verification, backups, and rollback.
 
 Seed local data after the database is running:
 
@@ -125,7 +129,7 @@ Auth pages live under `/auth`.
 - `/auth/reset-password`
 - `/auth/verify-email`
 
-Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Regular email signup collects the required details directly and moves to email verification. `/auth/onboarding` is only for Google signup when required details are missing. Email/password auth is connected to the NestJS API with httpOnly cookie sessions. Google OAuth is still pending backend implementation.
+Login and signup are separate routes with shared auth tabs, so switching tabs updates the URL. Regular email signup collects the required details directly and moves to email verification. `/auth/onboarding` is only for Google signup when required details are missing. Email/password auth uses httpOnly cookie sessions, and Google OAuth supports entrepreneur login and signup.
 
 ### Entrepreneur Workspace
 
@@ -168,7 +172,7 @@ apps/
   web/
     app/                Auth, entrepreneur, admin, and trainer routes
     components/         UI system, role-specific components, Radix primitives
-    lib/                mock data, stores, routes, helpers
+    lib/                API modules, stores, routes, and helpers
     types/              frontend domain types
   api/
     src/                NestJS backend source
@@ -209,59 +213,18 @@ Data-heavy surfaces should be designed for growth. Tables and table-like views s
 
 ## Current Data Model
 
-The current app uses mock data and in-memory React context stores.
-
-Mock data lives in:
-
-```text
-apps/web/lib/mock-data/
-```
-
-State and mutation logic live in:
-
-```text
-apps/web/lib/stores/
-```
-
-The mock data is intentionally shaped close to backend tables, including:
-
-- entrepreneurs
-- trainers
-- programmes
-- modules
-- content items
-- deliverables
-- sessions
-- tools
-- reporting data
-- sectors and stages
-
-When backend work starts, the store methods are the main swap points for API/database calls.
+Application business data is persisted through Prisma/PostgreSQL. Static reference datasets may remain in the web application only where they are intentionally code-owned rather than server-managed.
 
 ## Current Scope
 
 Implemented:
 
-- Auth UI scaffold
-- Entrepreneur workspace
-- Admin workspace
-- In-memory CRUD-style flows
-- Modal forms with validation
-- Searchable/filterable/paginated operational tables
-- Dashboard charts
-- Programme builder UI
-- Training library and learning path UI
-- Content, deliverable, sessions, tools, and reporting flows
-
-Not implemented yet:
-
-- Google OAuth backend flow
-- Most domain API routes
-- Persistent database writes
-- File storage
-- Real notifications
-- Real top-bar global search
-- Role-based route protection
+- Email/password and Google authentication with role-based workspace protection
+- Entrepreneur, trainer, and admin workspaces backed by role-scoped APIs
+- Programme, content, learning, deliverable, tool, session, and reporting workflows
+- Private object storage, Mux video, Google Calendar/Meet, and linked notifications
+- Cursor-paginated operational lists and backend-computed dashboards/aggregates
+- BullMQ workers for transactional email, notification delivery, audit processing, recurring deliverables, and report exports
 
 ## Development Guidelines
 
@@ -270,19 +233,11 @@ Not implemented yet:
 - Keep reusable UI in `components/shared`.
 - Prefer shared form, table, modal, and card primitives.
 - Avoid one-off layouts that will fail when data grows.
-- Avoid dead-end actions; actions should open real UI, navigate, update local state, or clearly represent a backend-ready placeholder.
+- Avoid dead-end actions; actions must open real UI, navigate, or persist a real state change.
 - Keep text readable and controls aligned.
 - Use Lucide icons for common UI actions.
 - Run `npm run build` after meaningful changes.
 
-## Backend Integration Notes
+## Frontend API Integration
 
-Future backend work will be implemented as a NestJS API. It should connect around the current boundaries:
-
-- Auth: replace UI-only auth with a real auth provider and role-based routing.
-- Data: replace `lib/stores` in-memory mutations with backend calls.
-- Storage: wire upload controls to file storage.
-- Notifications: connect bell/activity updates to real events.
-- Search: replace local filtering with backend-backed search where needed.
-
-The component layer should not need major rewrites if backend integration keeps these boundaries.
+Frontend requests, query keys, hooks, and API types live in domain folders under `apps/web/lib/api`. Routed pages and visual components consume those hooks rather than importing TanStack Query or calling the API client directly. See [docs/frontend-api-integration.md](./docs/frontend-api-integration.md).

@@ -422,6 +422,15 @@ Before merging backend work, ask:
 - The mandatory lifecycle review covers invitation acceptance/replacement, role/profile access, programme lifecycle/access, module/content creation/ownership/order, deliverable rules/reviews/due dates, tool lifecycle/access/request decisions, session transitions, calendar connections, and company settings/taxonomies. High-frequency learning progress, notification reads, cookie rotation, and temporary upload creation are deliberately excluded from business audit noise.
 - Feature 16 is complete. The production API build, live Docker dependency health, live 10-then-429 authentication check, API typecheck, and all 41 focused backend tests pass.
 
+## Production Runtime Hardening (2026-07-18)
+
+- Sending email is a worker-only capability. `EmailModule` is not global and is imported only by `WorkerModule`; the HTTP API uses the separate `EmailHealthModule` for readiness without gaining access to `EmailService.send()`. Auth and invitation services enqueue typed transactional jobs, while notification email remains a durable worker-claimed delivery.
+- Production configuration fails closed unless PostgreSQL, Redis, Resend, Google, Calendar encryption, DigitalOcean Spaces, and Mux credentials are present. Public application URLs and storage endpoints must use HTTPS, production email must use a verified non-local sender, and the single-Droplet Caddy proxy uses one origin for web and `/api/*`.
+- Production Compose runs a one-shot migration service before API/worker startup, Caddy-managed TLS, Redis AOF with `noeviction`, health-gated dependencies, bounded JSON logs, graceful shutdown periods, persistent volumes, and non-root API/web containers. Local and production web images use distinct names so building one stack cannot overwrite the other.
+- Swagger is development-only. Helmet, no-store API responses, Next security headers, shutdown hooks, and bounded provider request timeouts are production defaults.
+- Host Prisma commands load `.env.local` and replace the Docker-only `DATABASE_URL` with `DATABASE_HOST_URL`. Production migrations use the provisioned root `.env` directly and must run `prisma migrate deploy`, never development migration or seed commands.
+- The deployment, smoke-check, backup, and rollback procedure is maintained in `docs/production-deployment.md`.
+
 ## Schedule Window And Runtime Identity Contracts (2026-07-16)
 
 - Workspace shells use authenticated admin, trainer, and entrepreneur profile endpoints; seed users and in-memory business stores are not runtime identity sources.

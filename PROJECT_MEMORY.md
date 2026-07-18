@@ -315,3 +315,10 @@ Session workflow rules:
 - The entrepreneur schedule combines sessions and deliverable deadlines from authenticated backend date-window queries. Calendar hooks automatically follow every cursor before rendering the complete window, so a batch size never becomes a hidden event cap.
 - Deliverable instance queries accept validated `dateFrom`/`dateTo` filters, preserve role scope, reject reversed ranges, and remain cursor-paginated.
 - Active-route mock and direct-API boundary audits, changed-file lint, monorepo typechecks, both production builds, focused hardening tests, and live Docker profile/window/health responses pass.
+
+## Production Runtime Completion (2026-07-18)
+
+- Production deployment is a single-origin HTTPS stack behind Caddy: the public domain serves Next.js and proxies `/api/*` to NestJS. Production Compose automatically applies migrations before API/worker startup, keeps PostgreSQL and Redis internal, persists Redis with AOF/no-eviction, bounds logs, and runs application containers as non-root.
+- Local and production web images must keep distinct tags (`bid-hub-web-dev` and `bid-hub-web`) so production builds never replace the local development runtime.
+- Email delivery is always background work. The HTTP API may enqueue transactional or notification delivery but cannot resolve the send-capable `EmailService`; only the dedicated BullMQ worker imports `EmailModule`. API readiness uses a separate email-health service.
+- Production environment validation requires secure HTTPS roots and complete Resend, Google, Spaces, Mux, database, Redis, and encryption configuration. Deployment and rollback operations follow `docs/production-deployment.md`.

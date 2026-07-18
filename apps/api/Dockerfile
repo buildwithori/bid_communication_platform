@@ -45,9 +45,10 @@ COPY prisma/schema.prisma prisma/schema.prisma
 RUN npm ci --omit=dev --workspace @bid/api --workspace @bid/shared
 RUN npm run prisma:generate
 
-COPY --from=builder /workspace/apps/api/dist apps/api/dist
-COPY --from=builder /workspace/packages/shared/dist packages/shared/dist
-COPY --from=builder /workspace/prisma prisma
+COPY --chown=node:node --from=builder /workspace/apps/api/dist apps/api/dist
+COPY --chown=node:node --from=builder /workspace/packages/shared/dist packages/shared/dist
+COPY --chown=node:node --from=builder /workspace/prisma prisma
 
 EXPOSE 4000
+USER node
 CMD ["npm", "run", "start:api"]
