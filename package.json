@@ -40,5 +40,15 @@
     "dotenv-cli": "^11.0.0",
     "prisma": "^6.19.3",
     "typescript": "5.2.2"
+  },
+  "overrides": {
+    "@babel/runtime": "7.28.4",
+    "brace-expansion@1.1.11": "1.1.13",
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "next": {
+      "postcss": "8.5.19"
+    }
   }
 }

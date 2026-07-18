@@ -430,6 +430,7 @@ Before merging backend work, ask:
 - Swagger is development-only. Helmet, no-store API responses, Next security headers, shutdown hooks, and bounded provider request timeouts are production defaults.
 - Host Prisma commands load `.env.local` and replace the Docker-only `DATABASE_URL` with `DATABASE_HOST_URL`. Production migrations use the provisioned root `.env` directly and must run `prisma migrate deploy`, never development migration or seed commands.
 - The deployment, smoke-check, backup, and rollback procedure is maintained in `docs/production-deployment.md`.
+- NestJS runtime, platform, configuration, Swagger, CLI, and schematics packages are aligned on major version 11. The clean lockfile and both production image installs audit with zero vulnerabilities; retain the scoped root overrides for patched transitive PostCSS, UUID, Babel runtime, and brace-expansion versions until their direct parents adopt those releases.
 
 ## Schedule Window And Runtime Identity Contracts (2026-07-16)
 
