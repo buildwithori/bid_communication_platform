@@ -365,29 +365,29 @@ export default function EntrepreneurProfilePage() {
 
   return (
     <>
-      <section className="mb-4 overflow-hidden rounded-2xl border border-bid/15 bg-gradient-to-r from-bid via-bid-dark to-bid p-5 text-white shadow-sm">
+      <section className="mb-4 overflow-hidden rounded-2xl border border-bid/15 bg-gradient-to-r from-bid via-bid-dark to-bid p-5 text-white shadow-sm dark:border-white/15 dark:from-bid-light dark:via-bid-dark dark:to-bid-light">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <Avatar
             initials={initials(record.firstName, record.lastName, record.email)}
             size={68}
             tone="brand"
-            className="border-2 border-white/40 bg-white/20 text-white"
+            className="border-2 border-white/60 bg-white/20 text-white dark:bg-black/15"
           />
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold">
               {record.businessName}
             </h1>
-            <div className="mt-1 text-sm text-white/75">
+            <div className="mt-1 text-sm text-white/85">
               {record.representativeName} · {record.country}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {record.sector ? (
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs">
+                <span className="rounded-full border border-white/20 bg-black/10 px-2.5 py-1 text-xs text-white/90">
                   {record.sector.name}
                 </span>
               ) : null}
               {record.stage ? (
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs">
+                <span className="rounded-full border border-white/20 bg-black/10 px-2.5 py-1 text-xs text-white/90">
                   {record.stage.name}
                 </span>
               ) : null}
@@ -910,9 +910,9 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 function HeaderMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[120px] rounded-xl bg-white/10 px-4 py-3 text-center backdrop-blur">
+    <div className="min-w-[120px] rounded-xl border border-white/15 bg-black/10 px-4 py-3 text-center shadow-sm backdrop-blur dark:bg-black/20">
       <div className="text-xl font-semibold">{value}</div>
-      <div className="mt-0.5 text-xs text-white/70">{label}</div>
+      <div className="mt-0.5 text-xs text-white/85">{label}</div>
     </div>
   );
 }
