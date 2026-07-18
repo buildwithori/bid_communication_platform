@@ -19,11 +19,6 @@ export class UpsertProgrammeGoalDto {
   description?: string | null;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  evidence?: string | null;
-
-  @IsOptional()
   @IsBoolean()
   milestoneAchieved?: boolean;
 }

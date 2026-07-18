@@ -166,7 +166,6 @@ export type ProgrammeGoalRecord = {
   };
   targetAmountCents: number | null;
   description: string | null;
-  evidence: string | null;
   milestoneAchieved: boolean;
   createdAt: string;
   updatedAt: string;
@@ -210,7 +209,6 @@ export type ProgrammeGoalPayload = {
   goalTypeId: string;
   targetAmountCents?: number | null;
   description?: string | null;
-  evidence?: string | null;
   milestoneAchieved?: boolean;
 };
 

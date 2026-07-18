@@ -1119,7 +1119,7 @@ Current UI fields:
 
 - funding round: name, amount, date, source, optional programme, optional goal
 - periodic update: programme scope, period start/end, jobs by gender, notes
-- programme goal: optional programme depending on goal type, goal type, optional target amount, description
+- programme goal: optional programme depending on goal type, goal type, optional target amount, description, milestone-achieved flag
 
 Backend mapping:
 

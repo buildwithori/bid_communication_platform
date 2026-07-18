@@ -31,7 +31,6 @@ const goalSchema = z.object({
   programmeId: z.string().optional(),
   targetAmount: z.string().optional(),
   description: z.string().max(1000).optional(),
-  evidence: z.string().max(1000).optional(),
   milestoneAchieved: z.boolean(),
 });
 type GoalForm = z.infer<typeof goalSchema>;
@@ -126,7 +125,6 @@ export function ProgrammeGoalRecordModal({
               ? Math.round(Number(values.targetAmount) * 100)
               : null,
             description: values.description || null,
-            evidence: values.evidence || null,
             milestoneAchieved: values.milestoneAchieved,
           }),
         )}
@@ -214,21 +212,13 @@ export function ProgrammeGoalRecordModal({
         <FormField label="Goal description" optional className="mb-0">
           <FormTextarea rows={3} {...form.register("description")} />
         </FormField>
-        <FormField label="Evidence or status note" optional className="mb-0">
-          <FormTextarea rows={3} {...form.register("evidence")} />
-        </FormField>
         <label className="flex items-center gap-3 rounded-xl border border-line bg-surface-subtle p-3 text-sm text-ink">
           <input
             type="checkbox"
             className="h-4 w-4 accent-bid"
             {...form.register("milestoneAchieved")}
           />
-          <span>
-            <strong>Milestone achieved</strong>
-            <span className="mt-0.5 block text-ink-muted">
-              Mark this only when the recorded evidence supports completion.
-            </span>
-          </span>
+          <span className="font-semibold">Milestone achieved</span>
         </label>
         <ModalActions
           pending={isPending}
@@ -584,7 +574,6 @@ function goalDefaults(goal?: ProgrammeGoalRecord): GoalForm {
         ? ""
         : String(goal.targetAmountCents / 100),
     description: goal?.description ?? "",
-    evidence: goal?.evidence ?? "",
     milestoneAchieved: goal?.milestoneAchieved ?? false,
   };
 }

@@ -227,7 +227,6 @@ export class EntrepreneursService {
         ? {
             OR: [
               { description: { contains: query.search.trim(), mode: 'insensitive' } },
-              { evidence: { contains: query.search.trim(), mode: 'insensitive' } },
               { goalType: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
               { programme: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
             ],
@@ -347,7 +346,6 @@ export class EntrepreneursService {
             goalTypeId: dto.goalTypeId,
             targetAmountCents: dto.targetAmountCents ?? null,
             description: this.optionalText(dto.description),
-            evidence: this.optionalText(dto.evidence),
             milestoneAchieved: dto.milestoneAchieved ?? false,
           },
           include: this.programmeGoalInclude(),
@@ -376,7 +374,6 @@ export class EntrepreneursService {
             goalTypeId: dto.goalTypeId,
             targetAmountCents: dto.targetAmountCents ?? null,
             description: this.optionalText(dto.description),
-            evidence: this.optionalText(dto.evidence),
             milestoneAchieved: dto.milestoneAchieved ?? false,
           },
           include: this.programmeGoalInclude(),
@@ -831,7 +828,6 @@ export class EntrepreneursService {
       goalType: goal.goalType,
       targetAmountCents: goal.targetAmountCents,
       description: goal.description,
-      evidence: goal.evidence,
       milestoneAchieved: goal.milestoneAchieved,
       createdAt: goal.createdAt.toISOString(),
       updatedAt: goal.updatedAt.toISOString(),

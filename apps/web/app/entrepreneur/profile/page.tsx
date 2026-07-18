@@ -207,15 +207,6 @@ export default function EntrepreneurProfilePage() {
       ),
     },
     {
-      key: "evidence",
-      header: "Evidence",
-      cell: (goal) => (
-        <div className="max-w-[320px] truncate text-ink-muted">
-          {goal.evidence || "No evidence recorded"}
-        </div>
-      ),
-    },
-    {
       key: "status",
       header: "Status",
       cell: (goal) => (

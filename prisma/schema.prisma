@@ -673,7 +673,6 @@ model ProgrammeGoal {
   goalTypeId         String   @map("goal_type_id")
   targetAmountCents  Int?     @map("target_amount_cents")
   description        String?
-  evidence           String?
   milestoneAchieved  Boolean  @default(false) @map("milestone_achieved")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
