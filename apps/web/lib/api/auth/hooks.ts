@@ -45,7 +45,17 @@ export function useSignupMutation(handlers?: MutationHandlers<Awaited<ReturnType
 }
 
 export function useLoginMutation(handlers?: MutationHandlers<Awaited<ReturnType<typeof loginRequest>>>) {
-  return useApiMutation<Awaited<ReturnType<typeof loginRequest>>, LoginPayload>(loginRequest, handlers);
+  const queryClient = useQueryClient();
+  return useApiMutation<Awaited<ReturnType<typeof loginRequest>>, LoginPayload>(
+    loginRequest,
+    {
+      onSuccess: (data) => {
+        queryClient.setQueryData(authKeys.currentUser(), { user: data.user });
+        handlers?.onSuccess?.(data);
+      },
+      onError: handlers?.onError,
+    },
+  );
 }
 
 export function useForgotPasswordMutation(handlers?: MutationHandlers<Awaited<ReturnType<typeof forgotPasswordRequest>>>) {
@@ -73,7 +83,18 @@ export function useGoogleOnboardingQuery() {
 }
 
 export function useCompleteGoogleOnboardingMutation(handlers?: MutationHandlers<Awaited<ReturnType<typeof completeGoogleOnboardingRequest>>>) {
-  return useApiMutation<Awaited<ReturnType<typeof completeGoogleOnboardingRequest>>, GoogleOnboardingPayload>(completeGoogleOnboardingRequest, handlers);
+  const queryClient = useQueryClient();
+  return useApiMutation<Awaited<ReturnType<typeof completeGoogleOnboardingRequest>>, GoogleOnboardingPayload>(
+    completeGoogleOnboardingRequest,
+    {
+      onSuccess: (data) => {
+        queryClient.setQueryData(authKeys.currentUser(), { user: data.user });
+        queryClient.removeQueries({ queryKey: authKeys.onboarding() });
+        handlers?.onSuccess?.(data);
+      },
+      onError: handlers?.onError,
+    },
+  );
 }
 
 export function useLogoutMutation(handlers?: MutationHandlers<Awaited<ReturnType<typeof logoutRequest>>>) {

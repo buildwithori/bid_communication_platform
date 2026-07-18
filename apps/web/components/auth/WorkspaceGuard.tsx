@@ -4,7 +4,13 @@ import * as React from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCurrentUserQuery, type AuthUser } from '@/lib/api/auth';
-import { Skeleton } from '@/components/shared/Card';
+import {
+  AdminDashboardSkeleton,
+  EntrepreneurDashboardSkeleton,
+  TrainerDashboardSkeleton,
+} from '@/components/dashboard/DashboardSkeletons';
+import { WorkspaceShellSkeleton } from '@/components/layout/WorkspaceShellSkeleton';
+import { PageSkeleton } from '@/components/shared/Card';
 import { routes } from '@/lib/routes';
 
 type WorkspaceRole = AuthUser['role'];
@@ -35,21 +41,25 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
   }, [currentUserQuery.isLoading, isAllowed, pathname, router, user]);
 
   if (currentUserQuery.isLoading || !user || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !isAllowed) {
-    return <WorkspaceGuardFallback />;
+    return <WorkspaceGuardFallback role={allowedRoles[0] ?? 'entrepreneur'} pathname={pathname} />;
   }
   return <>{children}</>;
 }
 
-function WorkspaceGuardFallback() {
+function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathname: string }) {
+  const isDashboard = pathname === workspaceRouteForRole(role);
+  const content = isDashboard
+    ? role === 'admin'
+      ? <AdminDashboardSkeleton />
+      : role === 'trainer'
+        ? <TrainerDashboardSkeleton />
+        : <EntrepreneurDashboardSkeleton />
+    : <PageSkeleton />;
+
   return (
-    <div aria-label="Loading workspace" aria-busy="true" className="min-h-screen bg-canvas p-6 lg:p-10">
-      <div className="mx-auto max-w-7xl space-y-7">
-        <div className="flex items-center justify-between"><Skeleton className="h-9 w-36" /><Skeleton className="h-9 w-9 rounded-full" /></div>
-        <div className="space-y-2"><Skeleton className="h-8 w-64" /><Skeleton className="h-4 w-full max-w-lg" /></div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-28 w-full" />)}</div>
-        <Skeleton className="h-80 w-full" />
-      </div>
-    </div>
+    <WorkspaceShellSkeleton role={role}>
+      {content}
+    </WorkspaceShellSkeleton>
   );
 }
 
