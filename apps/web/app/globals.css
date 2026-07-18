@@ -79,6 +79,23 @@
 @layer base {
   * {
     @apply border-border;
+    --tw-ring-color: hsl(var(--ring) / 0.35);
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.28);
+    color: hsl(var(--foreground));
+  }
+
+  :focus-visible {
+    outline-color: hsl(var(--ring));
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    accent-color: hsl(var(--primary));
   }
   html,
   body {
