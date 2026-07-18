@@ -12,7 +12,7 @@ import { useForgotPasswordMutation } from '@/lib/api/auth';
 import { forgotPasswordSchema, type ForgotPasswordForm as ForgotPasswordFormValues } from '@/lib/forms/schemas';
 
 export default function ForgotPasswordPage() {
-  return <AuthShell title="Forgot password" description="Enter your email address and we will send password reset instructions." className="max-w-[460px]" footer={<AuthBackToLoginLink />}><ForgotPasswordForm /></AuthShell>;
+  return <AuthShell title="Forgot password" description="Enter your email address and we will send password reset instructions." footer={<AuthBackToLoginLink />}><ForgotPasswordForm /></AuthShell>;
 }
 
 function ForgotPasswordForm() {

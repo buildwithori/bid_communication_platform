@@ -6,7 +6,7 @@ export function AuthBackToLoginLink() {
   return (
     <Link
       href={routes.auth.login}
-      className="mx-auto flex w-fit items-center gap-2 text-sm font-medium text-ink-muted transition-colors hover:text-bid"
+      className="mx-auto flex w-fit items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
     >
       <ArrowLeft className="h-4 w-4" />
       Back to login

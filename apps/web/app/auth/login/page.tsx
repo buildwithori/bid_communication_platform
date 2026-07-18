@@ -28,7 +28,7 @@ const oauthErrors: Record<string, string> = {
 
 export default function AuthLoginPage() {
   return (
-    <AuthShell title="Sign in to BID Hub" className="max-w-[460px]">
+    <AuthShell title="Sign in to BID Hub">
       <AuthModeTabs active="login" />
       <React.Suspense fallback={<LoginFormSkeleton />}>
         <LoginForm />
@@ -56,14 +56,14 @@ function LoginForm() {
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-      {oauthError ? <div role="alert" className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{oauthErrors[oauthError] ?? oauthErrors.failed}</div> : null}
+      {oauthError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{oauthErrors[oauthError] ?? oauthErrors.failed}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('login'))}>Continue with Google</AuthGoogleButton>
       <AuthDivider label="or sign in with email" />
       <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" placeholder="you@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
       <AuthTextField icon={<Lock className="h-4 w-4" />} label="Password" type="password" placeholder="Enter password" error={form.formState.errors.password?.message} {...form.register('password')} />
-      <div className="text-right"><Link href={routes.auth.forgotPassword} className="text-sm font-medium text-bid hover:text-bid-dark">Forgot password?</Link></div>
+      <div className="text-right"><Link href={routes.auth.forgotPassword} className="text-sm font-medium text-primary hover:text-primary/80">Forgot password?</Link></div>
       <Button type="submit" size="lg" className="h-11 w-full" isLoading={mutation.isPending} loadingLabel="Signing in...">Sign in</Button>
-      <p className="text-center text-xs leading-5 text-ink-faint">By continuing, you agree to use BID Hub for authorised programme activity.</p>
+      <p className="text-center text-xs leading-5 text-muted-foreground">By continuing, you agree to use BID Hub for authorised programme activity.</p>
     </form>
   );
 }

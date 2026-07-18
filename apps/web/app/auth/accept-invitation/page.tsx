@@ -36,7 +36,6 @@ function AcceptInvitationView() {
     <AuthShell
       title={`Accept ${noun} invitation`}
       description={`Create your password to activate your BID Hub ${noun} workspace.`}
-      className="max-w-[460px]"
       footer={<AuthBackToLoginLink />}
     >
       <AcceptInvitationFormView isTrainer={isTrainer} />
@@ -81,12 +80,12 @@ function AcceptInvitationFormView({ isTrainer }: { isTrainer: boolean }) {
       })}
     >
       {!token ? (
-        <div className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           This invitation link is incomplete. Ask the inviting administrator to
           resend it.
         </div>
       ) : (
-        <div className="flex items-start gap-3 rounded-lg border border-bid/20 bg-bid-light px-4 py-3 text-sm leading-6 text-bid-dark">
+        <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-accent px-4 py-3 text-sm leading-6 text-accent-foreground">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
           This password activates the {noun} account attached to your invitation.
         </div>
@@ -126,7 +125,6 @@ function AcceptInvitationSkeleton() {
     <AuthShell
       title="Accept invitation"
       description="Loading your BID Hub invitation."
-      className="max-w-[460px]"
       footer={<AuthBackToLoginLink />}
     >
       <div aria-label="Loading invitation" aria-busy="true" className="space-y-4">

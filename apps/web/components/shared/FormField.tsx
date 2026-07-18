@@ -223,13 +223,13 @@ export function FormAutocomplete({
           type="button"
           disabled={disabled}
           className={cn(
-            'flex h-10 w-full min-w-0 items-center justify-between rounded-lg border border-black/[0.1] bg-surface-panel px-3 text-left text-sm font-normal text-ink shadow-sm outline-none transition hover:bg-surface-subtle focus:border-bid focus:ring-2 focus:ring-bid/10 disabled:pointer-events-none disabled:opacity-55',
-            !selected && 'text-ink-faint',
+            'flex h-10 w-full min-w-0 items-center justify-between rounded-lg border border-border bg-popover px-3 text-left text-sm font-normal text-popover-foreground shadow-sm outline-none transition hover:bg-accent focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:pointer-events-none disabled:opacity-55',
+            !selected && 'text-muted-foreground',
             className,
           )}
         >
           <span className="truncate">{selected?.label ?? placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-ink-faint" />
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={cn('w-[var(--radix-popover-trigger-width)] p-0', popoverClassName)}>
@@ -256,9 +256,9 @@ export function FormAutocomplete({
                     )}
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm text-ink">{option.label}</span>
+                    <span className="block truncate text-sm text-foreground">{option.label}</span>
                     {option.description && (
-                      <span className="mt-0.5 block truncate text-xs text-ink-muted">
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                         {option.description}
                       </span>
                     )}

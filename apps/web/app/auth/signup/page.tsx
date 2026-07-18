@@ -24,7 +24,7 @@ const countryOptions = countries.map((country) => ({ value: country, label: coun
 
 export default function AuthSignupPage() {
   return (
-    <AuthShell title="Create entrepreneur account" description="Entrepreneurs can create an account directly and start from the BID Hub workspace." className="max-w-[540px]">
+    <AuthShell title="Create entrepreneur account" description="Entrepreneurs can create an account directly and start from the BID Hub workspace.">
       <AuthModeTabs active="signup" />
       <React.Suspense fallback={<SignupFormSkeleton />}>
         <SignupForm />
@@ -51,7 +51,7 @@ function SignupForm() {
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, password: values.password, country: values.country, phone: values.phone }))}>
-      {oauthError ? <div role="alert" className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{signupOauthError(oauthError)}</div> : null}
+      {oauthError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{signupOauthError(oauthError)}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('signup'))}>Sign up with Google</AuthGoogleButton>
       <AuthDivider label="or create account with email" />
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
@@ -63,9 +63,9 @@ function SignupForm() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink">Country</span>
-          <FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value, { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11 border-line bg-white', form.formState.errors.country && 'border-danger focus:border-danger focus:ring-danger/10')} />
-          {form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-danger">{form.formState.errors.country.message}</span> : null}
+          <span className="mb-1.5 block text-sm font-medium text-foreground">Country</span>
+          <FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value, { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11', form.formState.errors.country && 'border-destructive focus:border-destructive focus:ring-destructive/10')} />
+          {form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-destructive">{form.formState.errors.country.message}</span> : null}
         </label>
         <AuthTextField label="Phone" type="tel" placeholder="+233 20 000 0000" error={form.formState.errors.phone?.message} {...form.register('phone')} />
       </div>

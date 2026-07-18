@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 export function AuthModeTabs({ active }: { active: 'login' | 'signup' }) {
   return (
-    <div className="mb-6 grid grid-cols-2 rounded-lg border border-line bg-surface-subtle p-1">
+    <div className="mb-6 grid grid-cols-2 rounded-lg border border-border bg-secondary p-1">
       <TabLink active={active === 'login'} href={routes.auth.login}>
         Login
       </TabLink>
@@ -31,10 +31,14 @@ function TabLink({
   return (
     <Link
       href={href}
+      prefetch
+      scroll={false}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex h-10 items-center justify-center rounded-md text-sm font-medium transition-colors',
-        active ? 'bg-white text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+        'flex h-10 items-center justify-center rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-200',
+        active
+          ? 'bg-card text-card-foreground shadow-sm'
+          : 'text-muted-foreground hover:bg-card/55 hover:text-foreground',
       )}
     >
       {children}

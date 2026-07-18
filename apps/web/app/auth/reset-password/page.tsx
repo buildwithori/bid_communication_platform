@@ -17,7 +17,7 @@ import { resetPasswordSchema, type ResetPasswordForm as ResetPasswordFormValues 
 import { routes } from '@/lib/routes';
 
 export default function ResetPasswordPage() {
-  return <AuthShell title="Reset password" description="Create a new password to keep your BID Hub account secure." className="max-w-[460px]" footer={<AuthBackToLoginLink />}><Suspense fallback={<div aria-label="Loading password reset" aria-busy="true" className="space-y-4"><Skeleton className="h-11 w-full" /><Skeleton className="h-11 w-full" /><Skeleton className="h-11 w-full" /></div>}><ResetPasswordForm /></Suspense></AuthShell>;
+  return <AuthShell title="Reset password" description="Create a new password to keep your BID Hub account secure." footer={<AuthBackToLoginLink />}><Suspense fallback={<div aria-label="Loading password reset" aria-busy="true" className="space-y-4"><Skeleton className="h-11 w-full" /><Skeleton className="h-11 w-full" /><Skeleton className="h-11 w-full" /></div>}><ResetPasswordForm /></Suspense></AuthShell>;
 }
 
 function ResetPasswordForm() {
@@ -30,7 +30,7 @@ function ResetPasswordForm() {
   });
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(({ password }) => token && mutation.mutate({ token, password }))}>
-      {!token ? <div className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">This reset link is incomplete. Request a new password reset email.</div> : null}
+      {!token ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">This reset link is incomplete. Request a new password reset email.</div> : null}
       <AuthTextField icon={<Lock className="h-4 w-4" />} label="New password" type="password" placeholder="Enter new password" error={form.formState.errors.password?.message} {...form.register('password')} />
       <AuthTextField icon={<Lock className="h-4 w-4" />} label="Confirm password" type="password" placeholder="Confirm new password" error={form.formState.errors.confirmPassword?.message} {...form.register('confirmPassword')} />
       <Button type="submit" size="lg" className="h-11 w-full" disabled={!token} isLoading={mutation.isPending} loadingLabel="Updating password...">Update password</Button>

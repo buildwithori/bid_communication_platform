@@ -33,25 +33,46 @@
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 335deg 56% 44%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 335deg 30% 20%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 335deg 56% 44%;
+    --background: 330 15% 7%;
+    --foreground: 330 10% 96%;
+    --card: 330 14% 10%;
+    --card-foreground: 330 10% 96%;
+    --popover: 330 14% 10%;
+    --popover-foreground: 330 10% 96%;
+    --primary: 335deg 62% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 330 10% 15%;
+    --secondary-foreground: 330 10% 96%;
+    --muted: 330 10% 15%;
+    --muted-foreground: 330 7% 68%;
+    --accent: 335deg 32% 19%;
+    --accent-foreground: 335deg 65% 84%;
+    --destructive: 0 62% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 12%;
+    --input: 0 0% 100% / 20%;
+    --ring: 335deg 62% 56%;
+  }
+}
+
+@keyframes auth-route-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-route-enter {
+  animation: auth-route-enter 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-route-enter {
+    animation: none;
   }
 }
 
