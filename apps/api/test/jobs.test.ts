@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 import { AuditOutboxStatus } from "@prisma/client";
 import { AuditService } from "../src/audit/audit.service";
@@ -7,6 +9,17 @@ import { JOB_NAMES } from "../src/jobs/jobs.constants";
 import { TransactionalEmailProcessor } from "../src/jobs/processors/transactional-email.processor";
 import { redisConnectionFromUrl } from "../src/jobs/redis-connection";
 import { TransactionalEmailQueueService } from "../src/jobs/transactional-email-queue.service";
+
+test("send-capable email transport is registered only in the worker process", () => {
+  const source = (path: string) =>
+    readFileSync(join(__dirname, "..", "src", path), "utf8");
+
+  assert.doesNotMatch(source("app.module.ts"), /EmailModule/);
+  assert.match(source("jobs/worker.module.ts"), /EmailModule/);
+  assert.doesNotMatch(source("admins/admins.module.ts"), /EmailModule/);
+  assert.doesNotMatch(source("trainers/trainers.module.ts"), /EmailModule/);
+  assert.doesNotMatch(source("entrepreneurs/entrepreneurs.module.ts"), /EmailModule/);
+});
 
 test("Redis URLs are parsed for authenticated TLS BullMQ connections", () => {
   const connection: any = redisConnectionFromUrl(

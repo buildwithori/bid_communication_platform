@@ -3,7 +3,6 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
-import { EmailModule } from './email/email.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { SettingsModule } from './settings/settings.module';
@@ -42,7 +41,6 @@ import { RedisRateLimitGuard } from './common/guards/redis-rate-limit.guard';
     }),
     DatabaseModule,
     RequestContextModule,
-    EmailModule,
     AuthModule,
     HealthModule,
     SettingsModule,

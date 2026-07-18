@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../database/prisma.service";
-import { EmailService } from "../email/email.service";
+import { EmailHealthService } from "../email/email-health.service";
 import { StorageService } from "../files/storage.service";
 import { JobsHealthService } from "../jobs/jobs-health.service";
 
@@ -17,7 +17,7 @@ export class OperationalHealthService {
     private readonly prisma: PrismaService,
     private readonly jobs: JobsHealthService,
     private readonly storage: StorageService,
-    private readonly email: EmailService,
+    private readonly email: EmailHealthService,
     private readonly config: ConfigService,
   ) {}
 
@@ -51,7 +51,6 @@ export class OperationalHealthService {
           "GOOGLE_CLIENT_ID",
           "GOOGLE_CLIENT_SECRET",
           "CALENDAR_TOKEN_ENCRYPTION_KEY",
-          "GOOGLE_CALENDAR_REDIRECT_URI",
         ]),
         video: this.configurationStatus([
           "MUX_TOKEN_ID",

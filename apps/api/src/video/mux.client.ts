@@ -66,6 +66,7 @@ export class MuxClient {
           "content-type": "application/json",
           ...init.headers,
         },
+        signal: AbortSignal.timeout(10_000),
       });
     } catch {
       throw new BadGatewayException("Could not reach the video provider.");

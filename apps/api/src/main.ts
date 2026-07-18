@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+import type { ServerResponse } from 'node:http';
 import { AppModule } from './app.module';
 import { PrismaService } from './database/prisma.service';
 
@@ -15,7 +17,13 @@ async function bootstrap() {
   const port = config.getOrThrow<number>('PORT');
   const webOrigin = config.getOrThrow<string>('WEB_ORIGIN');
 
+  app.enableShutdownHooks();
   app.set('trust proxy', 1);
+  app.use(helmet());
+  app.use((_request: unknown, response: ServerResponse, next: () => void) => {
+    response.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.enableCors({
     origin: webOrigin,
     credentials: true,
@@ -32,13 +40,15 @@ async function bootstrap() {
   const prisma = app.get(PrismaService);
   await prisma.enableShutdownHooks(app);
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('BID Hub API')
-    .setDescription('Backend API for BID Hub workspaces')
-    .setVersion('0.1.0')
-    .build();
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, swaggerDocument);
+  if (config.getOrThrow<string>('NODE_ENV') !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('BID Hub API')
+      .setDescription('Backend API for BID Hub workspaces')
+      .setVersion('0.1.0')
+      .build();
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, swaggerDocument);
+  }
 
   await app.listen(port);
 }

@@ -81,7 +81,10 @@ export class StorageService {
       { method: 'HEAD', storageKey, expiresInSeconds: 60 },
       { internal: true },
     );
-    const response = await fetch(signed.url, { method: 'HEAD' });
+    const response = await this.request(signed.url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(10_000),
+    });
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new ServiceUnavailableException('Object storage could not verify the upload.');
@@ -99,9 +102,10 @@ export class StorageService {
       { method: 'GET', storageKey, expiresInSeconds: 60 },
       { internal: true },
     );
-    const response = await fetch(signed.url, {
+    const response = await this.request(signed.url, {
       method: 'GET',
       headers: { range: `bytes=0-${Math.max(0, maxBytes - 1)}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       throw new ServiceUnavailableException('Object storage could not inspect the upload.');
@@ -119,14 +123,25 @@ export class StorageService {
       { method: 'PUT', storageKey, mimeType, expiresInSeconds: 300 },
       { internal: true },
     );
-    const response = await fetch(signed.url, {
+    const response = await this.request(signed.url, {
       method: 'PUT',
       headers: { 'content-type': mimeType },
       body: body as unknown as BodyInit,
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
       throw new ServiceUnavailableException(
         'Object storage could not save the generated file.',
+      );
+    }
+  }
+
+  private async request(url: string, init: RequestInit) {
+    try {
+      return await fetch(url, init);
+    } catch {
+      throw new ServiceUnavailableException(
+        'Object storage is temporarily unavailable.',
       );
     }
   }
