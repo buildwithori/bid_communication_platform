@@ -4,6 +4,7 @@ import { AuthProvider, BusinessRelationship, BusinessSource, UserRole, UserStatu
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../database/prisma.service';
 import { DeliverableLifecycleService } from '../deliverables/deliverable-lifecycle.service';
+import { AuthEmailService } from './auth-email.service';
 import { AuthService } from './auth.service';
 import { createPlainToken } from './auth.tokens';
 import { GoogleOnboardingDto } from './dto/google-onboarding.dto';
@@ -15,6 +16,7 @@ export class GoogleAuthService {
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
     private readonly deliverableLifecycle: DeliverableLifecycleService,
+    private readonly email: AuthEmailService,
   ) {}
 
   createAuthorization(mode: 'login' | 'signup') {
@@ -91,17 +93,46 @@ export class GoogleAuthService {
       throw new ForbiddenException('Onboarding details do not match the authenticated entrepreneur.');
     }
     const { firstName, lastName } = this.splitName(dto.representativeName);
-    await this.prisma.$transaction(async (tx) => {
+    const completedNow = await this.prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { firstName, lastName, phone: dto.phone.trim() } });
       const membership = await tx.businessMembership.findFirst({ where: { userId, isPrimary: true }, include: { business: true } });
+      let claimedCompletion = false;
+
       if (membership) {
-        await tx.business.update({ where: { id: membership.businessId }, data: { name: dto.businessName.trim(), country: dto.country.trim(), onboardingCompletedAt: new Date() } });
+        const completion = await tx.business.updateMany({
+          where: { id: membership.businessId, onboardingCompletedAt: null },
+          data: { name: dto.businessName.trim(), country: dto.country.trim(), onboardingCompletedAt: new Date() },
+        });
+        claimedCompletion = completion.count === 1;
+        if (!claimedCompletion) {
+          await tx.business.update({
+            where: { id: membership.businessId },
+            data: { name: dto.businessName.trim(), country: dto.country.trim() },
+          });
+        }
       } else {
-        const business = await tx.business.create({ data: { name: dto.businessName.trim(), country: dto.country.trim(), source: BusinessSource.self_registered, onboardingCompletedAt: new Date() } });
-        await tx.businessMembership.create({ data: { userId, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true } });
+        const business = await tx.business.create({
+          data: {
+            name: dto.businessName.trim(),
+            country: dto.country.trim(),
+            source: BusinessSource.self_registered,
+            onboardingCompletedAt: new Date(),
+          },
+        });
+        await tx.businessMembership.create({
+          data: { userId, businessId: business.id, relationship: BusinessRelationship.representative, isPrimary: true },
+        });
+        claimedCompletion = true;
       }
+
       await this.deliverableLifecycle.syncInstancesForEntrepreneur(tx, userId);
+      return claimedCompletion;
     });
+
+    if (completedNow) {
+      await this.email.sendWelcome(user.email, firstName?.trim() || user.email.split('@')[0]);
+    }
+
     return this.getOnboarding(userId);
   }
 

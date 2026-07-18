@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { AuditOutboxStatus } from "@prisma/client";
+import { AuditOutboxStatus, UserRole, UserStatus } from "@prisma/client";
 import { AuditService } from "../src/audit/audit.service";
+import { GoogleAuthService } from "../src/auth/google-auth.service";
 import { JobSchedulerService } from "../src/jobs/job-scheduler.service";
 import { JOB_NAMES } from "../src/jobs/jobs.constants";
 import { TransactionalEmailProcessor } from "../src/jobs/processors/transactional-email.processor";
@@ -187,4 +188,85 @@ test("audit processing recovers stale locks and schedules failed event retries",
   assert.equal(retryUpdate.data.status, AuditOutboxStatus.failed);
   assert.ok(retryUpdate.data.nextAttemptAt instanceof Date);
   assert.match(retryUpdate.data.error, /temporary database failure/);
+});
+
+test("Google onboarding queues one welcome email when the workspace becomes ready", async () => {
+  const user = {
+    id: "entrepreneur-1",
+    email: "founder@example.com",
+    firstName: "Google",
+    lastName: "Founder",
+    phone: null,
+    role: UserRole.entrepreneur,
+    status: UserStatus.active,
+    emailVerifiedAt: new Date(),
+  };
+  let onboardingCompletedAt: Date | null = null;
+  const sent: Array<{ to: string; name: string }> = [];
+
+  const membership = () => ({
+    id: "membership-1",
+    userId: user.id,
+    businessId: "business-1",
+    isPrimary: true,
+    business: {
+      id: "business-1",
+      onboardingCompletedAt,
+    },
+  });
+  const transactionClient = {
+    user: {
+      update: async () => user,
+    },
+    businessMembership: {
+      findFirst: async () => membership(),
+      create: async () => ({}),
+    },
+    business: {
+      updateMany: async () => {
+        if (onboardingCompletedAt) return { count: 0 };
+        onboardingCompletedAt = new Date();
+        return { count: 1 };
+      },
+      update: async () => ({}),
+      create: async () => ({ id: "business-1" }),
+    },
+  };
+  const prisma = {
+    user: {
+      findUniqueOrThrow: async () => user,
+    },
+    businessMembership: {
+      findFirst: async () => membership(),
+    },
+    $transaction: async (callback: (tx: any) => Promise<unknown>) =>
+      callback(transactionClient),
+  };
+  const service = new GoogleAuthService(
+    {} as never,
+    prisma as never,
+    {} as never,
+    {
+      syncInstancesForEntrepreneur: async () => ({ created: 0 }),
+    } as never,
+    {
+      sendWelcome: async (to: string, name: string) => {
+        sent.push({ to, name });
+        return {};
+      },
+    } as never,
+  );
+  const details = {
+    businessName: "Founder Labs",
+    representativeName: "David Founder",
+    email: user.email,
+    country: "Ghana",
+    phone: "+233200000000",
+  };
+
+  const result = await service.completeOnboarding(user.id, details);
+  await service.completeOnboarding(user.id, details);
+
+  assert.equal(result.user.onboardingRequired, false);
+  assert.deepEqual(sent, [{ to: user.email, name: "David" }]);
 });
