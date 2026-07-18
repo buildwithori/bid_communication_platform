@@ -18,6 +18,7 @@ import { getGoogleAuthUrl, useSignupMutation } from '@/lib/api/auth';
 import { signupSchema, type SignupForm as SignupFormValues } from '@/lib/forms/schemas';
 import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
+import { detectTimezone } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
 const countryOptions = countries.map((country) => ({ value: country, label: country }));
@@ -50,7 +51,7 @@ function SignupForm() {
   });
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, password: values.password, country: values.country, phone: values.phone }))}>
+    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, password: values.password, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
       {oauthError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{signupOauthError(oauthError)}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('signup'))}>Sign up with Google</AuthGoogleButton>
       <AuthDivider label="or create account with email" />

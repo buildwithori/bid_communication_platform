@@ -15,6 +15,7 @@ import { useCompleteGoogleOnboardingMutation, useGoogleOnboardingQuery } from '@
 import { entrepreneurOnboardingSchema, type EntrepreneurOnboardingForm } from '@/lib/forms/schemas';
 import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
+import { detectTimezone } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
 const countryOptions = countries.map((country) => ({ value: country, label: country }));
@@ -54,7 +55,7 @@ function OnboardingForm() {
   if (account.isError) return <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Your Google signup session could not be loaded. Return to sign in and try again.</div>;
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, country: values.country, phone: values.phone }))}>
+    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
       <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-6 text-muted-foreground">Google supplied your verified name and email. Add the missing business and contact details to open your workspace.</div>
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
       <div className="grid gap-3 sm:grid-cols-2">

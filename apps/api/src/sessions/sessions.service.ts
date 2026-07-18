@@ -192,7 +192,9 @@ export class SessionsService {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
     this.assertValidTimeRange(startAt, endAt);
-    const timezone = dto.timezone?.trim() || "UTC";
+    const timezone = await this.availability.resolveTimezone(
+      user.role === UserRole.entrepreneur ? user.timezone : dto.timezone,
+    );
     await this.availability.assertBookableTime(startAt, endAt, timezone);
 
     const entrepreneurUserId =

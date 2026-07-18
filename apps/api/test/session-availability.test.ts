@@ -19,11 +19,15 @@ function service(options?: {
     endAt: Date;
   }>;
   busy?: Record<string, Array<{ startAt: Date; endAt: Date }>>;
+  defaultTimezone?: string;
 }) {
   const candidates = options?.candidates ?? ["trainer-1"];
   const prisma = {
     companySettings: {
-      upsert: async () => policy,
+      upsert: async () => ({
+        ...policy,
+        defaultTimezone: options?.defaultTimezone ?? "UTC",
+      }),
     },
     user: {
       findMany: async () => candidates.map((id) => ({ id })),
@@ -89,6 +93,28 @@ test("specific-trainer slots are scoped to only that trainer calendar", async ()
     false,
   );
   assert.ok(result.slots.every((slot) => slot.targetUserId === "trainer-1"));
+});
+
+test("availability applies company hours in the company timezone and presents the requested local date", async () => {
+  const result = await service({
+    defaultTimezone: "Africa/Lagos",
+  }).getAvailability({
+    dateFrom: "2030-01-07",
+    dateTo: "2030-01-07",
+    timezone: "America/New_York",
+    durationMinutes: 60,
+  });
+
+  assert.equal(result.slots[0]?.startAt, "2030-01-07T08:00:00.000Z");
+  assert.equal(result.timezone, "America/New_York");
+});
+
+test("booking policy validates absolute time against the company timezone", async () => {
+  await service({ defaultTimezone: "Africa/Lagos" }).assertBookableTime(
+    new Date("2030-01-07T08:00:00.000Z"),
+    new Date("2030-01-07T09:00:00.000Z"),
+    "America/New_York",
+  );
 });
 
 test("booking policy rejects times outside configured company hours", async () => {

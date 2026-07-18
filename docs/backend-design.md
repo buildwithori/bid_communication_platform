@@ -373,13 +373,13 @@ A user has exactly one active role at a time.
 - Role change is not supported for launch. If a person needs a different role, they should be invited/created through the correct role flow.
 - Do not model multi-role users for launch.
 - Do not create separate `admin_profiles`, `trainer_profiles`, or `entrepreneur_profiles` tables.
-- Shared identity/profile fields belong on `users`.
+- Shared identity/profile fields belong on `users`, including the nullable personal IANA `timezone` preference.
 - Role-specific business data belongs in domain tables, not duplicate profile tables.
 
 ### Auth Flows
 
-- Email signup creates a user with role `entrepreneur`, creates/links a business through `business_memberships`, collects the required signup fields, and sends a verification email. It does not require onboarding.
-- Google signup may redirect to `/auth/onboarding` only when required signup baseline details are missing. Provider-supplied name/email should prefill the form; onboarding collects the remaining business name, representative name, email, country, and phone fields as needed.
+- Email signup captures the browser-detected IANA timezone when available, then creates a user with role `entrepreneur`, creates/links a business through `business_memberships`, collects the required signup fields, and sends a verification email. It does not require onboarding.
+- Google signup may redirect to `/auth/onboarding` only when required signup baseline details are missing. Onboarding stores the browser-detected IANA timezone when available. Provider-supplied name/email should prefill the form; onboarding collects the remaining business name, representative name, email, country, and phone fields as needed.
 - Dashboard access requires email verification for email signup. For Google signup, dashboard access also requires any onboarding step to be complete.
 - Login sets secure httpOnly session cookies.
 - Session/refresh rotation should invalidate reused/stolen session records.
@@ -1562,6 +1562,9 @@ Rules:
 - Do not return static time lists after trainer selection.
 - For open team requests, show slots that at least one eligible connected owner can cover.
 - When a user accepts a request, recheck availability inside the transaction/workflow.
+- Company working days and working-hour bounds are interpreted in `company_settings.default_timezone`.
+- Availability is returned in the requesting user’s effective timezone: personal user timezone, then company default, then UTC as a defensive fallback.
+- Each session stores the effective timezone as a historical snapshot for calendar creation and display.
 
 ### Meeting Link Creation
 

@@ -28,6 +28,8 @@ export type EntrepreneurRecord = {
   representativeName: string;
   email: string;
   phone: string | null;
+  timezone: string;
+  usesCompanyTimezone: boolean;
   country: string;
   status: EntrepreneurStatus;
   source: EntrepreneurSource;
@@ -84,6 +86,7 @@ export type EntrepreneurProfilePayload = {
   country: string;
   sectorId?: string | null;
   stageId?: string | null;
+  timezone?: string;
 };
 
 export type InviteEntrepreneurPayload = EntrepreneurProfilePayload & {

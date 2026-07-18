@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsTimeZone,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -46,6 +47,10 @@ export class EntrepreneurProfileDto {
   @IsString()
   @MaxLength(64)
   stageId?: string | null;
+
+  @IsOptional()
+  @IsTimeZone()
+  timezone?: string;
 }
 
 export class InviteEntrepreneurDto extends EntrepreneurProfileDto {

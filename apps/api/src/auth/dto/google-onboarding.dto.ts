@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsTimeZone, MaxLength } from 'class-validator';
 
 export class GoogleOnboardingDto {
   @IsString() @IsNotEmpty() @MaxLength(160)
@@ -15,4 +15,8 @@ export class GoogleOnboardingDto {
 
   @IsString() @IsNotEmpty() @MaxLength(40)
   phone!: string;
+
+  @IsOptional()
+  @IsTimeZone()
+  timezone?: string;
 }

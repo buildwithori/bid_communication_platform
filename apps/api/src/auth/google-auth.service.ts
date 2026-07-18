@@ -94,7 +94,7 @@ export class GoogleAuthService {
     }
     const { firstName, lastName } = this.splitName(dto.representativeName);
     const completedNow = await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { firstName, lastName, phone: dto.phone.trim() } });
+      await tx.user.update({ where: { id: userId }, data: { firstName, lastName, phone: dto.phone.trim(), ...(dto.timezone ? { timezone: dto.timezone.trim() } : {}) } });
       const membership = await tx.businessMembership.findFirst({ where: { userId, isPrimary: true }, include: { business: true } });
       let claimedCompletion = false;
 

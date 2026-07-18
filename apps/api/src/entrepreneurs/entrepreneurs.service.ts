@@ -15,6 +15,7 @@ type EntrepreneurMembership = BusinessMembership & {
     firstName: string | null;
     lastName: string | null;
     phone: string | null;
+    timezone: string | null;
     status: string;
     createdAt: Date;
     entrepreneurProgrammeGrants: Array<{
@@ -88,13 +89,14 @@ export class EntrepreneursService {
       ]);
 
     const visibleRows = rows.slice(0, take);
-    const [progress, learnerImpact] = await Promise.all([
+    const [progress, learnerImpact, settings] = await Promise.all([
       this.progressAggregates(visibleRows.map((row) => row.user.id), user),
       this.learnerImpactSummary(user, baseWhere),
+      this.getDefaultTimezone(),
     ]);
     return {
       items: visibleRows.map((row) =>
-        this.mapEntrepreneur(row, progress.get(row.user.id)),
+        this.mapEntrepreneur(row, progress.get(row.user.id), settings),
       ),
       nextCursor:
         rows.length > take
@@ -124,8 +126,11 @@ export class EntrepreneursService {
       throw new NotFoundException('Entrepreneur was not found.');
     }
 
-    const progress = await this.progressAggregates([membership.user.id], user);
-    return this.mapEntrepreneur(membership, progress.get(membership.user.id));
+    const [progress, timezone] = await Promise.all([
+      this.progressAggregates([membership.user.id], user),
+      this.getDefaultTimezone(),
+    ]);
+    return this.mapEntrepreneur(membership, progress.get(membership.user.id), timezone);
   }
 
   async listProgrammeAccess(
@@ -775,6 +780,7 @@ export class EntrepreneursService {
           firstName: true,
           lastName: true,
           phone: true,
+          timezone: true,
           status: true,
           createdAt: true,
           entrepreneurProgrammeGrants: {
@@ -1017,9 +1023,18 @@ export class EntrepreneursService {
     };
   }
 
+  private async getDefaultTimezone() {
+    const settings = await this.prisma.companySettings.upsert({
+      where: { singletonKey: 'default' }, update: {}, create: { singletonKey: 'default' },
+      select: { defaultTimezone: true },
+    });
+    return settings.defaultTimezone || 'UTC';
+  }
+
   private mapEntrepreneur(
     row: EntrepreneurMembership,
     learnerProgress = { average: 0, trackedProgrammes: 0 },
+    defaultTimezone = 'UTC',
   ) {
     const programmes = row.user.entrepreneurProgrammeGrants.map((grant) =>
       this.mapProgrammeAccess(grant),
@@ -1034,6 +1049,8 @@ export class EntrepreneursService {
       representativeName: [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') || row.user.email,
       email: row.user.email,
       phone: row.user.phone,
+      timezone: row.user.timezone ?? defaultTimezone,
+      usesCompanyTimezone: row.user.timezone === null,
       country: row.business.country,
       status: row.business.status,
       source: row.business.source,

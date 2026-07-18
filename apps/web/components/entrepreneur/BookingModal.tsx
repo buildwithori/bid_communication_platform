@@ -16,6 +16,7 @@ import { Button } from "@/components/shared/Button";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { Notice } from "@/components/shared/PageHeader";
 import { bookingSchema, type BookingForm } from "@/lib/forms/schemas";
+import { useEntrepreneurProfileQuery } from "@/lib/api/entrepreneurs";
 import {
   useCreateSessionMutation,
   useLazySessionTeamMembers,
@@ -56,7 +57,8 @@ export function BookingModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const profile = useEntrepreneurProfileQuery();
+  const timezone = profile.data?.timezone ?? "UTC";
   const [teamLookupOpen, setTeamLookupOpen] = React.useState(false);
   const [trainerSearch, setTrainerSearch] = React.useState("");
   const deferredTrainerSearch = React.useDeferredValue(trainerSearch);
@@ -73,7 +75,8 @@ export function BookingModal({
     },
   });
   const recipient = useWatch({ control: form.control, name: "recipient" });
-  const trainerId = useWatch({ control: form.control, name: "trainerId" }) ?? "";
+  const trainerId =
+    useWatch({ control: form.control, name: "trainerId" }) ?? "";
   const selectedDate = useWatch({ control: form.control, name: "date" });
   const sessionType = useWatch({ control: form.control, name: "sessionType" });
   const selectedTime = useWatch({ control: form.control, name: "time" });
@@ -128,6 +131,7 @@ export function BookingModal({
       label: new Date(slot.startAt).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: timezone,
       }),
       description:
         recipient === "general"

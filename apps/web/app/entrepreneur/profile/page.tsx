@@ -53,6 +53,7 @@ import {
   useLazySectorsQuery,
 } from "@/lib/api/settings";
 import { countries } from "@/lib/mock-data/definitions";
+import { getTimezoneOptions } from "@/lib/timezones";
 
 type ProfileTab =
   "business" | "goals" | "funding" | "updates" | "notifications";
@@ -65,6 +66,7 @@ const profileSchema = z.object({
   country: z.enum(countries),
   sectorId: z.string().optional(),
   stageId: z.string().optional(),
+  timezone: z.string().min(1, "Timezone is required"),
 });
 type ProfileForm = z.infer<typeof profileSchema>;
 
@@ -561,6 +563,7 @@ function BusinessTab({
     open: false,
     search: "",
   });
+  const [timezoneOpen, setTimezoneOpen] = React.useState(false);
   const sectors = useLazySectorsQuery({
     enabled: sectorLookup.open,
     search: React.useDeferredValue(sectorLookup.search) || undefined,
@@ -580,6 +583,10 @@ function BusinessTab({
   const country = useWatch({ control: form.control, name: "country" });
   const sectorId = useWatch({ control: form.control, name: "sectorId" });
   const stageId = useWatch({ control: form.control, name: "stageId" });
+  const timezone =
+    useWatch({ control: form.control, name: "timezone" }) ||
+    record.timezone ||
+    "UTC";
   React.useEffect(() => form.reset(profileDefaults(record)), [form, record]);
   return (
     <div className="space-y-4">
@@ -701,6 +708,37 @@ function BusinessTab({
               />
             </FormField>
           </FormRow2>
+          <FormField
+            label="Timezone"
+            error={form.formState.errors.timezone?.message}
+            className="mb-0"
+          >
+            <>
+              <FormAutocomplete
+                value={timezone}
+                onValueChange={(value) => form.setValue("timezone", value)}
+                options={
+                  timezoneOpen
+                    ? getTimezoneOptions()
+                    : [
+                        {
+                          value: timezone,
+                          label: timezone.replaceAll("_", " "),
+                        },
+                      ]
+                }
+                placeholder="Select timezone"
+                searchPlaceholder="Search timezones..."
+                emptyMessage="No timezone found."
+                onOpenChange={setTimezoneOpen}
+              />
+              <p className="mt-1.5 text-xs text-ink-faint">
+                {record.usesCompanyTimezone
+                  ? "Currently inherited from the company default. Saving makes this your personal timezone."
+                  : "Session times will be shown in this timezone."}
+              </p>
+            </>
+          </FormField>
           <div className="rounded-xl border border-line bg-surface-subtle p-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
               <Mail className="h-4 w-4" />
@@ -893,6 +931,7 @@ function profileDefaults(
     country: record.country as ProfileForm["country"],
     sectorId: record.sector?.id ?? "",
     stageId: record.stage?.id ?? "",
+    timezone: record.timezone || "UTC",
   };
 }
 function initials(firstName: string, lastName: string, email: string) {

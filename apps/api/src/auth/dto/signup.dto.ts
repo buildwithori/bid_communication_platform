@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsTimeZone, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsString()
@@ -37,4 +37,8 @@ export class SignupDto {
   @IsOptional()
   @IsString()
   stageId?: string;
+
+  @IsOptional()
+  @IsTimeZone()
+  timezone?: string;
 }

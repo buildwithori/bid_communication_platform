@@ -22,6 +22,7 @@ export type SignupPayload = {
   password: string;
   country: string;
   phone: string;
+  timezone?: string;
 };
 
 export type LoginPayload = { email: string; password: string };
@@ -36,6 +37,7 @@ export type GoogleOnboardingPayload = {
   email: string;
   country: string;
   phone: string;
+  timezone?: string;
 };
 
 export type SignupResult = { user: AuthUser; verification: DevTokenResponse };

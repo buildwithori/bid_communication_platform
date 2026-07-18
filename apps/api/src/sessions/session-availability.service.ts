@@ -100,6 +100,7 @@ export class SessionAvailabilityService {
         sessionWorkdayEndMinutes: true,
         sessionSlotIntervalMinutes: true,
         defaultSessionDurationMinutes: true,
+        defaultTimezone: true,
       },
     });
     const durationMinutes =
@@ -120,21 +121,23 @@ export class SessionAvailabilityService {
       };
     }
 
+    const policyDateFrom = new Date(dateFrom.getTime() - 86_400_000);
+    const policyDateTo = new Date(dateTo.getTime() + 86_400_000);
     const rangeStart = this.zonedDateTimeToUtc(
-      dateFrom.getUTCFullYear(),
-      dateFrom.getUTCMonth() + 1,
-      dateFrom.getUTCDate(),
+      policyDateFrom.getUTCFullYear(),
+      policyDateFrom.getUTCMonth() + 1,
+      policyDateFrom.getUTCDate(),
       Math.floor(policy.sessionWorkdayStartMinutes / 60),
       policy.sessionWorkdayStartMinutes % 60,
-      query.timezone,
+      policy.defaultTimezone,
     );
     const rangeEnd = this.zonedDateTimeToUtc(
-      dateTo.getUTCFullYear(),
-      dateTo.getUTCMonth() + 1,
-      dateTo.getUTCDate(),
+      policyDateTo.getUTCFullYear(),
+      policyDateTo.getUTCMonth() + 1,
+      policyDateTo.getUTCDate(),
       Math.floor(policy.sessionWorkdayEndMinutes / 60),
       policy.sessionWorkdayEndMinutes % 60,
-      query.timezone,
+      policy.defaultTimezone,
     );
 
     const localSessions = await this.prisma.session.findMany({
@@ -188,7 +191,7 @@ export class SessionAvailabilityService {
       targetUserId: string | null;
     }> = [];
     const now = new Date();
-    for (let day = 0; day < dayCount; day += 1) {
+    for (let day = -1; day <= dayCount; day += 1) {
       const current = new Date(dateFrom.getTime() + day * 86_400_000);
       const weekday = current.getUTCDay();
       if (!policy.sessionWorkingDays.includes(weekday)) continue;
@@ -204,9 +207,12 @@ export class SessionAvailabilityService {
           current.getUTCDate(),
           Math.floor(minute / 60),
           minute % 60,
-          query.timezone,
+          policy.defaultTimezone,
         );
         const endAt = new Date(startAt.getTime() + durationMinutes * 60_000);
+        const displayDate = this.zonedDateKey(startAt, query.timezone);
+        if (displayDate < query.dateFrom || displayDate > query.dateTo)
+          continue;
         if (startAt <= now) continue;
 
         const available = candidates.filter((candidate) => {
@@ -239,6 +245,23 @@ export class SessionAvailabilityService {
     };
   }
 
+  async resolveTimezone(preferred?: string | null) {
+    if (preferred?.trim()) {
+      const timezone = preferred.trim();
+      this.assertTimezone(timezone);
+      return timezone;
+    }
+    const settings = await this.prisma.companySettings.upsert({
+      where: { singletonKey: "default" },
+      update: {},
+      create: { singletonKey: "default" },
+      select: { defaultTimezone: true },
+    });
+    const timezone = settings.defaultTimezone || "UTC";
+    this.assertTimezone(timezone);
+    return timezone;
+  }
+
   async assertBookableTime(startAt: Date, endAt: Date, timezone: string) {
     this.assertTimezone(timezone);
     const policy = await this.prisma.companySettings.upsert({
@@ -250,10 +273,11 @@ export class SessionAvailabilityService {
         sessionWorkdayStartMinutes: true,
         sessionWorkdayEndMinutes: true,
         sessionSlotIntervalMinutes: true,
+        defaultTimezone: true,
       },
     });
-    const start = this.zonedParts(startAt, timezone);
-    const end = this.zonedParts(endAt, timezone);
+    const start = this.zonedParts(startAt, policy.defaultTimezone);
+    const end = this.zonedParts(endAt, policy.defaultTimezone);
     const startMinute = start.hour * 60 + start.minute;
     const endMinute = end.hour * 60 + end.minute;
     const sameDay =
@@ -366,6 +390,15 @@ export class SessionAvailabilityService {
     } catch {
       throw new BadRequestException("Choose a valid IANA timezone.");
     }
+  }
+
+  private zonedDateKey(value: Date, timezone: string) {
+    const parts = this.zonedParts(value, timezone);
+    return [
+      parts.year,
+      String(parts.month).padStart(2, "0"),
+      String(parts.day).padStart(2, "0"),
+    ].join("-");
   }
 
   private zonedParts(value: Date, timezone: string) {
