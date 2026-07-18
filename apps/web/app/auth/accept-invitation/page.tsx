@@ -12,12 +12,15 @@ import { AuthTextField } from "@/components/auth/AuthTextField";
 import { Button } from "@/components/shared/Button";
 import { Skeleton } from "@/components/shared/Card";
 import { useAcceptAdminInvitationMutation } from "@/lib/api/admins";
+import { useAcceptEntrepreneurInvitationMutation } from "@/lib/api/entrepreneurs";
 import { useAcceptTrainerInvitationMutation } from "@/lib/api/trainers";
 import {
   acceptTrainerInvitationSchema,
   type AcceptTrainerInvitationForm,
 } from "@/lib/forms/schemas";
 import { routes } from "@/lib/routes";
+
+type InvitationRole = "admin" | "trainer" | "entrepreneur";
 
 export default function AcceptInvitationPage() {
   return (
@@ -29,21 +32,20 @@ export default function AcceptInvitationPage() {
 
 function AcceptInvitationView() {
   const searchParams = useSearchParams();
-  const isTrainer = searchParams.get("role") === "trainer";
-  const noun = isTrainer ? "trainer" : "admin";
+  const invitationRole = resolveInvitationRole(searchParams.get("role"));
 
   return (
     <AuthShell
-      title={`Accept ${noun} invitation`}
-      description={`Create your password to activate your BID Hub ${noun} workspace.`}
+      title="Accept Invitation"
+      description="Create your password to activate your BID Hub workspace."
       footer={<AuthBackToLoginLink />}
     >
-      <AcceptInvitationFormView isTrainer={isTrainer} />
+      <AcceptInvitationFormView invitationRole={invitationRole} />
     </AuthShell>
   );
 }
 
-function AcceptInvitationFormView({ isTrainer }: { isTrainer: boolean }) {
+function AcceptInvitationFormView({ invitationRole }: { invitationRole: InvitationRole | null }) {
   const router = useRouter();
   const token = useSearchParams().get("token");
   const form = useForm<AcceptTrainerInvitationForm>({
@@ -51,9 +53,7 @@ function AcceptInvitationFormView({ isTrainer }: { isTrainer: boolean }) {
     defaultValues: { password: "", confirmPassword: "" },
   });
   const onAccepted = () => {
-    toast.success(
-      `${isTrainer ? "Trainer" : "Admin"} account activated. Sign in to continue.`,
-    );
+    toast.success("Account activated. Sign in to continue.");
     router.replace(routes.auth.login);
   };
   const adminMutation = useAcceptAdminInvitationMutation({
@@ -64,30 +64,39 @@ function AcceptInvitationFormView({ isTrainer }: { isTrainer: boolean }) {
     onSuccess: onAccepted,
     onError: (error) => toast.error(error.message),
   });
-  const isPending = isTrainer ? trainerMutation.isPending : adminMutation.isPending;
-  const noun = isTrainer ? "trainer" : "admin";
+  const entrepreneurMutation = useAcceptEntrepreneurInvitationMutation({
+    onSuccess: onAccepted,
+    onError: (error) => toast.error(error.message),
+  });
+  const isPending =
+    adminMutation.isPending ||
+    trainerMutation.isPending ||
+    entrepreneurMutation.isPending;
+  const hasValidInvitation = Boolean(token && invitationRole);
 
   return (
     <form
       className="space-y-4"
       onSubmit={form.handleSubmit(({ password }) => {
-        if (!token || isPending) return;
-        if (isTrainer) {
+        if (!token || !invitationRole || isPending) return;
+        if (invitationRole === "trainer") {
           trainerMutation.mutate({ token, password });
+        } else if (invitationRole === "entrepreneur") {
+          entrepreneurMutation.mutate({ token, password });
         } else {
           adminMutation.mutate({ token, password });
         }
       })}
     >
-      {!token ? (
+      {!hasValidInvitation ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          This invitation link is incomplete. Ask the inviting administrator to
-          resend it.
+          This invitation link is incomplete or invalid. Ask the person who
+          invited you to resend it.
         </div>
       ) : (
         <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-accent px-4 py-3 text-sm leading-6 text-accent-foreground">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-          This password activates the {noun} account attached to your invitation.
+          This password activates the account attached to your invitation.
         </div>
       )}
       <AuthTextField
@@ -110,11 +119,11 @@ function AcceptInvitationFormView({ isTrainer }: { isTrainer: boolean }) {
         type="submit"
         size="lg"
         className="h-11 w-full"
-        disabled={!token || isPending}
+        disabled={!hasValidInvitation || isPending}
         isLoading={isPending}
         loadingLabel="Activating account..."
       >
-        Activate {noun} account
+        Activate account
       </Button>
     </form>
   );
@@ -123,7 +132,7 @@ function AcceptInvitationFormView({ isTrainer }: { isTrainer: boolean }) {
 function AcceptInvitationSkeleton() {
   return (
     <AuthShell
-      title="Accept invitation"
+      title="Accept Invitation"
       description="Loading your BID Hub invitation."
       footer={<AuthBackToLoginLink />}
     >
@@ -135,4 +144,10 @@ function AcceptInvitationSkeleton() {
       </div>
     </AuthShell>
   );
+}
+
+function resolveInvitationRole(value: string | null): InvitationRole | null {
+  if (value === null || value === "admin") return "admin";
+  if (value === "trainer" || value === "entrepreneur") return value;
+  return null;
 }
