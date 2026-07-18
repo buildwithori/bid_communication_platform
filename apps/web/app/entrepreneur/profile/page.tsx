@@ -8,6 +8,11 @@ import { toast } from "sonner";
 import { Mail } from "lucide-react";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import {
+  ProfilePageSkeleton,
+  ProfileRecordsSkeleton,
+  type ProfileRecordsSkeletonKind,
+} from "@/components/entrepreneur/profile/ProfileLoadingSkeletons";
+import {
   FundraisingRoundRecordModal,
   PeriodicUpdateRecordModal,
   ProgrammeGoalRecordModal,
@@ -15,7 +20,7 @@ import {
 import { Avatar } from "@/components/shared/Avatar";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { Card, CardHeader } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -419,6 +424,7 @@ export default function EntrepreneurProfilePage() {
           search={goalSearch}
           onSearch={setGoalSearch}
           isLoading={goals.isLoading}
+          skeletonKind="goals"
           error={goals.error}
           rows={
             <DataTable
@@ -446,6 +452,7 @@ export default function EntrepreneurProfilePage() {
           search={fundingSearch}
           onSearch={setFundingSearch}
           isLoading={funding.isLoading}
+          skeletonKind="funding"
           error={funding.error}
           rows={
             <DataTable
@@ -473,6 +480,7 @@ export default function EntrepreneurProfilePage() {
           search={updateSearch}
           onSearch={setUpdateSearch}
           isLoading={updates.isLoading}
+          skeletonKind="updates"
           error={updates.error}
           rows={
             <DataTable
@@ -770,6 +778,7 @@ function RecordsCard({
   search,
   onSearch,
   isLoading,
+  skeletonKind,
   error,
   rows,
   hasMore,
@@ -783,6 +792,7 @@ function RecordsCard({
   search: string;
   onSearch: (value: string) => void;
   isLoading: boolean;
+  skeletonKind: ProfileRecordsSkeletonKind;
   error: Error | null;
   rows: React.ReactNode;
   hasMore: boolean;
@@ -815,7 +825,7 @@ function RecordsCard({
         />
       </TableToolbar>
       {isLoading ? (
-        <RecordsSkeleton />
+        <ProfileRecordsSkeleton kind={skeletonKind} />
       ) : error ? (
         <Notice>Records could not be loaded. {error.message}</Notice>
       ) : (
@@ -898,25 +908,6 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
       <div className="mt-0.5 text-xs text-white/70 dark:text-white/85">
         {label}
       </div>
-    </div>
-  );
-}
-function RecordsSkeleton() {
-  return (
-    <div className="space-y-2">
-      <Skeleton className="h-14" />
-      <Skeleton className="h-14" />
-      <Skeleton className="h-14" />
-      <Skeleton className="h-14" />
-    </div>
-  );
-}
-function ProfilePageSkeleton() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-36 rounded-2xl" />
-      <Skeleton className="h-10 w-[620px] max-w-full" />
-      <Skeleton className="h-[480px] rounded-xl" />
     </div>
   );
 }

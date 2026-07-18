@@ -252,11 +252,28 @@ function PreferencesSkeleton() {
     <div
       aria-label="Loading notification preferences"
       aria-busy="true"
-      className="space-y-2"
+      className="overflow-hidden rounded-xl border border-line"
     >
-      {Array.from({ length: 4 }, (_, index) => (
-        <Skeleton key={index} className="h-20 w-full" />
-      ))}
+      <div className="grid grid-cols-[minmax(0,1fr)_88px_88px] gap-2 bg-surface-subtle px-4 py-3">
+        <Skeleton className="h-3 w-36" />
+        <Skeleton className="mx-auto h-3 w-12" />
+        <Skeleton className="mx-auto h-3 w-10" />
+      </div>
+      <div className="divide-y divide-line">
+        {Array.from({ length: 5 }, (_, index) => (
+          <div
+            key={index}
+            className="grid min-h-20 grid-cols-[minmax(0,1fr)_88px_88px] items-center gap-2 px-4 py-3"
+          >
+            <div className="space-y-2 pr-4">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-full max-w-md" />
+            </div>
+            <Skeleton className="mx-auto h-10 w-10" />
+            <Skeleton className="mx-auto h-10 w-10" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
