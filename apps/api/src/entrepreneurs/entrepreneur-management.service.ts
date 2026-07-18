@@ -416,6 +416,9 @@ export class EntrepreneurManagementService {
             firstName: dto.firstName.trim(),
             lastName: dto.lastName.trim(),
             phone: dto.phone?.trim() || null,
+            ...(dto.timezone !== undefined
+              ? { timezone: dto.timezone.trim() }
+              : {}),
           },
         });
         await tx.business.update({
