@@ -57,7 +57,7 @@ export default function EntrepreneurDashboardPage() {
       <PageHeader
         title={`Welcome back, ${data.entrepreneur.businessName}`}
         description="Your learning progress, deliverables, and upcoming support in one place."
-        actions={<div className="flex flex-wrap gap-2"><Button onClick={() => setBookOpen(true)} variant="outline"><CalendarPlus className="h-4 w-4" />Book meeting</Button><Link href={routes.entrepreneur.training}><Button>Continue learning<ArrowRight className="h-4 w-4" /></Button></Link></div>}
+        actions={<div className="flex flex-wrap gap-2"><Button onClick={() => setBookOpen(true)} variant="outline" className="border border-primary text-primary hover:border-primary hover:bg-accent hover:text-primary"><CalendarPlus className="h-4 w-4" />Book meeting</Button><Link href={routes.entrepreneur.training}><Button>Continue learning<ArrowRight className="h-4 w-4" /></Button></Link></div>}
       />
       <MetricGrid columns={3}>
         <StatCard label="Training progress" value={<>{data.metrics.trainingProgress}<span className="text-[13px] text-ink-muted">%</span></>} subline={`${data.metrics.completedContent} of ${data.metrics.totalContent} items · ${data.metrics.trackedProgrammes} programmes`} dotColor="bid" accent="bid" />
