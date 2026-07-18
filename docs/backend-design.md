@@ -1581,7 +1581,8 @@ Notifications should be a full system:
 - read/unread state per recipient
 - actor and entity references so the UI can link to the right business object
 - per-channel delivery records for in-app and email fanout
-- company defaults plus future user-level preferences
+- company defaults plus per-event user overrides exposed through role-scoped preference groups
+- atomic grouped preference updates with explicit mixed-channel state
 - BullMQ jobs for delivery, reminders, retries, and weekly digests
 
 Email delivery stack:

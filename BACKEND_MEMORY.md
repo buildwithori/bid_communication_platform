@@ -373,6 +373,7 @@ Before merging backend work, ask:
 
 - Notifications are recipient-scoped durable records with separate per-channel delivery rows. In-app visibility requires a sent in-app delivery; skipped channels do not leak into the notification centre.
 - Multi-recipient lifecycle fanout uses NotificationsService.createNotifications so company defaults and exact user/type preferences are fetched in batches and the event fanout is created transactionally.
+- Preference persistence remains per notification type, while authenticated grouped preference endpoints expose only groups relevant to the user role. Group channel updates are transactionally applied to all member types; grouped reads return null for mixed channel state.
 - The email worker atomically claims pending/failed delivery rows, recovers stale processing rows, caps attempts, applies exponential retry delay, and persists sent/failed timestamps and safe failure reasons. A fixed worker batch is processing backpressure, not a hidden API-list cap.
 - Notification actionUrl accepts only application-relative paths beginning with one slash. Frontend routing ignores unsafe values and exact-detail routes refetch the resource through a role-scoped endpoint.
 - Session, deliverable, and tool-request lifecycles currently emit in-app and email notifications. Auth and invitation messages remain direct module-owned transactional email where the recipient may not have an active user record; reporting and system producers should reuse the notification service when their owning features are built.

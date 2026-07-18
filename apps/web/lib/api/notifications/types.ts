@@ -1,24 +1,24 @@
 export type NotificationType =
-  | 'session_request'
-  | 'session_confirmed'
-  | 'session_rescheduled'
-  | 'session_declined'
-  | 'session_cancelled'
-  | 'session_completed'
-  | 'deliverable_review'
-  | 'deliverable_changes_requested'
-  | 'tool_request_updated'
-  | 'trainer_nudge'
-  | 'system';
+  | "session_request"
+  | "session_confirmed"
+  | "session_rescheduled"
+  | "session_declined"
+  | "session_cancelled"
+  | "session_completed"
+  | "deliverable_review"
+  | "deliverable_changes_requested"
+  | "tool_request_updated"
+  | "trainer_nudge"
+  | "system";
 
-export type NotificationSeverity = 'info' | 'success' | 'warning' | 'critical';
+export type NotificationSeverity = "info" | "success" | "warning" | "critical";
 export type NotificationEntityType =
-  | 'session'
-  | 'deliverable_instance'
-  | 'tool_request'
-  | 'programme'
-  | 'entrepreneur'
-  | 'content_item';
+  | "session"
+  | "deliverable_instance"
+  | "tool_request"
+  | "programme"
+  | "entrepreneur"
+  | "content_item";
 
 export type NotificationRecord = {
   id: string;
@@ -30,10 +30,15 @@ export type NotificationRecord = {
   entityId: string | null;
   actionUrl: string | null;
   readAt: string | null;
-  actor: { id: string; name: string; email: string; role: 'admin' | 'trainer' | 'entrepreneur' } | null;
+  actor: {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "trainer" | "entrepreneur";
+  } | null;
   deliveries: Array<{
-    channel: 'in_app' | 'email';
-    status: 'pending' | 'processing' | 'sent' | 'failed' | 'skipped';
+    channel: "in_app" | "email";
+    status: "pending" | "processing" | "sent" | "failed" | "skipped";
     sentAt: string | null;
     failedAt: string | null;
   }>;
@@ -47,6 +52,21 @@ export type NotificationPreference = {
   emailEnabled: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+export type NotificationPreferenceGroupName =
+  "sessions" | "deliverables" | "tools" | "coaching" | "product";
+
+export type NotificationPreferenceGroup = {
+  group: NotificationPreferenceGroupName;
+  types: NotificationType[];
+  inAppEnabled: boolean | null;
+  emailEnabled: boolean | null;
+};
+
+export type NotificationPreferenceUpdate = {
+  inAppEnabled?: boolean;
+  emailEnabled?: boolean;
 };
 
 export type NotificationSummary = {

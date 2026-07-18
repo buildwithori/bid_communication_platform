@@ -14,6 +14,7 @@ import { Button } from "@/components/shared/Button";
 import { FormField, FormInput } from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
+import { Tabs } from "@/components/shared/Tabs";
 import {
   useTrainerProfileQuery,
   useUpdateTrainerProfileMutation,
@@ -37,6 +38,7 @@ const roleLabels = {
 } as const;
 
 export default function TrainerSettingsPage() {
+  const [tab, setTab] = React.useState<"account" | "notifications">("account");
   const profile = useTrainerProfileQuery();
   const calendar = useCalendarConnectionQuery();
   const form = useForm<TrainerProfileForm>({
@@ -78,7 +80,9 @@ export default function TrainerSettingsPage() {
           description="Manage the profile and calendar details used across your trainer workspace."
         />
         <Card>
-          <Notice>Trainer settings could not be loaded. {error?.message}</Notice>
+          <Notice>
+            Trainer settings could not be loaded. {error?.message}
+          </Notice>
           <Button
             className="mt-4"
             variant="outline"
@@ -104,104 +108,135 @@ export default function TrainerSettingsPage() {
         description="Manage the profile and calendar details used across your trainer workspace."
       />
 
-      <MetricGrid columns={3}>
-        <StatCard
-          label="Profile"
-          value={trainer.directoryStatus === "active" ? "Active" : "Inactive"}
-          subline={roleLabels[trainer.roleLabel]}
-          dotColor={trainer.directoryStatus === "active" ? "success" : "warning"}
-          accent={trainer.directoryStatus === "active" ? "success" : "warning"}
-        />
-        <StatCard
-          label="Calendar"
-          value={connected ? "Connected" : "Not connected"}
-          subline="Google Meet sessions"
-          dotColor={connected ? "success" : "warning"}
-          accent={connected ? "success" : "warning"}
-        />
-        <StatCard
-          label="My entrepreneurs"
-          value={trainer.portfolio.inferredEntrepreneurs}
-          subline="Entrepreneurs you support"
-          dotColor="info"
-          accent="info"
-        />
-      </MetricGrid>
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: "account", label: "Profile and calendar" },
+          { value: "notifications", label: "Notifications" },
+        ]}
+      />
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card>
-          <CardHeader
-            title="Profile details"
-            description="These details appear in trainer lists, session ownership, and entrepreneur-facing booking flows."
-            actions={<UserRound className="h-5 w-5 text-ink-faint" />}
-          />
-          <form
-            onSubmit={form.handleSubmit((values) => updateProfile.mutate(values))}
-            className="space-y-4"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                label="First name"
-                error={form.formState.errors.firstName?.message}
+      {tab === "account" ? (
+        <>
+          <MetricGrid columns={3}>
+            <StatCard
+              label="Profile"
+              value={
+                trainer.directoryStatus === "active" ? "Active" : "Inactive"
+              }
+              subline={roleLabels[trainer.roleLabel]}
+              dotColor={
+                trainer.directoryStatus === "active" ? "success" : "warning"
+              }
+              accent={
+                trainer.directoryStatus === "active" ? "success" : "warning"
+              }
+            />
+            <StatCard
+              label="Calendar"
+              value={connected ? "Connected" : "Not connected"}
+              subline="Google Meet sessions"
+              dotColor={connected ? "success" : "warning"}
+              accent={connected ? "success" : "warning"}
+            />
+            <StatCard
+              label="My entrepreneurs"
+              value={trainer.portfolio.inferredEntrepreneurs}
+              subline="Entrepreneurs you support"
+              dotColor="info"
+              accent="info"
+            />
+          </MetricGrid>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <Card>
+              <CardHeader
+                title="Profile details"
+                description="These details appear in trainer lists, session ownership, and entrepreneur-facing booking flows."
+                actions={<UserRound className="h-5 w-5 text-ink-faint" />}
+              />
+              <form
+                onSubmit={form.handleSubmit((values) =>
+                  updateProfile.mutate(values),
+                )}
+                className="space-y-4"
               >
-                <FormInput {...form.register("firstName")} />
-              </FormField>
-              <FormField
-                label="Last name"
-                error={form.formState.errors.lastName?.message}
-              >
-                <FormInput {...form.register("lastName")} />
-              </FormField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Email">
-                <FormInput type="email" value={trainer.email} disabled />
-              </FormField>
-              <FormField label="Phone" error={form.formState.errors.phone?.message} optional>
-                <FormInput type="tel" {...form.register("phone")} />
-              </FormField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Role">
-                <FormInput value={roleLabels[trainer.roleLabel]} disabled />
-              </FormField>
-              <FormField label="Specialisms">
-                <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-black/[0.1] bg-surface-subtle px-3 py-2">
-                  {trainer.specialisms.length ? (
-                    trainer.specialisms.map((specialism) => (
-                      <Badge key={specialism.id} tone="blue">{specialism.name}</Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-ink-muted">No specialisms assigned</span>
-                  )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="First name"
+                    error={form.formState.errors.firstName?.message}
+                  >
+                    <FormInput {...form.register("firstName")} />
+                  </FormField>
+                  <FormField
+                    label="Last name"
+                    error={form.formState.errors.lastName?.message}
+                  >
+                    <FormInput {...form.register("lastName")} />
+                  </FormField>
                 </div>
-              </FormField>
-            </div>
 
-            <div className="flex justify-end border-t border-line pt-4">
-              <Button
-                type="submit"
-                isLoading={updateProfile.isPending}
-                loadingLabel="Saving profile"
-              >
-                Save profile
-              </Button>
-            </div>
-          </form>
-        </Card>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Email">
+                    <FormInput type="email" value={trainer.email} disabled />
+                  </FormField>
+                  <FormField
+                    label="Phone"
+                    error={form.formState.errors.phone?.message}
+                    optional
+                  >
+                    <FormInput type="tel" {...form.register("phone")} />
+                  </FormField>
+                </div>
 
-        <CalendarConnectionCard
-          connected={connected}
-          accountEmail={calendar.data?.accountEmail ?? trainer.email}
-          isConnecting={authorizeCalendar.isPending}
-          isDisconnecting={disconnectCalendar.isPending}
-          onConnect={() => authorizeCalendar.mutate()}
-          onDisconnect={() => disconnectCalendar.mutate()}
-        />
-      </div>
-      <NotificationPreferencesCard />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Role">
+                    <FormInput value={roleLabels[trainer.roleLabel]} disabled />
+                  </FormField>
+                  <FormField label="Specialisms">
+                    <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-black/[0.1] bg-surface-subtle px-3 py-2">
+                      {trainer.specialisms.length ? (
+                        trainer.specialisms.map((specialism) => (
+                          <Badge key={specialism.id} tone="blue">
+                            {specialism.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-ink-muted">
+                          No specialisms assigned
+                        </span>
+                      )}
+                    </div>
+                  </FormField>
+                </div>
+
+                <div className="flex justify-end border-t border-line pt-4">
+                  <Button
+                    type="submit"
+                    isLoading={updateProfile.isPending}
+                    loadingLabel="Saving profile"
+                  >
+                    Save profile
+                  </Button>
+                </div>
+              </form>
+            </Card>
+
+            <CalendarConnectionCard
+              connected={connected}
+              accountEmail={calendar.data?.accountEmail ?? trainer.email}
+              isConnecting={authorizeCalendar.isPending}
+              isDisconnecting={disconnectCalendar.isPending}
+              onConnect={() => authorizeCalendar.mutate()}
+              onDisconnect={() => disconnectCalendar.mutate()}
+            />
+          </div>
+        </>
+      ) : null}
+      {tab === "notifications" ? (
+        <NotificationPreferencesCard role="trainer" />
+      ) : null}
     </>
   );
 }

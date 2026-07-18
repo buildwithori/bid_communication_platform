@@ -267,7 +267,8 @@ Session workflow rules:
 
 - Feature 13 uses one durable, recipient-scoped notification system across admin, trainer, and entrepreneur workspaces. Lists are cursor-paginated, unread/total counts are backend-computed, read state is persisted, and the shared notification centre loads lazily.
 - Notification action URLs must be safe internal application paths and should identify the exact resource with a query ID when the destination opens a detail modal. Session, deliverable, and tool-request destinations resolve that scoped resource from the backend rather than relying on the currently loaded list page.
-- Lifecycle fanout resolves company defaults and user preferences in batches, creates per-channel delivery rows, and never performs business summaries in React. User notification preferences live in each role settings/profile experience.
+- Lifecycle fanout resolves company defaults and user preferences in batches, creates per-channel delivery rows, and never performs business summaries in React. User notification preferences live in a dedicated tab in each role settings/profile experience.
+- Store notification overrides per event type for exact delivery enforcement, but expose role-scoped groups to users. Admin, trainer, and entrepreneur receive only operationally relevant groups; a group update must atomically upsert every event type in that group and mixed legacy values must be represented explicitly.
 - All runtime email action links and brand assets must derive their absolute root from APP_WEB_URL through the shared EmailService helpers. Feature modules own their templates and orchestration; preview props may use illustrative local values only for the React Email preview runtime.
 - Notification email delivery is asynchronous and retryable, with atomic claims, stale-processing recovery, capped exponential backoff, attempt metadata, and persisted pending/processing/sent/failed/skipped states.
 

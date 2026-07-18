@@ -54,7 +54,8 @@ import {
 } from "@/lib/api/settings";
 import { countries } from "@/lib/mock-data/definitions";
 
-type ProfileTab = "business" | "goals" | "funding" | "updates";
+type ProfileTab =
+  "business" | "goals" | "funding" | "updates" | "notifications";
 
 const profileSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -72,6 +73,7 @@ const tabs = [
   { value: "goals" as const, label: "Programme goals" },
   { value: "funding" as const, label: "Fundraising history" },
   { value: "updates" as const, label: "Periodic updates" },
+  { value: "notifications" as const, label: "Notifications" },
 ];
 
 export default function EntrepreneurProfilePage() {
@@ -407,8 +409,10 @@ export default function EntrepreneurProfilePage() {
             isPending={updateProfile.isPending}
             onSubmit={(values) => updateProfile.mutate(values)}
           />
-          <NotificationPreferencesCard />
         </>
+      ) : null}
+      {tab === "notifications" ? (
+        <NotificationPreferencesCard role="entrepreneur" />
       ) : null}
       {tab === "goals" ? (
         <RecordsCard
