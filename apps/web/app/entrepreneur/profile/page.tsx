@@ -61,9 +61,11 @@ import {
 } from "@/lib/api/settings";
 import { countries } from "@/lib/mock-data/definitions";
 import { getTimezoneOptions } from "@/lib/timezones";
-
-type ProfileTab =
-  "business" | "goals" | "funding" | "updates" | "notifications";
+import {
+  entrepreneurProfileTabFromQuery,
+  entrepreneurProfileTabQueryValues,
+  type EntrepreneurProfileTab,
+} from "@/lib/entrepreneur-profile-tabs";
 
 const profileSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -85,32 +87,16 @@ const tabs = [
   { value: "notifications" as const, label: "Notifications" },
 ];
 
-const profileTabQueryValues: Record<ProfileTab, string> = {
-  business: "business-details",
-  goals: "programme-goals",
-  funding: "fundraising-history",
-  updates: "periodic-updates",
-  notifications: "notifications",
-};
-
-function profileTabFromQuery(value: string | null): ProfileTab {
-  return (
-    (Object.entries(profileTabQueryValues).find(
-      ([, queryValue]) => queryValue === value,
-    )?.[0] as ProfileTab | undefined) ?? "business"
-  );
-}
-
 export default function EntrepreneurProfilePage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tab = profileTabFromQuery(searchParams.get("tab"));
+  const tab = entrepreneurProfileTabFromQuery(searchParams.get("tab"));
   const setTab = React.useCallback(
-    (nextTab: ProfileTab) => {
+    (nextTab: EntrepreneurProfileTab) => {
       if (nextTab === tab) return;
       const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", profileTabQueryValues[nextTab]);
+      params.set("tab", entrepreneurProfileTabQueryValues[nextTab]);
       router.push((pathname + "?" + params.toString()) as Route, {
         scroll: false,
       });
@@ -180,7 +166,7 @@ export default function EntrepreneurProfilePage() {
     onError: (error) => toast.error(error.message),
   });
 
-  if (profile.isLoading) return <ProfilePageSkeleton />;
+  if (profile.isLoading) return <ProfilePageSkeleton tab={tab} />;
   if (profile.isError || !profile.data)
     return (
       <Notice>

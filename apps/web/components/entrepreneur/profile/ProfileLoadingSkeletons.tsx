@@ -1,15 +1,29 @@
 "use client";
 
 import { Card, Skeleton } from "@/components/shared/Card";
+import type { EntrepreneurProfileTab } from "@/lib/entrepreneur-profile-tabs";
+import { cn } from "@/lib/utils";
 
 export type ProfileRecordsSkeletonKind = "goals" | "funding" | "updates";
 
-export function ProfilePageSkeleton() {
+export function ProfilePageSkeleton({
+  tab = "business",
+}: {
+  tab?: EntrepreneurProfileTab;
+}) {
   return (
-    <div aria-label="Loading profile" aria-busy="true" className="space-y-4">
+    <div
+      aria-label={"Loading " + tab.replaceAll("-", " ") + " profile tab"}
+      aria-busy="true"
+      className="space-y-4"
+    >
       <ProfileHeroSkeleton />
-      <ProfileTabsSkeleton />
-      <BusinessDetailsSkeleton />
+      <ProfileTabsSkeleton tab={tab} />
+      {tab === "business" ? <BusinessDetailsSkeleton /> : null}
+      {tab === "notifications" ? <NotificationPreferencesSkeleton /> : null}
+      {tab === "goals" || tab === "funding" || tab === "updates" ? (
+        <RecordsPageSkeleton kind={tab} />
+      ) : null}
     </div>
   );
 }
@@ -92,13 +106,86 @@ function ProfileHeroSkeleton() {
   );
 }
 
-function ProfileTabsSkeleton() {
+function ProfileTabsSkeleton({ tab }: { tab: EntrepreneurProfileTab }) {
+  const tabs: Array<{ tab: EntrepreneurProfileTab; width: number }> = [
+    { tab: "business", width: 136 },
+    { tab: "goals", width: 138 },
+    { tab: "funding", width: 142 },
+    { tab: "updates", width: 132 },
+    { tab: "notifications", width: 112 },
+  ];
+
   return (
     <div className="flex w-fit max-w-full gap-1 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-sm">
-      {[136, 138, 142, 132, 112].map((width) => (
-        <Skeleton key={width} className="h-9 shrink-0" style={{ width }} />
+      {tabs.map((item) => (
+        <Skeleton
+          key={item.tab}
+          className={cn(
+            "h-9 shrink-0",
+            item.tab === tab && "bg-bid/25 dark:bg-bid/35",
+          )}
+          style={{ width: item.width }}
+        />
       ))}
     </div>
+  );
+}
+
+function RecordsPageSkeleton({ kind }: { kind: ProfileRecordsSkeletonKind }) {
+  return (
+    <Card>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-80 max-w-full" />
+        </div>
+        <Skeleton className="h-8 w-28" />
+      </div>
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-line bg-surface-subtle p-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-72 max-w-full" />
+        </div>
+        <Skeleton className="h-9 w-full md:w-72" />
+      </div>
+      <ProfileRecordsSkeleton kind={kind} />
+    </Card>
+  );
+}
+
+function NotificationPreferencesSkeleton() {
+  return (
+    <Card>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-[520px] max-w-full" />
+        </div>
+        <Skeleton className="h-5 w-5 rounded-full" />
+      </div>
+      <div className="overflow-hidden rounded-xl border border-line">
+        <div className="grid grid-cols-[minmax(0,1fr)_68px_68px] gap-1 bg-surface-subtle px-4 py-3">
+          <Skeleton className="h-3 w-36" />
+          <Skeleton className="mx-auto h-3 w-12" />
+          <Skeleton className="mx-auto h-3 w-10" />
+        </div>
+        <div className="divide-y divide-line">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div
+              key={index}
+              className="grid min-h-20 grid-cols-[minmax(0,1fr)_68px_68px] items-center gap-1 px-4 py-3"
+            >
+              <div className="space-y-2 pr-4">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-full max-w-md" />
+              </div>
+              <Skeleton className="mx-auto h-10 w-10" />
+              <Skeleton className="mx-auto h-10 w-10" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
   );
 }
 

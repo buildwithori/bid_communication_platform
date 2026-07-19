@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import type { Route } from 'next';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCurrentUserQuery, type AuthUser } from '@/lib/api/auth';
 import {
   AdminDashboardSkeleton,
@@ -14,6 +14,7 @@ import { PageSkeleton } from '@/components/shared/Card';
 import { ProfilePageSkeleton } from '@/components/entrepreneur/profile/ProfileLoadingSkeletons';
 import { authenticatedDestination, workspaceRouteForRole } from '@/lib/auth-navigation';
 import { routes } from '@/lib/routes';
+import { entrepreneurProfileTabFromQuery } from '@/lib/entrepreneur-profile-tabs';
 
 type WorkspaceRole = AuthUser['role'];
 
@@ -55,7 +56,11 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
 function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathname: string }) {
   const isDashboard = pathname === workspaceRouteForRole(role);
   const content = pathname === routes.entrepreneur.profile
-    ? <ProfilePageSkeleton />
+    ? (
+        <React.Suspense fallback={<ProfilePageSkeleton />}>
+          <UrlAwareProfileSkeleton />
+        </React.Suspense>
+      )
     : isDashboard
       ? role === 'admin'
       ? <AdminDashboardSkeleton />
@@ -69,4 +74,10 @@ function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathn
       {content}
     </WorkspaceShellSkeleton>
   );
+}
+
+function UrlAwareProfileSkeleton() {
+  const searchParams = useSearchParams();
+  const tab = entrepreneurProfileTabFromQuery(searchParams.get('tab'));
+  return <ProfilePageSkeleton tab={tab} />;
 }
