@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -83,8 +85,38 @@ const tabs = [
   { value: "notifications" as const, label: "Notifications" },
 ];
 
+const profileTabQueryValues: Record<ProfileTab, string> = {
+  business: "business-details",
+  goals: "programme-goals",
+  funding: "fundraising-history",
+  updates: "periodic-updates",
+  notifications: "notifications",
+};
+
+function profileTabFromQuery(value: string | null): ProfileTab {
+  return (
+    (Object.entries(profileTabQueryValues).find(
+      ([, queryValue]) => queryValue === value,
+    )?.[0] as ProfileTab | undefined) ?? "business"
+  );
+}
+
 export default function EntrepreneurProfilePage() {
-  const [tab, setTab] = React.useState<ProfileTab>("business");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = profileTabFromQuery(searchParams.get("tab"));
+  const setTab = React.useCallback(
+    (nextTab: ProfileTab) => {
+      if (nextTab === tab) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", profileTabQueryValues[nextTab]);
+      router.push((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    },
+    [pathname, router, searchParams, tab],
+  );
   const [goalSearch, setGoalSearch] = React.useState("");
   const [fundingSearch, setFundingSearch] = React.useState("");
   const [updateSearch, setUpdateSearch] = React.useState("");
