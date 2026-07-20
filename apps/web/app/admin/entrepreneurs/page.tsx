@@ -249,10 +249,13 @@ export default function AdminEntrepreneursPage() {
       header: "Sector",
       cell: (record) =>
         record.sector ? (
-          <Badge tone="blue">{record.sector.name}</Badge>
+          <Badge tone="blue" className="whitespace-nowrap">
+            {record.sector.name}
+          </Badge>
         ) : (
           <span className="text-ink-faint">Not set</span>
         ),
+      className: "min-w-[170px]",
     },
     { key: "country", header: "Country", cell: (record) => record.country },
     {
@@ -260,10 +263,13 @@ export default function AdminEntrepreneursPage() {
       header: "Stage",
       cell: (record) =>
         record.stage ? (
-          <Badge tone="neutral">{record.stage.name}</Badge>
+          <Badge tone="neutral" className="whitespace-nowrap">
+            {record.stage.name}
+          </Badge>
         ) : (
           <span className="text-ink-faint">Not set</span>
         ),
+      className: "min-w-[190px]",
     },
     {
       key: "programmes",
@@ -303,12 +309,16 @@ export default function AdminEntrepreneursPage() {
       key: "source",
       header: "Source",
       cell: (record) => (
-        <Badge tone={record.source === "admin_invited" ? "brand" : "neutral"}>
+        <Badge
+          tone={record.source === "admin_invited" ? "brand" : "neutral"}
+          className="whitespace-nowrap"
+        >
           {record.source === "admin_invited"
             ? "Admin-invited"
             : "Self-registered"}
         </Badge>
       ),
+      className: "min-w-[160px]",
     },
     {
       key: "status",
@@ -464,7 +474,7 @@ export default function AdminEntrepreneursPage() {
               rows={directory.rows}
               rowKey={(record) => record.entrepreneurUserId}
               emptyMessage="No entrepreneurs match these filters."
-              tableClassName="min-w-[1320px]"
+              tableClassName="min-w-[1540px]"
             />
             <TablePagination
               page={directory.page}
