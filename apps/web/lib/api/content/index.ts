@@ -3,7 +3,7 @@ export {
   useContentItemsPage,
   useCreateModuleContentMutation,
   useDeleteContentItemMutation,
-  useLazyEmbeddedToolsLookup,
+  useLazyPublishedToolsLookup,
   useLazyReusableContentItems,
   useModuleContentItemsInfinite,
   useModuleContentItemsPage,

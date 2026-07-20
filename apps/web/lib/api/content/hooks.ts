@@ -134,13 +134,18 @@ export function useModuleContentItemsInfinite(moduleId: string, query: PageQuery
   };
 }
 
-export function useLazyEmbeddedToolsLookup({ enabled, search }: { enabled: boolean; search?: string }) {
+export function useLazyPublishedToolsLookup({
+  enabled,
+  search,
+}: {
+  enabled: boolean;
+  search?: string;
+}) {
   const result = useInfiniteQuery({
-    queryKey: [...contentKeys.all, 'embedded-tools', search ?? ''],
+    queryKey: [...contentKeys.all, 'published-tools', search ?? ''],
     queryFn: ({ pageParam }) =>
       listToolsRequest({
         search,
-        type: 'embedded_tool',
         status: 'published',
         take: 20,
         cursor: pageParam,

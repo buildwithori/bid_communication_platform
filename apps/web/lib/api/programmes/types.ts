@@ -311,6 +311,8 @@ export type ProgrammePlayerItem = {
     toolId: string | null;
     source: 'library' | 'custom';
     toolName: string | null;
+    toolType: 'pdf' | 'embedded_tool' | null;
+    fileId: string | null;
     url: string | null;
   } | null;
   progress: {

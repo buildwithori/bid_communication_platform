@@ -877,7 +877,14 @@ export class ProgrammesService {
                     },
                     toolLink: {
                       include: {
-                        tool: { select: { name: true, embeddedUrl: true } },
+                        tool: {
+                          select: {
+                            name: true,
+                            type: true,
+                            embeddedUrl: true,
+                            pdfAssetId: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -991,6 +998,8 @@ export class ProgrammesService {
                   toolId: item.toolLink.toolId,
                   source: item.toolLink.source,
                   toolName: item.toolLink.tool?.name ?? null,
+                  toolType: item.toolLink.tool?.type ?? null,
+                  fileId: item.toolLink.tool?.pdfAssetId ?? null,
                   url: item.toolLink.tool?.embeddedUrl ?? item.toolLink.externalUrl,
                 }
               : null,

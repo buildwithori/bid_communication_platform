@@ -803,6 +803,7 @@ Rules:
 - Tool area is required when an admin creates a tool. It powers filtering, reporting, and request triage.
 - PDF tools use uploaded file assets stored in DigitalOcean Spaces. Do not store PDF URLs entered by admins as the primary source.
 - Embedded tools store a validated `embedded_url` and should be rendered in a sandboxed iframe where possible.
+- Learning content may link to any published entrepreneur tool. Linked PDF tools use authenticated file access and the in-app document viewer; linked online tools use the sandboxed in-app viewer.
 - `all_entrepreneurs` tools are visible to every entrepreneur unless that entrepreneur has a hidden override.
 - Programme tools are visible to entrepreneurs with access to one of the selected programmes.
 - Entrepreneur tools are visible only to selected entrepreneur users.

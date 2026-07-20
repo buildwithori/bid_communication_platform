@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { ProgrammesService } from '../src/programmes/programmes.service';
 import { ContentService } from '../src/content/content.service';
+import { FilesService } from '../src/files/files.service';
 
 const entrepreneur = {
   id: 'entrepreneur-1',
@@ -285,4 +286,94 @@ test('content attachment rejects duplicates anywhere in a connected programme', 
   );
   assert.equal(locked, true);
   assert.equal(created, false);
+});
+
+test('published PDF entrepreneur tools can be attached to learning content', async () => {
+  const service = new ContentService(
+    {
+      tool: {
+        findUnique: async () => ({
+          id: 'tool-1',
+          type: 'pdf',
+          status: 'published',
+          embeddedUrl: null,
+          pdfAssetId: 'file-1',
+        }),
+      },
+    } as never,
+    {} as never,
+    {} as never,
+  );
+  const validateTool = (
+    service as unknown as {
+      ensureToolSource(input: { toolId: string }): Promise<void>;
+    }
+  ).ensureToolSource.bind(service);
+
+  await validateTool({ toolId: 'tool-1' });
+});
+
+test('unpublished entrepreneur tools cannot be attached to learning content', async () => {
+  const service = new ContentService(
+    {
+      tool: {
+        findUnique: async () => ({
+          id: 'tool-1',
+          type: 'pdf',
+          status: 'draft',
+          embeddedUrl: null,
+          pdfAssetId: 'file-1',
+        }),
+      },
+    } as never,
+    {} as never,
+    {} as never,
+  );
+  const validateTool = (
+    service as unknown as {
+      ensureToolSource(input: { toolId: string }): Promise<void>;
+    }
+  ).ensureToolSource.bind(service);
+
+  await assert.rejects(
+    validateTool({ toolId: 'tool-1' }),
+    /Only published entrepreneur tools/,
+  );
+});
+
+test('programme access authorizes a linked PDF entrepreneur tool', async () => {
+  let programmeQuery: unknown;
+  const service = new FilesService(
+    {
+      programme: {
+        findFirst: async (query: unknown) => {
+          programmeQuery = query;
+          return { id: 'programme-1' };
+        },
+      },
+    } as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+  const canReadFile = (
+    service as unknown as {
+      canReadFile(user: unknown, file: unknown): Promise<boolean>;
+    }
+  ).canReadFile.bind(service);
+
+  const allowed = await canReadFile(entrepreneur, {
+    contentItem: null,
+    deliverableSubmissions: [],
+    toolPdfAsset: {
+      id: 'tool-1',
+      visibility: 'programmes',
+      hiddenEntrepreneurs: [],
+      entrepreneurAccess: [],
+      programmeAccess: [],
+    },
+  });
+
+  assert.equal(allowed, true);
+  assert.ok(programmeQuery);
 });

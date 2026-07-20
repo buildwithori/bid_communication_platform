@@ -245,6 +245,37 @@ export class FilesService {
 
       const hidden = file.toolPdfAsset.hiddenEntrepreneurs.some((entry) => entry.entrepreneurUserId === user.id);
       if (hidden) return false;
+
+      const linkedProgramme = await this.prisma.programme.findFirst({
+        where: {
+          archivedAt: null,
+          publishedAt: { not: null },
+          OR: [
+            { accessType: ProgrammeAccessType.free },
+            {
+              accessGrants: {
+                some: { entrepreneurUserId: user.id, revokedAt: null },
+              },
+            },
+          ],
+          modules: {
+            some: {
+              module: {
+                contentItems: {
+                  some: {
+                    contentItem: {
+                      status: ContentItemStatus.ready,
+                      toolLink: { is: { toolId: file.toolPdfAsset.id } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: { id: true },
+      });
+      if (linkedProgramme) return true;
       if (file.toolPdfAsset.visibility === 'all_entrepreneurs') return true;
       if (file.toolPdfAsset.entrepreneurAccess.some((entry) => entry.entrepreneurUserId === user.id)) return true;
 
@@ -286,6 +317,39 @@ export class FilesService {
           select: { id: true },
         });
         if (programme) return true;
+      }
+      if (file.toolPdfAsset) {
+        const linkedProgramme = await this.prisma.programme.findFirst({
+          where: {
+            modules: {
+              some: {
+                module: {
+                  contentItems: {
+                    some: {
+                      contentItem: {
+                        status: ContentItemStatus.ready,
+                        toolLink: { is: { toolId: file.toolPdfAsset.id } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            AND: {
+              modules: {
+                some: {
+                  module: {
+                    contentItems: {
+                      some: { contentItem: { trainerId: user.id } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          select: { id: true },
+        });
+        if (linkedProgramme) return true;
       }
       return file.deliverableSubmissions.some((submission) => (
         submission.instance.programme.modules.some((programmeModule) => (

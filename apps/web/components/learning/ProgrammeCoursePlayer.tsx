@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   FileText,
   Layers3,
   Play,
@@ -129,7 +128,12 @@ export function ProgrammeCoursePlayer({
   const [completionAction, setCompletionAction] =
     React.useState<CompletionAction | null>(null);
   const signedFile = useSignedFileUrlQuery(
-    active?.item.type === 'pdf' ? active.item.file?.id : undefined,
+    active?.item.type === 'pdf'
+      ? active.item.file?.id
+      : active?.item.type === 'tool' &&
+          active.item.toolLink?.toolType === 'pdf'
+        ? active.item.toolLink.fileId ?? undefined
+        : undefined,
     Boolean(active),
   );
   const signedVideo = useSignedVideoPlaybackQuery(
@@ -385,10 +389,6 @@ export function ProgrammeCoursePlayer({
                     Play from beginning
                   </Button>
                 ) : null}
-                <ExternalAssetButton
-                  item={active.item}
-                  signedFile={signedFile}
-                />
                 {canTrack ? (
                   <Button
                     type="button"
@@ -749,7 +749,7 @@ function MediaStage({
       </div>
     );
   }
-  if (item.type === 'pdf') {
+  if (item.type === 'pdf' || item.toolLink?.toolType === 'pdf') {
     if (signedFile.isLoading) return <StageSkeleton tall />;
     if (signedFile.isError || !signedFile.data) {
       return (
@@ -785,30 +785,6 @@ function MediaStage({
       className="h-[620px] w-full bg-white"
       sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
     />
-  );
-}
-
-function ExternalAssetButton({
-  item,
-  signedFile,
-}: {
-  item: ProgrammePlayerItem;
-  signedFile: QueryState<{ download: { url: string } }>;
-}) {
-  const url =
-    item.type === 'pdf'
-      ? signedFile.data?.download.url
-      : item.type === 'tool'
-        ? item.toolLink?.url
-        : null;
-  if (!url) return null;
-  return (
-    <Button asChild type="button" variant="outline">
-      <a href={url} target="_blank" rel="noreferrer">
-        Open new tab
-        <ExternalLink className="h-4 w-4" />
-      </a>
-    </Button>
   );
 }
 

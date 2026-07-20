@@ -823,12 +823,26 @@ export class ContentService {
     if (input.toolId) {
       const tool = await this.prisma.tool.findUnique({
         where: { id: input.toolId },
-        select: { id: true, type: true, embeddedUrl: true },
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          embeddedUrl: true,
+          pdfAssetId: true,
+        },
       });
       if (!tool) throw new NotFoundException('Tool was not found.');
-      if (tool.type !== 'embedded_tool' || !tool.embeddedUrl) {
+      if (tool.status !== 'published') {
         throw new ForbiddenException(
-          'Only embedded tools can be attached to learning content.',
+          'Only published entrepreneur tools can be attached to learning content.',
+        );
+      }
+      if (
+        (tool.type === 'embedded_tool' && !tool.embeddedUrl) ||
+        (tool.type === 'pdf' && !tool.pdfAssetId)
+      ) {
+        throw new ForbiddenException(
+          'This entrepreneur tool does not have a previewable resource.',
         );
       }
       return;
@@ -898,6 +912,8 @@ export class ContentService {
             externalUrl: item.toolLink.externalUrl,
             source: item.toolLink.source,
             toolName: item.toolLink.tool?.name ?? null,
+            toolType: item.toolLink.tool?.type ?? null,
+            fileId: item.toolLink.tool?.pdfAssetId ?? null,
             url: item.toolLink.tool?.embeddedUrl ?? item.toolLink.externalUrl,
           }
         : null,

@@ -262,7 +262,7 @@ Business rules:
 - Max entrepreneurs is required.
 - Video upload uses Mux.
 - PDF/file upload uses DigitalOcean Spaces.
-- Embedded tools can select from entrepreneur tools or use a direct URL.
+- Learning tool content can reuse any published entrepreneur tool, including PDF resources and online tools. A custom online tool may use a direct URL.
 
 Done when:
 

@@ -17,7 +17,7 @@ import { Notice } from '@/components/shared/PageHeader';
 import {
   useAttachContentItemMutation,
   useCreateModuleContentMutation,
-  useLazyEmbeddedToolsLookup,
+  useLazyPublishedToolsLookup,
   useUpdateContentItemMutation,
   type ContentItemRecord,
   type ContentItemType,
@@ -127,7 +127,7 @@ export function CreateContentItemModal({
     status: 'active',
     take: 20,
   });
-  const tools = useLazyEmbeddedToolsLookup({
+  const tools = useLazyPublishedToolsLookup({
     enabled: open && type === 'tool' && toolSource === 'library',
     search: toolSearch.trim() || undefined,
   });
@@ -384,9 +384,12 @@ export function CreateContentItemModal({
                   options={tools.rows.map((tool) => ({
                     value: tool.id,
                     label: tool.name,
-                    description: tool.description,
+                    description:
+                      (tool.type === 'pdf' ? 'PDF resource' : 'Online tool') +
+                      ' · ' +
+                      tool.description,
                   }))}
-                  placeholder="Select embedded tool"
+                  placeholder="Select entrepreneur tool"
                   searchPlaceholder="Search tools..."
                   onSearchChange={setToolSearch}
                   isLoading={tools.isLoading || tools.isFetchingNextPage}
