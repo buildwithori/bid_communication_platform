@@ -40,7 +40,6 @@ export default function DeliverablesPage() {
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(ALL);
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(6);
-  const [lookupOpen, setLookupOpen] = React.useState(false);
   const [lookupSearch, setLookupSearch] = React.useState('');
   const groups = useDeliverableGroupsPage({
     search: debouncedQuery || undefined,
@@ -48,7 +47,7 @@ export default function DeliverablesPage() {
     view: statusFilter === ALL ? undefined : statusFilter,
     take: pageSize,
   });
-  const lookup = useLazyDeliverableGroups({ enabled: lookupOpen, search: lookupSearch || undefined, take: 20 });
+  const lookup = useLazyDeliverableGroups({ enabled: true, search: lookupSearch || undefined, take: 20 });
   const summary = groups.summary;
   const needsAction = (summary?.not_submitted ?? 0) + (summary?.overdue ?? 0) + (summary?.changes_required ?? 0);
 
@@ -97,7 +96,6 @@ export default function DeliverablesPage() {
               placeholder="All programmes"
               searchPlaceholder="Search programmes..."
               emptyMessage="No programme found."
-              onOpenChange={setLookupOpen}
               onSearchChange={setLookupSearch}
               isLoading={lookup.isLoading}
               hasMore={lookup.hasNextPage}

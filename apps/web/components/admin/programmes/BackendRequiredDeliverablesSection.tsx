@@ -135,22 +135,22 @@ export function RequiredDeliverablesSection({
   const [pageSize, setPageSize] = React.useState(5);
   const [addOpen, setAddOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<ProgrammeDeliverableRule | null>(null);
-  const [stageLookup, setStageLookup] = React.useState({ open: false, search: '' });
-  const [moduleLookup, setModuleLookup] = React.useState({ open: false, search: '' });
+  const [stageLookup, setStageLookup] = React.useState({ search: '' });
+  const [moduleLookup, setModuleLookup] = React.useState({ search: '' });
   const modalOpen = addOpen || Boolean(editTarget);
   const rules = useProgrammeDeliverableRulesPage(programmeId, {
     search: debouncedQuery || undefined,
     take: pageSize,
   });
   const stages = useLazyBusinessStagesQuery({
-    enabled: modalOpen && stageLookup.open,
+    enabled: modalOpen,
     search: stageLookup.search || undefined,
     active: true,
     take: 20,
   });
   const modules = useLazyProgrammeModules({
     programmeId,
-    enabled: modalOpen && moduleLookup.open,
+    enabled: modalOpen,
     search: moduleLookup.search || undefined,
     take: 20,
   });
@@ -337,7 +337,7 @@ export function RequiredDeliverablesSection({
   );
 }
 
-type LookupState = { open: boolean; search: string };
+type LookupState = { search: string };
 
 function RuleModal({
   title,
@@ -404,7 +404,6 @@ function RuleModal({
               searchPlaceholder="Search programme modules..."
               emptyMessage="No programme module found."
               isLoading={modules.isFetching}
-              onOpenChange={(value) => setModuleLookup((state) => ({ ...state, open: value }))}
               onSearchChange={(search) => setModuleLookup((state) => ({ ...state, search }))}
               hasMore={Boolean(modules.hasNextPage)}
               onLoadMore={() => void modules.fetchNextPage()}
@@ -429,7 +428,6 @@ function RuleModal({
             searchPlaceholder="Search business stages..."
             emptyMessage="No active business stage found."
             isLoading={stages.isFetching}
-            onOpenChange={(value) => setStageLookup((state) => ({ ...state, open: value }))}
             onSearchChange={(search) => setStageLookup((state) => ({ ...state, search }))}
             hasMore={Boolean(stages.hasNextPage)}
             onLoadMore={() => void stages.fetchNextPage()}

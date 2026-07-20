@@ -83,13 +83,9 @@ export function CreateContentItemModal({
   onOpenChange: (open: boolean) => void;
   initialModuleId?: string;
 }) {
-  const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState('');
-  const [moduleOpen, setModuleOpen] = React.useState(false);
   const [moduleSearch, setModuleSearch] = React.useState('');
-  const [trainerOpen, setTrainerOpen] = React.useState(false);
   const [trainerSearch, setTrainerSearch] = React.useState('');
-  const [toolOpen, setToolOpen] = React.useState(false);
   const [toolSearch, setToolSearch] = React.useState('');
   const [assetFile, setAssetFile] = React.useState<File | null>(null);
 
@@ -114,25 +110,25 @@ export function CreateContentItemModal({
   const toolId = useWatch({ control: form.control, name: 'toolId' });
 
   const programmes = useLazyProgrammesLookup({
-    enabled: open && !initialModuleId && programmeOpen,
+    enabled: open && !initialModuleId,
     search: programmeSearch.trim() || undefined,
     includeArchived: false,
     take: 20,
   });
   const modules = useLazyProgrammeModules({
     programmeId,
-    enabled: open && !initialModuleId && Boolean(programmeId) && moduleOpen,
+    enabled: open && !initialModuleId && Boolean(programmeId),
     search: moduleSearch.trim() || undefined,
     take: 20,
   });
   const trainers = useLazyTrainersLookup({
-    enabled: open && trainerOpen,
+    enabled: open,
     search: trainerSearch.trim() || undefined,
     status: 'active',
     take: 20,
   });
   const tools = useLazyEmbeddedToolsLookup({
-    enabled: open && type === 'tool' && toolSource === 'library' && toolOpen,
+    enabled: open && type === 'tool' && toolSource === 'library',
     search: toolSearch.trim() || undefined,
   });
   const createContent = useCreateModuleContentMutation();
@@ -144,10 +140,6 @@ export function CreateContentItemModal({
   const close = () => {
     onOpenChange(false);
     setAssetFile(null);
-    setProgrammeOpen(false);
-    setModuleOpen(false);
-    setTrainerOpen(false);
-    setToolOpen(false);
     setProgrammeSearch('');
     setModuleSearch('');
     setTrainerSearch('');
@@ -250,7 +242,6 @@ export function CreateContentItemModal({
                 }))}
                 placeholder="Select programme"
                 searchPlaceholder="Search programmes..."
-                onOpenChange={setProgrammeOpen}
                 onSearchChange={setProgrammeSearch}
                 isLoading={programmes.isLoading || programmes.isFetchingNextPage}
                 hasMore={Boolean(programmes.hasNextPage)}
@@ -276,7 +267,6 @@ export function CreateContentItemModal({
                 }
                 searchPlaceholder="Search modules..."
                 disabled={!programmeId}
-                onOpenChange={setModuleOpen}
                 onSearchChange={setModuleSearch}
                 isLoading={modules.isLoading || modules.isFetchingNextPage}
                 hasMore={Boolean(modules.hasNextPage)}
@@ -321,7 +311,6 @@ export function CreateContentItemModal({
             }))}
             placeholder="Select trainer"
             searchPlaceholder="Search trainers..."
-            onOpenChange={setTrainerOpen}
             onSearchChange={setTrainerSearch}
             isLoading={trainers.isLoading || trainers.isFetchingNextPage}
             hasMore={Boolean(trainers.hasNextPage)}
@@ -399,7 +388,6 @@ export function CreateContentItemModal({
                   }))}
                   placeholder="Select embedded tool"
                   searchPlaceholder="Search tools..."
-                  onOpenChange={setToolOpen}
                   onSearchChange={setToolSearch}
                   isLoading={tools.isLoading || tools.isFetchingNextPage}
                   hasMore={Boolean(tools.hasNextPage)}
@@ -452,7 +440,6 @@ export function EditContentItemModal({
   item: ContentItemRecord | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [trainerOpen, setTrainerOpen] = React.useState(false);
   const [trainerSearch, setTrainerSearch] = React.useState('');
   const form = useForm<EditForm>({
     resolver: zodResolver(editSchema),
@@ -463,7 +450,7 @@ export function EditContentItemModal({
   });
   const trainerId = useWatch({ control: form.control, name: 'trainerId' });
   const trainers = useLazyTrainersLookup({
-    enabled: Boolean(item) && trainerOpen,
+    enabled: Boolean(item),
     search: trainerSearch.trim() || undefined,
     status: 'active',
     take: 20,
@@ -526,7 +513,6 @@ export function EditContentItemModal({
             ]}
             placeholder="Select trainer"
             searchPlaceholder="Search trainers..."
-            onOpenChange={setTrainerOpen}
             onSearchChange={setTrainerSearch}
             isLoading={trainers.isLoading || trainers.isFetchingNextPage}
             hasMore={Boolean(trainers.hasNextPage)}
@@ -556,19 +542,17 @@ export function AttachContentItemModal({
 }) {
   const [programmeId, setProgrammeId] = React.useState('');
   const [moduleId, setModuleId] = React.useState('');
-  const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState('');
-  const [moduleOpen, setModuleOpen] = React.useState(false);
   const [moduleSearch, setModuleSearch] = React.useState('');
   const programmes = useLazyProgrammesLookup({
-    enabled: Boolean(item) && programmeOpen,
+    enabled: Boolean(item),
     search: programmeSearch.trim() || undefined,
     includeArchived: false,
     take: 20,
   });
   const modules = useLazyProgrammeModules({
     programmeId,
-    enabled: Boolean(item) && Boolean(programmeId) && moduleOpen,
+    enabled: Boolean(item) && Boolean(programmeId),
     search: moduleSearch.trim() || undefined,
     take: 20,
   });
@@ -609,7 +593,6 @@ export function AttachContentItemModal({
           }))}
           placeholder="Select programme"
           searchPlaceholder="Search programmes..."
-          onOpenChange={setProgrammeOpen}
           onSearchChange={setProgrammeSearch}
           isLoading={programmes.isLoading || programmes.isFetchingNextPage}
           hasMore={Boolean(programmes.hasNextPage)}
@@ -628,7 +611,6 @@ export function AttachContentItemModal({
           placeholder={programmeId ? 'Select module' : 'Select a programme first'}
           searchPlaceholder="Search modules..."
           disabled={!programmeId}
-          onOpenChange={setModuleOpen}
           onSearchChange={setModuleSearch}
           isLoading={modules.isLoading || modules.isFetchingNextPage}
           hasMore={Boolean(modules.hasNextPage)}

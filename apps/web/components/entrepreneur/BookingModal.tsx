@@ -60,7 +60,6 @@ export function BookingModal({
 }) {
   const profile = useEntrepreneurProfileQuery();
   const timezone = profile.data?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
-  const [teamLookupOpen, setTeamLookupOpen] = React.useState(false);
   const [trainerSearch, setTrainerSearch] = React.useState("");
   const form = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
@@ -82,7 +81,7 @@ export function BookingModal({
   const selectedTime = useWatch({ control: form.control, name: "time" });
 
   const trainers = useLazySessionTeamMembers({
-    enabled: open && recipient === "specific" && teamLookupOpen,
+    enabled: open && recipient === "specific",
     search: trainerSearch || undefined,
     take: 20,
     role: "trainer",
@@ -236,7 +235,6 @@ export function BookingModal({
               searchPlaceholder="Search connected trainers..."
               emptyMessage="No connected trainer found."
               isLoading={trainers.isLoading || trainers.isFetchingNextPage}
-              onOpenChange={setTeamLookupOpen}
               onSearchChange={setTrainerSearch}
               hasMore={Boolean(trainers.hasNextPage)}
               onLoadMore={() => void trainers.fetchNextPage()}

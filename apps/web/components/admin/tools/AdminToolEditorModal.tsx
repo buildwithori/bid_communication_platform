@@ -112,12 +112,11 @@ export function AdminToolEditorModal({
   );
   const [file, setFile] = React.useState<File | null>(null);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
-  const [areaOpen, setAreaOpen] = React.useState(false);
   const [areaSearch, setAreaSearch] = React.useState("");
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const areas = useLazyToolAreasQuery({
-    enabled: open && areaOpen,
+    enabled: open,
     search: areaSearch || undefined,
     active: true,
     take: 20,
@@ -235,7 +234,6 @@ export function AdminToolEditorModal({
               placeholder="Select tool area"
               searchPlaceholder="Search tool areas..."
               emptyMessage="No tool area found."
-              onOpenChange={setAreaOpen}
               onSearchChange={setAreaSearch}
               isLoading={areas.isLoading || areas.isFetchingNextPage}
               hasMore={Boolean(areas.hasNextPage)}
@@ -389,15 +387,14 @@ function AudienceSelect({
   error?: string;
   enabled: boolean;
 }) {
-  const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const programmeQuery = useLazyProgrammesLookup({
-    enabled: enabled && open && mode === "programmes",
+    enabled: enabled && mode === "programmes",
     search: search || undefined,
     take: 20,
   });
   const entrepreneurQuery = useLazyEntrepreneursLookup({
-    enabled: enabled && open && mode === "entrepreneurs",
+    enabled: enabled && mode === "entrepreneurs",
     search: search || undefined,
     status: "active",
     take: 20,
@@ -441,7 +438,6 @@ function AudienceSelect({
               : "Search entrepreneurs..."
           }
           emptyMessage="No matching option found."
-          onOpenChange={setOpen}
           onSearchChange={setSearch}
           isLoading={query.isLoading || query.isFetchingNextPage}
           hasMore={Boolean(query.hasNextPage)}

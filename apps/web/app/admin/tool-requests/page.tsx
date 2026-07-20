@@ -78,7 +78,6 @@ export default function AdminToolRequestsPage() {
     setActiveRequest(null);
     if (linkedRequestId) router.replace(routes.admin.toolRequests);
   }
-  const [areaOpen, setAreaOpen] = useState(false);
   const [areaSearch, setAreaSearch] = useState("");
 
   const requests = useToolRequestsPage({
@@ -91,7 +90,7 @@ export default function AdminToolRequestsPage() {
     take: pageSize,
   });
   const areas = useLazyToolAreasQuery({
-    enabled: areaOpen,
+    enabled: true,
     search: areaSearch || undefined,
     active: true,
     take: 20,
@@ -343,7 +342,6 @@ export default function AdminToolRequestsPage() {
               placeholder="All tool areas"
               searchPlaceholder="Search tool areas..."
               emptyMessage="No tool area found."
-              onOpenChange={setAreaOpen}
               onSearchChange={setAreaSearch}
               isLoading={areas.isLoading || areas.isFetchingNextPage}
               hasMore={Boolean(areas.hasNextPage)}
@@ -419,10 +417,9 @@ function ToolRequestReviewModal({
   onDecide: (status: ToolRequestStatus) => void;
   onViewLibrary: () => void;
 }) {
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [toolSearch, setToolSearch] = useState("");
   const tools = useLazyToolsQuery({
-    enabled: toolsOpen && Boolean(request),
+    enabled: Boolean(request),
     search: toolSearch || undefined,
     status: "published",
     take: 20,
@@ -516,7 +513,6 @@ function ToolRequestReviewModal({
                 placeholder="Select the published tool"
                 searchPlaceholder="Search published tools..."
                 emptyMessage="No published tool found."
-                onOpenChange={setToolsOpen}
                 onSearchChange={setToolSearch}
                 isLoading={tools.isLoading || tools.isFetchingNextPage}
                 hasMore={Boolean(tools.hasNextPage)}

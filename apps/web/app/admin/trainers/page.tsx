@@ -117,7 +117,6 @@ export default function AdminTrainersPage() {
   const [status, setStatus] = React.useState<AllOr<TrainerDirectoryStatus>>("all");
   const [calendar, setCalendar] = React.useState<AllOr<TrainerCalendarFilter>>("all");
   const [sectorId, setSectorId] = React.useState("all");
-  const [sectorOpen, setSectorOpen] = React.useState(false);
   const [sectorSearch, setSectorSearch] = React.useState("");
   const [pageSize, setPageSize] = React.useState(10);
 
@@ -130,7 +129,7 @@ export default function AdminTrainersPage() {
     take: pageSize,
   });
   const sectors = useLazySectorsQuery({
-    enabled: sectorOpen,
+    enabled: true,
     search: sectorSearch.trim() || undefined,
     active: true,
     take: 20,
@@ -382,7 +381,6 @@ export default function AdminTrainersPage() {
               searchPlaceholder="Search specialisms..."
               emptyMessage="No active specialism found."
               isLoading={sectors.isFetching}
-              onOpenChange={setSectorOpen}
               onSearchChange={setSectorSearch}
               hasMore={Boolean(sectors.hasNextPage)}
               onLoadMore={() => void sectors.fetchNextPage()}

@@ -92,11 +92,9 @@ export default function AdminEntrepreneursPage() {
   const [sectorId, setSectorId] = React.useState("all");
   const [stageId, setStageId] = React.useState("all");
   const [sectorLookup, setSectorLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [stageLookup, setStageLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [pageSize, setPageSize] = React.useState(10);
@@ -110,13 +108,13 @@ export default function AdminEntrepreneursPage() {
     take: pageSize,
   });
   const sectors = useLazySectorsQuery({
-    enabled: sectorLookup.open,
+    enabled: true,
     search: sectorLookup.search || undefined,
     active: true,
     take: 20,
   });
   const stages = useLazyBusinessStagesQuery({
-    enabled: stageLookup.open,
+    enabled: true,
     search: stageLookup.search || undefined,
     active: true,
     take: 20,
@@ -405,9 +403,6 @@ export default function AdminEntrepreneursPage() {
               searchPlaceholder="Search sectors..."
               emptyMessage="No active sector found."
               isLoading={sectors.isFetching}
-              onOpenChange={(open) =>
-                setSectorLookup((state) => ({ ...state, open }))
-              }
               onSearchChange={(search) =>
                 setSectorLookup((state) => ({ ...state, search }))
               }
@@ -422,9 +417,6 @@ export default function AdminEntrepreneursPage() {
               searchPlaceholder="Search stages..."
               emptyMessage="No active stage found."
               isLoading={stages.isFetching}
-              onOpenChange={(open) =>
-                setStageLookup((state) => ({ ...state, open }))
-              }
               onSearchChange={(search) =>
                 setStageLookup((state) => ({ ...state, search }))
               }
@@ -540,11 +532,11 @@ function ProgrammeAccessModal({
   entrepreneurId: string | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [lookup, setLookup] = React.useState({ open: false, search: "" });
+  const [lookup, setLookup] = React.useState({ search: "" });
   const [selected, setSelected] = React.useState("");
   const access = useProgrammeAccessQuery(entrepreneurId, { take: 10 });
   const programmes = useLazyGrantableProgrammesQuery({
-    enabled: Boolean(entrepreneurId && lookup.open),
+    enabled: Boolean(entrepreneurId),
     search: lookup.search || undefined,
   });
   const grant = useGrantProgrammeAccessMutation({
@@ -628,7 +620,6 @@ function ProgrammeAccessModal({
             searchPlaceholder="Search programmes..."
             emptyMessage="No additional programme found."
             isLoading={programmes.isFetching}
-            onOpenChange={(open) => setLookup((state) => ({ ...state, open }))}
             onSearchChange={(search) =>
               setLookup((state) => ({ ...state, search }))
             }

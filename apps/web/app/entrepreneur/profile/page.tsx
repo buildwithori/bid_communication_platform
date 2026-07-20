@@ -583,22 +583,20 @@ function BusinessTab({
   onSubmit: (values: ProfileForm) => void;
 }) {
   const [sectorLookup, setSectorLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [stageLookup, setStageLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [timezoneOpen, setTimezoneOpen] = React.useState(false);
   const sectors = useLazySectorsQuery({
-    enabled: sectorLookup.open,
+    enabled: true,
     search: sectorLookup.search || undefined,
     active: true,
     take: 20,
   });
   const stages = useLazyBusinessStagesQuery({
-    enabled: stageLookup.open,
+    enabled: true,
     search: stageLookup.search || undefined,
     active: true,
     take: 20,
@@ -686,9 +684,6 @@ function BusinessTab({
                 searchPlaceholder="Search sectors..."
                 emptyMessage="No active sector found."
                 isLoading={sectors.isFetching}
-                onOpenChange={(open) =>
-                  setSectorLookup((state) => ({ ...state, open }))
-                }
                 onSearchChange={(search) =>
                   setSectorLookup((state) => ({ ...state, search }))
                 }
@@ -723,9 +718,6 @@ function BusinessTab({
                 searchPlaceholder="Search stages..."
                 emptyMessage="No active stage found."
                 isLoading={stages.isFetching}
-                onOpenChange={(open) =>
-                  setStageLookup((state) => ({ ...state, open }))
-                }
                 onSearchChange={(search) =>
                   setStageLookup((state) => ({ ...state, search }))
                 }

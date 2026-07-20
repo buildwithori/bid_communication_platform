@@ -105,18 +105,16 @@ function SessionEditorModalForm({
   const [slotStartAt, setSlotStartAt] = React.useState("");
   const [reason, setReason] = React.useState("");
   const [error, setError] = React.useState("");
-  const [entrepreneurOpen, setEntrepreneurOpen] = React.useState(false);
-  const [ownerOpen, setOwnerOpen] = React.useState(false);
   const [entrepreneurSearch, setEntrepreneurSearch] = React.useState("");
   const [ownerSearch, setOwnerSearch] = React.useState("");
 
   const entrepreneurs = useLazyEntrepreneursLookup({
-    enabled: open && entrepreneurOpen && mode === "create",
+    enabled: open && mode === "create",
     search: entrepreneurSearch || undefined,
     take: 20,
   });
   const owners = useLazySessionTeamMembers({
-    enabled: open && ownerOpen && actor === "admin" && mode === "create",
+    enabled: open && actor === "admin" && mode === "create",
     search: ownerSearch || undefined,
     take: 20,
   });
@@ -240,7 +238,6 @@ function SessionEditorModalForm({
             isLoading={
               entrepreneurs.isLoading || entrepreneurs.isFetchingNextPage
             }
-            onOpenChange={setEntrepreneurOpen}
             onSearchChange={setEntrepreneurSearch}
             hasMore={Boolean(entrepreneurs.hasNextPage)}
             onLoadMore={() => void entrepreneurs.fetchNextPage()}
@@ -273,7 +270,6 @@ function SessionEditorModalForm({
                 placeholder="Search connected team members"
                 searchPlaceholder="Search team members..."
                 isLoading={owners.isLoading || owners.isFetchingNextPage}
-                onOpenChange={setOwnerOpen}
                 onSearchChange={setOwnerSearch}
                 hasMore={Boolean(owners.hasNextPage)}
                 onLoadMore={() => void owners.fetchNextPage()}

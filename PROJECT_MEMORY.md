@@ -89,8 +89,9 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Avoid UI that only works for a tiny dataset. Prefer search/filter/pagination from the start.
 - Every fetching view needs a page-specific skeleton that matches the final layout closely enough to feel smooth. Use skeleton cards, rows, charts, and headers that fit the page instead of a generic centered spinner for full-page loading.
 - Async buttons must show an inline loading spinner beside the label and disable duplicate submissions while pending.
-- Autocomplete and scalable select controls should fetch lazily when opened or searched. Do not fetch all options on page load just to populate a closed control.
+- Backend-backed autocomplete options preload with their containing UI: page filters when the page/view is active, modal fields when the modal opens, and dependent fields only after their required parent value exists. Opening the dropdown must never initiate its first request. Search remains server-driven and paginated; do not fetch an entire option set eagerly.
 - Every user-entered search must use the shared 300 ms debounce boundary before triggering API queries or expensive local filtering. Typing stays visually immediate, clearing propagates immediately, and remote autocompletes inherit debounce from the shared `FormAutocomplete` rather than adding a second page-level delay.
+- Shared autocomplete/select triggers must show an inline themed spinner while their options are loading, especially when a dependent field is repopulating after a parent selection changes.
 - Autocomplete, select, and lookup UIs must support pagination or infinite scrolling. Do not build UI around a hidden fixed result cap.
 
 ## Current Important Decisions

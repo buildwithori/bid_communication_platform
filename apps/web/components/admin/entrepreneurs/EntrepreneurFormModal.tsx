@@ -41,31 +41,28 @@ export function EntrepreneurFormModal({
 }) {
   const isEdit = Boolean(entrepreneur);
   const [sectorLookup, setSectorLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [stageLookup, setStageLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [programmeLookup, setProgrammeLookup] = React.useState({
-    open: false,
     search: "",
   });
   const sectors = useLazySectorsQuery({
-    enabled: open && sectorLookup.open,
+    enabled: open,
     search: sectorLookup.search || undefined,
     active: true,
     take: 20,
   });
   const stages = useLazyBusinessStagesQuery({
-    enabled: open && stageLookup.open,
+    enabled: open,
     search: stageLookup.search || undefined,
     active: true,
     take: 20,
   });
   const programmes = useLazyGrantableProgrammesQuery({
-    enabled: open && !isEdit && programmeLookup.open,
+    enabled: open && !isEdit,
     search: programmeLookup.search || undefined,
   });
   const form = useForm<EntrepreneurProfileForm>({
@@ -193,9 +190,6 @@ export function EntrepreneurFormModal({
               searchPlaceholder="Search sectors..."
               emptyMessage="No active sector found."
               isLoading={sectors.isFetching}
-              onOpenChange={(value) =>
-                setSectorLookup((state) => ({ ...state, open: value }))
-              }
               onSearchChange={(search) =>
                 setSectorLookup((state) => ({ ...state, search }))
               }
@@ -214,9 +208,6 @@ export function EntrepreneurFormModal({
               searchPlaceholder="Search stages..."
               emptyMessage="No active stage found."
               isLoading={stages.isFetching}
-              onOpenChange={(value) =>
-                setStageLookup((state) => ({ ...state, open: value }))
-              }
               onSearchChange={(search) =>
                 setStageLookup((state) => ({ ...state, search }))
               }
@@ -242,9 +233,6 @@ export function EntrepreneurFormModal({
               searchPlaceholder="Search published programmes..."
               emptyMessage="No grantable programme found."
               isLoading={programmes.isFetching}
-              onOpenChange={(value) =>
-                setProgrammeLookup((state) => ({ ...state, open: value }))
-              }
               onSearchChange={(search) =>
                 setProgrammeLookup((state) => ({ ...state, search }))
               }

@@ -87,9 +87,7 @@ export default function AdminReportingPage() {
   const [appliedDateTo, setAppliedDateTo] = React.useState(() =>
     initialDate(12, 31),
   );
-  const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState("");
-  const [overdueProgrammeOpen, setOverdueProgrammeOpen] = React.useState(false);
   const [overdueProgrammeSearch, setOverdueProgrammeSearch] =
     React.useState("");
   const [overdueQuery, setOverdueQuery] = React.useState("");
@@ -111,12 +109,12 @@ export default function AdminReportingPage() {
   };
   const report = useReportingOverviewQuery(reportQuery);
   const programmes = useLazyProgrammesLookup({
-    enabled: programmeOpen,
+    enabled: true,
     search: programmeSearch || undefined,
     take: 20,
   });
   const overdueProgrammes = useLazyProgrammesLookup({
-    enabled: overdueProgrammeOpen,
+    enabled: true,
     search: overdueProgrammeSearch || undefined,
     take: 20,
   });
@@ -334,7 +332,6 @@ export default function AdminReportingPage() {
             options={programmeOptions}
             placeholder="All programmes"
             searchPlaceholder="Search programmes..."
-            onOpenChange={setProgrammeOpen}
             onSearchChange={setProgrammeSearch}
             isLoading={programmes.isLoading || programmes.isFetchingNextPage}
             hasMore={Boolean(programmes.hasNextPage)}
@@ -521,7 +518,6 @@ export default function AdminReportingPage() {
                   : overdueProgrammeOptions
               }
               disabled={selectedProgramme !== ALL}
-              onOpenChange={setOverdueProgrammeOpen}
               onSearchChange={setOverdueProgrammeSearch}
               isLoading={
                 overdueProgrammes.isLoading ||

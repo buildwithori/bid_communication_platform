@@ -71,15 +71,13 @@ export function ProgrammeGoalRecordModal({
   onSubmit: (payload: ProgrammeGoalPayload) => void;
 }) {
   const [typeLookup, setTypeLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [programmeLookup, setProgrammeLookup] = React.useState({
-    open: false,
     search: "",
   });
   const goalTypes = useLazyProgrammeGoalTypesQuery({
-    enabled: open && typeLookup.open,
+    enabled: open,
     search: typeLookup.search || undefined,
     active: true,
     take: 20,
@@ -90,7 +88,7 @@ export function ProgrammeGoalRecordModal({
       search: programmeLookup.search || undefined,
       take: 20,
     },
-    programmeLookup.open,
+    open,
   );
   const form = useForm<GoalForm>({
     resolver: zodResolver(goalSchema),
@@ -156,9 +154,6 @@ export function ProgrammeGoalRecordModal({
             searchPlaceholder="Search goal types..."
             emptyMessage="No active goal type found."
             isLoading={goalTypes.isFetching}
-            onOpenChange={(value) =>
-              setTypeLookup((state) => ({ ...state, open: value }))
-            }
             onSearchChange={(search) =>
               setTypeLookup((state) => ({ ...state, search }))
             }
@@ -185,9 +180,6 @@ export function ProgrammeGoalRecordModal({
             searchPlaceholder="Search assigned programmes..."
             emptyMessage="No assigned programme found."
             isLoading={programmes.isFetching}
-            onOpenChange={(value) =>
-              setProgrammeLookup((state) => ({ ...state, open: value }))
-            }
             onSearchChange={(search) =>
               setProgrammeLookup((state) => ({ ...state, search }))
             }
@@ -246,11 +238,9 @@ export function FundraisingRoundRecordModal({
   onSubmit: (payload: FundraisingRoundPayload) => void;
 }) {
   const [programmeLookup, setProgrammeLookup] = React.useState({
-    open: false,
     search: "",
   });
   const [goalLookup, setGoalLookup] = React.useState({
-    open: false,
     search: "",
   });
   const programmes = useProgrammeAccessQuery(
@@ -259,7 +249,7 @@ export function FundraisingRoundRecordModal({
       search: programmeLookup.search || undefined,
       take: 20,
     },
-    programmeLookup.open,
+    open,
   );
   const goals = useProgrammeGoalsQuery(
     open ? entrepreneurId : null,
@@ -268,7 +258,7 @@ export function FundraisingRoundRecordModal({
       linkableOnly: true,
       take: 20,
     },
-    goalLookup.open,
+    open,
   );
   const form = useForm<FundingForm>({
     resolver: zodResolver(fundingSchema),
@@ -360,9 +350,6 @@ export function FundraisingRoundRecordModal({
             searchPlaceholder="Search assigned programmes..."
             emptyMessage="No assigned programme found."
             isLoading={programmes.isFetching}
-            onOpenChange={(value) =>
-              setProgrammeLookup((state) => ({ ...state, open: value }))
-            }
             onSearchChange={(search) =>
               setProgrammeLookup((state) => ({ ...state, search }))
             }
@@ -396,9 +383,6 @@ export function FundraisingRoundRecordModal({
             searchPlaceholder="Search goals..."
             emptyMessage="No programme goal found."
             isLoading={goals.isFetching}
-            onOpenChange={(value) =>
-              setGoalLookup((state) => ({ ...state, open: value }))
-            }
             onSearchChange={(search) =>
               setGoalLookup((state) => ({ ...state, search }))
             }
@@ -432,7 +416,6 @@ export function PeriodicUpdateRecordModal({
   onSubmit: (payload: PeriodicUpdatePayload) => void;
 }) {
   const [programmeLookup, setProgrammeLookup] = React.useState({
-    open: false,
     search: "",
   });
   const programmes = useProgrammeAccessQuery(
@@ -441,7 +424,7 @@ export function PeriodicUpdateRecordModal({
       search: programmeLookup.search || undefined,
       take: 20,
     },
-    programmeLookup.open,
+    open,
   );
   const form = useForm<UpdateForm>({
     resolver: zodResolver(updateSchema),
@@ -496,9 +479,6 @@ export function PeriodicUpdateRecordModal({
             searchPlaceholder="Search assigned programmes..."
             emptyMessage="No assigned programme found."
             isLoading={programmes.isFetching}
-            onOpenChange={(value) =>
-              setProgrammeLookup((state) => ({ ...state, open: value }))
-            }
             onSearchChange={(search) =>
               setProgrammeLookup((state) => ({ ...state, search }))
             }

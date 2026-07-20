@@ -68,7 +68,6 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
   const [statusFilter, setStatusFilter] = React.useState<ReviewStatusFilter>(ALL);
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(10);
-  const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState('');
   const queue = useDeliverableReviewQueuePage({
     search: debouncedQuery || undefined,
@@ -76,7 +75,7 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
     take: pageSize,
     ...apiFilters(statusFilter),
   });
-  const programmes = useLazyProgrammesLookup({ enabled: programmeOpen, search: programmeSearch || undefined, take: 20 });
+  const programmes = useLazyProgrammesLookup({ enabled: true, search: programmeSearch || undefined, take: 20 });
   const rows = React.useMemo(() => queue.rows.map(mapDeliverableReviewRow), [queue.rows]);
   const summary = queue.summary;
   const today = new Date();
@@ -168,7 +167,6 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
               placeholder="All programmes"
               searchPlaceholder="Search programmes..."
               emptyMessage="No programme found."
-              onOpenChange={setProgrammeOpen}
               onSearchChange={setProgrammeSearch}
               isLoading={programmes.isLoading}
               hasMore={programmes.hasNextPage}

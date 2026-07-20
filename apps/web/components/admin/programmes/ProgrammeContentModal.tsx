@@ -338,11 +338,10 @@ function ReuseModuleContentModal({
   onOpenChange: (open: boolean) => void;
   module: ModuleSummary;
 }) {
-  const [lookupOpen, setLookupOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [contentItemId, setContentItemId] = React.useState('');
   const reusable = useLazyReusableContentItems(module.id, {
-    enabled: open && lookupOpen,
+    enabled: open,
     search: search.trim() || undefined,
     take: 20,
   });
@@ -351,7 +350,6 @@ function ReuseModuleContentModal({
   const close = () => {
     if (attach.isPending) return;
     onOpenChange(false);
-    setLookupOpen(false);
     setSearch('');
     setContentItemId('');
   };
@@ -400,7 +398,6 @@ function ReuseModuleContentModal({
             placeholder="Search content library"
             searchPlaceholder="Search content..."
             emptyMessage="No reusable content found."
-            onOpenChange={setLookupOpen}
             onSearchChange={setSearch}
             isLoading={reusable.isLoading || reusable.isFetchingNextPage}
             hasMore={Boolean(reusable.hasNextPage)}

@@ -987,7 +987,6 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search);
   const [stageId, setStageId] = React.useState('all');
-  const [stageLookupOpen, setStageLookupOpen] = React.useState(false);
   const [stageSearch, setStageSearch] = React.useState('');
   const [pageSize, setPageSize] = React.useState(5);
   const entrepreneurs = useEntrepreneursPage({
@@ -997,7 +996,7 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
     take: pageSize,
   });
   const stages = useLazyBusinessStagesQuery({
-    enabled: stageLookupOpen,
+    enabled: true,
     search: stageSearch.trim() || undefined,
     active: true,
     take: 20,
@@ -1095,7 +1094,6 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
             ]}
             placeholder="All stages"
             searchPlaceholder="Search stages..."
-            onOpenChange={setStageLookupOpen}
             onSearchChange={setStageSearch}
             isLoading={stages.isLoading || stages.isFetchingNextPage}
             hasMore={Boolean(stages.hasNextPage)}

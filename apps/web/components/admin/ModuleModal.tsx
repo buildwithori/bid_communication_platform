@@ -38,11 +38,10 @@ export function ModuleModal({
   programId: string;
 }) {
   const [mode, setMode] = React.useState<ModuleMode>('create');
-  const [reuseOpen, setReuseOpen] = React.useState(false);
   const [reuseSearch, setReuseSearch] = React.useState('');
   const reusableModules = useLazyReusableProgrammeModules({
     programmeId: programId,
-    enabled: open && mode === 'reuse' && reuseOpen,
+    enabled: open && mode === 'reuse',
     search: reuseSearch.trim() || undefined,
     take: 20,
   });
@@ -65,7 +64,6 @@ export function ModuleModal({
 
   const close = () => {
     onOpenChange(false);
-    setReuseOpen(false);
     setReuseSearch('');
     form.reset();
     reuseForm.reset({ moduleId: '' });
@@ -177,7 +175,6 @@ export function ModuleModal({
               placeholder="Search reusable modules"
               searchPlaceholder="Search modules..."
               emptyMessage="No reusable modules available."
-              onOpenChange={setReuseOpen}
               onSearchChange={setReuseSearch}
               isLoading={
                 reusableModules.isLoading ||

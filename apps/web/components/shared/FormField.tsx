@@ -124,6 +124,7 @@ export interface FormSelectProps {
   id?: string;
   className?: string;
   disabled?: boolean;
+  isLoading?: boolean;
 }
 
 export function FormSelect({
@@ -134,6 +135,7 @@ export function FormSelect({
   id,
   className,
   disabled,
+  isLoading = false,
 }: FormSelectProps) {
   const selectedOption = options.find((option) => option.value === value);
 
@@ -147,6 +149,8 @@ export function FormSelect({
     >
       <SelectTrigger
         id={id}
+        loading={isLoading}
+        aria-busy={isLoading}
         className={cn(
           'h-10 rounded-[7px] border border-line-strong bg-surface-panel px-3 text-sm text-ink focus-visible:border-bid focus-visible:ring-0 focus-visible:ring-offset-0 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
           'h-10 w-full rounded-lg border-border font-normal shadow-sm focus-visible:ring-2 focus-visible:ring-bid/10 [&>span]:truncate',
@@ -238,6 +242,7 @@ export function FormAutocomplete({
         <button
           type="button"
           disabled={disabled}
+          aria-busy={isLoading}
           className={cn(
             'flex h-10 w-full min-w-0 items-center justify-between rounded-lg border border-border bg-popover px-3 text-left text-sm font-normal text-popover-foreground shadow-sm outline-none transition hover:bg-accent focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted',
             !selected && 'text-muted-foreground',
@@ -245,7 +250,11 @@ export function FormAutocomplete({
           )}
         >
           <span className="truncate">{selected?.label ?? placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          {isLoading ? (
+            <InlineSpinner className="ml-2 shrink-0 text-bid" />
+          ) : (
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={cn('w-[var(--radix-popover-trigger-width)] p-0', popoverClassName)}>

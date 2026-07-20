@@ -36,7 +36,6 @@ export default function TrainerEntrepreneursPage() {
   const [search, setSearch] = React.useState("");
   const debouncedSearch = useDebouncedValue(search);
   const [programmeId, setProgrammeId] = React.useState(ALL);
-  const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState("");
   const [pageSize, setPageSize] = React.useState(10);
   const [viewId, setViewId] = React.useState<string | null>(null);
@@ -46,7 +45,7 @@ export default function TrainerEntrepreneursPage() {
     take: pageSize,
   });
   const programmes = useLazyProgrammesLookup({
-    enabled: programmeOpen,
+    enabled: true,
     search: programmeSearch.trim() || undefined,
     take: 20,
   });
@@ -244,7 +243,6 @@ export default function TrainerEntrepreneursPage() {
               placeholder="All supported programmes"
               searchPlaceholder="Search programmes..."
               emptyMessage="No supported programme found."
-              onOpenChange={setProgrammeOpen}
               onSearchChange={setProgrammeSearch}
               isLoading={programmes.isLoading}
               hasMore={Boolean(programmes.hasNextPage)}

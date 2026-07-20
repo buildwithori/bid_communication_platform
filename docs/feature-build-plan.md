@@ -14,7 +14,7 @@ This document is the working plan for backend and frontend integration. The goal
 - Audit logs should be emitted by lifecycle hooks/services in the background. Feature code should not manually create audit rows in every controller action.
 - Keep local and production Docker separate. Local includes developer tools like Mailpit and pgAdmin; production does not.
 - Every list, lookup, autocomplete, and table endpoint must be designed for growth. Do not hard-cap results as a hidden product limit. Use cursor pagination or infinite-scroll friendly pagination everywhere, including autocomplete sources.
-- Autocomplete/select data should be fetched lazily when the control opens or when the user searches, not eagerly for every page load.
+- Backend-backed autocomplete/select data should preload when its containing page/view becomes active or its modal opens; dependent lookups wait for required parent values. Clicking the control must not initiate the first request. Search remains backend-driven and cursor-paginated, with no eager full-dataset fetch.
 - All search inputs must use the shared 300 ms debounce boundary. Remote autocomplete search is debounced by the shared control, so consumers must avoid adding a second delay.
 - Frontend screens must show a page-specific skeleton whenever server-side or client-side data is loading. Do not leave blank pages or generic spinners for full-page fetches.
 - Buttons that trigger async work must show an inline loading spinner beside the button label and prevent duplicate submission while pending.

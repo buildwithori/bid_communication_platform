@@ -41,10 +41,9 @@ export function TrainerModal({
   onSubmit: (values: TrainerForm) => void;
 }) {
   const isEdit = mode === "edit" && Boolean(trainer);
-  const [specialismOpen, setSpecialismOpen] = React.useState(false);
   const [specialismSearch, setSpecialismSearch] = React.useState("");
   const sectors = useLazySectorsQuery({
-    enabled: open && specialismOpen,
+    enabled: open,
     search: specialismSearch || undefined,
     active: true,
     take: 20,
@@ -76,7 +75,6 @@ export function TrainerModal({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setSpecialismOpen(false);
       setSpecialismSearch("");
     }
     onOpenChange(nextOpen);
@@ -194,7 +192,6 @@ export function TrainerModal({
             searchPlaceholder="Search sectors..."
             emptyMessage="No active sector found."
             isLoading={sectors.isFetching}
-            onOpenChange={setSpecialismOpen}
             onSearchChange={setSpecialismSearch}
             hasMore={Boolean(sectors.hasNextPage)}
             onLoadMore={() => void sectors.fetchNextPage()}

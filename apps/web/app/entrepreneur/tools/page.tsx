@@ -454,7 +454,6 @@ export default function ToolsPage() {
     setActiveRequest(null);
     if (linkedRequestId) router.replace("/entrepreneur/tools");
   }
-  const [areaOpen, setAreaOpen] = React.useState(false);
   const [areaSearch, setAreaSearch] = React.useState("");
 
   const toolPage = useToolsPage({
@@ -480,7 +479,7 @@ export default function ToolsPage() {
       toast.error("Could not send request", { description: error.message }),
   });
   const areas = useLazyToolAreasQuery({
-    enabled: areaOpen,
+    enabled: true,
     search: areaSearch || undefined,
     active: true,
     take: 20,
@@ -635,7 +634,6 @@ export default function ToolsPage() {
                 placeholder="All tool areas"
                 searchPlaceholder="Search tool areas..."
                 emptyMessage="No tool area found."
-                onOpenChange={setAreaOpen}
                 onSearchChange={setAreaSearch}
                 isLoading={areas.isLoading || areas.isFetchingNextPage}
                 hasMore={Boolean(areas.hasNextPage)}
