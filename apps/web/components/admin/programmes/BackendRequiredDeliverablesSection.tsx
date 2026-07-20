@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
@@ -205,9 +205,17 @@ export function RequiredDeliverablesSection({
     })),
   ]);
 
+  const openAdd = () => {
+    addForm.reset(defaults());
+    setStageLookup({ search: '' });
+    setModuleLookup({ search: '' });
+    setAddOpen(true);
+  };
   const openEdit = (rule: ProgrammeDeliverableRule) => {
-    setEditTarget(rule);
     editForm.reset(defaults(rule));
+    setStageLookup({ search: '' });
+    setModuleLookup({ search: '' });
+    setEditTarget(rule);
   };
   const columns: Column<ProgrammeDeliverableRule>[] = [
     {
@@ -255,7 +263,7 @@ export function RequiredDeliverablesSection({
       <div className="mt-5">
         <CardHeader
           title={`Required deliverables - ${programName}`}
-          actions={<Button size="sm" onClick={() => setAddOpen(true)}>+ Add deliverable type</Button>}
+          actions={<Button size="sm" onClick={openAdd}>+ Add deliverable type</Button>}
         />
         <Notice>
           These rules generate entrepreneur-specific requirements and reporting-period submissions.
@@ -368,7 +376,7 @@ function RuleModal({
   onClose: () => void;
   onSubmit: (values: RequiredDeliverableForm) => void;
 }) {
-  const dueType = form.watch('dueType');
+  const dueType = useWatch({ control: form.control, name: 'dueType', defaultValue: 'fixed-date' });
   return (
     <Modal open={open} onOpenChange={(next) => !next && onClose()} title={title}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -376,61 +384,87 @@ function RuleModal({
           <FormInput placeholder="e.g. Business Model Canvas, Pitch Deck" {...form.register('name')} />
         </FormField>
         <FormField label="Due rule" error={form.formState.errors.dueType?.message}>
-          <FormSelect
-            value={dueType}
-            onValueChange={(value) => form.setValue(
-              'dueType',
-              value as RequiredDeliverableForm['dueType'],
-              { shouldValidate: true },
+          <Controller
+            control={form.control}
+            name="dueType"
+            render={({ field }) => (
+              <FormSelect
+                value={field.value}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  form.clearErrors(['dueDate', 'moduleRule', 'recurringCadence']);
+                }}
+                options={dueTypeOptions}
+              />
             )}
-            options={dueTypeOptions}
           />
         </FormField>
         {dueType === 'fixed-date' && (
           <FormField label="Due date" error={form.formState.errors.dueDate?.message}>
-            <DatePicker
-              value={form.watch('dueDate')}
-              onChange={(value) => form.setValue('dueDate', value, { shouldValidate: true })}
+            <Controller
+              control={form.control}
+              name="dueDate"
+              render={({ field }) => (
+                <DatePicker value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+              )}
             />
           </FormField>
         )}
         {dueType === 'module-completion' && (
           <FormField label="Due after" error={form.formState.errors.moduleRule?.message}>
-            <FormAutocomplete
-              value={form.watch('moduleRule') ?? ''}
-              onValueChange={(value) => form.setValue('moduleRule', value, { shouldValidate: true })}
-              options={moduleOptions}
-              placeholder="Select module"
-              searchPlaceholder="Search programme modules..."
-              emptyMessage="No programme module found."
-              isLoading={modules.isFetching}
-              onSearchChange={(search) => setModuleLookup((state) => ({ ...state, search }))}
-              hasMore={Boolean(modules.hasNextPage)}
-              onLoadMore={() => void modules.fetchNextPage()}
+            <Controller
+              control={form.control}
+              name="moduleRule"
+              render={({ field }) => (
+                <FormAutocomplete
+                  value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  options={moduleOptions}
+                  placeholder="Select module"
+                  searchPlaceholder="Search programme modules..."
+                  emptyMessage="No programme module found."
+                  isLoading={modules.isFetching}
+                  onSearchChange={(search) => setModuleLookup((state) => ({ ...state, search }))}
+                  hasMore={Boolean(modules.hasNextPage)}
+                  onLoadMore={() => void modules.fetchNextPage()}
+                />
+              )}
             />
           </FormField>
         )}
         {dueType === 'recurring' && (
           <FormField label="Cadence" error={form.formState.errors.recurringCadence?.message}>
-            <FormSelect
-              value={form.watch('recurringCadence') ?? 'quarterly'}
-              onValueChange={(value) => form.setValue('recurringCadence', value, { shouldValidate: true })}
-              options={recurringOptions}
+            <Controller
+              control={form.control}
+              name="recurringCadence"
+              render={({ field }) => (
+                <FormSelect
+                  value={field.value ?? 'quarterly'}
+                  onValueChange={field.onChange}
+                  options={recurringOptions}
+                />
+              )}
             />
           </FormField>
         )}
         <FormField label="Required for" error={form.formState.errors.requiredFor?.message}>
-          <FormAutocomplete
-            value={form.watch('requiredFor')}
-            onValueChange={(value) => form.setValue('requiredFor', value, { shouldValidate: true })}
-            options={stageOptions}
-            placeholder="Select who must submit"
-            searchPlaceholder="Search business stages..."
-            emptyMessage="No active business stage found."
-            isLoading={stages.isFetching}
-            onSearchChange={(search) => setStageLookup((state) => ({ ...state, search }))}
-            hasMore={Boolean(stages.hasNextPage)}
-            onLoadMore={() => void stages.fetchNextPage()}
+          <Controller
+            control={form.control}
+            name="requiredFor"
+            render={({ field }) => (
+              <FormAutocomplete
+                value={field.value}
+                onValueChange={field.onChange}
+                options={stageOptions}
+                placeholder="Select who must submit"
+                searchPlaceholder="Search business stages..."
+                emptyMessage="No active business stage found."
+                isLoading={stages.isFetching}
+                onSearchChange={(search) => setStageLookup((state) => ({ ...state, search }))}
+                hasMore={Boolean(stages.hasNextPage)}
+                onLoadMore={() => void stages.fetchNextPage()}
+              />
+            )}
           />
         </FormField>
         <Notice>
