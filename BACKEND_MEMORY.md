@@ -193,6 +193,7 @@ Initial access rules:
 - Trainer scope is inferred from content ownership, not direct entrepreneur assignment.
 - Content ratings roll up to the trainer attached to that content item.
 - Learner progress is tracked only for entrepreneur users. Track content progress in programme/module/content context, maintain module/programme progress summaries server-side, and use a batched/throttled progress sync endpoint so video/player interactions do not spam the backend.
+- `GET /programmes/:id/player` is the authenticated, role-scoped course-player contract. It returns the complete ordered module/content tree without pagination because the curriculum is one bounded programme document. Entrepreneurs receive ready content plus their contextual progress; authorized admin/trainer previews receive all content states and no learner progress.
 - Programme access is many-to-many. An entrepreneur can have zero, one, or many programme access grants, plus automatic free resources.
 - Programme access grants are per entrepreneur user, not per business. Business-level programme context is derived through the entrepreneur users attached to the business.
 - Free resources are globally available and should not be stored as per-entrepreneur assignments.

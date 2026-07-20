@@ -8,13 +8,7 @@ import { ProgrammeQueryDto, ProgrammeLifecycle } from './dto/programme-query.dto
 import { ProgrammeDeliverableRuleQueryDto } from './dto/programme-deliverable-rule-query.dto';
 import { ArchiveProgrammeDto, CreateProgrammeDto, UpdateProgrammeDto } from './dto/programme-actions.dto';
 import { CreateProgrammeDeliverableRuleDto, UpsertProgrammeDeliverableRuleDto } from './dto/upsert-programme-deliverable-rule.dto';
-import {
-  CreateProgrammeModuleDto,
-  MoveProgrammeModuleDto,
-  ProgrammeModuleQueryDto,
-  ReuseProgrammeModuleDto,
-  UpdateProgrammeModuleDto,
-} from './dto/programme-module.dto';
+import { CreateProgrammeModuleDto, MoveProgrammeModuleDto, ProgrammeModuleQueryDto, ReuseProgrammeModuleDto, UpdateProgrammeModuleDto } from './dto/programme-module.dto';
 
 const DEFAULT_TAKE = 20;
 
@@ -24,8 +18,9 @@ const deliverableRuleInclude = {
   _count: { select: { instances: true } },
 } satisfies Prisma.ProgrammeDeliverableRuleInclude;
 
-type ProgrammeDeliverableRuleWithInclude = Prisma.ProgrammeDeliverableRuleGetPayload<{ include: typeof deliverableRuleInclude }>;
-
+type ProgrammeDeliverableRuleWithInclude = Prisma.ProgrammeDeliverableRuleGetPayload<{
+  include: typeof deliverableRuleInclude;
+}>;
 
 type ProgrammeListMetrics = {
   content: { total: number; videos: number; pdfs: number; tools: number };
@@ -101,19 +96,18 @@ export class ProgrammesService {
         entityId: ({ id }) => id,
         summary: ({ name }) => `Created programme ${name ?? ''}`.trim(),
       },
-      (tx) => tx.programme.create({
-        data: {
-          name: dto.name.trim(),
-          description: dto.description?.trim() ?? '',
-          accessType: dto.accessType,
-          startDate: dates.startDate,
-          endDate: dates.endDate,
-          maxEntrepreneurs: dto.maxEntrepreneurs,
-          ...(dto.publishState === 'published'
-            ? { publishedAt: new Date(), publishedById: user.id }
-            : {}),
-        },
-      }),
+      (tx) =>
+        tx.programme.create({
+          data: {
+            name: dto.name.trim(),
+            description: dto.description?.trim() ?? '',
+            accessType: dto.accessType,
+            startDate: dates.startDate,
+            endDate: dates.endDate,
+            maxEntrepreneurs: dto.maxEntrepreneurs,
+            ...(dto.publishState === 'published' ? { publishedAt: new Date(), publishedById: user.id } : {}),
+          },
+        }),
     );
     return this.getProgramme(user, created.id);
   }
@@ -124,10 +118,7 @@ export class ProgrammesService {
     if (existing.archivedAt) {
       throw new BadRequestException('Restore this programme before editing it.');
     }
-    const dates = this.programmeDates(
-      dto.startDate ?? existing.startDate.toISOString(),
-      dto.endDate ?? existing.endDate.toISOString(),
-    );
+    const dates = this.programmeDates(dto.startDate ?? existing.startDate.toISOString(), dto.endDate ?? existing.endDate.toISOString());
     await this.audit.capture(
       {
         action: 'programmes.updated',
@@ -135,17 +126,18 @@ export class ProgrammesService {
         entityId: ({ id: entityId }) => entityId,
         summary: ({ name }) => `Updated programme ${name ?? ''}`.trim(),
       },
-      (tx) => tx.programme.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(dto.description !== undefined ? { description: dto.description.trim() } : {}),
-          ...(dto.accessType !== undefined ? { accessType: dto.accessType } : {}),
-          ...(dto.startDate !== undefined ? { startDate: dates.startDate } : {}),
-          ...(dto.endDate !== undefined ? { endDate: dates.endDate } : {}),
-          ...(dto.maxEntrepreneurs !== undefined ? { maxEntrepreneurs: dto.maxEntrepreneurs } : {}),
-        },
-      }),
+      (tx) =>
+        tx.programme.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(dto.description !== undefined ? { description: dto.description.trim() } : {}),
+            ...(dto.accessType !== undefined ? { accessType: dto.accessType } : {}),
+            ...(dto.startDate !== undefined ? { startDate: dates.startDate } : {}),
+            ...(dto.endDate !== undefined ? { endDate: dates.endDate } : {}),
+            ...(dto.maxEntrepreneurs !== undefined ? { maxEntrepreneurs: dto.maxEntrepreneurs } : {}),
+          },
+        }),
     );
     return this.getProgramme(user, id);
   }
@@ -164,10 +156,11 @@ export class ProgrammesService {
           entityId: ({ id: entityId }) => entityId,
           summary: ({ name }) => `Published programme ${name ?? ''}`.trim(),
         },
-        (tx) => tx.programme.update({
-          where: { id },
-          data: { publishedAt: new Date(), publishedById: user.id },
-        }),
+        (tx) =>
+          tx.programme.update({
+            where: { id },
+            data: { publishedAt: new Date(), publishedById: user.id },
+          }),
       );
     }
     return this.getProgramme(user, id);
@@ -178,9 +171,7 @@ export class ProgrammesService {
     const programme = await this.findProgrammeOrThrow(id);
     if (programme.archivedAt) return this.getProgramme(user, id);
     if (!programme.publishedAt || programme.endDate >= new Date()) {
-      throw new BadRequestException(
-        'A programme can be archived only after its timeline is completed.',
-      );
+      throw new BadRequestException('A programme can be archived only after its timeline is completed.');
     }
     await this.audit.capture(
       {
@@ -189,14 +180,15 @@ export class ProgrammesService {
         entityId: ({ id: entityId }) => entityId,
         summary: ({ name }) => `Archived programme ${name ?? ''}`.trim(),
       },
-      (tx) => tx.programme.update({
-        where: { id },
-        data: {
-          archivedAt: new Date(),
-          archivedById: user.id,
-          archiveReason: dto.reason.trim(),
-        },
-      }),
+      (tx) =>
+        tx.programme.update({
+          where: { id },
+          data: {
+            archivedAt: new Date(),
+            archivedById: user.id,
+            archiveReason: dto.reason.trim(),
+          },
+        }),
     );
     return this.getProgramme(user, id);
   }
@@ -212,10 +204,11 @@ export class ProgrammesService {
           entityId: ({ id: entityId }) => entityId,
           summary: ({ name }) => `Restored programme ${name ?? ''}`.trim(),
         },
-        (tx) => tx.programme.update({
-          where: { id },
-          data: { archivedAt: null, archivedById: null, archiveReason: null },
-        }),
+        (tx) =>
+          tx.programme.update({
+            where: { id },
+            data: { archivedAt: null, archivedById: null, archiveReason: null },
+          }),
       );
     }
     return this.getProgramme(user, id);
@@ -224,16 +217,7 @@ export class ProgrammesService {
   async getProgrammeSummary(user: User) {
     const now = new Date();
     const scope = this.programmeScopeWhere(user) ?? {};
-    const [
-      totalProgrammes,
-      activeProgrammes,
-      totalModules,
-      activeEnrollment,
-      activeEntrepreneurs,
-      contentTotal,
-      ownedContent,
-      progress,
-    ] = await Promise.all([
+    const [totalProgrammes, activeProgrammes, totalModules, activeEnrollment, activeEntrepreneurs, contentTotal, ownedContent, progress] = await Promise.all([
       this.prisma.programme.count({ where: scope }),
       this.prisma.programme.count({
         where: {
@@ -252,8 +236,9 @@ export class ProgrammesService {
         SELECT COUNT(DISTINCT pag.entrepreneur_user_id)::bigint AS "count"
         FROM programme_access_grants pag
         WHERE pag.revoked_at IS NULL
-        ${user.role === UserRole.trainer
-          ? Prisma.sql`
+        ${
+          user.role === UserRole.trainer
+            ? Prisma.sql`
               AND EXISTS (
                 SELECT 1
                 FROM programme_modules pm
@@ -263,7 +248,8 @@ export class ProgrammesService {
                   AND ci.trainer_id = ${user.id}
               )
             `
-          : Prisma.empty}
+            : Prisma.empty
+        }
       `),
       this.prisma.moduleContentItem.count({
         where: {
@@ -326,7 +312,7 @@ export class ProgrammesService {
       this.prisma.programme.count({ where }),
     ]);
 
-    const nextCursor = rows.length > take ? rows[take - 1]?.id ?? null : null;
+    const nextCursor = rows.length > take ? (rows[take - 1]?.id ?? null) : null;
     const pageRows = rows.slice(0, take);
     const metrics = await this.programmeListMetrics(
       pageRows.map((programme) => programme.id),
@@ -337,36 +323,28 @@ export class ProgrammesService {
     return { items, nextCursor, totalItems };
   }
 
-  async listProgrammeModules(
-    user: User,
-    programmeId: string,
-    query: ProgrammeModuleQueryDto,
-  ) {
+  async listProgrammeModules(user: User, programmeId: string, query: ProgrammeModuleQueryDto) {
     if (!(await this.canReadProgramme(user, programmeId))) {
       throw new ForbiddenException('You do not have access to this programme.');
     }
 
     const take = query.take ?? DEFAULT_TAKE;
     if (query.progressStatus && user.role !== UserRole.entrepreneur) {
-      throw new BadRequestException(
-        "Module progress filtering is only available to entrepreneurs.",
-      );
+      throw new BadRequestException('Module progress filtering is only available to entrepreneurs.');
     }
     const moduleFilters: Prisma.LearningModuleWhereInput[] = [];
     if (query.search?.trim()) {
       const search = query.search.trim();
       moduleFilters.push({
         OR: [
-          { title: { contains: search, mode: "insensitive" } },
-          { description: { contains: search, mode: "insensitive" } },
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
           {
             contentItems: {
               some: {
                 contentItem: {
-                  title: { contains: search, mode: "insensitive" },
-                  ...(user.role === UserRole.entrepreneur
-                    ? { status: ContentItemStatus.ready }
-                    : {}),
+                  title: { contains: search, mode: 'insensitive' },
+                  ...(user.role === UserRole.entrepreneur ? { status: ContentItemStatus.ready } : {}),
                 },
               },
             },
@@ -380,9 +358,7 @@ export class ProgrammesService {
           some: {
             contentItem: {
               type: query.contentType,
-              ...(user.role === UserRole.entrepreneur
-                ? { status: ContentItemStatus.ready }
-                : {}),
+              ...(user.role === UserRole.entrepreneur ? { status: ContentItemStatus.ready } : {}),
             },
           },
         },
@@ -390,7 +366,7 @@ export class ProgrammesService {
     }
     if (query.progressStatus && user.role === UserRole.entrepreneur) {
       moduleFilters.push(
-        query.progressStatus === "not_started"
+        query.progressStatus === 'not_started'
           ? {
               OR: [
                 {
@@ -406,7 +382,7 @@ export class ProgrammesService {
                     some: {
                       entrepreneurUserId: user.id,
                       programmeId,
-                      status: "not_started",
+                      status: 'not_started',
                     },
                   },
                 },
@@ -451,21 +427,15 @@ export class ProgrammesService {
     );
 
     return {
-      items: pageRows.map((row) =>
-        this.mapProgrammeModule(row, metrics.get(row.moduleId)),
-      ),
-      nextCursor: rows.length > take ? pageRows.at(-1)?.id ?? null : null,
+      items: pageRows.map((row) => this.mapProgrammeModule(row, metrics.get(row.moduleId))),
+      nextCursor: rows.length > take ? (pageRows.at(-1)?.id ?? null) : null,
       totalItems,
     };
   }
 
-  async getProgrammeModule(
-    user: User,
-    programmeId: string,
-    moduleId: string,
-  ) {
+  async getProgrammeModule(user: User, programmeId: string, moduleId: string) {
     if (!(await this.canReadProgramme(user, programmeId))) {
-      throw new ForbiddenException("You do not have access to this programme.");
+      throw new ForbiddenException('You do not have access to this programme.');
     }
     const row = await this.prisma.programmeModule.findUnique({
       where: { programmeId_moduleId: { programmeId, moduleId } },
@@ -477,18 +447,18 @@ export class ProgrammesService {
         },
       },
     });
-    if (!row) throw new NotFoundException("Programme module was not found.");
+    if (!row) throw new NotFoundException('Programme module was not found.');
 
     const [metrics, previous, next] = await Promise.all([
       this.moduleContentMetrics([moduleId], user, programmeId),
       this.prisma.programmeModule.findFirst({
         where: { programmeId, position: { lt: row.position } },
-        orderBy: [{ position: "desc" }, { id: "desc" }],
+        orderBy: [{ position: 'desc' }, { id: 'desc' }],
         select: { module: { select: { id: true, title: true } } },
       }),
       this.prisma.programmeModule.findFirst({
         where: { programmeId, position: { gt: row.position } },
-        orderBy: [{ position: "asc" }, { id: "asc" }],
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
         select: { module: { select: { id: true, title: true } } },
       }),
     ]);
@@ -502,11 +472,7 @@ export class ProgrammesService {
     };
   }
 
-  async listReusableModules(
-    user: User,
-    programmeId: string,
-    query: ProgrammeModuleQueryDto,
-  ) {
+  async listReusableModules(user: User, programmeId: string, query: ProgrammeModuleQueryDto) {
     this.assertAdmin(user);
     await this.assertMutableProgramme(programmeId);
     const take = query.take ?? DEFAULT_TAKE;
@@ -556,16 +522,12 @@ export class ProgrammesService {
         programmeUses: module._count.programmes,
         updatedAt: module.updatedAt.toISOString(),
       })),
-      nextCursor: rows.length > take ? pageRows.at(-1)?.id ?? null : null,
+      nextCursor: rows.length > take ? (pageRows.at(-1)?.id ?? null) : null,
       totalItems,
     };
   }
 
-  async createProgrammeModule(
-    user: User,
-    programmeId: string,
-    dto: CreateProgrammeModuleDto,
-  ) {
+  async createProgrammeModule(user: User, programmeId: string, dto: CreateProgrammeModuleDto) {
     this.assertAdmin(user);
     const created = await this.audit.capture(
       {
@@ -600,11 +562,7 @@ export class ProgrammesService {
     return this.getProgrammeModuleSummary(programmeId, created.id);
   }
 
-  async reuseProgrammeModule(
-    user: User,
-    programmeId: string,
-    dto: ReuseProgrammeModuleDto,
-  ) {
+  async reuseProgrammeModule(user: User, programmeId: string, dto: ReuseProgrammeModuleDto) {
     this.assertAdmin(user);
     const reused = await this.audit.capture(
       {
@@ -623,9 +581,7 @@ export class ProgrammesService {
           },
         });
         if (!module) {
-          throw new BadRequestException(
-            'This reusable module is unavailable or already attached.',
-          );
+          throw new BadRequestException('This reusable module is unavailable or already attached.');
         }
         const maxPosition = await tx.programmeModule.aggregate({
           where: { programmeId },
@@ -644,12 +600,7 @@ export class ProgrammesService {
     return this.getProgrammeModuleSummary(programmeId, reused.id);
   }
 
-  async updateProgrammeModule(
-    user: User,
-    programmeId: string,
-    moduleId: string,
-    dto: UpdateProgrammeModuleDto,
-  ) {
+  async updateProgrammeModule(user: User, programmeId: string, moduleId: string, dto: UpdateProgrammeModuleDto) {
     this.assertAdmin(user);
     const updated = await this.audit.capture(
       {
@@ -668,12 +619,8 @@ export class ProgrammesService {
           where: { id: moduleId },
           data: {
             ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-            ...(dto.description !== undefined
-              ? { description: dto.description.trim() }
-              : {}),
-            ...(dto.isReusable !== undefined
-              ? { isReusable: dto.isReusable }
-              : {}),
+            ...(dto.description !== undefined ? { description: dto.description.trim() } : {}),
+            ...(dto.isReusable !== undefined ? { isReusable: dto.isReusable } : {}),
           },
         });
         return { ...module, name: module.title };
@@ -682,12 +629,7 @@ export class ProgrammesService {
     return this.getProgrammeModuleSummary(programmeId, updated.id);
   }
 
-  async moveProgrammeModule(
-    user: User,
-    programmeId: string,
-    moduleId: string,
-    dto: MoveProgrammeModuleDto,
-  ) {
+  async moveProgrammeModule(user: User, programmeId: string, moduleId: string, dto: MoveProgrammeModuleDto) {
     this.assertAdmin(user);
     await this.audit.capture(
       {
@@ -740,11 +682,7 @@ export class ProgrammesService {
     return this.getProgrammeModuleSummary(programmeId, moduleId);
   }
 
-  async listDeliverableRules(
-    user: User,
-    programmeId: string,
-    query: ProgrammeDeliverableRuleQueryDto,
-  ) {
+  async listDeliverableRules(user: User, programmeId: string, query: ProgrammeDeliverableRuleQueryDto) {
     if (!(await this.canReadProgramme(user, programmeId))) {
       throw new ForbiddenException('You do not have access to this programme.');
     }
@@ -752,9 +690,7 @@ export class ProgrammesService {
     const take = pageSize(query);
     const where: Prisma.ProgrammeDeliverableRuleWhereInput = {
       programmeId,
-      ...(query.search?.trim()
-        ? { name: { contains: query.search.trim(), mode: 'insensitive' } }
-        : {}),
+      ...(query.search?.trim() ? { name: { contains: query.search.trim(), mode: 'insensitive' } } : {}),
     };
     const [rules, totalItems] = await Promise.all([
       this.prisma.programmeDeliverableRule.findMany({
@@ -777,15 +713,11 @@ export class ProgrammesService {
           _count: { _all: true },
         })
       : [];
-    const submittedByRule = new Map(
-      submittedGroups.map((group) => [group.ruleId, group._count._all]),
-    );
+    const submittedByRule = new Map(submittedGroups.map((group) => [group.ruleId, group._count._all]));
 
     return {
       ...toCursorPage(rules, take, (rule) => rule.id),
-      items: page.map((rule) =>
-        this.mapDeliverableRule(rule, submittedByRule.get(rule.id) ?? 0),
-      ),
+      items: page.map((rule) => this.mapDeliverableRule(rule, submittedByRule.get(rule.id) ?? 0)),
       totalItems,
     };
   }
@@ -806,10 +738,11 @@ export class ProgrammesService {
         summary: ({ name }) => `Created deliverable rule ${name ?? ''}`.trim(),
         payload: { programmeId, dueType: dto.dueType },
       },
-      (tx) => tx.programmeDeliverableRule.create({
-        data: this.deliverableRuleData(programmeId, dto) as Prisma.ProgrammeDeliverableRuleUncheckedCreateInput,
-        include: this.deliverableRuleInclude(),
-      }),
+      (tx) =>
+        tx.programmeDeliverableRule.create({
+          data: this.deliverableRuleData(programmeId, dto) as Prisma.ProgrammeDeliverableRuleUncheckedCreateInput,
+          include: this.deliverableRuleInclude(),
+        }),
     );
 
     await this.createImmediateDeliverableInstances(rule.id);
@@ -818,12 +751,7 @@ export class ProgrammesService {
     return this.getDeliverableRuleResponse(rule.id);
   }
 
-  async updateDeliverableRule(
-    user: User,
-    programmeId: string,
-    ruleId: string,
-    dto: UpsertProgrammeDeliverableRuleDto,
-  ) {
+  async updateDeliverableRule(user: User, programmeId: string, ruleId: string, dto: UpsertProgrammeDeliverableRuleDto) {
     if (user.role !== UserRole.admin) {
       throw new ForbiddenException('Only admins can manage programme deliverable rules.');
     }
@@ -844,11 +772,12 @@ export class ProgrammesService {
         summary: ({ name }) => `Updated deliverable rule ${name ?? ''}`.trim(),
         payload: { programmeId, ruleId },
       },
-      (tx) => tx.programmeDeliverableRule.update({
-        where: { id: ruleId },
-        data: this.deliverableRuleData(programmeId, dto, true) as Prisma.ProgrammeDeliverableRuleUncheckedUpdateInput,
-        include: this.deliverableRuleInclude(),
-      }),
+      (tx) =>
+        tx.programmeDeliverableRule.update({
+          where: { id: ruleId },
+          data: this.deliverableRuleData(programmeId, dto, true) as Prisma.ProgrammeDeliverableRuleUncheckedUpdateInput,
+          include: this.deliverableRuleInclude(),
+        }),
     );
 
     await this.createImmediateDeliverableInstances(ruleId);
@@ -881,6 +810,217 @@ export class ProgrammesService {
     return this.mapProgrammeDetailSummary(programme, metrics.get(id));
   }
 
+  async getProgrammePlayer(user: User, programmeId: string) {
+    const programme = await this.prisma.programme.findUnique({
+      where: { id: programmeId },
+    });
+    if (!programme) throw new NotFoundException('Programme was not found.');
+    if (!(await this.canReadProgramme(user, programmeId))) {
+      throw new ForbiddenException('You do not have access to this programme.');
+    }
+
+    const moduleLinks = await this.prisma.programmeModule.findMany({
+      where: { programmeId },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      include: {
+        module: {
+          include: {
+            contentItems: {
+              where: user.role === UserRole.entrepreneur ? { contentItem: { status: ContentItemStatus.ready } } : undefined,
+              orderBy: [{ position: 'asc' }, { id: 'asc' }],
+              include: {
+                contentItem: {
+                  include: {
+                    trainer: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                      },
+                    },
+                    videoAsset: {
+                      select: { id: true, duration: true, status: true },
+                    },
+                    fileAssets: {
+                      orderBy: { createdAt: 'desc' },
+                      take: 1,
+                      select: {
+                        id: true,
+                        originalFilename: true,
+                        mimeType: true,
+                        sizeBytes: true,
+                        status: true,
+                      },
+                    },
+                    toolLink: {
+                      include: {
+                        tool: { select: { name: true, embeddedUrl: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const moduleIds = moduleLinks.map((link) => link.moduleId);
+    const contentIds = moduleLinks.flatMap((link) => link.module.contentItems.map((item) => item.contentItemId));
+    const [programmeProgress, moduleProgress, contentProgress] =
+      user.role === UserRole.entrepreneur
+        ? await Promise.all([
+            this.prisma.learnerProgrammeProgress.findUnique({
+              where: {
+                entrepreneurUserId_programmeId: {
+                  entrepreneurUserId: user.id,
+                  programmeId,
+                },
+              },
+              select: { status: true, progressPercent: true },
+            }),
+            this.prisma.learnerModuleProgress.findMany({
+              where: {
+                entrepreneurUserId: user.id,
+                programmeId,
+                moduleId: { in: moduleIds },
+              },
+              select: {
+                moduleId: true,
+                status: true,
+                progressPercent: true,
+                completedContentCount: true,
+                totalContentCount: true,
+              },
+            }),
+            this.prisma.learnerContentProgress.findMany({
+              where: {
+                entrepreneurUserId: user.id,
+                programmeId,
+                contentItemId: { in: contentIds },
+              },
+              select: {
+                moduleId: true,
+                contentItemId: true,
+                status: true,
+                progressPercent: true,
+                lastPositionSeconds: true,
+                completedAt: true,
+              },
+            }),
+          ])
+        : [null, [], []];
+
+    const moduleProgressById = new Map(moduleProgress.map((progress) => [progress.moduleId, progress]));
+    const contentProgressByContext = new Map(contentProgress.map((progress) => [progress.moduleId + ':' + progress.contentItemId, progress]));
+
+    const modules = moduleLinks.map((link) => {
+      const progress = moduleProgressById.get(link.moduleId);
+      return {
+        id: link.module.id,
+        linkId: link.id,
+        title: link.module.title,
+        description: link.module.description,
+        position: link.position,
+        progress:
+          user.role === UserRole.entrepreneur
+            ? {
+                status: progress?.status ?? 'not_started',
+                progressPercent: progress?.progressPercent ?? 0,
+                completedContentCount: progress?.completedContentCount ?? 0,
+                totalContentCount: progress?.totalContentCount ?? link.module.contentItems.length,
+              }
+            : null,
+        items: link.module.contentItems.map((moduleItem) => {
+          const item = moduleItem.contentItem;
+          const file = item.fileAssets[0] ?? null;
+          const itemProgress = contentProgressByContext.get(link.moduleId + ':' + item.id);
+          const trainerName = item.trainer ? [item.trainer.firstName, item.trainer.lastName].filter(Boolean).join(' ') || item.trainer.email : null;
+          return {
+            id: item.id,
+            title: item.title,
+            type: item.type,
+            status: item.status,
+            position: moduleItem.position,
+            durationSeconds: item.durationSeconds,
+            durationLabel: item.durationSeconds ? Math.round(item.durationSeconds / 60) + ' min' : null,
+            trainer: item.trainer ? { id: item.trainer.id, name: trainerName } : null,
+            video: item.videoAsset
+              ? {
+                  id: item.videoAsset.id,
+                  durationSeconds: item.videoAsset.duration,
+                  status: item.videoAsset.status,
+                }
+              : null,
+            file: file
+              ? {
+                  id: file.id,
+                  originalFilename: file.originalFilename,
+                  mimeType: file.mimeType,
+                  sizeBytes: Number(file.sizeBytes),
+                  status: file.status,
+                }
+              : null,
+            toolLink: item.toolLink
+              ? {
+                  id: item.toolLink.id,
+                  toolId: item.toolLink.toolId,
+                  source: item.toolLink.source,
+                  toolName: item.toolLink.tool?.name ?? null,
+                  url: item.toolLink.tool?.embeddedUrl ?? item.toolLink.externalUrl,
+                }
+              : null,
+            progress:
+              user.role === UserRole.entrepreneur
+                ? {
+                    status: itemProgress?.status ?? 'not_started',
+                    progressPercent: itemProgress?.progressPercent ?? 0,
+                    lastPositionSeconds: itemProgress?.lastPositionSeconds ?? null,
+                    completedAt: itemProgress?.completedAt?.toISOString() ?? null,
+                  }
+                : null,
+          };
+        }),
+      };
+    });
+    const playlist = modules.flatMap((module) => module.items.map((item) => ({ moduleId: module.id, item })));
+    const resume = playlist.find((entry) => entry.item.progress?.status !== 'completed') ?? playlist[0] ?? null;
+
+    return {
+      programme: {
+        id: programme.id,
+        name: programme.name,
+        description: programme.description,
+        lifecycle: this.lifecycle(programme),
+        accessType: programme.accessType,
+      },
+      viewer: {
+        role: user.role,
+        canTrackProgress: user.role === UserRole.entrepreneur,
+      },
+      progress:
+        user.role === UserRole.entrepreneur
+          ? {
+              status: programmeProgress?.status ?? 'not_started',
+              progressPercent: programmeProgress?.progressPercent ?? 0,
+              completedContentCount: contentProgress.filter((item) => item.status === 'completed').length,
+              totalContentCount: playlist.length,
+            }
+          : null,
+      modules,
+      resume: resume ? { moduleId: resume.moduleId, contentItemId: resume.item.id } : null,
+      summary: {
+        modules: modules.length,
+        contentItems: playlist.length,
+        videos: playlist.filter((entry) => entry.item.type === 'video').length,
+        pdfs: playlist.filter((entry) => entry.item.type === 'pdf').length,
+        tools: playlist.filter((entry) => entry.item.type === 'tool').length,
+      },
+    };
+  }
+
   private deliverableRuleInclude() {
     return deliverableRuleInclude;
   }
@@ -898,27 +1038,31 @@ export class ProgrammesService {
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
       ...(dueType !== undefined ? { dueType } : {}),
       ...(dueType !== undefined || dto.dueDate !== undefined
-        ? { dueDate: dueType === DeliverableDueType.fixed_date && dto.dueDate ? this.dateOnly(dto.dueDate) : null }
+        ? {
+            dueDate: dueType === DeliverableDueType.fixed_date && dto.dueDate ? this.dateOnly(dto.dueDate) : null,
+          }
         : {}),
       ...(dueType !== undefined || dto.dueAfterModuleId !== undefined
-        ? { dueAfterModuleId: dueType === DeliverableDueType.module_completion ? dto.dueAfterModuleId ?? null : null }
+        ? {
+            dueAfterModuleId: dueType === DeliverableDueType.module_completion ? (dto.dueAfterModuleId ?? null) : null,
+          }
         : {}),
       ...(dueType !== undefined || dto.recurringCadence !== undefined
-        ? { recurringCadence: dueType === DeliverableDueType.recurring ? dto.recurringCadence ?? null : null }
+        ? {
+            recurringCadence: dueType === DeliverableDueType.recurring ? (dto.recurringCadence ?? null) : null,
+          }
         : {}),
       ...(requiredForScope !== undefined ? { requiredForScope } : {}),
       ...(requiredForScope !== undefined || dto.requiredStageId !== undefined
-        ? { requiredStageId: requiredForScope === DeliverableRequiredScope.stage ? dto.requiredStageId ?? null : null }
+        ? {
+            requiredStageId: requiredForScope === DeliverableRequiredScope.stage ? (dto.requiredStageId ?? null) : null,
+          }
         : {}),
       ...(dto.active !== undefined ? { active: dto.active } : {}),
     };
   }
 
-  private async validateDeliverableRuleInput(
-    programmeId: string,
-    dto: CreateProgrammeDeliverableRuleDto | UpsertProgrammeDeliverableRuleDto,
-    currentRuleId?: string,
-  ) {
+  private async validateDeliverableRuleInput(programmeId: string, dto: CreateProgrammeDeliverableRuleDto | UpsertProgrammeDeliverableRuleDto, currentRuleId?: string) {
     if (dto.name?.trim()) {
       const duplicate = await this.prisma.programmeDeliverableRule.findFirst({
         where: {
@@ -971,9 +1115,7 @@ export class ProgrammesService {
 
     const dueDate = rule.dueDate;
     const entrepreneurIds = await this.eligibleEntrepreneurIdsForRule(rule);
-    const status = dueDate.getTime() < Date.now()
-      ? DeliverableInstanceStatus.overdue
-      : DeliverableInstanceStatus.not_submitted;
+    const status = dueDate.getTime() < Date.now() ? DeliverableInstanceStatus.overdue : DeliverableInstanceStatus.not_submitted;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.deliverableInstance.createMany({
@@ -992,7 +1134,9 @@ export class ProgrammesService {
           ruleId: rule.id,
           entrepreneurUserId: { in: entrepreneurIds },
           dueUpdatedAt: null,
-          status: { in: [DeliverableInstanceStatus.not_submitted, DeliverableInstanceStatus.overdue] },
+          status: {
+            in: [DeliverableInstanceStatus.not_submitted, DeliverableInstanceStatus.overdue],
+          },
         },
         data: { dueDate, status },
       });
@@ -1049,11 +1193,7 @@ export class ProgrammesService {
     return this.mapDeliverableRule(rule, submittedCount);
   }
 
-  private mapDeliverableRule(
-    rule: ProgrammeDeliverableRuleWithInclude,
-    submittedCount = 0,
-  ) {
-
+  private mapDeliverableRule(rule: ProgrammeDeliverableRuleWithInclude, submittedCount = 0) {
     return {
       id: rule.id,
       programmeId: rule.programmeId,
@@ -1072,10 +1212,7 @@ export class ProgrammesService {
     };
   }
 
-  private async getProgrammeModuleSummary(
-    programmeId: string,
-    moduleId: string,
-  ) {
+  private async getProgrammeModuleSummary(programmeId: string, moduleId: string) {
     const row = await this.prisma.programmeModule.findUnique({
       where: { programmeId_moduleId: { programmeId, moduleId } },
       include: {
@@ -1107,8 +1244,12 @@ export class ProgrammesService {
     },
     metrics?: ModuleContentMetrics,
   ) {
-    const content =
-      metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 };
+    const content = metrics?.content ?? {
+      total: 0,
+      videos: 0,
+      pdfs: 0,
+      tools: 0,
+    };
     const readyItems = metrics?.readyItems ?? 0;
     return {
       linkId: row.id,
@@ -1119,20 +1260,13 @@ export class ProgrammesService {
       position: row.position,
       programmeUses: row.module._count.programmes,
       content,
-      readiness:
-        content.total > 0 && readyItems === content.total
-          ? 'ready'
-          : 'needs_content',
+      readiness: content.total > 0 && readyItems === content.total ? 'ready' : 'needs_content',
       learnerProgress: metrics?.learnerProgress ?? null,
       updatedAt: row.module.updatedAt.toISOString(),
     };
   }
 
-  private async moduleContentMetrics(
-    moduleIds: string[],
-    user?: User,
-    programmeId?: string,
-  ) {
+  private async moduleContentMetrics(moduleIds: string[], user?: User, programmeId?: string) {
     const metrics = new Map<string, ModuleContentMetrics>();
     for (const moduleId of moduleIds) {
       metrics.set(moduleId, {
@@ -1152,9 +1286,7 @@ export class ProgrammesService {
       FROM module_content_items mci
       JOIN content_items ci ON ci.id = mci.content_item_id
       WHERE mci.module_id IN (${Prisma.join(moduleIds)})
-      ${user?.role === UserRole.entrepreneur
-        ? Prisma.sql`AND ci.status::text = ${ContentItemStatus.ready}`
-        : Prisma.empty}
+      ${user?.role === UserRole.entrepreneur ? Prisma.sql`AND ci.status::text = ${ContentItemStatus.ready}` : Prisma.empty}
       GROUP BY mci.module_id, ci.type, ci.status
     `);
 
@@ -1198,19 +1330,14 @@ export class ProgrammesService {
     return metrics;
   }
 
-  private async assertMutableProgramme(
-    programmeId: string,
-    client: Prisma.TransactionClient | PrismaService = this.prisma,
-  ) {
+  private async assertMutableProgramme(programmeId: string, client: Prisma.TransactionClient | PrismaService = this.prisma) {
     const programme = await client.programme.findUnique({
       where: { id: programmeId },
       select: { id: true, archivedAt: true },
     });
     if (!programme) throw new NotFoundException('Programme was not found.');
     if (programme.archivedAt) {
-      throw new BadRequestException(
-        'Restore this programme before changing its curriculum.',
-      );
+      throw new BadRequestException('Restore this programme before changing its curriculum.');
     }
     return programme;
   }
@@ -1230,20 +1357,17 @@ export class ProgrammesService {
   private programmeDates(startValue: string, endValue: string) {
     const startDate = new Date(startValue);
     const endDate = new Date(endValue);
-    if (
-      Number.isNaN(startDate.getTime()) ||
-      Number.isNaN(endDate.getTime()) ||
-      endDate < startDate
-    ) {
-      throw new BadRequestException(
-        'Programme end date must be on or after its start date.',
-      );
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
+      throw new BadRequestException('Programme end date must be on or after its start date.');
     }
     return { startDate, endDate };
   }
 
   private async ensureProgrammeExists(programmeId: string) {
-    const programme = await this.prisma.programme.findUnique({ where: { id: programmeId }, select: { id: true } });
+    const programme = await this.prisma.programme.findUnique({
+      where: { id: programmeId },
+      select: { id: true },
+    });
     if (!programme) throw new NotFoundException('Programme was not found.');
   }
 
@@ -1257,10 +1381,7 @@ export class ProgrammesService {
     if (query.search?.trim()) {
       const search = query.search.trim();
       filters.push({
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-        ],
+        OR: [{ name: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }],
       });
     }
 
@@ -1270,9 +1391,7 @@ export class ProgrammesService {
 
     if (query.progressStatus) {
       if (user.role !== UserRole.entrepreneur) {
-        throw new BadRequestException(
-          'Progress status filtering is only available to entrepreneurs.',
-        );
+        throw new BadRequestException('Progress status filtering is only available to entrepreneurs.');
       }
       filters.push(
         query.progressStatus === 'not_started'
@@ -1326,10 +1445,18 @@ export class ProgrammesService {
     if (lifecycle === 'archived') return { archivedAt: { not: null } };
     if (lifecycle === 'draft') return { archivedAt: null, publishedAt: null };
     if (lifecycle === 'scheduled') {
-      return { archivedAt: null, publishedAt: { not: null }, startDate: { gt: now } };
+      return {
+        archivedAt: null,
+        publishedAt: { not: null },
+        startDate: { gt: now },
+      };
     }
     if (lifecycle === 'completed') {
-      return { archivedAt: null, publishedAt: { not: null }, endDate: { lt: now } };
+      return {
+        archivedAt: null,
+        publishedAt: { not: null },
+        endDate: { lt: now },
+      };
     }
     return {
       archivedAt: null,
@@ -1348,7 +1475,11 @@ export class ProgrammesService {
         archivedAt: null,
         OR: [
           { accessType: ProgrammeAccessType.free },
-          { accessGrants: { some: { entrepreneurUserId: user.id, revokedAt: null } } },
+          {
+            accessGrants: {
+              some: { entrepreneurUserId: user.id, revokedAt: null },
+            },
+          },
         ],
       };
     }
@@ -1413,7 +1544,10 @@ export class ProgrammesService {
       },
       content: metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 },
       readiness: moduleCount === 0 ? 0 : Math.round((readyModuleCount / moduleCount) * 100),
-      learnerProgress: metrics?.learnerProgress ?? { average: 0, trackedLearners: 0 },
+      learnerProgress: metrics?.learnerProgress ?? {
+        average: 0,
+        trackedLearners: 0,
+      },
       nextLearning: metrics?.nextLearning ?? null,
     };
   }
@@ -1430,12 +1564,8 @@ export class ProgrammesService {
     }
     if (programmeIds.length === 0) return metrics;
 
-    const visibleContent =
-      user.role === UserRole.entrepreneur
-        ? Prisma.sql`AND ci.status::text = 'ready'`
-        : Prisma.empty;
-    const [contentRows, readyModuleRows, progressRows, nextLearningRows] =
-      await Promise.all([
+    const visibleContent = user.role === UserRole.entrepreneur ? Prisma.sql`AND ci.status::text = 'ready'` : Prisma.empty;
+    const [contentRows, readyModuleRows, progressRows, nextLearningRows] = await Promise.all([
       this.prisma.$queryRaw<ContentCountRow[]>(Prisma.sql`
         SELECT pm.programme_id AS "programmeId", ci.type::text AS "type", COUNT(*)::bigint AS "count"
         FROM programme_modules pm
@@ -1587,18 +1717,15 @@ export class ProgrammesService {
         total: moduleCount,
         ready: readyModuleCount,
       },
-      content:
-        metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 },
-      readiness:
-        moduleCount === 0
-          ? 0
-          : Math.round((readyModuleCount / moduleCount) * 100),
-      learnerProgress:
-        metrics?.learnerProgress ?? { average: 0, trackedLearners: 0 },
+      content: metrics?.content ?? { total: 0, videos: 0, pdfs: 0, tools: 0 },
+      readiness: moduleCount === 0 ? 0 : Math.round((readyModuleCount / moduleCount) * 100),
+      learnerProgress: metrics?.learnerProgress ?? {
+        average: 0,
+        trackedLearners: 0,
+      },
       nextLearning: metrics?.nextLearning ?? null,
     };
   }
-
 
   private lifecycle(programme: Pick<Programme, 'publishedAt' | 'archivedAt' | 'startDate' | 'endDate'>) {
     if (programme.archivedAt) return 'archived';
@@ -1608,6 +1735,4 @@ export class ProgrammesService {
     if (programme.endDate < now) return 'completed';
     return 'active';
   }
-
-
 }

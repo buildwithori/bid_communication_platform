@@ -1328,6 +1328,7 @@ Programmes:
 - `GET /programmes`
 - `POST /programmes`
 - `GET /programmes/:id`
+- `GET /programmes/:id/player`
 - `PATCH /programmes/:id`
 - `POST /programmes/:id/publish`
 - `POST /programmes/:id/archive`
@@ -1335,6 +1336,8 @@ Programmes:
 - `GET /programmes/:id/modules`
 - `POST /programmes/:id/modules`
 - `PATCH /programmes/:id/modules/reorder`
+
+`GET /programmes/:id/player` is the deliberate exception to ordinary list pagination. It returns one authorized programme's complete ordered curriculum for the shared learner/staff player. Entrepreneur responses include only ready content and the authenticated learner's progress; authorized admin/trainer responses include all content states for preview and never create learner progress.
 
 Learning content:
 
