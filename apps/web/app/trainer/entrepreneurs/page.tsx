@@ -29,6 +29,7 @@ import {
   type EntrepreneurRecord,
 } from "@/lib/api/entrepreneurs";
 import { useLazyProgrammesLookup } from "@/lib/api/programmes";
+import { formatRating } from "@/lib/format-rating";
 
 const ALL = "all";
 
@@ -199,7 +200,7 @@ export default function TrainerEntrepreneursPage() {
         />
         <StatCard
           label="Content rating"
-          value={impact.ratingCount ? impact.averageRating.toFixed(1) + "/5" : "—"}
+          value={impact.ratingCount ? formatRating(impact.averageRating) : "—"}
           subline={impact.ratingCount + " learner ratings"}
           dotColor="warning"
           accent="warning"

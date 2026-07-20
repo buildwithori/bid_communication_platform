@@ -39,6 +39,7 @@ import {
 } from "@/lib/api/trainers";
 import { useLazySectorsQuery } from "@/lib/api/settings";
 import type { TrainerForm } from "@/lib/forms/schemas";
+import { formatRating } from "@/lib/format-rating";
 
 type TrainerTab = "directory" | "workload";
 type AllOr<T extends string> = "all" | T;
@@ -322,7 +323,7 @@ export default function AdminTrainersPage() {
           <span className="text-ink-faint">No ratings</span>
         ) : (
           <div>
-            <span className="font-medium">{trainer.ratings.average.toFixed(1)}/5</span>
+            <span className="font-medium">{formatRating(trainer.ratings.average)}</span>
             <span className="ml-1 text-ink-muted">({trainer.ratings.count})</span>
           </div>
         ),
@@ -597,7 +598,7 @@ function TrainerDetailModal({
               value={
                 trainer.ratings.average == null
                   ? "—"
-                  : `${trainer.ratings.average.toFixed(1)}/5`
+                  : formatRating(trainer.ratings.average)
               }
               detail={
                 trainer.ratings.count

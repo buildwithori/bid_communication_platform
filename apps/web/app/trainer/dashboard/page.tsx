@@ -25,6 +25,7 @@ import { MetricGrid } from "@/components/shared/MetricGrid";
 import { Notice, PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { useTrainerDashboardQuery, type TrainerDashboard } from "@/lib/api/dashboards";
+import { formatRating } from "@/lib/format-rating";
 import { routes } from "@/lib/routes";
 
 const chartColors = ["#842751", "#185FA5", "#1D9E75", "#BA7517"];
@@ -59,7 +60,7 @@ export default function TrainerDashboardPage() {
         <StatCard label="Learners reached" value={data.metrics.learnersReached} subline={`${data.metrics.learnersNeedingAttention} need attention`} dotColor="bid" accent="bid" />
         <StatCard label="Upcoming sessions" value={data.metrics.upcomingSessions} subline="Next three shown below" dotColor="info" accent="info" />
         <StatCard label="Pending reviews" value={data.metrics.pendingReviews} subline={`${data.metrics.changesRequested} changes requested`} dotColor="warning" accent="warning" />
-        <StatCard label="Content rating" value={data.metrics.ratingCount ? `${data.metrics.contentRating.toFixed(1)}/5` : "—"} subline={`${data.metrics.ratingCount} ratings across ${data.metrics.ownedContent} items`} dotColor="success" accent="success" />
+        <StatCard label="Content rating" value={data.metrics.ratingCount ? formatRating(data.metrics.contentRating) : "—"} subline={`${data.metrics.ratingCount} ratings across ${data.metrics.ownedContent} items`} dotColor="success" accent="success" />
       </MetricGrid>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
