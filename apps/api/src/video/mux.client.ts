@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { IntegrationLoggerService } from "../common/observability/integration-logger.service";
 
 type MuxDirectUploadResponse = {
   data?: {
@@ -16,7 +17,10 @@ type MuxDirectUploadResponse = {
 
 @Injectable()
 export class MuxClient {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly integration: IntegrationLoggerService,
+  ) {}
 
   async createDirectUpload(videoAssetId: string, userId: string) {
     const response = await this.request<MuxDirectUploadResponse>("/uploads", {
@@ -48,7 +52,10 @@ export class MuxClient {
     });
   }
 
-  private async request<T = unknown>(path: string, init: RequestInit): Promise<T> {
+  private async request<T = unknown>(
+    path: string,
+    init: RequestInit,
+  ): Promise<T> {
     const tokenId = this.config.get<string>("MUX_TOKEN_ID");
     const tokenSecret = this.config.get<string>("MUX_TOKEN_SECRET");
     if (!tokenId || !tokenSecret) {
@@ -57,32 +64,42 @@ export class MuxClient {
       );
     }
 
-    let response: Response;
-    try {
-      response = await fetch(`https://api.mux.com/video/v1${path}`, {
-        ...init,
-        headers: {
-          authorization: `Basic ${Buffer.from(`${tokenId}:${tokenSecret}`).toString("base64")}`,
-          "content-type": "application/json",
-          ...init.headers,
-        },
-        signal: AbortSignal.timeout(10_000),
-      });
-    } catch {
-      throw new BadGatewayException("Could not reach the video provider.");
-    }
+    const method = init.method ?? "GET";
+    const operation =
+      method === "POST" ? "direct_upload.create" : "direct_upload.cancel";
+    return this.integration.trackOutbound(
+      { provider: "mux", operation, method },
+      async () => {
+        let response: Response;
+        try {
+          response = await fetch(`https://api.mux.com/video/v1${path}`, {
+            ...init,
+            headers: {
+              authorization: `Basic ${Buffer.from(
+                `${tokenId}:${tokenSecret}`,
+              ).toString("base64")}`,
+              "content-type": "application/json",
+              ...init.headers,
+            },
+            signal: AbortSignal.timeout(10_000),
+          });
+        } catch {
+          throw new BadGatewayException("Could not reach the video provider.");
+        }
 
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as
-        | MuxDirectUploadResponse
-        | null;
-      const message = body?.error?.messages?.[0];
-      throw new BadGatewayException(
-        message ?? "The video provider rejected the request.",
-      );
-    }
+        if (!response.ok) {
+          const body = (await response
+            .json()
+            .catch(() => null)) as MuxDirectUploadResponse | null;
+          const message = body?.error?.messages?.[0];
+          throw new BadGatewayException(
+            message ?? "The video provider rejected the request.",
+          );
+        }
 
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+        if (response.status === 204) return undefined as T;
+        return (await response.json()) as T;
+      },
+    );
   }
 }

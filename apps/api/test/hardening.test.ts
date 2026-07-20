@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ReportExportFormat, ReportExportStatus, UserRole } from "@prisma/client";
+import { BadRequestException } from "@nestjs/common";
+import {
+  ReportExportFormat,
+  ReportExportStatus,
+  UserRole,
+} from "@prisma/client";
 import { DeliverablesService } from "../src/deliverables/deliverables.service";
 import { ApiExceptionFilter } from "../src/common/filters/api-exception.filter";
 import type { RequestWithContext } from "../src/common/request-context/request-context.types";
-import { RequestIdMiddleware } from "../src/common/request-context/request-id.middleware";
+import {
+  RequestIdMiddleware,
+  safeHttpPath,
+} from "../src/common/request-context/request-id.middleware";
+import { RequestContextService } from "../src/common/request-context/request-context.service";
+import { IntegrationLoggerService } from "../src/common/observability/integration-logger.service";
 import { normalizeTraceId } from "../src/common/request-context/trace-id";
 import { OperationalHealthService } from "../src/health/operational-health.service";
 import { ReportExportService } from "../src/reporting/report-export.service";
@@ -14,6 +24,90 @@ test("trace IDs accept bounded safe values and reject injection-shaped input", (
   assert.equal(normalizeTraceId("bad\nforged-log"), null);
   assert.equal(normalizeTraceId("x".repeat(129)), null);
   assert.equal(normalizeTraceId(["request-1"]), null);
+});
+
+test("HTTP logging strips query strings and records completed requests", () => {
+  assert.equal(
+    safeHttpPath("/api/auth/google/callback?code=secret&state=private"),
+    "/api/auth/google/callback",
+  );
+
+  const logs: string[] = [];
+  const listeners: Partial<Record<"finish" | "close", () => void>> = {};
+  const middleware = new RequestIdMiddleware();
+  (
+    middleware as unknown as {
+      logger: { log(value: string): void; warn(value: string): void };
+    }
+  ).logger = {
+    log: (value) => logs.push(value),
+    warn: (value) => logs.push(value),
+  };
+  const request: RequestWithContext = {
+    headers: { "x-request-id": "request-1" },
+    method: "GET",
+    originalUrl: "/api/auth/google/callback?code=secret&state=private",
+  };
+
+  middleware.use(
+    request,
+    {
+      statusCode: 200,
+      setHeader: () => undefined,
+      once: (event, listener) => {
+        listeners[event] = listener;
+      },
+    },
+    () => undefined,
+  );
+  request.user = { role: UserRole.admin } as never;
+  listeners.finish?.();
+
+  assert.equal(logs.length, 2);
+  assert.match(logs[0] ?? "", /http\.request\.received/);
+  assert.match(logs[1] ?? "", /http\.request\.completed/);
+  assert.match(logs[1] ?? "", /"authenticated":true/);
+  assert.doesNotMatch(logs.join("\n"), /secret|private|\?/);
+});
+
+test("integration logging keeps correlation context and redacts provider errors", async () => {
+  const requestContext = new RequestContextService();
+  const integration = new IntegrationLoggerService(requestContext);
+  const logs: string[] = [];
+  (
+    integration as unknown as {
+      logger: { log(value: string): void; warn(value: string): void };
+    }
+  ).logger = {
+    log: (value) => logs.push(value),
+    warn: (value) => logs.push(value),
+  };
+
+  await assert.rejects(
+    requestContext.run(
+      {
+        requestId: "request-2",
+        correlationId: "correlation-2",
+        actorUserId: null,
+        ipAddress: null,
+        userAgent: null,
+      },
+      () =>
+        integration.trackOutbound(
+          { provider: "google_calendar", operation: "free_busy.query" },
+          async () => {
+            throw new Error("provider-token=secret-value");
+          },
+        ),
+    ),
+    /secret-value/,
+  );
+
+  assert.equal(logs.length, 2);
+  assert.match(logs.join("\n"), /request-2/);
+  assert.match(logs.join("\n"), /correlation-2/);
+  assert.match(logs.join("\n"), /integration\.outbound\.failed/);
+  assert.doesNotMatch(logs.join("\n"), /secret-value|provider-token/);
 });
 
 test("request middleware replaces an unsafe inbound ID and echoes the generated ID", () => {
@@ -76,6 +170,46 @@ test("global 5xx logging includes trace context without logging exception messag
     (responseBody as { error: { message: string } }).error.message,
     "Something went wrong. Please try again.",
   );
+});
+
+test("expected HTTP errors are logged without request values", () => {
+  const logs: string[] = [];
+  const filter = new ApiExceptionFilter();
+  (
+    filter as unknown as {
+      logger: { error(value: string): void; warn(value: string): void };
+    }
+  ).logger = {
+    error: (value) => logs.push(value),
+    warn: (value) => logs.push(value),
+  };
+  const response = {
+    status() {
+      return this;
+    },
+    json() {},
+  };
+  const host = {
+    switchToHttp: () => ({
+      getRequest: () => ({
+        headers: {},
+        method: "POST",
+        originalUrl: "/api/login?email=private.com",
+        requestId: "request-4xx",
+      }),
+      getResponse: () => response,
+    }),
+  };
+
+  filter.catch(
+    new BadRequestException("private validation value"),
+    host as never,
+  );
+
+  assert.equal(logs.length, 1);
+  assert.match(logs[0] ?? "", /http\.request\.failed/);
+  assert.match(logs[0] ?? "", /"status":400/);
+  assert.doesNotMatch(logs[0] ?? "", /private|example\.com|\?/);
 });
 
 test("operational health reports required failures without exposing error details", async () => {

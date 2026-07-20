@@ -19,7 +19,10 @@ test("send-capable email transport is registered only in the worker process", ()
   assert.match(source("jobs/worker.module.ts"), /EmailModule/);
   assert.doesNotMatch(source("admins/admins.module.ts"), /EmailModule/);
   assert.doesNotMatch(source("trainers/trainers.module.ts"), /EmailModule/);
-  assert.doesNotMatch(source("entrepreneurs/entrepreneurs.module.ts"), /EmailModule/);
+  assert.doesNotMatch(
+    source("entrepreneurs/entrepreneurs.module.ts"),
+    /EmailModule/,
+  );
 });
 
 test("Redis URLs are parsed for authenticated TLS BullMQ connections", () => {
@@ -254,6 +257,12 @@ test("Google onboarding queues one welcome email when the workspace becomes read
         sent.push({ to, name });
         return {};
       },
+    } as never,
+    {
+      trackOutbound: async (
+        _details: unknown,
+        operation: () => Promise<unknown>,
+      ) => operation(),
     } as never,
   );
   const details = {

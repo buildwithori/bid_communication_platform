@@ -17,6 +17,7 @@ import {
 } from "@prisma/client";
 import { createSign } from "crypto";
 import { AuditService } from "../audit/audit.service";
+import { IntegrationLoggerService } from "../common/observability/integration-logger.service";
 import { PrismaService } from "../database/prisma.service";
 import { MuxClient } from "./mux.client";
 import { verifyMuxWebhookSignature } from "./mux-signature";
@@ -47,6 +48,7 @@ export class VideoService {
     private readonly config: ConfigService,
     private readonly mux: MuxClient,
     private readonly audit: AuditService,
+    private readonly integration: IntegrationLoggerService,
   ) {}
 
   async createDirectUpload(user: User) {
@@ -80,8 +82,13 @@ export class VideoService {
     if (video.contentItemId) {
       throw new BadRequestException("Attached videos cannot be cancelled.");
     }
-    if (video.status === AssetStatus.ready || video.status === AssetStatus.archived) {
-      throw new BadRequestException("This video upload can no longer be cancelled.");
+    if (
+      video.status === AssetStatus.ready ||
+      video.status === AssetStatus.archived
+    ) {
+      throw new BadRequestException(
+        "This video upload can no longer be cancelled.",
+      );
     }
 
     if (video.muxUploadId) {
@@ -122,7 +129,8 @@ export class VideoService {
     }
 
     const expiresAtSeconds =
-      Math.floor(Date.now() / 1000) + Math.max(2 * 60 * 60, (video.duration ?? 0) + 30 * 60);
+      Math.floor(Date.now() / 1000) +
+      Math.max(2 * 60 * 60, (video.duration ?? 0) + 30 * 60);
     return {
       playbackId: video.playbackId,
       token: this.signPlaybackToken(video.playbackId, expiresAtSeconds),
@@ -151,66 +159,73 @@ export class VideoService {
     const eventId = event.id;
     const eventType = event.type;
 
-    return this.prisma.$transaction(async (tx) => {
-      const internalId =
-        event.data?.meta?.external_id ??
-        event.data?.new_asset_settings?.meta?.external_id ??
-        event.data?.passthrough ??
-        event.data?.new_asset_settings?.passthrough ??
-        null;
-      const video = await tx.videoAsset.findFirst({
-        where: {
-          OR: [
-            ...(internalId ? [{ id: internalId }] : []),
-            { muxAssetId: event.data?.id },
-            { muxAssetId: event.data?.asset_id },
-            { muxUploadId: event.data?.id },
-            { muxUploadId: event.data?.upload_id },
-          ].filter((condition) =>
-            Object.values(condition).every((value) => Boolean(value)),
-          ),
-        },
-      });
-
-      const inserted = await tx.videoWebhookEvent.createMany({
-        skipDuplicates: true,
-        data: {
-          id: eventId,
-          eventType,
-          videoAssetId: video?.id ?? null,
-          processedAt: new Date(),
-        },
-      });
-      if (inserted.count === 0) return { received: true, duplicate: true };
-      if (!video) return { received: true, matched: false };
-
-
-      const update = this.webhookUpdate(event);
-      if (update) {
-        const updated = await tx.videoAsset.update({
-          where: { id: video.id },
-          data: update.video,
-        });
-        if (updated.contentItemId && update.contentStatus) {
-          await tx.contentItem.update({
-            where: { id: updated.contentItemId },
-            data: { status: update.contentStatus },
+    return this.integration.trackWebhook(
+      {
+        provider: "mux",
+        operation: eventType,
+        externalEventId: eventId,
+      },
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          const internalId =
+            event.data?.meta?.external_id ??
+            event.data?.new_asset_settings?.meta?.external_id ??
+            event.data?.passthrough ??
+            event.data?.new_asset_settings?.passthrough ??
+            null;
+          const video = await tx.videoAsset.findFirst({
+            where: {
+              OR: [
+                ...(internalId ? [{ id: internalId }] : []),
+                { muxAssetId: event.data?.id },
+                { muxAssetId: event.data?.asset_id },
+                { muxUploadId: event.data?.id },
+                { muxUploadId: event.data?.upload_id },
+              ].filter((condition) =>
+                Object.values(condition).every((value) => Boolean(value)),
+              ),
+            },
           });
-        }
-        await this.audit.enqueue(
-          {
-            eventKey: `mux:${event.id}`,
-            action: `videos.mux.${event.type}`,
-            entityType: "videoAsset",
-            entityId: video.id,
-            summary: `Mux video transition: ${event.type}`,
-          },
-          tx,
-        );
-      }
 
-      return { received: true, matched: true };
-    });
+          const inserted = await tx.videoWebhookEvent.createMany({
+            skipDuplicates: true,
+            data: {
+              id: eventId,
+              eventType,
+              videoAssetId: video?.id ?? null,
+              processedAt: new Date(),
+            },
+          });
+          if (inserted.count === 0) return { received: true, duplicate: true };
+          if (!video) return { received: true, matched: false };
+
+          const update = this.webhookUpdate(event);
+          if (update) {
+            const updated = await tx.videoAsset.update({
+              where: { id: video.id },
+              data: update.video,
+            });
+            if (updated.contentItemId && update.contentStatus) {
+              await tx.contentItem.update({
+                where: { id: updated.contentItemId },
+                data: { status: update.contentStatus },
+              });
+            }
+            await this.audit.enqueue(
+              {
+                eventKey: `mux:${event.id}`,
+                action: `videos.mux.${event.type}`,
+                entityType: "videoAsset",
+                entityId: video.id,
+                summary: `Mux video transition: ${event.type}`,
+              },
+              tx,
+            );
+          }
+
+          return { received: true, matched: true };
+        }),
+    );
   }
 
   private webhookUpdate(event: MuxWebhook) {
@@ -307,7 +322,11 @@ export class VideoService {
         publishedAt: { not: null },
         OR: [
           { accessType: ProgrammeAccessType.free },
-          { accessGrants: { some: { entrepreneurUserId: user.id, revokedAt: null } } },
+          {
+            accessGrants: {
+              some: { entrepreneurUserId: user.id, revokedAt: null },
+            },
+          },
         ],
         modules: {
           some: {
@@ -335,7 +354,9 @@ export class VideoService {
 
   private signPlaybackToken(playbackId: string, expiresAt: number) {
     const keyId = this.config.get<string>("MUX_SIGNING_KEY_ID");
-    const encodedPrivateKey = this.config.get<string>("MUX_SIGNING_PRIVATE_KEY");
+    const encodedPrivateKey = this.config.get<string>(
+      "MUX_SIGNING_PRIVATE_KEY",
+    );
     if (!keyId || !encodedPrivateKey) {
       throw new ServiceUnavailableException(
         "Signed video playback is not configured for this environment.",

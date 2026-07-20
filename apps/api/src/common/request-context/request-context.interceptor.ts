@@ -26,7 +26,8 @@ export class RequestContextInterceptor implements NestInterceptor {
     const userAgent = request.headers["user-agent"];
     const correlationHeader = request.headers["x-correlation-id"];
     const requestId = request.requestId ?? "unknown";
-    const correlationId = normalizeTraceId(correlationHeader) ?? requestId;
+    const correlationId =
+      request.correlationId ?? normalizeTraceId(correlationHeader) ?? requestId;
     request.correlationId = correlationId;
     response.setHeader("x-correlation-id", correlationId);
 

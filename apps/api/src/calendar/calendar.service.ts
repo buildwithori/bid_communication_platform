@@ -14,6 +14,7 @@ import { OAuth2Client } from "google-auth-library";
 import { AuditService } from "../audit/audit.service";
 import { createPlainToken } from "../auth/auth.tokens";
 import { PrismaService } from "../database/prisma.service";
+import { IntegrationLoggerService } from "../common/observability/integration-logger.service";
 import { CalendarTokenService } from "./calendar-token.service";
 
 const CALENDAR_SCOPES = [
@@ -30,6 +31,7 @@ export class CalendarService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly tokens: CalendarTokenService,
+    private readonly integration: IntegrationLoggerService,
   ) {}
 
   authorization() {
@@ -57,17 +59,32 @@ export class CalendarService {
     }
 
     const client = this.client();
-    const { tokens } = await client.getToken(code);
+    const { tokens } = await this.integration.trackOutbound(
+      {
+        provider: "google_oauth",
+        operation: "calendar.token_exchange",
+        method: "POST",
+      },
+      () => client.getToken(code),
+    );
     if (!tokens.access_token || !tokens.id_token) {
       throw new BadRequestException(
         "Google did not return complete Calendar credentials.",
       );
     }
 
-    const ticket = await client.verifyIdToken({
-      idToken: tokens.id_token,
-      audience: this.clientId(),
-    });
+    const ticket = await this.integration.trackOutbound(
+      {
+        provider: "google_oauth",
+        operation: "calendar.identity_verify",
+        method: "POST",
+      },
+      () =>
+        client.verifyIdToken({
+          idToken: tokens.id_token!,
+          audience: this.clientId(),
+        }),
+    );
     const profile = ticket.getPayload();
     if (!profile?.email || !profile.email_verified) {
       throw new BadRequestException(
@@ -356,34 +373,51 @@ export class CalendarService {
       refresh_token: this.tokens.decrypt(connection.encryptedRefreshToken),
     });
 
-    try {
-      const response = await client.request<T>(request);
-      const refreshedAccessToken = client.credentials.access_token;
-      if (refreshedAccessToken) {
-        await this.prisma.calendarConnection.update({
-          where: { id: connection.id },
-          data: {
-            encryptedAccessToken: this.tokens.encrypt(refreshedAccessToken),
-            status: CalendarConnectionStatus.connected,
-            lastSyncedAt: new Date(),
-          },
-        });
-      }
-      return response.data;
-    } catch (error) {
-      const status = (error as { response?: { status?: number } }).response
-        ?.status;
-      if (request.method === "DELETE" && status === 404) {
-        return undefined as T;
-      }
-      await this.prisma.calendarConnection.update({
-        where: { id: connection.id },
-        data: { status: CalendarConnectionStatus.error },
-      });
-      throw new ServiceUnavailableException(
-        "Google Calendar availability is temporarily unavailable. Reconnect the calendar if the problem continues.",
-      );
-    }
+    return this.integration.trackOutbound(
+      {
+        provider: "google_calendar",
+        operation: this.calendarOperation(request),
+        method: request.method,
+      },
+      async () => {
+        try {
+          const response = await client.request<T>(request);
+          const refreshedAccessToken = client.credentials.access_token;
+          if (refreshedAccessToken) {
+            await this.prisma.calendarConnection.update({
+              where: { id: connection.id },
+              data: {
+                encryptedAccessToken: this.tokens.encrypt(refreshedAccessToken),
+                status: CalendarConnectionStatus.connected,
+                lastSyncedAt: new Date(),
+              },
+            });
+          }
+          return response.data;
+        } catch (error) {
+          const status = (error as { response?: { status?: number } }).response
+            ?.status;
+          if (request.method === "DELETE" && status === 404) {
+            return undefined as T;
+          }
+          await this.prisma.calendarConnection.update({
+            where: { id: connection.id },
+            data: { status: CalendarConnectionStatus.error },
+          });
+          throw new ServiceUnavailableException(
+            "Google Calendar availability is temporarily unavailable. Reconnect the calendar if the problem continues.",
+          );
+        }
+      },
+    );
+  }
+
+  private calendarOperation(request: { url: string; method: string }) {
+    if (request.url.includes("/freeBusy")) return "free_busy.query";
+    if (request.method === "POST") return "event.create";
+    if (request.method === "PATCH") return "event.update";
+    if (request.method === "DELETE") return "event.delete";
+    return "event.get";
   }
 
   private mapConnection(connection: CalendarConnection | null) {

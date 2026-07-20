@@ -1757,12 +1757,14 @@ Do not leak raw Prisma/provider errors to the frontend.
 
 Minimum production setup:
 
-- structured JSON logging with request IDs
+- structured JSON logging with request and correlation IDs
+- query-free inbound request lifecycle logs for received, completed, aborted, and failed requests
+- sanitized outbound-integration lifecycle logs for Google, Mux, email, and object storage
 - Sentry for backend exceptions
 - health endpoint
 - readiness endpoint
 - queue dashboard or admin observability for BullMQ
-- provider webhook logs
+- provider webhook logs after signature and payload validation
 - audit log table for business actions
 - audit outbox backlog and failures
 
