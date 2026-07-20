@@ -54,11 +54,21 @@ export function NavSidebar({
 }: NavSidebarProps) {
   const pathname = usePathname();
 
-  const isActive = (href: string) => {
-    // Exact route match for index pages, prefix match otherwise.
-    if (pathname === href) return true;
-    return pathname.startsWith(href + '/');
-  };
+  const activeHref = React.useMemo(() => {
+    const matchingItems = sections
+      .flatMap((section) => section.items)
+      .filter((item) => {
+        const href = String(item.href);
+        return pathname === href || pathname.startsWith(href + '/');
+      });
+
+    return matchingItems.reduce<string | null>((best, item) => {
+      const href = String(item.href);
+      return !best || href.length > best.length ? href : best;
+    }, null);
+  }, [pathname, sections]);
+
+  const isActive = (href: string) => href === activeHref;
 
   return (
     <div className="flex h-full flex-col bg-surface-panel">
