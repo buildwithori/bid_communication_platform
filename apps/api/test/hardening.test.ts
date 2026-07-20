@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BadRequestException } from "@nestjs/common";
 import {
+  EntrepreneurToolStatus,
+  EntrepreneurToolType,
+  EntrepreneurToolVisibility,
   ReportExportFormat,
   ReportExportStatus,
   UserRole,
@@ -18,6 +21,7 @@ import { IntegrationLoggerService } from "../src/common/observability/integratio
 import { normalizeTraceId } from "../src/common/request-context/trace-id";
 import { OperationalHealthService } from "../src/health/operational-health.service";
 import { ReportExportService } from "../src/reporting/report-export.service";
+import { ToolsService } from "../src/tools/tools.service";
 
 test("trace IDs accept bounded safe values and reject injection-shaped input", () => {
   assert.equal(normalizeTraceId(" request-123:child "), "request-123:child");
@@ -383,4 +387,101 @@ test("deliverable calendar windows preserve entrepreneur scope and reject revers
     /date range is invalid/i,
   );
   assert.equal(freshnessChecks, 1);
+});
+
+test("draft tools do not require a publish-ready audience", async () => {
+  const service = new ToolsService(
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+  const validate = (
+    service as unknown as {
+      validateToolPayload(
+        effective: Record<string, unknown>,
+        changed: Record<string, unknown>,
+      ): Promise<void>;
+    }
+  ).validateToolPayload.bind(service);
+
+  await validate(
+    {
+      type: EntrepreneurToolType.embedded_tool,
+      status: EntrepreneurToolStatus.draft,
+      visibility: EntrepreneurToolVisibility.programmes,
+      embeddedUrl: null,
+      programmeIds: [],
+    },
+    { status: EntrepreneurToolStatus.draft },
+  );
+
+  await assert.rejects(
+    validate(
+      {
+        type: EntrepreneurToolType.embedded_tool,
+        status: EntrepreneurToolStatus.published,
+        visibility: EntrepreneurToolVisibility.programmes,
+        embeddedUrl: "https://example.com/tool",
+        programmeIds: [],
+      },
+      { status: EntrepreneurToolStatus.published },
+    ),
+    /Select at least one programme before publishing/,
+  );
+});
+
+test("status-only tool updates retain the persisted audience for validation", async () => {
+  let effectivePayload: Record<string, unknown> | undefined;
+  let changedPayload: Record<string, unknown> | undefined;
+  const existing = {
+    id: "tool-1",
+    name: "Growth planner",
+    description: "A programme planning tool.",
+    type: EntrepreneurToolType.embedded_tool,
+    toolAreaId: "area-1",
+    iconKey: "document",
+    visibility: EntrepreneurToolVisibility.programmes,
+    status: EntrepreneurToolStatus.published,
+    embeddedUrl: "https://example.com/tool",
+    pdfAssetId: null,
+    programmeAccess: [{ programmeId: "programme-1" }],
+    entrepreneurAccess: [],
+    hiddenEntrepreneurs: [{ entrepreneurUserId: "entrepreneur-2" }],
+  };
+  const service = new ToolsService(
+    { tool: { findUnique: async () => existing } } as never,
+    {} as never,
+    {
+      capture: async () => {
+        throw new Error("validation-complete");
+      },
+    } as never,
+    {} as never,
+  );
+  (
+    service as unknown as {
+      validateToolPayload(
+        effective: Record<string, unknown>,
+        changed: Record<string, unknown>,
+      ): Promise<void>;
+    }
+  ).validateToolPayload = async (effective, changed) => {
+    effectivePayload = effective;
+    changedPayload = changed;
+  };
+
+  await assert.rejects(
+    service.updateTool(
+      { id: "admin-1", role: UserRole.admin } as never,
+      "tool-1",
+      { status: EntrepreneurToolStatus.draft },
+    ),
+    /validation-complete/,
+  );
+  assert.deepEqual(effectivePayload?.programmeIds, ["programme-1"]);
+  assert.deepEqual(effectivePayload?.hiddenEntrepreneurUserIds, [
+    "entrepreneur-2",
+  ]);
+  assert.deepEqual(changedPayload, { status: EntrepreneurToolStatus.draft });
 });

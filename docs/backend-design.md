@@ -807,6 +807,7 @@ Rules:
 - Programme tools are visible to entrepreneurs with access to one of the selected programmes.
 - Entrepreneur tools are visible only to selected entrepreneur users.
 - Hidden overrides are per entrepreneur user and can remove inherited global or programme tool access for exceptions.
+- Draft and archived tools may be saved without a publish-ready asset or audience. Publishing must validate the complete effective tool state, including persisted programme and entrepreneur access when a partial update changes only the status.
 - Tool request records are linked to the entrepreneur user, not the business record. Business context is derived through membership.
 - Tool requests do not need `requested_by_id`; the requesting actor is the `entrepreneur_user_id`. If admins later create requests on behalf of entrepreneurs, capture that actor through audit logs instead of duplicating ownership fields.
 - When a requested tool is built, link the request to `linked_tool_id` so the entrepreneur can see the admin decision and open the created tool.

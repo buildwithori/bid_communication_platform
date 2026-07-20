@@ -143,7 +143,11 @@ export function AdminToolEditorModal({
     if (draft.description.trim().length < 10)
       next.description = "Describe the tool in at least 10 characters.";
     if (!draft.toolAreaId) next.toolAreaId = "Select a tool area.";
-    if (draft.type === "embedded_tool" && !draft.embeddedUrl.trim())
+    if (
+      draft.type === "embedded_tool" &&
+      draft.status === "published" &&
+      !draft.embeddedUrl.trim()
+    )
       next.embeddedUrl = "Add the online tool link.";
     if (
       draft.type === "pdf" &&
@@ -152,9 +156,17 @@ export function AdminToolEditorModal({
       !tool?.pdfAsset
     )
       next.pdf = "Upload a PDF before publishing.";
-    if (draft.visibility === "programmes" && !programmes.length)
+    if (
+      draft.status === "published" &&
+      draft.visibility === "programmes" &&
+      !programmes.length
+    )
       next.audience = "Select at least one programme.";
-    if (draft.visibility === "entrepreneurs" && !entrepreneurs.length)
+    if (
+      draft.status === "published" &&
+      draft.visibility === "entrepreneurs" &&
+      !entrepreneurs.length
+    )
       next.audience = "Select at least one entrepreneur.";
     setErrors(next);
     return !Object.keys(next).length;

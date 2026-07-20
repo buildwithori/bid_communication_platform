@@ -384,7 +384,7 @@ export class ToolsService {
   }
 
   async createTool(user: User, dto: CreateToolDto) {
-    await this.validateToolPayload(dto);
+    await this.validateToolPayload(dto, dto);
     if (dto.pdfAssetId) {
       await this.files.markReadyForUser(
         user,
@@ -438,11 +438,32 @@ export class ToolsService {
   }
 
   async updateTool(user: User, id: string, dto: UpsertToolDto) {
-    const existing = await this.prisma.tool.findUnique({ where: { id } });
+    const existing = await this.prisma.tool.findUnique({
+      where: { id },
+      include: {
+        programmeAccess: { select: { programmeId: true } },
+        entrepreneurAccess: { select: { entrepreneurUserId: true } },
+        hiddenEntrepreneurs: { select: { entrepreneurUserId: true } },
+      },
+    });
     if (!existing) throw new NotFoundException("Tool was not found.");
 
-    const merged = { ...existing, ...dto };
-    await this.validateToolPayload(merged);
+    const merged = {
+      ...existing,
+      ...dto,
+      programmeIds:
+        dto.programmeIds ??
+        existing.programmeAccess.map((access) => access.programmeId),
+      entrepreneurUserIds:
+        dto.entrepreneurUserIds ??
+        existing.entrepreneurAccess.map((access) => access.entrepreneurUserId),
+      hiddenEntrepreneurUserIds:
+        dto.hiddenEntrepreneurUserIds ??
+        existing.hiddenEntrepreneurs.map(
+          (access) => access.entrepreneurUserId,
+        ),
+    };
+    await this.validateToolPayload(merged, dto);
 
     if (dto.pdfAssetId) {
       await this.files.markReadyForUser(
@@ -611,19 +632,22 @@ export class ToolsService {
     );
   }
 
-  private async validateToolPayload(dto: Partial<UpsertToolDto>) {
-    if (dto.toolAreaId) {
+  private async validateToolPayload(
+    effective: Partial<UpsertToolDto>,
+    changed: Partial<UpsertToolDto> = effective,
+  ) {
+    if (changed.toolAreaId) {
       const toolArea = await this.prisma.toolArea.findFirst({
-        where: { id: dto.toolAreaId, active: true },
+        where: { id: changed.toolAreaId, active: true },
       });
       if (!toolArea)
         throw new BadRequestException("Select a valid active tool area.");
     }
 
     if (
-      dto.type === EntrepreneurToolType.embedded_tool &&
-      dto.status === EntrepreneurToolStatus.published &&
-      !dto.embeddedUrl
+      effective.type === EntrepreneurToolType.embedded_tool &&
+      effective.status === EntrepreneurToolStatus.published &&
+      !effective.embeddedUrl
     ) {
       throw new BadRequestException(
         "Online tools need a link before publishing.",
@@ -631,9 +655,9 @@ export class ToolsService {
     }
 
     if (
-      dto.type === EntrepreneurToolType.pdf &&
-      dto.status === EntrepreneurToolStatus.published &&
-      !dto.pdfAssetId
+      effective.type === EntrepreneurToolType.pdf &&
+      effective.status === EntrepreneurToolStatus.published &&
+      !effective.pdfAssetId
     ) {
       throw new BadRequestException(
         "PDF tools need an uploaded file before publishing.",
@@ -641,27 +665,29 @@ export class ToolsService {
     }
 
     if (
-      dto.visibility === EntrepreneurToolVisibility.programmes &&
-      (dto.programmeIds ?? []).length === 0
+      effective.status === EntrepreneurToolStatus.published &&
+      effective.visibility === EntrepreneurToolVisibility.programmes &&
+      (effective.programmeIds ?? []).length === 0
     ) {
       throw new BadRequestException(
-        "Select at least one programme for programme visibility.",
+        "Select at least one programme before publishing this programme-visible tool.",
       );
     }
 
     if (
-      dto.visibility === EntrepreneurToolVisibility.entrepreneurs &&
-      (dto.entrepreneurUserIds ?? []).length === 0
+      effective.status === EntrepreneurToolStatus.published &&
+      effective.visibility === EntrepreneurToolVisibility.entrepreneurs &&
+      (effective.entrepreneurUserIds ?? []).length === 0
     ) {
       throw new BadRequestException(
-        "Select at least one entrepreneur for individual visibility.",
+        "Select at least one entrepreneur before publishing this individually visible tool.",
       );
     }
 
-    await this.ensureProgrammesExist(dto.programmeIds ?? []);
+    await this.ensureProgrammesExist(changed.programmeIds ?? []);
     await this.ensureEntrepreneursExist([
-      ...(dto.entrepreneurUserIds ?? []),
-      ...(dto.hiddenEntrepreneurUserIds ?? []),
+      ...(changed.entrepreneurUserIds ?? []),
+      ...(changed.hiddenEntrepreneurUserIds ?? []),
     ]);
   }
 
