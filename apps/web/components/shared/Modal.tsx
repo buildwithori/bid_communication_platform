@@ -19,7 +19,7 @@ const widthClass: Record<NonNullable<ModalProps['width']>, string> = {
   md: 'w-[500px]',
   wide: 'w-[620px]',
   xl: 'w-[min(960px,calc(100vw-32px))]',
-  media: 'w-[min(1180px,calc(100vw-32px))]',
+  media: 'w-[min(1360px,calc(100vw-24px))]',
 };
 
 export function Modal({
@@ -55,6 +55,7 @@ export function Modal({
         <DialogPrimitive.Content
           className={cn(
             'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
+            width === 'media' && 'max-h-[calc(100vh-24px)] p-4 sm:p-5',
             widthClass[width],
           )}
         >

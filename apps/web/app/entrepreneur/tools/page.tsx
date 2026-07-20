@@ -8,7 +8,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   FileText,
   LayoutGrid,
   Plus,
@@ -286,17 +285,6 @@ function ToolPreviewModal({
               >
                 Next <ChevronRight className="h-4 w-4" />
               </Button>
-              {previewUrl ? (
-                <Button
-                  asChild
-                  variant="outline"
-                  className="border-bid/35 bg-bid-light/35 text-bid-dark hover:bg-bid-light"
-                >
-                  <a href={previewUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" /> Open
-                  </a>
-                </Button>
-              ) : null}
             </div>
           </div>
         </div>
@@ -304,13 +292,18 @@ function ToolPreviewModal({
           {previewUrl ? (
             <iframe
               title={`${tool.name} preview`}
-              src={previewUrl}
+              src={
+                isOnline
+                  ? previewUrl
+                  : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
+              }
+              loading="eager"
               sandbox={
                 isOnline
                   ? "allow-forms allow-popups allow-same-origin allow-scripts"
                   : undefined
               }
-              className="h-[56vh] min-h-[430px] w-full bg-card"
+              className="h-[68vh] min-h-[480px] w-full bg-white"
             />
           ) : (
             <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">

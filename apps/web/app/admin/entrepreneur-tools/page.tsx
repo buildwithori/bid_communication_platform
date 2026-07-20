@@ -4,7 +4,6 @@ import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import {
   CalendarDays,
-  ExternalLink,
   FileText,
   LayoutGrid,
   Plus,
@@ -486,8 +485,8 @@ function ToolDetailsModal({
     <Modal
       open={Boolean(tool)}
       onOpenChange={(open) => !open && onClose()}
-      title="Tool details"
-      width="xl"
+      title="Tool preview"
+      width="media"
     >
       <div className="space-y-4">
         <div className="rounded-2xl border border-line bg-surface-subtle p-4">
@@ -512,13 +511,6 @@ function ToolDetailsModal({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {previewUrl ? (
-                <Button asChild variant="outline">
-                  <a href={previewUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" /> Open
-                  </a>
-                </Button>
-              ) : null}
               <Button onClick={() => onEdit(tool)}>Edit tool</Button>
             </div>
           </div>
@@ -537,13 +529,18 @@ function ToolDetailsModal({
           {previewUrl ? (
             <iframe
               title={`${tool.name} preview`}
-              src={previewUrl}
+              src={
+                tool.type === "embedded_tool"
+                  ? previewUrl
+                  : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
+              }
+              loading="eager"
               sandbox={
                 tool.type === "embedded_tool"
                   ? "allow-forms allow-popups allow-same-origin allow-scripts"
                   : undefined
               }
-              className="h-[48vh] min-h-[360px] w-full bg-white"
+              className="h-[64vh] min-h-[480px] w-full bg-white"
             />
           ) : (
             <div className="grid min-h-[320px] place-items-center bg-surface-subtle p-8 text-center text-sm text-ink-muted">
