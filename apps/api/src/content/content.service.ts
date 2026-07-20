@@ -293,27 +293,17 @@ export class ContentService {
         payload: { moduleId },
       },
       async (tx) => {
-        const [module, contentItem, existing, maxPosition] = await Promise.all([
+        const [module, contentItem] = await Promise.all([
           tx.learningModule.findUnique({
             where: { id: moduleId },
-            select: { id: true },
+            select: {
+              id: true,
+              programmes: { select: { programmeId: true } },
+            },
           }),
           tx.contentItem.findUnique({
             where: { id: input.contentItemId },
             select: { id: true, title: true },
-          }),
-          tx.moduleContentItem.findUnique({
-            where: {
-              moduleId_contentItemId: {
-                moduleId,
-                contentItemId: input.contentItemId,
-              },
-            },
-            select: { id: true },
-          }),
-          tx.moduleContentItem.aggregate({
-            where: { moduleId },
-            _max: { position: true },
           }),
         ]);
 
@@ -321,11 +311,55 @@ export class ContentService {
         if (!contentItem) {
           throw new NotFoundException('Content item was not found.');
         }
+
+        await tx.$queryRaw(Prisma.sql`
+          SELECT id FROM modules WHERE id = ${moduleId} FOR UPDATE
+        `);
+
+        const programmeIds = module.programmes
+          .map((link) => link.programmeId)
+          .sort();
+        if (programmeIds.length) {
+          await tx.$queryRaw(Prisma.sql`
+            SELECT id
+            FROM programmes
+            WHERE id IN (${Prisma.join(programmeIds)})
+            ORDER BY id
+            FOR UPDATE
+          `);
+        }
+        const existing = await tx.moduleContentItem.findFirst({
+          where: {
+            contentItemId: input.contentItemId,
+            OR: [
+              { moduleId },
+              ...(programmeIds.length
+                ? [
+                    {
+                      module: {
+                        programmes: {
+                          some: { programmeId: { in: programmeIds } },
+                        },
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          },
+          select: { moduleId: true },
+        });
         if (existing) {
           throw new BadRequestException(
-            'This content item is already attached to the module.',
+            existing.moduleId === moduleId
+              ? 'This content item is already attached to the module.'
+              : 'This content item is already used in a programme connected to this module.',
           );
         }
+
+        const maxPosition = await tx.moduleContentItem.aggregate({
+          where: { moduleId },
+          _max: { position: true },
+        });
 
         await tx.moduleContentItem.create({
           data: {

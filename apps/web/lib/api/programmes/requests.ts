@@ -41,6 +41,9 @@ function toQueryString(query?: ProgrammeQuery) {
   if (typeof query?.grantableOnly === 'boolean') {
     params.set('grantableOnly', String(query.grantableOnly));
   }
+  if (query?.excludeContentItemId) {
+    params.set('excludeContentItemId', query.excludeContentItemId);
+  }
   if (query?.take) params.set('take', String(query.take));
   if (query?.cursor) params.set('cursor', query.cursor);
   const value = params.toString();
@@ -95,6 +98,9 @@ function toModuleQueryString(query?: ProgrammeModuleQuery) {
   if (query?.contentType) params.set('contentType', query.contentType);
   if (query?.progressStatus) {
     params.set('progressStatus', query.progressStatus);
+  }
+  if (query?.excludeContentItemId) {
+    params.set('excludeContentItemId', query.excludeContentItemId);
   }
   if (query?.take) params.set('take', String(query.take));
   if (query?.cursor) params.set('cursor', query.cursor);

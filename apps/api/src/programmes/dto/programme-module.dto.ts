@@ -26,6 +26,11 @@ export class ProgrammeModuleQueryDto {
   progressStatus?: "not_started" | "in_progress" | "completed";
 
   @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  excludeContentItemId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(1)

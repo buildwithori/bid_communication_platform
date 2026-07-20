@@ -619,7 +619,7 @@ Rules:
 
 Rules:
 
-- A module can be reused across programmes.
+- A module can be reused across programmes. A content item may appear only once in any programme curriculum; content-reuse programme and module lookups must exclude destinations that already contain it, including duplicates introduced indirectly through a shared module. The attach mutation must recheck this rule transactionally across every programme using the target module.
 - Reordering must update `position` safely inside a transaction.
 - Trainer attribution comes from content item ownership at the time of rating.
 - Business-level rating reports are derived through the entrepreneur user's business membership, not stored directly on `content_ratings`.

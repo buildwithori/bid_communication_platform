@@ -364,6 +364,25 @@ export class ProgrammesService {
         },
       });
     }
+    if (query.excludeContentItemId) {
+      moduleFilters.push({
+        programmes: {
+          none: {
+            programme: {
+              modules: {
+                some: {
+                  module: {
+                    contentItems: {
+                      some: { contentItemId: query.excludeContentItemId },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
     if (query.progressStatus && user.role === UserRole.entrepreneur) {
       moduleFilters.push(
         query.progressStatus === 'not_started'
@@ -1424,6 +1443,20 @@ export class ProgrammesService {
 
     if (query.grantableOnly) {
       filters.push({ publishedAt: { not: null }, archivedAt: null });
+    }
+
+    if (query.excludeContentItemId) {
+      filters.push({
+        modules: {
+          none: {
+            module: {
+              contentItems: {
+                some: { contentItemId: query.excludeContentItemId },
+              },
+            },
+          },
+        },
+      });
     }
 
     const lifecycleWhere = this.lifecycleWhere(query.lifecycle);

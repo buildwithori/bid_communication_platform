@@ -548,12 +548,14 @@ export function AttachContentItemModal({
     enabled: Boolean(item),
     search: programmeSearch.trim() || undefined,
     includeArchived: false,
+    excludeContentItemId: item?.id,
     take: 20,
   });
   const modules = useLazyProgrammeModules({
     programmeId,
     enabled: Boolean(item) && Boolean(programmeId),
     search: moduleSearch.trim() || undefined,
+    excludeContentItemId: item?.id,
     take: 20,
   });
   const attach = useAttachContentItemMutation();
@@ -595,6 +597,7 @@ export function AttachContentItemModal({
           searchPlaceholder="Search programmes..."
           onSearchChange={setProgrammeSearch}
           isLoading={programmes.isLoading || programmes.isFetchingNextPage}
+          emptyMessage="No eligible programme found. Programmes already using this content are hidden."
           hasMore={Boolean(programmes.hasNextPage)}
           onLoadMore={() => void programmes.fetchNextPage()}
         />
@@ -613,6 +616,7 @@ export function AttachContentItemModal({
           disabled={!programmeId}
           onSearchChange={setModuleSearch}
           isLoading={modules.isLoading || modules.isFetchingNextPage}
+          emptyMessage="No eligible module found. Modules that would create a duplicate are hidden."
           hasMore={Boolean(modules.hasNextPage)}
           onLoadMore={() => void modules.fetchNextPage()}
         />

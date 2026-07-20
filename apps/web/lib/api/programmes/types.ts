@@ -141,6 +141,7 @@ export type ProgrammeModuleQuery = {
   search?: string;
   contentType?: ProgrammeContentType;
   progressStatus?: 'not_started' | 'in_progress' | 'completed';
+  excludeContentItemId?: string;
   take?: number;
   cursor?: string;
 };
@@ -182,6 +183,7 @@ export type ProgrammeQuery = {
   progressStatus?: 'not_started' | 'in_progress' | 'completed';
   includeArchived?: boolean;
   grantableOnly?: boolean;
+  excludeContentItemId?: string;
   take?: number;
   cursor?: string;
 };

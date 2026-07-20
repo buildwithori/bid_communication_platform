@@ -43,6 +43,11 @@ export class ProgrammeQueryDto {
   grantableOnly?: boolean;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  excludeContentItemId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(1)

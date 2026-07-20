@@ -6,6 +6,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { ProgrammesService } from '../src/programmes/programmes.service';
+import { ContentService } from '../src/content/content.service';
 
 const entrepreneur = {
   id: 'entrepreneur-1',
@@ -177,4 +178,111 @@ test('preview visibility exposes non-ready content only to admins', async () => 
   });
   assert.equal(trainerResult.viewer.canTrackProgress, false);
   assert.equal(trainerResult.progress, null);
+});
+
+test('programme reuse lookup excludes programmes already containing the content', () => {
+  const service = new ProgrammesService({} as never, {} as never, {} as never);
+  const builder = service as unknown as {
+    buildProgrammeWhere: (
+      user: unknown,
+      query: { excludeContentItemId: string },
+    ) => { AND: unknown[] };
+  };
+  const where = builder.buildProgrammeWhere(
+    { id: 'admin-1', role: UserRole.admin },
+    { excludeContentItemId: 'content-1' },
+  );
+
+  assert.deepEqual(where.AND[0], {
+    modules: {
+      none: {
+        module: {
+          contentItems: { some: { contentItemId: 'content-1' } },
+        },
+      },
+    },
+  });
+});
+
+test('module reuse lookup excludes shared modules that would duplicate content', async () => {
+  let moduleQuery: any;
+  const prisma = {
+    programme: { count: async () => 1 },
+    programmeModule: {
+      findMany: async (query: unknown) => {
+        moduleQuery = query;
+        return [];
+      },
+      count: async () => 0,
+    },
+  };
+  const service = new ProgrammesService(prisma as never, {} as never, {} as never);
+
+  await service.listProgrammeModules(
+    { id: 'admin-1', role: UserRole.admin } as never,
+    'programme-1',
+    { excludeContentItemId: 'content-1' },
+  );
+
+  assert.deepEqual(moduleQuery.where.module.AND[0], {
+    programmes: {
+      none: {
+        programme: {
+          modules: {
+            some: {
+              module: {
+                contentItems: { some: { contentItemId: 'content-1' } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+});
+
+test('content attachment rejects duplicates anywhere in a connected programme', async () => {
+  let created = false;
+  let locked = false;
+  const transaction = {
+    learningModule: {
+      findUnique: async () => ({
+        id: 'module-target',
+        programmes: [
+          { programmeId: 'programme-2' },
+          { programmeId: 'programme-1' },
+        ],
+      }),
+    },
+    contentItem: {
+      findUnique: async () => ({ id: 'content-1', title: 'Welcome' }),
+    },
+    moduleContentItem: {
+      aggregate: async () => ({ _max: { position: 2 } }),
+      findFirst: async () => ({ moduleId: 'module-existing' }),
+      create: async () => {
+        created = true;
+      },
+    },
+    $queryRaw: async () => {
+      locked = true;
+      return [];
+    },
+  };
+  const audit = {
+    capture: async (_definition: unknown, mutation: (tx: unknown) => unknown) =>
+      mutation(transaction),
+  };
+  const service = new ContentService({} as never, {} as never, audit as never);
+
+  await assert.rejects(
+    service.attachModuleContentItem(
+      { id: 'admin-1', role: UserRole.admin } as never,
+      'module-target',
+      { contentItemId: 'content-1' },
+    ),
+    /already used in a programme connected to this module/,
+  );
+  assert.equal(locked, true);
+  assert.equal(created, false);
 });
