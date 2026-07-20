@@ -237,47 +237,87 @@ export class ReportExportService {
     overview: Awaited<ReturnType<ReportingService["overview"]>>,
     overdue: Awaited<ReturnType<ReportingService["overdueUpdates"]>>["items"],
   ) {
+    const generatedAt = new Date();
     const rows: Array<Array<string | number>> = [
-      ["BID Hub reporting export"],
-      ["Period from", overview.period.from],
-      ["Period to", overview.period.to],
-      ["Programme", overview.scope.programmeName],
-      ["Currency", overview.settings.currency],
+      ["BID Hub impact and performance report"],
+      ["Generated", this.dateTime(generatedAt)],
+      [
+        "Reporting period",
+        this.shortDate(overview.period.from) +
+          " to " +
+          this.shortDate(overview.period.to),
+      ],
+      ["Programme scope", overview.scope.programmeName],
+      ["Reporting currency", overview.settings.currency],
       [],
-      ["Summary"],
-      ["Jobs created", overview.metrics.jobsCreated],
-      ["Jobs created for women", overview.metrics.jobsWomen],
-      ["Jobs created for men", overview.metrics.jobsMen],
-      ["Funds mobilised", overview.metrics.fundsMobilisedCents / 100],
-      ["Entrepreneurs with funds", overview.metrics.entrepreneursWithFunds],
-      ["Update submission rate", `${overview.metrics.updateSubmissionRate}%`],
+      ["Executive summary"],
+      ["Metric", "Value", "Context"],
+      [
+        "Jobs created",
+        overview.metrics.jobsCreated,
+        "Periodic updates overlapping the reporting period",
+      ],
+      [
+        "Jobs created for women",
+        overview.metrics.jobsWomen,
+        "Reported jobs for women",
+      ],
+      [
+        "Jobs created for men",
+        overview.metrics.jobsMen,
+        "Reported jobs for men",
+      ],
+      [
+        "Funds mobilised",
+        overview.metrics.fundsMobilisedCents / 100,
+        overview.settings.currency,
+      ],
+      [
+        "Entrepreneurs with funds",
+        overview.metrics.entrepreneursWithFunds,
+        "Distinct entrepreneurs in the reporting period",
+      ],
+      [
+        "Update submission rate",
+        overview.metrics.updateSubmissionRate + "%",
+        overview.metrics.submittedEntrepreneurs +
+          " of " +
+          overview.metrics.totalEntrepreneurs +
+          " eligible entrepreneurs",
+      ],
       [
         "Training completion rate",
-        `${overview.metrics.trainingCompletionRate}%`,
+        overview.metrics.trainingCompletionRate + "%",
+        "Average programme learning progress",
       ],
-      ["Overdue entrepreneurs", overview.metrics.overdueEntrepreneurs],
+      [
+        "Overdue entrepreneurs",
+        overview.metrics.overdueEntrepreneurs,
+        "Current follow-up position as at generation time",
+      ],
       [],
-      ["Jobs by programme"],
-      ["Programme", "Jobs"],
-      ...overview.jobsByProgramme.map((item) => [
-        item.programmeName,
-        item.value,
-      ]),
+      ["Programme performance"],
+      [
+        "Programme",
+        "Jobs created",
+        "Funds mobilised (" + overview.settings.currency + ")",
+      ],
+      ...this.programmeRows(overview),
+      [
+        "Total",
+        overview.metrics.jobsCreated,
+        overview.metrics.fundsMobilisedCents / 100,
+      ],
       [],
-      ["Funds by programme"],
-      ["Programme", `Funds (${overview.settings.currency})`],
-      ...overview.fundsByProgramme.map((item) => [
-        item.programmeName,
-        item.value / 100,
-      ]),
-      [],
-      ["Overdue updates"],
+      ["Overdue periodic updates"],
       [
         "Business",
         "Representative",
         "Email",
         "Programme access",
+        "Last reporting period",
         "Last submitted",
+        "Joined BID Hub",
         "Days without report",
         "Days overdue",
         "Priority",
@@ -286,19 +326,39 @@ export class ReportExportService {
         item.businessName,
         item.representativeName,
         item.email,
-        item.programmes.map((programme) => programme.name).join("; "),
-        item.lastReport?.submittedAt ?? "Never",
+        item.programmes.map((programme) => programme.name).join("; ") ||
+          "No assigned programme",
+        item.lastReport
+          ? this.shortDate(item.lastReport.periodStart) +
+            " to " +
+            this.shortDate(item.lastReport.periodEnd)
+          : "Never submitted",
+        item.lastReport
+          ? this.dateTime(item.lastReport.submittedAt)
+          : "Never submitted",
+        this.shortDate(item.joinedAt),
         item.daysWithoutReport,
         item.daysOverdue,
-        item.priority,
+        this.priorityLabel(item.priority),
       ]),
+      [],
+      ["Methodology and interpretation"],
+      ["Jobs", overview.sources.jobs],
+      ["Funds", overview.sources.funds],
+      [
+        "Overdue follow-up",
+        overview.sources.overdue +
+          " The overdue list is current at export generation time and is not limited to the selected reporting period.",
+      ],
+      [
+        "Unattributed activity",
+        "Records without a programme remain company-wide and are not assigned to a programme result.",
+      ],
     ];
-    return Buffer.from(
-      rows
-        .map((row) => row.map((cell) => this.csvCell(cell)).join(","))
-        .join("\r\n"),
-      "utf8",
-    );
+    const content = rows
+      .map((row) => row.map((cell) => this.csvCell(cell)).join(","))
+      .join("\r\n");
+    return Buffer.from("\uFEFF" + content, "utf8");
   }
 
   private async xlsx(
@@ -306,117 +366,523 @@ export class ReportExportService {
     overdue: Awaited<ReturnType<ReportingService["overdueUpdates"]>>["items"],
   ) {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = "BID Hub";
-    workbook.created = new Date();
+    const generatedAt = new Date();
+    const brand = "FF8F2858";
+    const brandDark = "FF651A3D";
+    const brandLight = "FFF7E8EF";
+    const ink = "FF252129";
+    const muted = "FF6F6872";
+    const line = "FFE4DCE1";
+    const soft = "FFF8F5F7";
+    const white = "FFFFFFFF";
+    const currencyFormat = '#,##0.00 "' + overview.settings.currency + '"';
 
-    const summary = workbook.addWorksheet("Summary");
+    workbook.creator = "BID Hub";
+    workbook.lastModifiedBy = "BID Hub reporting worker";
+    workbook.company = "BID Hub";
+    workbook.title = "BID Hub impact and performance report";
+    workbook.subject = overview.scope.programmeName + " performance report";
+    workbook.description =
+      "Programme performance, jobs, funds, learning progress, and overdue reporting follow-up.";
+    workbook.keywords =
+      "BID Hub, impact, programme, jobs, fundraising, training";
+    workbook.category = "Operational reporting";
+    workbook.created = generatedAt;
+    workbook.modified = generatedAt;
+    workbook.calcProperties.fullCalcOnLoad = true;
+
+    const summary = workbook.addWorksheet("Executive summary", {
+      views: [{ state: "frozen", ySplit: 7 }],
+      pageSetup: {
+        orientation: "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
+        paperSize: 9,
+      },
+      properties: { defaultRowHeight: 20 },
+    });
+    summary.mergeCells("A1:D1");
+    summary.getCell("A1").value = "BID Hub impact and performance report";
+    summary.getCell("A1").font = {
+      bold: true,
+      size: 20,
+      color: { argb: white },
+    };
+    summary.getCell("A1").fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: brand },
+    };
+    summary.getCell("A1").alignment = {
+      vertical: "middle",
+      horizontal: "left",
+    };
+    summary.getRow(1).height = 38;
+    summary.mergeCells("A2:D2");
+    summary.getCell("A2").value =
+      "A decision-ready view of programme outcomes and reporting follow-up";
+    summary.getCell("A2").font = { italic: true, color: { argb: muted } };
+    summary.getRow(2).height = 25;
     summary.addRows([
-      ["BID Hub reporting export"],
-      ["Period from", overview.period.from],
-      ["Period to", overview.period.to],
-      ["Programme", overview.scope.programmeName],
-      ["Currency", overview.settings.currency],
-      [],
-      ["Metric", "Value"],
-      ["Jobs created", overview.metrics.jobsCreated],
-      ["Jobs created for women", overview.metrics.jobsWomen],
-      ["Jobs created for men", overview.metrics.jobsMen],
-      ["Funds mobilised", overview.metrics.fundsMobilisedCents / 100],
-      ["Entrepreneurs with funds", overview.metrics.entrepreneursWithFunds],
-      ["Update submission rate", overview.metrics.updateSubmissionRate / 100],
+      ["Programme scope", overview.scope.programmeName],
       [
+        "Reporting period",
+        this.shortDate(overview.period.from) +
+          " to " +
+          this.shortDate(overview.period.to),
+      ],
+      ["Generated", this.dateTime(generatedAt)],
+      ["Reporting currency", overview.settings.currency],
+      ["Metric", "Value", "Metric", "Value"],
+      [
+        "Jobs created",
+        overview.metrics.jobsCreated,
+        "Funds mobilised",
+        overview.metrics.fundsMobilisedCents / 100,
+      ],
+      [
+        "Jobs for women",
+        overview.metrics.jobsWomen,
+        "Jobs for men",
+        overview.metrics.jobsMen,
+      ],
+      [
+        "Update submission rate",
+        overview.metrics.updateSubmissionRate / 100,
         "Training completion rate",
         overview.metrics.trainingCompletionRate / 100,
       ],
-      ["Overdue entrepreneurs", overview.metrics.overdueEntrepreneurs],
+      [
+        "Updates submitted",
+        overview.metrics.submittedEntrepreneurs,
+        "Eligible entrepreneurs",
+        overview.metrics.totalEntrepreneurs,
+      ],
+      [
+        "Entrepreneurs with funds",
+        overview.metrics.entrepreneursWithFunds,
+        "Overdue entrepreneurs",
+        overview.metrics.overdueEntrepreneurs,
+      ],
     ]);
-    summary.getRow(1).font = {
-      bold: true,
-      size: 16,
-      color: { argb: "FF842751" },
-    };
-    summary.getRow(7).font = { bold: true };
-    summary.getCell("B13").numFmt = "0%";
-    summary.getCell("B14").numFmt = "0%";
-    summary.columns = [{ width: 34 }, { width: 28 }];
+    summary.mergeCells("B3:D3");
+    summary.mergeCells("B4:D4");
+    summary.mergeCells("B5:D5");
+    summary.mergeCells("B6:D6");
+    for (let rowNumber = 3; rowNumber <= 6; rowNumber += 1) {
+      const row = summary.getRow(rowNumber);
+      row.getCell(1).font = { bold: true, color: { argb: muted } };
+      row.getCell(2).font = { color: { argb: ink } };
+      row.getCell(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: soft },
+      };
+      row.getCell(2).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: soft },
+      };
+    }
+    this.styleHeader(summary.getRow(7), brandDark, white);
+    for (let rowNumber = 8; rowNumber <= 12; rowNumber += 1) {
+      const row = summary.getRow(rowNumber);
+      row.getCell(1).font = { color: { argb: muted } };
+      row.getCell(2).font = { bold: true, size: 13, color: { argb: ink } };
+      row.getCell(3).font = { color: { argb: muted } };
+      row.getCell(4).font = { bold: true, size: 13, color: { argb: ink } };
+      if (rowNumber % 2 === 0) {
+        for (let column = 1; column <= 4; column += 1) {
+          row.getCell(column).fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: soft },
+          };
+        }
+      }
+    }
+    summary.getCell("D8").numFmt = currencyFormat;
+    summary.getCell("B10").numFmt = "0%";
+    summary.getCell("D10").numFmt = "0%";
+    summary.mergeCells("A14:D14");
+    summary.getCell("A14").value = "How to read this report";
+    this.styleSection(summary.getCell("A14"), brandLight, brandDark);
+    const notes = [
+      ["Jobs", overview.sources.jobs],
+      ["Funds", overview.sources.funds],
+      [
+        "Follow-up",
+        "The overdue count and follow-up sheet show current status at export generation time.",
+      ],
+    ];
+    for (const note of notes) {
+      const row = summary.addRow(note);
+      summary.mergeCells(row.number, 2, row.number, 4);
+      row.getCell(1).font = { bold: true, color: { argb: muted } };
+      row.getCell(2).alignment = { wrapText: true, vertical: "top" };
+      row.height = 34;
+    }
+    summary.columns = [
+      { width: 27 },
+      { width: 22 },
+      { width: 27 },
+      { width: 22 },
+    ];
+    summary.headerFooter.oddFooter =
+      "&LBID Hub&CExecutive summary&RPage &P of &N";
 
-    const breakdown = workbook.addWorksheet("Programme breakdown");
+    const breakdown = workbook.addWorksheet("Programme performance", {
+      views: [{ state: "frozen", ySplit: 4 }],
+      pageSetup: {
+        orientation: "landscape",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        paperSize: 9,
+      },
+    });
+    breakdown.mergeCells("A1:C1");
+    breakdown.getCell("A1").value = "Programme performance";
+    this.styleSheetTitle(breakdown.getCell("A1"), brand, white);
+    breakdown.mergeCells("A2:C2");
+    breakdown.getCell("A2").value =
+      "Jobs and funds recorded for " +
+      overview.scope.programmeName +
+      " during the selected period.";
+    breakdown.getCell("A2").font = { color: { argb: muted } };
+    breakdown.addRow([]);
     breakdown.addRow([
       "Programme",
       "Jobs created",
-      `Funds (${overview.settings.currency})`,
+      "Funds mobilised (" + overview.settings.currency + ")",
     ]);
-    const fundById = new Map(
-      overview.fundsByProgramme.map((item) => [item.programmeId, item.value]),
-    );
-    const ids = new Set([
-      ...overview.jobsByProgramme.map((item) => item.programmeId),
-      ...overview.fundsByProgramme.map((item) => item.programmeId),
+    this.styleHeader(breakdown.getRow(4), brandDark, white);
+    const performanceRows = this.programmeRows(overview);
+    for (const values of performanceRows) breakdown.addRow(values);
+    const totalRow = breakdown.addRow([
+      "Total",
+      overview.metrics.jobsCreated,
+      overview.metrics.fundsMobilisedCents / 100,
     ]);
-    for (const id of ids) {
-      const jobs = overview.jobsByProgramme.find(
-        (item) => item.programmeId === id,
-      );
-      const funds = overview.fundsByProgramme.find(
-        (item) => item.programmeId === id,
-      );
-      breakdown.addRow([
-        jobs?.programmeName ?? funds?.programmeName ?? "Unknown",
-        jobs?.value ?? 0,
-        (fundById.get(id) ?? 0) / 100,
-      ]);
-    }
-    breakdown.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-    breakdown.getRow(1).fill = {
+    totalRow.font = { bold: true, color: { argb: ink } };
+    totalRow.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF842751" },
+      fgColor: { argb: brandLight },
     };
-    breakdown.columns = [{ width: 42 }, { width: 18 }, { width: 22 }];
+    const performanceEnd = Math.max(4, totalRow.number);
+    breakdown.autoFilter = { from: "A4", to: "C" + performanceEnd };
+    breakdown.columns = [{ width: 46 }, { width: 18 }, { width: 27 }];
+    for (let rowNumber = 5; rowNumber <= totalRow.number; rowNumber += 1) {
+      breakdown.getRow(rowNumber).getCell(3).numFmt = currencyFormat;
+    }
+    this.styleBody(breakdown, 5, totalRow.number, 3, line, soft);
+    breakdown.headerFooter.oddFooter =
+      "&LBID Hub&CProgramme performance&RPage &P of &N";
 
-    const followUp = workbook.addWorksheet("Overdue updates");
+    const followUp = workbook.addWorksheet("Overdue follow-up", {
+      views: [{ state: "frozen", ySplit: 4, xSplit: 2 }],
+      pageSetup: {
+        orientation: "landscape",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        paperSize: 9,
+      },
+    });
+    followUp.mergeCells("A1:K1");
+    followUp.getCell("A1").value = "Overdue periodic update follow-up";
+    this.styleSheetTitle(followUp.getCell("A1"), brand, white);
+    followUp.mergeCells("A2:K2");
+    followUp.getCell("A2").value =
+      "Current follow-up status generated " +
+      this.dateTime(generatedAt) +
+      ". This list is not constrained by the selected reporting period.";
+    followUp.getCell("A2").font = { color: { argb: muted } };
+    followUp.getCell("A2").alignment = { wrapText: true };
+    followUp.addRow([]);
     followUp.addRow([
       "Business",
       "Representative",
       "Email",
       "Programme access",
+      "Period start",
+      "Period end",
       "Last submitted",
+      "Joined BID Hub",
       "Days without report",
       "Days overdue",
       "Priority",
     ]);
+    this.styleHeader(followUp.getRow(4), brandDark, white);
     for (const item of overdue) {
-      followUp.addRow([
+      const row = followUp.addRow([
         item.businessName,
         item.representativeName,
-        item.email,
-        item.programmes.map((programme) => programme.name).join("; "),
-        item.lastReport?.submittedAt ?? "Never",
+        { text: item.email, hyperlink: "mailto:" + item.email },
+        item.programmes.map((programme) => programme.name).join("; ") ||
+          "No assigned programme",
+        item.lastReport ? new Date(item.lastReport.periodStart) : null,
+        item.lastReport ? new Date(item.lastReport.periodEnd) : null,
+        item.lastReport ? new Date(item.lastReport.submittedAt) : null,
+        new Date(item.joinedAt),
         item.daysWithoutReport,
         item.daysOverdue,
-        item.priority,
+        this.priorityLabel(item.priority),
       ]);
+      for (let column = 5; column <= 8; column += 1)
+        row.getCell(column).numFmt = "dd mmm yyyy";
+      row.getCell(3).font = { color: { argb: "FF1667A8" }, underline: true };
+      const priorityCell = row.getCell(11);
+      const priorityColor =
+        item.priority === "critical"
+          ? "FFFDE7E7"
+          : item.priority === "late"
+            ? "FFFFF2D9"
+            : "FFEAF3FF";
+      const priorityInk =
+        item.priority === "critical"
+          ? "FFB42318"
+          : item.priority === "late"
+            ? "FF9A6700"
+            : "FF175CD3";
+      priorityCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: priorityColor },
+      };
+      priorityCell.font = { bold: true, color: { argb: priorityInk } };
     }
-    followUp.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-    followUp.getRow(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF842751" },
-    };
-    followUp.views = [{ state: "frozen", ySplit: 1 }];
-    followUp.autoFilter = { from: "A1", to: "H1" };
+    const followUpEnd = Math.max(4, followUp.rowCount);
+    followUp.autoFilter = { from: "A4", to: "K" + followUpEnd };
     followUp.columns = [
       { width: 28 },
       { width: 24 },
-      { width: 30 },
+      { width: 31 },
       { width: 38 },
-      { width: 24 },
+      { width: 16 },
+      { width: 16 },
+      { width: 20 },
+      { width: 18 },
       { width: 20 },
       { width: 15 },
-      { width: 18 },
+      { width: 19 },
     ];
+    this.styleBody(followUp, 5, followUp.rowCount, 11, line, soft);
+    followUp.headerFooter.oddFooter =
+      "&LBID Hub&COverdue follow-up&RPage &P of &N";
+
+    const methodology = workbook.addWorksheet("Methodology", {
+      pageSetup: {
+        orientation: "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
+        paperSize: 9,
+      },
+    });
+    methodology.mergeCells("A1:C1");
+    methodology.getCell("A1").value = "Report methodology and data notes";
+    this.styleSheetTitle(methodology.getCell("A1"), brand, white);
+    methodology.mergeCells("A2:C2");
+    methodology.getCell("A2").value =
+      "Definitions used to interpret this workbook consistently.";
+    methodology.getCell("A2").font = { color: { argb: muted } };
+    methodology.addRow([]);
+    methodology.addRow(["Area", "Definition", "Important note"]);
+    this.styleHeader(methodology.getRow(4), brandDark, white);
+    const methodologyRows = [
+      [
+        "Jobs created",
+        overview.sources.jobs,
+        "Jobs for women and men are reported subsets and may not equal total jobs when source records are incomplete.",
+      ],
+      [
+        "Funds mobilised",
+        overview.sources.funds,
+        "Only fundraising rounds in the company reporting currency are included.",
+      ],
+      [
+        "Update submission rate",
+        "Distinct entrepreneurs with an overlapping periodic update divided by eligible entrepreneurs in scope.",
+        overview.metrics.submittedEntrepreneurs +
+          " submitted of " +
+          overview.metrics.totalEntrepreneurs +
+          " eligible.",
+      ],
+      [
+        "Training completion",
+        "Average stored programme progress for the selected programme scope.",
+        "Learners without a stored progress record do not contribute a progress percentage.",
+      ],
+      [
+        "Overdue follow-up",
+        overview.sources.overdue,
+        "This is a current operational queue as at " +
+          this.dateTime(generatedAt) +
+          ", not a historical period metric.",
+      ],
+      [
+        "Programme attribution",
+        "Activity with no programme link remains company-wide.",
+        "Unattributed activity is never forced into an individual programme result.",
+      ],
+    ];
+    for (const values of methodologyRows) methodology.addRow(values);
+    methodology.columns = [{ width: 25 }, { width: 68 }, { width: 58 }];
+    this.styleBody(methodology, 5, methodology.rowCount, 3, line, soft);
+    methodology.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber >= 5) {
+        row.alignment = { vertical: "top", wrapText: true };
+        row.height = 52;
+      }
+    });
+    methodology.headerFooter.oddFooter =
+      "&LBID Hub&CMethodology&RPage &P of &N";
+
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
+  }
+
+  private programmeRows(
+    overview: Awaited<ReturnType<ReportingService["overview"]>>,
+  ): Array<[string, number, number]> {
+    const jobs = new Map(
+      overview.jobsByProgramme.map((item) => [
+        item.programmeId ?? "unattributed",
+        item,
+      ]),
+    );
+    const funds = new Map(
+      overview.fundsByProgramme.map((item) => [
+        item.programmeId ?? "unattributed",
+        item,
+      ]),
+    );
+    const ids = new Set([...jobs.keys(), ...funds.keys()]);
+    return [...ids]
+      .map((id): [string, number, number] => {
+        const job = jobs.get(id);
+        const fund = funds.get(id);
+        return [
+          job?.programmeName ?? fund?.programmeName ?? "Unknown programme",
+          job?.value ?? 0,
+          (fund?.value ?? 0) / 100,
+        ];
+      })
+      .sort(
+        (left, right) =>
+          right[1] - left[1] ||
+          right[2] - left[2] ||
+          left[0].localeCompare(right[0]),
+      );
+  }
+
+  private styleSheetTitle(
+    cell: ExcelJS.Cell,
+    background: string,
+    foreground: string,
+  ) {
+    cell.font = { bold: true, size: 18, color: { argb: foreground } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: background },
+    };
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+    cell.worksheet.getRow(Number(cell.row)).height = 36;
+  }
+
+  private styleSection(
+    cell: ExcelJS.Cell,
+    background: string,
+    foreground: string,
+  ) {
+    cell.font = { bold: true, size: 12, color: { argb: foreground } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: background },
+    };
+    cell.alignment = { vertical: "middle" };
+    cell.worksheet.getRow(Number(cell.row)).height = 26;
+  }
+
+  private styleHeader(
+    row: ExcelJS.Row,
+    background: string,
+    foreground: string,
+  ) {
+    row.font = { bold: true, color: { argb: foreground } };
+    row.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: background },
+    };
+    row.alignment = { vertical: "middle", wrapText: true };
+    row.height = 30;
+  }
+
+  private styleBody(
+    worksheet: ExcelJS.Worksheet,
+    fromRow: number,
+    toRow: number,
+    lastColumn: number,
+    line: string,
+    alternate: string,
+  ) {
+    for (let rowNumber = fromRow; rowNumber <= toRow; rowNumber += 1) {
+      const row = worksheet.getRow(rowNumber);
+      row.alignment = { vertical: "top", wrapText: true };
+      if ((rowNumber - fromRow) % 2 === 1) {
+        for (let column = 1; column <= lastColumn; column += 1) {
+          if (
+            !row.getCell(column).fill ||
+            row.getCell(column).fill.type === undefined
+          ) {
+            row.getCell(column).fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: alternate },
+            };
+          }
+        }
+      }
+      for (let column = 1; column <= lastColumn; column += 1) {
+        row.getCell(column).border = {
+          bottom: { style: "hair", color: { argb: line } },
+        };
+      }
+    }
+  }
+
+  private shortDate(value: string | Date) {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(value));
+  }
+
+  private dateTime(value: string | Date) {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+      timeZoneName: "short",
+    }).format(new Date(value));
+  }
+
+  private priorityLabel(priority: string) {
+    if (priority === "critical") return "Critical - over 90 days late";
+    if (priority === "late") return "31-90 days late";
+    return "Newly overdue";
   }
 
   private filename(scope: string, format: ReportExportFormat, createdAt: Date) {
@@ -430,7 +896,8 @@ export class ReportExportService {
 
   private csvCell(value: string | number) {
     const text = String(value);
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    const safe = /^[=+\-@]/.test(text) ? String.fromCharCode(39) + text : text;
+    return /[",\r\n]/.test(safe) ? '"' + safe.replace(/"/g, '""') + '"' : safe;
   }
 
   private map(report: {

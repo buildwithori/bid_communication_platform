@@ -854,7 +854,7 @@ Rules:
 - Periodic updates collect jobs and narrative reporting only. Funding belongs in `fundraising_rounds`, not `periodic_updates`.
 - Fundraising rounds are linked to the entrepreneur user, not the business record. Business-level funding history is derived through business membership.
 - If attribution is missing, report as company-wide/unattributed, not under a programme.
-- Report exports should generate CSV/Excel files in the first backend release. Do not build branded PDF generation yet.
+- Report exports should generate CSV/Excel files in the first backend release. Excel exports must be branded, decision-ready workbooks with separate executive summary, programme performance, current overdue follow-up, and methodology sheets. CSV exports must retain report scope and source context and neutralize spreadsheet formula-leading values. The overdue follow-up section is current at generation time rather than constrained to the historical reporting period. Do not build branded PDF generation yet.
 
 ### Notifications and Audit
 
