@@ -804,6 +804,7 @@ Rules:
 - PDF and Excel tools use uploaded file assets stored in DigitalOcean Spaces. Do not store provider URLs entered by admins as their primary source.
 - Embedded tools store a validated `embedded_url` and should be rendered in a sandboxed iframe where possible.
 - Learning content may link to any published entrepreneur tool. Linked PDF tools use authenticated file access and the in-app document viewer; linked Excel tools use the authenticated worksheet viewer; linked online tools use the sandboxed in-app viewer.
+- A library entrepreneur tool may appear at most once in a module. Tool and reusable-content lookups must exclude tools already represented in the target module, and create/attach mutations must lock the module and recheck the rule transactionally.
 - `all_entrepreneurs` tools are visible to every entrepreneur unless that entrepreneur has a hidden override.
 - Programme tools are visible to entrepreneurs with access to one of the selected programmes.
 - Entrepreneur tools are visible only to selected entrepreneur users.

@@ -9,6 +9,7 @@ import {
 import { ProgrammesService } from "../src/programmes/programmes.service";
 import { ContentService } from "../src/content/content.service";
 import { FilesService } from "../src/files/files.service";
+import { ToolsService } from "../src/tools/tools.service";
 
 const entrepreneur = {
   id: "entrepreneur-1",
@@ -483,4 +484,175 @@ test("workbook preview returns a bounded worksheet window", async () => {
     },
   );
   assert.equal(storageReads, 1);
+});
+
+
+test("creating tool content rejects a tool already used in the module", async () => {
+  let created = false;
+  let locked = false;
+  const transaction = {
+    $queryRaw: async () => {
+      locked = true;
+      return [];
+    },
+    moduleContentItem: {
+      findFirst: async () => ({ id: "placement-1" }),
+      aggregate: async () => ({ _max: { position: 1 } }),
+      create: async () => undefined,
+    },
+    contentItem: {
+      create: async () => {
+        created = true;
+        return { id: "content-new", title: "Planner" };
+      },
+    },
+  };
+  const service = new ContentService(
+    {
+      learningModule: { findUnique: async () => ({ id: "module-1" }) },
+      tool: {
+        findUnique: async () => ({
+          id: "tool-1",
+          type: "embedded_tool",
+          status: "published",
+          embeddedUrl: "https://example.com/tool",
+          fileAssetId: null,
+        }),
+      },
+    } as never,
+    {} as never,
+    {
+      capture: async (
+        _definition: unknown,
+        mutation: (tx: unknown) => Promise<unknown>,
+      ) => mutation(transaction),
+    } as never,
+  );
+
+  await assert.rejects(
+    service.createModuleContentItem(
+      { id: "admin-1", role: UserRole.admin } as never,
+      "module-1",
+      { title: "Planner", type: "tool", toolId: "tool-1" } as never,
+    ),
+    /already used in this module/,
+  );
+  assert.equal(locked, true);
+  assert.equal(created, false);
+});
+
+test("reusing content rejects another item linked to the same module tool", async () => {
+  let lookup = 0;
+  let created = false;
+  const transaction = {
+    learningModule: {
+      findUnique: async () => ({ id: "module-1", programmes: [] }),
+    },
+    contentItem: {
+      findUnique: async () => ({
+        id: "content-2",
+        title: "Planner copy",
+        toolLink: { toolId: "tool-1" },
+      }),
+    },
+    moduleContentItem: {
+      findFirst: async () => {
+        lookup += 1;
+        return lookup === 1 ? null : { id: "placement-1" };
+      },
+      aggregate: async () => ({ _max: { position: 1 } }),
+      create: async () => {
+        created = true;
+      },
+    },
+    $queryRaw: async () => [],
+  };
+  const service = new ContentService(
+    {} as never,
+    {} as never,
+    {
+      capture: async (
+        _definition: unknown,
+        mutation: (tx: unknown) => Promise<unknown>,
+      ) => mutation(transaction),
+    } as never,
+  );
+
+  await assert.rejects(
+    service.attachModuleContentItem(
+      { id: "admin-1", role: UserRole.admin } as never,
+      "module-1",
+      { contentItemId: "content-2" },
+    ),
+    /already used in this module/,
+  );
+  assert.equal(created, false);
+});
+
+test("reusable content lookup excludes other items linked to a module tool", () => {
+  const service = new ContentService({} as never, {} as never, {} as never);
+  const where = (
+    service as unknown as {
+      contentWhere(query: { excludeModuleId: string }): Record<string, unknown>;
+    }
+  ).contentWhere({ excludeModuleId: "module-1" });
+
+  assert.deepEqual(where, {
+    AND: [
+      { modules: { none: { moduleId: "module-1" } } },
+      {
+        NOT: {
+          toolLink: {
+            is: {
+              toolId: { not: null },
+              tool: {
+                contentLinks: {
+                  some: {
+                    contentItem: {
+                      modules: { some: { moduleId: "module-1" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+  });
+});
+
+
+test("published tool lookup excludes tools already used in the module", () => {
+  const service = new ToolsService(
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+  const where = (
+    service as unknown as {
+      buildToolWhere(
+        user: { id: string; role: UserRole },
+        query: { excludeModuleId: string },
+      ): Record<string, unknown>;
+    }
+  ).buildToolWhere(
+    { id: "admin-1", role: UserRole.admin },
+    { excludeModuleId: "module-1" },
+  );
+
+  assert.deepEqual(where, {
+    AND: [
+      {
+        contentLinks: {
+          none: {
+            contentItem: {
+              modules: { some: { moduleId: "module-1" } },
+            },
+          },
+        },
+      },
+    ],
+  });
 });

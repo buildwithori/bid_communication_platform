@@ -44,6 +44,7 @@ export type ToolQuery = {
   visibility?: ApiToolVisibility;
   status?: ApiToolStatus;
   toolAreaId?: string;
+  excludeModuleId?: string;
   take?: number;
   cursor?: string;
 };

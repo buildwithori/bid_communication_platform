@@ -14,6 +14,8 @@ function toQueryString(query?: ToolQuery) {
   if (query?.visibility) params.set("visibility", query.visibility);
   if (query?.status) params.set("status", query.status);
   if (query?.toolAreaId) params.set("toolAreaId", query.toolAreaId);
+  if (query?.excludeModuleId)
+    params.set("excludeModuleId", query.excludeModuleId);
   if (query?.take) params.set("take", String(query.take));
   if (query?.cursor) params.set("cursor", query.cursor);
   const value = params.toString();

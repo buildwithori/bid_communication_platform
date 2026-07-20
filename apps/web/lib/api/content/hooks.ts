@@ -137,16 +137,24 @@ export function useModuleContentItemsInfinite(moduleId: string, query: PageQuery
 export function useLazyPublishedToolsLookup({
   enabled,
   search,
+  excludeModuleId,
 }: {
   enabled: boolean;
   search?: string;
+  excludeModuleId?: string;
 }) {
   const result = useInfiniteQuery({
-    queryKey: [...contentKeys.all, 'published-tools', search ?? ''],
+    queryKey: [
+      ...contentKeys.all,
+      'published-tools',
+      search ?? '',
+      excludeModuleId ?? '',
+    ],
     queryFn: ({ pageParam }) =>
       listToolsRequest({
         search,
         status: 'published',
+        excludeModuleId,
         take: 20,
         cursor: pageParam,
       }),

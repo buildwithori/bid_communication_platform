@@ -556,6 +556,17 @@ export class ToolsService {
     if (query.type) filters.push({ type: query.type });
     if (query.visibility) filters.push({ visibility: query.visibility });
     if (query.toolAreaId) filters.push({ toolAreaId: query.toolAreaId });
+    if (query.excludeModuleId && user.role === UserRole.admin) {
+      filters.push({
+        contentLinks: {
+          none: {
+            contentItem: {
+              modules: { some: { moduleId: query.excludeModuleId } },
+            },
+          },
+        },
+      });
+    }
     if (query.status) filters.push({ status: query.status });
 
     return filters.length ? { AND: filters } : {};

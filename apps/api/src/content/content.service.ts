@@ -174,6 +174,24 @@ export class ContentService {
         payload: { moduleId, type: input.type },
       },
       async (tx) => {
+        await tx.$queryRaw(Prisma.sql`
+          SELECT id FROM modules WHERE id = ${moduleId} FOR UPDATE
+        `);
+        if (input.toolId) {
+          const existingTool = await tx.moduleContentItem.findFirst({
+            where: {
+              moduleId,
+              contentItem: { toolLink: { is: { toolId: input.toolId } } },
+            },
+            select: { id: true },
+          });
+          if (existingTool) {
+            throw new BadRequestException(
+              "This entrepreneur tool is already used in this module.",
+            );
+          }
+        }
+
         const maxPosition = await tx.moduleContentItem.aggregate({
           where: { moduleId },
           _max: { position: true },
@@ -304,7 +322,11 @@ export class ContentService {
           }),
           tx.contentItem.findUnique({
             where: { id: input.contentItemId },
-            select: { id: true, title: true },
+            select: {
+              id: true,
+              title: true,
+              toolLink: { select: { toolId: true } },
+            },
           }),
         ]);
 
@@ -355,6 +377,22 @@ export class ContentService {
               ? "This content item is already attached to the module."
               : "This content item is already used in a programme connected to this module.",
           );
+        }
+        if (contentItem.toolLink?.toolId) {
+          const existingTool = await tx.moduleContentItem.findFirst({
+            where: {
+              moduleId,
+              contentItem: {
+                toolLink: { is: { toolId: contentItem.toolLink.toolId } },
+              },
+            },
+            select: { id: true },
+          });
+          if (existingTool) {
+            throw new BadRequestException(
+              "This entrepreneur tool is already used in this module.",
+            );
+          }
         }
 
         const maxPosition = await tx.moduleContentItem.aggregate({
@@ -650,7 +688,31 @@ export class ContentService {
         ? { modules: { some: { moduleId: query.moduleId } } }
         : {}),
       ...(query.excludeModuleId
-        ? { modules: { none: { moduleId: query.excludeModuleId } } }
+        ? {
+            AND: [
+              { modules: { none: { moduleId: query.excludeModuleId } } },
+              {
+                NOT: {
+                  toolLink: {
+                    is: {
+                      toolId: { not: null },
+                      tool: {
+                        contentLinks: {
+                          some: {
+                            contentItem: {
+                              modules: {
+                                some: { moduleId: query.excludeModuleId },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }
         : {}),
       ...(search
         ? {

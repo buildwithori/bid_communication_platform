@@ -134,7 +134,13 @@ export function CreateContentItemModal({
   const tools = useLazyPublishedToolsLookup({
     enabled: open && type === "tool" && toolSource === "library",
     search: toolSearch.trim() || undefined,
+    excludeModuleId: moduleId || undefined,
   });
+  React.useEffect(() => {
+    form.setValue("toolId", "");
+    setToolSearch("");
+  }, [form, moduleId]);
+
   const createContent = useCreateModuleContentMutation();
   const fileUpload = useDirectFileUploadMutation();
   const videoUpload = useDirectVideoUploadMutation();
@@ -437,6 +443,7 @@ export function CreateContentItemModal({
                   }))}
                   placeholder="Select entrepreneur tool"
                   searchPlaceholder="Search tools..."
+                  emptyMessage="No unused entrepreneur tools found."
                   onSearchChange={setToolSearch}
                   isLoading={tools.isLoading || tools.isFetchingNextPage}
                   hasMore={Boolean(tools.hasNextPage)}
