@@ -2,9 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { AuditOutboxStatus, UserRole, UserStatus } from "@prisma/client";
+import {
+  AuditOutboxStatus,
+  ExternalResourceDeletionStatus,
+  ExternalResourceProvider,
+  UserRole,
+  UserStatus,
+} from "@prisma/client";
 import { AuditService } from "../src/audit/audit.service";
 import { GoogleAuthService } from "../src/auth/google-auth.service";
+import { ExternalResourceCleanupService } from '../src/jobs/external-resource-cleanup.service';
 import { JobSchedulerService } from "../src/jobs/job-scheduler.service";
 import { JOB_NAMES } from "../src/jobs/jobs.constants";
 import { TransactionalEmailProcessor } from "../src/jobs/processors/transactional-email.processor";
@@ -62,13 +69,14 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
     queue() as never,
     queue() as never,
     queue() as never,
+    queue() as never,
     { getOrThrow: (key: string) => configValues[key] } as never,
   );
 
   await scheduler.onApplicationBootstrap();
 
-  assert.equal(calls.filter((call) => call.method === "schedule").length, 4);
-  assert.equal(calls.filter((call) => call.method === "add").length, 4);
+  assert.equal(calls.filter((call) => call.method === "schedule").length, 5);
+  assert.equal(calls.filter((call) => call.method === "add").length, 5);
   assert.deepEqual(
     calls
       .filter((call) => call.method === "schedule")
@@ -78,7 +86,48 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
       "notification-delivery-scheduler",
       "notification-automation-scheduler",
       "recurring-deliverables-scheduler",
+      "external-resource-cleanup-scheduler",
     ],
+  );
+});
+
+test("external resource cleanup deletes queued storage objects and marks the record complete", async () => {
+  const updates: any[] = [];
+  const deleted: string[] = [];
+  const record = {
+    id: "cleanup-1",
+    provider: ExternalResourceProvider.object_storage,
+    externalId: "content/asset.pdf",
+    ownerUserId: null,
+    attempts: 0,
+  };
+  const prisma = {
+    externalResourceDeletion: {
+      updateMany: async (input: unknown) => {
+        updates.push(input);
+        return { count: 1 };
+      },
+      findMany: async () => [record],
+      update: async (input: unknown) => {
+        updates.push(input);
+        return {};
+      },
+    },
+  };
+  const cleanup = new ExternalResourceCleanupService(
+    prisma as never,
+    { deleteObject: async (key: string) => { deleted.push(key); } } as never,
+    {} as never,
+    {} as never,
+  );
+
+  const result = await cleanup.processPending();
+
+  assert.deepEqual(result, { processed: 1, failed: 0, total: 1, hasMore: false });
+  assert.deepEqual(deleted, ["content/asset.pdf"]);
+  assert.equal(
+    updates.at(-1).data.status,
+    ExternalResourceDeletionStatus.completed,
   );
 });
 

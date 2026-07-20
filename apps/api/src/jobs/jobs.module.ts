@@ -32,6 +32,7 @@ import { JobsHealthService } from "./jobs-health.service";
       { name: QUEUE_NAMES.recurringDeliverables },
       { name: QUEUE_NAMES.transactionalEmail },
       { name: QUEUE_NAMES.reportExports },
+      { name: QUEUE_NAMES.externalResourceCleanup },
     ),
   ],
   providers: [TransactionalEmailQueueService, JobsHealthService],

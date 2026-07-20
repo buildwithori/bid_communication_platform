@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -20,11 +21,16 @@ import {
   UpdateContentItemDto,
 } from './dto/content-query.dto';
 import { UpsertContentRatingDto } from './dto/upsert-content-rating.dto';
+import { DeleteResourceDto } from '../resource-deletion/dto/delete-resource.dto';
+import { ResourceDeletionService } from '../resource-deletion/resource-deletion.service';
 
 @ApiTags('content')
 @Controller('content')
 export class ContentController {
-  constructor(private readonly contentService: ContentService) {}
+  constructor(
+    private readonly contentService: ContentService,
+    private readonly resourceDeletion: ResourceDeletionService,
+  ) {}
 
   @Get('items')
   @Roles(UserRole.admin)
@@ -79,6 +85,16 @@ export class ContentController {
       contentItemId,
       input,
     );
+  }
+
+  @Delete('items/:contentItemId')
+  @Roles(UserRole.admin)
+  deleteContentItem(
+    @CurrentUser() user: User,
+    @Param('contentItemId') contentItemId: string,
+    @Body() input: DeleteResourceDto,
+  ) {
+    return this.resourceDeletion.deleteContentItem(user, contentItemId, input);
   }
 
   @Patch('items/:contentItemId')

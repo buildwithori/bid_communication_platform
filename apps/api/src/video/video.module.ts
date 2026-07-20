@@ -9,6 +9,6 @@ import { VideoService } from "./video.service";
   imports: [AuditModule],
   controllers: [VideoController, MuxWebhookController],
   providers: [MuxClient, VideoService],
-  exports: [VideoService],
+  exports: [VideoService, MuxClient],
 })
 export class VideoModule {}

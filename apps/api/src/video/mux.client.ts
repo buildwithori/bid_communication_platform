@@ -52,6 +52,12 @@ export class MuxClient {
     });
   }
 
+  async deleteAsset(assetId: string) {
+    await this.request(`/assets/${encodeURIComponent(assetId)}`, {
+      method: "DELETE",
+    });
+  }
+
   private async request<T = unknown>(
     path: string,
     init: RequestInit,
@@ -66,7 +72,11 @@ export class MuxClient {
 
     const method = init.method ?? "GET";
     const operation =
-      method === "POST" ? "direct_upload.create" : "direct_upload.cancel";
+      method === "POST"
+        ? "direct_upload.create"
+        : path.startsWith("/assets/")
+          ? "asset.delete"
+          : "direct_upload.cancel";
     return this.integration.trackOutbound(
       { provider: "mux", operation, method },
       async () => {
@@ -88,6 +98,9 @@ export class MuxClient {
         }
 
         if (!response.ok) {
+          if (method === "DELETE" && response.status === 404) {
+            return undefined as T;
+          }
           const body = (await response
             .json()
             .catch(() => null)) as MuxDirectUploadResponse | null;

@@ -24,6 +24,8 @@ export class JobSchedulerService implements OnApplicationBootstrap {
     private readonly notificationAutomationQueue: Queue,
     @InjectQueue(QUEUE_NAMES.recurringDeliverables)
     private readonly recurringQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.externalResourceCleanup)
+    private readonly externalCleanupQueue: Queue,
     private readonly config: ConfigService,
   ) {}
 
@@ -40,6 +42,7 @@ export class JobSchedulerService implements OnApplicationBootstrap {
     const automationInterval = this.config.getOrThrow<number>(
       "NOTIFICATION_AUTOMATION_INTERVAL_MS",
     );
+    const externalCleanupInterval = 30_000;
 
     await Promise.all([
       this.installScheduler(
@@ -65,6 +68,12 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         "recurring-deliverables-scheduler",
         JOB_NAMES.syncRecurringDeliverables,
         recurringInterval,
+      ),
+      this.installScheduler(
+        this.externalCleanupQueue,
+        "external-resource-cleanup-scheduler",
+        JOB_NAMES.cleanupExternalResources,
+        externalCleanupInterval,
       ),
     ]);
 
@@ -96,6 +105,14 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         this.startupOptions(
           JOB_NAMES.syncRecurringDeliverables,
           recurringInterval,
+        ),
+      ),
+      this.externalCleanupQueue.add(
+        JOB_NAMES.cleanupExternalResources,
+        {},
+        this.startupOptions(
+          JOB_NAMES.cleanupExternalResources,
+          externalCleanupInterval,
         ),
       ),
     ]);

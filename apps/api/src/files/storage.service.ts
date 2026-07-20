@@ -4,7 +4,7 @@ import { IntegrationLoggerService } from "../common/observability/integration-lo
 import { createHmac, createHash } from "crypto";
 
 export type SignedUrlInput = {
-  method: "PUT" | "GET" | "HEAD";
+  method: "PUT" | "GET" | "HEAD" | "DELETE";
   storageKey: string;
   mimeType?: string;
   expiresInSeconds?: number;
@@ -184,6 +184,23 @@ export class StorageService {
     if (!response.ok) {
       throw new ServiceUnavailableException(
         "Object storage could not save the generated file.",
+      );
+    }
+  }
+
+  async deleteObject(storageKey: string) {
+    const signed = this.presign(
+      { method: "DELETE", storageKey, expiresInSeconds: 60 },
+      { internal: true },
+    );
+    const response = await this.request(
+      signed.url,
+      { method: "DELETE", signal: AbortSignal.timeout(10_000) },
+      "object.delete",
+    );
+    if (!response.ok && response.status !== 404) {
+      throw new ServiceUnavailableException(
+        "Object storage could not delete the file.",
       );
     }
   }

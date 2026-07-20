@@ -231,6 +231,20 @@ enum AuditOutboxStatus {
   failed
 }
 
+enum ExternalResourceProvider {
+  mux_asset
+  mux_upload
+  object_storage
+  google_calendar_event
+}
+
+enum ExternalResourceDeletionStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
 enum LearnerProgressStatus {
   not_started
   in_progress
@@ -1449,4 +1463,23 @@ model AuditOutbox {
   @@index([actorUserId, createdAt])
   @@index([entityType, entityId])
   @@map("audit_outbox")
+}
+
+model ExternalResourceDeletion {
+  id            String                         @id @default(cuid())
+  provider      ExternalResourceProvider
+  externalId    String                         @map("external_id")
+  ownerUserId   String?                        @map("owner_user_id")
+  status        ExternalResourceDeletionStatus @default(pending)
+  attempts      Int                            @default(0)
+  lockedAt      DateTime?                      @map("locked_at")
+  completedAt   DateTime?                      @map("completed_at")
+  nextAttemptAt DateTime?                      @map("next_attempt_at")
+  error         String?
+  createdAt     DateTime                       @default(now()) @map("created_at")
+  updatedAt     DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([provider, externalId])
+  @@index([status, nextAttemptAt, createdAt])
+  @@map("external_resource_deletions")
 }

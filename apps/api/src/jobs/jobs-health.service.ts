@@ -18,6 +18,8 @@ export class JobsHealthService {
     private readonly transactionalEmailQueue: Queue,
     @InjectQueue(QUEUE_NAMES.reportExports)
     private readonly reportExportQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.externalResourceCleanup)
+    private readonly externalCleanupQueue: Queue,
   ) {}
 
   async status() {
@@ -46,6 +48,7 @@ export class JobsHealthService {
         this.recurringQueue,
         this.transactionalEmailQueue,
         this.reportExportQueue,
+        this.externalCleanupQueue,
       ].map(async (queue) => ({
         name: queue.name,
         counts: await queue.getJobCounts("wait", "active", "delayed", "failed"),
