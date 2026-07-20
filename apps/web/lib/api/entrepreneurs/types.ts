@@ -147,6 +147,7 @@ export type ToolAccessVariables = {
 export type ProfileRecordQuery = {
   search?: string;
   programmeId?: string;
+  linkableOnly?: boolean;
   take?: number;
   cursor?: string;
 };
@@ -182,6 +183,7 @@ export type FundraisingRoundRecord = {
     id: string;
     description: string | null;
     goalType: { id: string; name: string; key: string };
+    linkable: boolean;
   } | null;
   name: string;
   amountCents: number;

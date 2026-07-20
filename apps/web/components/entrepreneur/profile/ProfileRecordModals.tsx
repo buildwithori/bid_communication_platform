@@ -265,6 +265,7 @@ export function FundraisingRoundRecordModal({
     open ? entrepreneurId : null,
     {
       search: React.useDeferredValue(goalLookup.search) || undefined,
+      linkableOnly: true,
       take: 20,
     },
     goalLookup.open,
@@ -375,7 +376,7 @@ export function FundraisingRoundRecordModal({
             onValueChange={(value) => form.setValue("programmeGoalId", value)}
             options={unique([
               { value: "", label: "Not linked to a goal" },
-              ...(round?.programmeGoal
+              ...(round?.programmeGoal?.linkable
                 ? [
                     {
                       value: round.programmeGoal.id,
@@ -584,7 +585,9 @@ function fundingDefaults(round?: FundraisingRoundRecord): FundingForm {
     date: round?.date.slice(0, 10) ?? "",
     source: round?.source ?? "",
     programmeId: round?.programme?.id ?? "",
-    programmeGoalId: round?.programmeGoal?.id ?? "",
+    programmeGoalId: round?.programmeGoal?.linkable
+      ? round.programmeGoal.id
+      : "",
   };
 }
 function updateDefaults(update?: PeriodicUpdateRecord): UpdateForm {

@@ -1124,6 +1124,7 @@ Current UI fields:
 Backend mapping:
 
 - Funds by programme are only valid when `fundraising_rounds.programme_id` or linked `programme_goal.programme_id` exists.
+- Fundraising rounds may link only to an unachieved goal whose programme, when present, is not archived. Goal lookups used by selectors must enforce this in the paginated backend query, and mutations must validate it again.
 - Jobs by programme are only valid when `periodic_updates.programme_id` exists.
 - Periodic updates are linked to `entrepreneur_user_id`; business display/reporting is derived through membership.
 - Company-wide/unattributed records must stay company-wide in analytics.

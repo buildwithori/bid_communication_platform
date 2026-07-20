@@ -226,18 +226,29 @@ export class EntrepreneursService {
   ) {
     await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
     const take = query.take ?? DEFAULT_TAKE;
+    const filters: Prisma.ProgrammeGoalWhereInput[] = [];
+    if (query.linkableOnly) {
+      filters.push({
+        milestoneAchieved: false,
+        OR: [
+          { programmeId: null },
+          { programme: { is: { archivedAt: null } } },
+        ],
+      });
+    }
+    if (query.search?.trim()) {
+      filters.push({
+        OR: [
+          { description: { contains: query.search.trim(), mode: 'insensitive' } },
+          { goalType: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
+          { programme: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
+        ],
+      });
+    }
     const where: Prisma.ProgrammeGoalWhereInput = {
       entrepreneurUserId,
       ...(query.programmeId ? { programmeId: query.programmeId } : {}),
-      ...(query.search?.trim()
-        ? {
-            OR: [
-              { description: { contains: query.search.trim(), mode: 'insensitive' } },
-              { goalType: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
-              { programme: { name: { contains: query.search.trim(), mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
+      ...(filters.length ? { AND: filters } : {}),
     };
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.programmeGoal.findMany({
@@ -675,9 +686,20 @@ export class EntrepreneursService {
     if (dto.programmeGoalId) {
       const goal = await this.prisma.programmeGoal.findFirst({
         where: { id: dto.programmeGoalId, entrepreneurUserId },
-        select: { id: true, programmeId: true },
+        select: {
+          id: true,
+          programmeId: true,
+          milestoneAchieved: true,
+          programme: { select: { archivedAt: true } },
+        },
       });
       if (!goal) throw new BadRequestException('Select a valid goal owned by this entrepreneur.');
+      if (goal.milestoneAchieved) {
+        throw new BadRequestException('An achieved goal cannot be linked to a fundraising round.');
+      }
+      if (goal.programme?.archivedAt) {
+        throw new BadRequestException('A goal from an archived programme cannot be linked to a fundraising round.');
+      }
       if (goal.programmeId && dto.programmeId && goal.programmeId !== dto.programmeId) {
         throw new BadRequestException('The linked goal belongs to a different programme.');
       }
@@ -744,6 +766,8 @@ export class EntrepreneursService {
         select: {
           id: true,
           description: true,
+          milestoneAchieved: true,
+          programme: { select: { archivedAt: true } },
           goalType: { select: { id: true, name: true, key: true } },
         },
       },
@@ -846,7 +870,16 @@ export class EntrepreneursService {
       id: round.id,
       entrepreneurUserId: round.entrepreneurUserId,
       programme: round.programme,
-      programmeGoal: round.programmeGoal,
+      programmeGoal: round.programmeGoal
+        ? {
+            id: round.programmeGoal.id,
+            description: round.programmeGoal.description,
+            goalType: round.programmeGoal.goalType,
+            linkable:
+              !round.programmeGoal.milestoneAchieved &&
+              !round.programmeGoal.programme?.archivedAt,
+          }
+        : null,
       name: round.name,
       amountCents: round.amountCents,
       currency: round.currency,

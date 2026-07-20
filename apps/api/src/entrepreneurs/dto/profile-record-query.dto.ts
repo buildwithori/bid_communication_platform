@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -18,6 +19,15 @@ export class ProfileRecordQueryDto {
   @IsString()
   @MaxLength(64)
   programmeId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  linkableOnly?: boolean;
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
