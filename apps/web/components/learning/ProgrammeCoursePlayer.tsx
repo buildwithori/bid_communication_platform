@@ -45,6 +45,8 @@ type PlaylistEntry = {
   item: ProgrammePlayerItem;
 };
 
+type CompletionAction = 'mark' | 'next';
+
 type QueryState<T> = {
   data?: T;
   isLoading: boolean;
@@ -100,11 +102,16 @@ export function ProgrammeCoursePlayer({
     () => new Set(active ? [active.module.id] : []),
   );
   const [playerKey, setPlayerKey] = React.useState(0);
+  const [restartFromBeginningKey, setRestartFromBeginningKey] =
+    React.useState<string | null>(null);
   const [ratingEntry, setRatingEntry] = React.useState<PlaylistEntry | null>(
     null,
   );
   const [continueAfterRating, setContinueAfterRating] =
     React.useState<PlaylistEntry | null>(null);
+  const [locallyCompletedIds, setLocallyCompletedIds] = React.useState(
+    () => new Set<string>(),
+  );
   const promptedRatingsRef = React.useRef(new Set<string>());
   const openedRef = React.useRef<string | null>(null);
   const checkpointRef = React.useRef(0);
@@ -119,8 +126,8 @@ export function ProgrammeCoursePlayer({
       : null,
   );
   const syncProgress = useSyncLearnerProgressMutation();
-  const [manualCompletionPending, setManualCompletionPending] =
-    React.useState(false);
+  const [completionAction, setCompletionAction] =
+    React.useState<CompletionAction | null>(null);
   const signedFile = useSignedFileUrlQuery(
     active?.item.type === 'pdf' ? active.item.file?.id : undefined,
     Boolean(active),
@@ -132,6 +139,7 @@ export function ProgrammeCoursePlayer({
 
   const choose = React.useCallback(
     (entry: PlaylistEntry) => {
+      setRestartFromBeginningKey(null);
       setActiveKey(entryKey(entry));
       setExpanded((current) => new Set(current).add(entry.module.id));
       onContentChange?.(entry.item.id);
@@ -156,10 +164,11 @@ export function ProgrammeCoursePlayer({
       position?: number,
       duration?: number,
       notify = false,
-      showInlinePending = false,
+      pendingAction?: CompletionAction,
+      onSaved?: () => void,
     ) => {
       if (!active || !canTrack) return;
-      if (showInlinePending) setManualCompletionPending(true);
+      if (pendingAction) setCompletionAction(pendingAction);
       syncProgress.mutate(
         [
           {
@@ -178,16 +187,17 @@ export function ProgrammeCoursePlayer({
             source: status === 'completed' ? 'explicit_action' : 'player',
           },
         ],
-        notify || showInlinePending
+        notify || pendingAction || onSaved
           ? {
               onSuccess: () => {
                 if (notify) toast.success('Learning progress saved.');
+                onSaved?.();
               },
               onError: (error) => {
-                if (notify) toast.error(error.message);
+                if (notify || pendingAction) toast.error(error.message);
               },
               onSettled: () => {
-                if (showInlinePending) setManualCompletionPending(false);
+                if (pendingAction) setCompletionAction(null);
               },
             }
           : undefined,
@@ -219,7 +229,9 @@ export function ProgrammeCoursePlayer({
   const next =
     currentIndex < playlist.length - 1 ? playlist[currentIndex + 1] : null;
   const itemProgress = progress.data?.content ?? active.item.progress;
-  const completed = itemProgress?.status === 'completed';
+  const completed =
+    itemProgress?.status === 'completed' ||
+    locallyCompletedIds.has(active.item.id);
   const meta = typeMeta[active.item.type];
   const TypeIcon = meta.icon;
 
@@ -234,13 +246,29 @@ export function ProgrammeCoursePlayer({
     saveProgress('in_progress', value, position, duration);
   }
 
-  function promptForRating(target: PlaylistEntry | null) {
-    if (!canTrack || promptedRatingsRef.current.has(active.item.id)) {
+  function promptForRating(
+    completedEntry: PlaylistEntry,
+    target: PlaylistEntry | null,
+  ) {
+    if (
+      !canTrack ||
+      promptedRatingsRef.current.has(completedEntry.item.id)
+    ) {
       if (target) choose(target);
       return;
     }
-    setRatingEntry(active);
+    setRatingEntry(completedEntry);
     setContinueAfterRating(target);
+  }
+
+  function handleCompletionSaved(
+    completedEntry: PlaylistEntry,
+    target: PlaylistEntry | null,
+  ) {
+    setLocallyCompletedIds((current) =>
+      new Set(current).add(completedEntry.item.id),
+    );
+    promptForRating(completedEntry, target);
   }
 
   function finishRatingPrompt() {
@@ -279,7 +307,11 @@ export function ProgrammeCoursePlayer({
             item={active.item}
             signedFile={signedFile}
             signedVideo={signedVideo}
-            resumePosition={itemProgress?.lastPositionSeconds ?? 0}
+            resumePosition={
+              restartFromBeginningKey === entryKey(active)
+                ? 0
+                : (itemProgress?.lastPositionSeconds ?? 0)
+            }
             onProgress={checkpoint}
             onPause={(position, duration) => {
               const percent = duration
@@ -292,15 +324,20 @@ export function ProgrammeCoursePlayer({
                 duration,
               );
             }}
-            onEnded={() => {
+            onEnded={(duration) => {
+              const finalDuration =
+                Number.isFinite(duration) && duration > 0
+                  ? duration
+                  : (active.item.durationSeconds ?? undefined);
               saveProgress(
                 'completed',
                 100,
-                active.item.durationSeconds ?? undefined,
-                active.item.durationSeconds ?? undefined,
+                finalDuration,
+                finalDuration,
                 true,
+                undefined,
+                () => handleCompletionSaved(active, next),
               );
-              promptForRating(next);
             }}
           />
 
@@ -336,13 +373,16 @@ export function ProgrammeCoursePlayer({
                   <Button
                     type="button"
                     variant="outline"
+                    title="Restart playback at 00:00. Your completion stays saved."
                     onClick={() => {
                       checkpointRef.current = 0;
+                      setRestartFromBeginningKey(entryKey(active));
                       setPlayerKey((value) => value + 1);
+                      toast.success('Restarted from the beginning.');
                     }}
                   >
                     <RotateCcw className="h-4 w-4" />
-                    Start over
+                    Play from beginning
                   </Button>
                 ) : null}
                 <ExternalAssetButton
@@ -353,8 +393,8 @@ export function ProgrammeCoursePlayer({
                   <Button
                     type="button"
                     variant={completed ? 'outline' : 'success'}
-                    disabled={completed}
-                    isLoading={manualCompletionPending}
+                    disabled={completed || completionAction !== null}
+                    isLoading={completionAction === 'mark'}
                     loadingLabel="Saving..."
                     onClick={() =>
                       saveProgress(
@@ -363,7 +403,8 @@ export function ProgrammeCoursePlayer({
                         undefined,
                         undefined,
                         true,
-                        true,
+                        'mark',
+                        () => handleCompletionSaved(active, null),
                       )
                     }
                   >
@@ -388,19 +429,35 @@ export function ProgrammeCoursePlayer({
               </span>
               <Button
                 type="button"
-                disabled={!next && (!canTrack || active.item.type === 'video')}
+                disabled={
+                  completionAction !== null ||
+                  (!next &&
+                    (!canTrack ||
+                      (active.item.type === 'video' && !completed)))
+                }
+                isLoading={completionAction === 'next'}
+                loadingLabel="Saving..."
                 onClick={() => {
                   if (canTrack && active.item.type !== 'video') {
-                    saveProgress('completed', 100);
-                    promptForRating(next);
+                    saveProgress(
+                      'completed',
+                      100,
+                      undefined,
+                      undefined,
+                      false,
+                      'next',
+                      () => handleCompletionSaved(active, next),
+                    );
+                    return;
+                  }
+                  if (canTrack && completed) {
+                    promptForRating(active, next);
                     return;
                   }
                   if (next) choose(next);
                 }}
               >
-                {next || active.item.type === 'video'
-                  ? 'Next'
-                  : 'Finish lesson'}
+                {next ? 'Next' : 'Finish lesson'}
                 {next ? <ChevronRight className="h-4 w-4" /> : null}
               </Button>
             </div>
@@ -633,7 +690,7 @@ function MediaStage({
   resumePosition: number;
   onProgress: (position: number, duration: number) => void;
   onPause: (position: number, duration: number) => void;
-  onEnded: () => void;
+  onEnded: (duration: number) => void;
 }) {
   if (item.status !== 'ready') {
     return (
@@ -667,7 +724,7 @@ function MediaStage({
           tokens={{ playback: signedVideo.data.token }}
           metadataVideoTitle={item.title}
           streamType="on-demand"
-          startTime={resumePosition || undefined}
+          startTime={resumePosition}
           onTimeUpdate={(event: Event) => {
             const player = event.currentTarget as MuxPlayerElement;
             onProgress(player.currentTime, player.duration);
@@ -676,7 +733,10 @@ function MediaStage({
             const player = event.currentTarget as MuxPlayerElement;
             onPause(player.currentTime, player.duration);
           }}
-          onEnded={onEnded}
+          onEnded={(event: Event) => {
+            const player = event.currentTarget as MuxPlayerElement;
+            onEnded(player.duration);
+          }}
           className="aspect-video max-h-[720px] w-full"
         />
       </div>
