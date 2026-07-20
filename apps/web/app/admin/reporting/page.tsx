@@ -9,6 +9,7 @@ import { Badge } from "@/components/shared/Badge";
 import { BarChartRow } from "@/components/shared/BarChartRow";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader } from "@/components/shared/Card";
+import { DatePicker } from "@/components/shared/DatePicker";
 import {
   DataTable,
   RowActions,
@@ -20,7 +21,6 @@ import {
 } from "@/components/shared/DataTable";
 import {
   FormAutocomplete,
-  FormInput,
   FormSelect,
 } from "@/components/shared/FormField";
 import { MessageModal } from "@/components/shared/MessageModal";
@@ -337,12 +337,10 @@ export default function AdminReportingPage() {
             hasMore={Boolean(programmes.hasNextPage)}
             onLoadMore={() => programmes.fetchNextPage()}
           />
-          <FormInput
-            type="date"
-            aria-label="Report start date"
+          <DatePicker
+            ariaLabel="Report start date"
             value={dateFrom}
-            onChange={(event) => {
-              const next = event.target.value;
+            onChange={(next) => {
               setDateFrom(next);
               if (next && dateTo && next <= dateTo) {
                 setAppliedDateFrom(next);
@@ -350,12 +348,10 @@ export default function AdminReportingPage() {
               }
             }}
           />
-          <FormInput
-            type="date"
-            aria-label="Report end date"
+          <DatePicker
+            ariaLabel="Report end date"
             value={dateTo}
-            onChange={(event) => {
-              const next = event.target.value;
+            onChange={(next) => {
               setDateTo(next);
               if (dateFrom && next && dateFrom <= next) {
                 setAppliedDateFrom(dateFrom);

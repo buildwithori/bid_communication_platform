@@ -56,6 +56,7 @@ export interface DatePickerProps {
   value?: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
+  ariaLabel?: string;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -75,6 +76,7 @@ export function DatePicker({
   value,
   onChange,
   onBlur,
+  ariaLabel,
   placeholder = 'Select date',
   disabled,
   className,
@@ -110,6 +112,7 @@ export function DatePicker({
       <PopoverTrigger asChild>
         <button
           type="button"
+          aria-label={ariaLabel}
           disabled={disabled}
           onBlur={onBlur}
           className={cn(
