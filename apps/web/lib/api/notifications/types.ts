@@ -86,6 +86,10 @@ export type NotificationAutomationPreference = {
   weeklyDigestOverride: boolean | null;
   weeklyDigestEnabled: boolean;
   defaults: { reminderEnabled: boolean; weeklyDigestEnabled: boolean };
+  scope: {
+    reminderKinds: Array<"session" | "deliverable">;
+    weeklyDigestKinds: Array<"unread_activity" | "session" | "deliverable">;
+  };
 };
 
 export type NotificationAutomationPreferenceUpdate = {

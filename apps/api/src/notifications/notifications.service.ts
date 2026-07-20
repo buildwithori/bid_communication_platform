@@ -11,6 +11,7 @@ import {
   NotificationType,
   Prisma,
   User,
+  UserRole,
 } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationQueryDto } from "./dto/notification-query.dto";
@@ -346,6 +347,19 @@ export class NotificationsService {
       weeklyDigestEnabled:
         preference?.weeklyDigestEnabled ?? defaults.weeklyDigestEnabled,
       defaults,
+      scope: this.automationScope(user.role),
+    };
+  }
+
+  private automationScope(role: UserRole) {
+    const entrepreneur = role === UserRole.entrepreneur;
+    return {
+      reminderKinds: entrepreneur
+        ? (["session", "deliverable"] as const)
+        : (["session"] as const),
+      weeklyDigestKinds: entrepreneur
+        ? (["unread_activity", "session", "deliverable"] as const)
+        : (["unread_activity", "session"] as const),
     };
   }
 

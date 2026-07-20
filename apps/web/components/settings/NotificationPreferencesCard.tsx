@@ -225,8 +225,16 @@ export function NotificationPreferencesCard({
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <AutomationPreference
-              label="Due-date and session reminders"
-              description="Reminders up to 24 hours before confirmed sessions and outstanding deliverables are due."
+              label={
+                automation.data.scope.reminderKinds.includes("deliverable")
+                  ? "Session and deliverable reminders"
+                  : "Upcoming session reminders"
+              }
+              description={
+                automation.data.scope.reminderKinds.includes("deliverable")
+                  ? "Reminders up to 24 hours before confirmed sessions and outstanding deliverables are due."
+                  : "Reminders up to 24 hours before confirmed sessions assigned to you."
+              }
               enabled={automation.data.reminderEnabled}
               disabled={updateAutomation.isPending}
               isLoading={
@@ -246,7 +254,11 @@ export function NotificationPreferencesCard({
             />
             <AutomationPreference
               label="Weekly summary email"
-              description="A Monday summary of unread activity, upcoming sessions, and deliverables due in the next seven days."
+              description={
+                automation.data.scope.weeklyDigestKinds.includes("deliverable")
+                  ? "A Monday summary of unread activity, upcoming sessions, and deliverables due in the next seven days."
+                  : "A Monday summary of unread activity and sessions assigned to you in the next seven days."
+              }
               enabled={automation.data.weeklyDigestEnabled}
               disabled={updateAutomation.isPending}
               isLoading={

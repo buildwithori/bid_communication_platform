@@ -232,6 +232,49 @@ test("group updates atomically upsert only notification types relevant to the us
   assert.equal(result.emailEnabled, false);
 });
 
+test("automation preferences expose role-specific schedule scope", async () => {
+  const prisma = {
+    notificationAutomationPreference: { findUnique: async () => null },
+    companySettings: {
+      findUnique: async () => ({
+        reminderNotificationsEnabledByDefault: true,
+        weeklyDigestEnabledByDefault: false,
+      }),
+    },
+  };
+  const service = new NotificationsService(prisma as never);
+
+  const entrepreneur = await service.getAutomationPreference(user as never);
+  const admin = await service.getAutomationPreference({
+    ...user,
+    role: UserRole.admin,
+  } as never);
+  const trainer = await service.getAutomationPreference({
+    ...user,
+    role: UserRole.trainer,
+  } as never);
+
+  assert.deepEqual(entrepreneur.scope.reminderKinds, [
+    "session",
+    "deliverable",
+  ]);
+  assert.deepEqual(entrepreneur.scope.weeklyDigestKinds, [
+    "unread_activity",
+    "session",
+    "deliverable",
+  ]);
+  assert.deepEqual(admin.scope.reminderKinds, ["session"]);
+  assert.deepEqual(admin.scope.weeklyDigestKinds, [
+    "unread_activity",
+    "session",
+  ]);
+  assert.deepEqual(trainer.scope.reminderKinds, ["session"]);
+  assert.deepEqual(trainer.scope.weeklyDigestKinds, [
+    "unread_activity",
+    "session",
+  ]);
+});
+
 test("clearing one channel restores company inheritance without changing the other", async () => {
   const stored = new Map<
     NotificationType,

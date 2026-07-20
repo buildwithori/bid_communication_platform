@@ -210,7 +210,7 @@ export class NotificationAutomationService {
             recipientUserId: user.id,
             type: NotificationType.weekly_digest,
             title: "Your weekly BID Hub summary",
-            body: `${summary.unread} unread update(s), ${summary.sessions} upcoming session(s), and ${summary.deliverables} deliverable(s) due in the next 7 days.`,
+            body: this.weeklyDigestBody(user.role, summary),
             severity: NotificationSeverity.info,
             actionUrl: this.dashboardUrl(user.role),
             dedupeKey: `weekly-digest:${user.id}:${this.localDate(now, timezone)}`,
@@ -385,6 +385,26 @@ export class NotificationAutomationService {
       minute: "2-digit",
       timeZoneName: "short",
     }).format(date);
+  }
+
+  private weeklyDigestBody(
+    role: UserRole,
+    summary: { unread: number; sessions: number; deliverables: number },
+  ) {
+    const activity =
+      summary.unread +
+      " unread update(s) and " +
+      summary.sessions +
+      " upcoming session(s)";
+    if (role !== UserRole.entrepreneur) {
+      return activity + " in the next 7 days.";
+    }
+    return (
+      activity +
+      ", with " +
+      summary.deliverables +
+      " deliverable(s) due in the next 7 days."
+    );
   }
 
   private sessionUrl(role: UserRole, sessionId: string) {
