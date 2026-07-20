@@ -499,7 +499,9 @@ function ProgramMetric({
 const formatProgrammeDate = (date: string) =>
   new Date(date).toLocaleDateString('en-US', {
     month: 'short',
+    day: 'numeric',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 
 const metricValue = (value: number | undefined, loading: boolean) =>
