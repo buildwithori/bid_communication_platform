@@ -271,7 +271,8 @@ export function FormAutocomplete({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={`${option.label} ${option.description ?? ''}`}
+                  value={option.value}
+                  keywords={[option.label, option.description ?? '']}
                   onSelect={() => {
                     onValueChange(option.value);
                     setOpen(false);

@@ -40,3 +40,5 @@ List and lookup hooks must expose cursor pagination or infinite-query behavior. 
 All user-entered searches use `useDebouncedValue` from `lib/search` before reaching API hooks or expensive local filters. The standard delay is 300 ms, while clearing is propagated on the next event-loop tick. `FormAutocomplete` owns remote-search debouncing globally; consumers pass its already-debounced search state directly to lazy hooks and must not wrap it in another debounce.
 
 Pass option-query loading state to the shared autocomplete/select primitive. The trigger renders a themed inline spinner while options are loading, so dependent fields visibly communicate repopulation after a parent value changes.
+
+Autocomplete option identity must come from the stable backend value. Display labels and descriptions belong in searchable keywords; never use display text as command identity because distinct records can share it.
