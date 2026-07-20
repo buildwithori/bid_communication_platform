@@ -161,6 +161,36 @@ export class StorageService {
     return new Uint8Array(await response.arrayBuffer());
   }
 
+  async readObject(storageKey: string, maxBytes = 25 * 1024 * 1024) {
+    const signed = this.presign(
+      { method: "GET", storageKey, expiresInSeconds: 60 },
+      { internal: true },
+    );
+    const response = await this.request(
+      signed.url,
+      { method: "GET", signal: AbortSignal.timeout(30_000) },
+      "object.read",
+    );
+    if (!response.ok) {
+      throw new ServiceUnavailableException(
+        "Object storage could not read the file.",
+      );
+    }
+    const declaredSize = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredSize) && declaredSize > maxBytes) {
+      throw new ServiceUnavailableException(
+        "This file is too large to preview safely.",
+      );
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > maxBytes) {
+      throw new ServiceUnavailableException(
+        "This file is too large to preview safely.",
+      );
+    }
+    return bytes;
+  }
+
   async healthCheck() {
     await this.statObject("__bid-hub-healthcheck__");
     return { provider: "s3-compatible" as const };

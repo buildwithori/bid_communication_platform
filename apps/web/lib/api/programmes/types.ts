@@ -1,7 +1,8 @@
-export type ProgrammeLifecycle = 'draft' | 'scheduled' | 'active' | 'completed' | 'archived';
-export type ProgrammeAccessType = 'free' | 'assigned';
-export type ProgrammeContentType = 'video' | 'pdf' | 'tool';
-export type ProgrammePublishState = 'draft' | 'published';
+export type ProgrammeLifecycle =
+  "draft" | "scheduled" | "active" | "completed" | "archived";
+export type ProgrammeAccessType = "free" | "assigned";
+export type ProgrammeContentType = "video" | "pdf" | "excel" | "tool";
+export type ProgrammePublishState = "draft" | "published";
 
 type ProgrammeBase = {
   id: string;
@@ -22,6 +23,7 @@ type ProgrammeBase = {
     total: number;
     videos: number;
     pdfs: number;
+    excels: number;
     tools: number;
   };
   readiness: number;
@@ -96,11 +98,12 @@ export type ProgrammeModuleRecord = {
     total: number;
     videos: number;
     pdfs: number;
+    excels: number;
     tools: number;
   };
-  readiness: 'ready' | 'needs_content';
+  readiness: "ready" | "needs_content";
   learnerProgress: {
-    status: 'not_started' | 'in_progress' | 'completed';
+    status: "not_started" | "in_progress" | "completed";
     progressPercent: number;
     completedContentCount: number;
     totalContentCount: number;
@@ -140,7 +143,7 @@ export type ReusableProgrammeModulePage = {
 export type ProgrammeModuleQuery = {
   search?: string;
   contentType?: ProgrammeContentType;
-  progressStatus?: 'not_started' | 'in_progress' | 'completed';
+  progressStatus?: "not_started" | "in_progress" | "completed";
   excludeContentItemId?: string;
   take?: number;
   cursor?: string;
@@ -157,7 +160,8 @@ export type CreateProgrammeModuleVariables = {
   payload: CreateProgrammeModulePayload;
 };
 
-export type UpdateProgrammeModulePayload = Partial<CreateProgrammeModulePayload>;
+export type UpdateProgrammeModulePayload =
+  Partial<CreateProgrammeModulePayload>;
 
 export type UpdateProgrammeModuleVariables = {
   programmeId: string;
@@ -180,7 +184,7 @@ export type ProgrammeQuery = {
   search?: string;
   accessType?: ProgrammeAccessType;
   lifecycle?: ProgrammeLifecycle;
-  progressStatus?: 'not_started' | 'in_progress' | 'completed';
+  progressStatus?: "not_started" | "in_progress" | "completed";
   includeArchived?: boolean;
   grantableOnly?: boolean;
   excludeContentItemId?: string;
@@ -198,7 +202,9 @@ export type CreateProgrammePayload = {
   publishState?: ProgrammePublishState;
 };
 
-export type UpdateProgrammePayload = Partial<Omit<CreateProgrammePayload, 'publishState'>>;
+export type UpdateProgrammePayload = Partial<
+  Omit<CreateProgrammePayload, "publishState">
+>;
 
 export type UpdateProgrammeVariables = {
   id: string;
@@ -225,9 +231,11 @@ export type DeleteProgrammeModuleVariables = {
   confirmation: string;
 };
 
-export type ProgrammeDeliverableDueType = 'fixed_date' | 'module_completion' | 'recurring';
-export type ProgrammeDeliverableRecurringCadence = 'monthly' | 'quarterly' | 'six_monthly';
-export type ProgrammeDeliverableRequiredScope = 'all' | 'stage';
+export type ProgrammeDeliverableDueType =
+  "fixed_date" | "module_completion" | "recurring";
+export type ProgrammeDeliverableRecurringCadence =
+  "monthly" | "quarterly" | "six_monthly";
+export type ProgrammeDeliverableRequiredScope = "all" | "stage";
 
 export type ProgrammeDeliverableRule = {
   id: string;
@@ -283,13 +291,14 @@ export type UpdateProgrammeDeliverableRuleVariables = {
   payload: UpsertProgrammeDeliverableRulePayload;
 };
 
-export type ProgrammePlayerProgressStatus = 'not_started' | 'in_progress' | 'completed';
+export type ProgrammePlayerProgressStatus =
+  "not_started" | "in_progress" | "completed";
 
 export type ProgrammePlayerItem = {
   id: string;
   title: string;
   type: ProgrammeContentType;
-  status: 'draft' | 'processing' | 'ready' | 'failed' | 'archived';
+  status: "draft" | "processing" | "ready" | "failed" | "archived";
   position: number;
   durationSeconds: number | null;
   durationLabel: string | null;
@@ -309,9 +318,9 @@ export type ProgrammePlayerItem = {
   toolLink: {
     id: string;
     toolId: string | null;
-    source: 'library' | 'custom';
+    source: "library" | "custom";
     toolName: string | null;
-    toolType: 'pdf' | 'embedded_tool' | null;
+    toolType: "pdf" | "excel" | "embedded_tool" | null;
     fileId: string | null;
     url: string | null;
   } | null;
@@ -347,7 +356,7 @@ export type ProgrammePlayerPayload = {
     accessType: ProgrammeAccessType;
   };
   viewer: {
-    role: 'admin' | 'trainer' | 'entrepreneur';
+    role: "admin" | "trainer" | "entrepreneur";
     canTrackProgress: boolean;
   };
   progress: {
@@ -363,6 +372,7 @@ export type ProgrammePlayerPayload = {
     contentItems: number;
     videos: number;
     pdfs: number;
+    excels: number;
     tools: number;
   };
 };

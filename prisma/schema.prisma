@@ -82,6 +82,7 @@ enum ProgrammeAccessType {
 enum ContentItemType {
   video
   pdf
+  excel
   tool
 }
 
@@ -104,7 +105,9 @@ enum AssetStatus {
 enum FileAssetUsage {
   deliverable_submission
   content_pdf
+  content_excel
   tool_pdf
+  tool_excel
   report_export
 }
 
@@ -127,6 +130,7 @@ enum ToolLinkSource {
 
 enum EntrepreneurToolType {
   pdf
+  excel
   embedded_tool
 }
 
@@ -910,7 +914,7 @@ model FileAsset {
   updatedAt        DateTime        @updatedAt @map("updated_at")
 
   contentItem            ContentItem?            @relation(fields: [contentItemId], references: [id])
-  toolPdfAsset           Tool?                   @relation("ToolPdfAsset")
+  toolFileAsset          Tool?                   @relation("ToolFileAsset")
   deliverableSubmissions DeliverableSubmission[]
   uploadedBy             User?                   @relation("FileAssetUploadedBy", fields: [uploadedById], references: [id])
   reportExport           ReportExport?
@@ -946,7 +950,7 @@ model Tool {
   iconKey     String                     @map("icon_key")
   visibility  EntrepreneurToolVisibility @default(all_entrepreneurs)
   status      EntrepreneurToolStatus     @default(draft)
-  pdfAssetId  String?                    @unique @map("pdf_asset_id")
+  fileAssetId String?                    @unique @map("file_asset_id")
   embeddedUrl String?                    @map("embedded_url")
   createdById String                     @map("created_by_id")
   updatedById String?                    @map("updated_by_id")
@@ -956,7 +960,7 @@ model Tool {
   updatedAt   DateTime                   @updatedAt @map("updated_at")
 
   toolArea            ToolArea                 @relation(fields: [toolAreaId], references: [id])
-  pdfAsset            FileAsset?               @relation("ToolPdfAsset", fields: [pdfAssetId], references: [id])
+  fileAsset           FileAsset?               @relation("ToolFileAsset", fields: [fileAssetId], references: [id])
   createdBy           User                     @relation("ToolCreatedBy", fields: [createdById], references: [id])
   updatedBy           User?                    @relation("ToolUpdatedBy", fields: [updatedById], references: [id])
   programmeAccess     ToolProgrammeAccess[]

@@ -444,7 +444,7 @@ test("status-only tool updates retain the persisted audience for validation", as
     visibility: EntrepreneurToolVisibility.programmes,
     status: EntrepreneurToolStatus.published,
     embeddedUrl: "https://example.com/tool",
-    pdfAssetId: null,
+    fileAssetId: null,
     programmeAccess: [{ programmeId: "programme-1" }],
     entrepreneurAccess: [],
     hiddenEntrepreneurs: [{ entrepreneurUserId: "entrepreneur-2" }],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useDebouncedValue } from '@/lib/search';
+import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
 import {
   CalendarDays,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminToolEditorModal } from "@/components/admin/tools/AdminToolEditorModal";
+import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
@@ -67,6 +68,17 @@ const visibilityLabels: Record<ApiToolVisibility, string> = {
   programmes: "Selected programmes",
   entrepreneurs: "Selected entrepreneurs",
 };
+const toolTypeLabels: Record<ApiToolType, string> = {
+  pdf: "PDF resource",
+  excel: "Excel workbook",
+  embedded_tool: "Online tool",
+};
+const toolTypeTone: Record<ApiToolType, BadgeTone> = {
+  pdf: "blue",
+  excel: "green",
+  embedded_tool: "brand",
+};
+
 const visibilityTone: Record<ApiToolVisibility, BadgeTone> = {
   all_entrepreneurs: "green",
   programmes: "blue",
@@ -83,11 +95,13 @@ function formatDate(value?: string | null) {
     : "Not updated";
 }
 function sourceLabel(tool: ToolRecord) {
-  return tool.type === "pdf"
-    ? (tool.pdfAsset?.originalFilename ?? "No PDF attached")
-    : tool.embeddedUrl
-      ? "Online link added"
-      : "No tool link added";
+  if (tool.type !== "embedded_tool") {
+    return (
+      tool.fileAsset?.originalFilename ??
+      (tool.type === "excel" ? "No workbook attached" : "No PDF attached")
+    );
+  }
+  return tool.embeddedUrl ? "Online link added" : "No tool link added";
 }
 function audienceDetail(tool: ToolRecord) {
   if (tool.visibility === "all_entrepreneurs") {
@@ -207,7 +221,9 @@ export default function AdminEntrepreneurToolsPage() {
                 "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
                 tool.type === "pdf"
                   ? "bg-info-light text-info"
-                  : "bg-bid-light text-bid",
+                  : tool.type === "excel"
+                    ? "bg-success-light text-success"
+                    : "bg-bid-light text-bid",
               )}
             >
               <Icon className="h-5 w-5" />
@@ -227,8 +243,8 @@ export default function AdminEntrepreneurToolsPage() {
       header: "Type",
       className: "min-w-[156px]",
       cell: (tool) => (
-        <Badge tone={tool.type === "pdf" ? "blue" : "green"}>
-          {tool.type === "pdf" ? "PDF resource" : "Online tool"}
+        <Badge tone={toolTypeTone[tool.type]}>
+          {toolTypeLabels[tool.type]}
         </Badge>
       ),
     },
@@ -293,7 +309,7 @@ export default function AdminEntrepreneurToolsPage() {
     <>
       <PageHeader
         title="Entrepreneur tools"
-        description="Manage downloadable PDF resources and online tools entrepreneurs can open from their workspace."
+        description="Manage PDF resources, Excel workbooks, and online tools entrepreneurs can use in their workspace."
         actions={<Button onClick={openCreate}>+ Add tool</Button>}
       />
       <Notice>
@@ -366,6 +382,7 @@ export default function AdminEntrepreneurToolsPage() {
             >
               <option value="all">All types</option>
               <option value="pdf">PDF resources</option>
+              <option value="excel">Excel workbooks</option>
               <option value="embedded_tool">Online tools</option>
             </TableFilterSelect>
             <TableFilterAutocomplete
@@ -480,7 +497,11 @@ function ToolDetailsModal({
 }) {
   if (!tool) return null;
   const previewUrl =
-    tool.type === "pdf" ? tool.pdfAsset?.downloadUrl : tool.embeddedUrl;
+    tool.type === "embedded_tool"
+      ? tool.embeddedUrl
+      : tool.type === "pdf"
+        ? tool.fileAsset?.downloadUrl
+        : null;
   return (
     <Modal
       open={Boolean(tool)}
@@ -493,8 +514,8 @@ function ToolDetailsModal({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="flex flex-wrap gap-2">
-                <Badge tone={tool.type === "pdf" ? "blue" : "green"}>
-                  {tool.type === "pdf" ? "PDF resource" : "Online tool"}
+                <Badge tone={toolTypeTone[tool.type]}>
+                  {toolTypeLabels[tool.type]}
                 </Badge>
                 <Badge tone={statusTone[tool.status]}>
                   {statusLabels[tool.status]}
@@ -525,30 +546,34 @@ function ToolDetailsModal({
           <InfoBlock label="Source" value={sourceLabel(tool)} />
           <InfoBlock label="Last updated" value={formatDate(tool.updatedAt)} />
         </div>
-        <div className="overflow-hidden rounded-2xl border border-line bg-white">
-          {previewUrl ? (
-            <iframe
-              title={`${tool.name} preview`}
-              src={
-                tool.type === "embedded_tool"
-                  ? previewUrl
-                  : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
-              }
-              loading="eager"
-              sandbox={
-                tool.type === "embedded_tool"
-                  ? "allow-forms allow-popups allow-same-origin allow-scripts"
-                  : undefined
-              }
-              className="h-[64vh] min-h-[480px] w-full bg-white"
-            />
-          ) : (
-            <div className="grid min-h-[320px] place-items-center bg-surface-subtle p-8 text-center text-sm text-ink-muted">
-              Add a {tool.type === "pdf" ? "PDF resource" : "tool link"} before
-              this can be previewed.
-            </div>
-          )}
-        </div>
+        {tool.type === "excel" ? (
+          <SpreadsheetViewer fileId={tool.fileAsset?.id} title={tool.name} />
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-line bg-white">
+            {previewUrl ? (
+              <iframe
+                title={`${tool.name} preview`}
+                src={
+                  tool.type === "embedded_tool"
+                    ? previewUrl
+                    : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
+                }
+                loading="eager"
+                sandbox={
+                  tool.type === "embedded_tool"
+                    ? "allow-forms allow-popups allow-same-origin allow-scripts"
+                    : undefined
+                }
+                className="h-[64vh] min-h-[480px] w-full bg-white"
+              />
+            ) : (
+              <div className="grid min-h-[320px] place-items-center bg-surface-subtle p-8 text-center text-sm text-ink-muted">
+                Add a {tool.type === "pdf" ? "PDF resource" : "tool link"}{" "}
+                before this can be previewed.
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );

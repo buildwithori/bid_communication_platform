@@ -23,7 +23,7 @@ const DEFAULT_TAKE = 20;
 
 const toolInclude = {
   toolArea: { select: { id: true, name: true, key: true } },
-  pdfAsset: {
+  fileAsset: {
     select: {
       id: true,
       originalFilename: true,
@@ -385,11 +385,13 @@ export class ToolsService {
 
   async createTool(user: User, dto: CreateToolDto) {
     await this.validateToolPayload(dto, dto);
-    if (dto.pdfAssetId) {
+    if (dto.fileAssetId) {
       await this.files.markReadyForUser(
         user,
-        dto.pdfAssetId,
-        FileAssetUsage.tool_pdf,
+        dto.fileAssetId,
+        dto.type === EntrepreneurToolType.excel
+          ? FileAssetUsage.tool_excel
+          : FileAssetUsage.tool_pdf,
       );
     }
 
@@ -415,7 +417,7 @@ export class ToolsService {
             iconKey: dto.iconKey.trim(),
             visibility: dto.visibility,
             status: dto.status,
-            pdfAssetId: dto.pdfAssetId || null,
+            fileAssetId: dto.fileAssetId || null,
             embeddedUrl: dto.embeddedUrl?.trim() || null,
             createdById: user.id,
             publishedAt:
@@ -459,17 +461,17 @@ export class ToolsService {
         existing.entrepreneurAccess.map((access) => access.entrepreneurUserId),
       hiddenEntrepreneurUserIds:
         dto.hiddenEntrepreneurUserIds ??
-        existing.hiddenEntrepreneurs.map(
-          (access) => access.entrepreneurUserId,
-        ),
+        existing.hiddenEntrepreneurs.map((access) => access.entrepreneurUserId),
     };
     await this.validateToolPayload(merged, dto);
 
-    if (dto.pdfAssetId) {
+    if (dto.fileAssetId) {
       await this.files.markReadyForUser(
         user,
-        dto.pdfAssetId,
-        FileAssetUsage.tool_pdf,
+        dto.fileAssetId,
+        (dto.type ?? existing.type) === EntrepreneurToolType.excel
+          ? FileAssetUsage.tool_excel
+          : FileAssetUsage.tool_pdf,
       );
     }
     await this.audit.capture(
@@ -503,8 +505,8 @@ export class ToolsService {
             ...(dto.visibility !== undefined
               ? { visibility: dto.visibility }
               : {}),
-            ...(dto.pdfAssetId !== undefined
-              ? { pdfAssetId: dto.pdfAssetId || null }
+            ...(dto.fileAssetId !== undefined
+              ? { fileAssetId: dto.fileAssetId || null }
               : {}),
             ...(dto.embeddedUrl !== undefined
               ? { embeddedUrl: dto.embeddedUrl?.trim() || null }
@@ -655,12 +657,15 @@ export class ToolsService {
     }
 
     if (
-      effective.type === EntrepreneurToolType.pdf &&
+      (effective.type === EntrepreneurToolType.pdf ||
+        effective.type === EntrepreneurToolType.excel) &&
       effective.status === EntrepreneurToolStatus.published &&
-      !effective.pdfAssetId
+      !effective.fileAssetId
     ) {
       throw new BadRequestException(
-        "PDF tools need an uploaded file before publishing.",
+        effective.type === EntrepreneurToolType.excel
+          ? "Excel tools need an uploaded workbook before publishing."
+          : "PDF tools need an uploaded file before publishing.",
       );
     }
 
@@ -799,19 +804,19 @@ export class ToolsService {
       visibility: tool.visibility,
       status: tool.status,
       embeddedUrl: tool.embeddedUrl,
-      pdfAsset: tool.pdfAsset
+      fileAsset: tool.fileAsset
         ? {
-            id: tool.pdfAsset.id,
-            originalFilename: tool.pdfAsset.originalFilename,
-            mimeType: tool.pdfAsset.mimeType,
-            sizeBytes: tool.pdfAsset.sizeBytes.toString(),
-            status: tool.pdfAsset.status,
-            storageKey: tool.pdfAsset.storageKey,
+            id: tool.fileAsset.id,
+            originalFilename: tool.fileAsset.originalFilename,
+            mimeType: tool.fileAsset.mimeType,
+            sizeBytes: tool.fileAsset.sizeBytes.toString(),
+            status: tool.fileAsset.status,
+            storageKey: tool.fileAsset.storageKey,
             downloadUrl:
-              tool.pdfAsset.status === "ready"
+              tool.fileAsset.status === "ready"
                 ? this.storage.presign({
                     method: "GET",
-                    storageKey: tool.pdfAsset.storageKey,
+                    storageKey: tool.fileAsset.storageKey,
                     expiresInSeconds: 5 * 60,
                   }).url
                 : null,

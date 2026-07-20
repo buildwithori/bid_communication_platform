@@ -1,27 +1,36 @@
-import type { ApiToolType, ApiToolVisibility, ToolPayload, ToolRecord } from '@/lib/api/tools';
-import type { Tool, ToolType, ToolVisibility } from '@/types';
+import type {
+  ApiToolType,
+  ApiToolVisibility,
+  ToolPayload,
+  ToolRecord,
+} from "@/lib/api/tools";
+import type { Tool, ToolType, ToolVisibility } from "@/types";
 
 export const apiToolTypeToUi: Record<ApiToolType, ToolType> = {
-  pdf: 'pdf',
-  embedded_tool: 'embed',
+  pdf: "pdf",
+  excel: "excel",
+  embedded_tool: "embed",
 };
 
 export const uiToolTypeToApi: Record<ToolType, ApiToolType> = {
-  pdf: 'pdf',
-  embed: 'embedded_tool',
+  pdf: "pdf",
+  excel: "excel",
+  embed: "embedded_tool",
 };
 
-export const apiToolVisibilityToUi: Record<ApiToolVisibility, ToolVisibility> = {
-  all_entrepreneurs: 'all-entrepreneurs',
-  programmes: 'programmes',
-  entrepreneurs: 'entrepreneurs',
-};
+export const apiToolVisibilityToUi: Record<ApiToolVisibility, ToolVisibility> =
+  {
+    all_entrepreneurs: "all-entrepreneurs",
+    programmes: "programmes",
+    entrepreneurs: "entrepreneurs",
+  };
 
-export const uiToolVisibilityToApi: Record<ToolVisibility, ApiToolVisibility> = {
-  'all-entrepreneurs': 'all_entrepreneurs',
-  programmes: 'programmes',
-  entrepreneurs: 'entrepreneurs',
-};
+export const uiToolVisibilityToApi: Record<ToolVisibility, ApiToolVisibility> =
+  {
+    "all-entrepreneurs": "all_entrepreneurs",
+    programmes: "programmes",
+    entrepreneurs: "entrepreneurs",
+  };
 
 export function mapToolRecordToUi(record: ToolRecord): Tool {
   return {
@@ -34,36 +43,44 @@ export function mapToolRecordToUi(record: ToolRecord): Tool {
     visibility: apiToolVisibilityToUi[record.visibility],
     programmeIds: record.audience.programmeIds,
     entrepreneurIds: record.audience.entrepreneurUserIds,
-    pdfFileName: record.pdfAsset?.originalFilename,
-    pdfUrl: record.pdfAsset?.downloadUrl ?? undefined,
+    fileName: record.fileAsset?.originalFilename,
+    fileUrl: record.fileAsset?.downloadUrl ?? undefined,
+    fileId: record.fileAsset?.id,
     embedUrl: record.embeddedUrl ?? undefined,
     updatedAt: record.updatedAt,
-    iconKey: isToolIcon(record.iconKey) ? record.iconKey : 'plus',
+    iconKey: isToolIcon(record.iconKey) ? record.iconKey : "plus",
   };
 }
 
 export function buildToolPayloadFromUi(
   tool: Tool,
   toolAreaId: string,
-  options?: { pdfAssetId?: string | null; hiddenEntrepreneurUserIds?: string[] },
+  options?: {
+    fileAssetId?: string | null;
+    hiddenEntrepreneurUserIds?: string[];
+  },
 ): ToolPayload {
-  const isPdf = tool.type === 'pdf';
+  const isFile = tool.type === "pdf" || tool.type === "excel";
   return {
     name: tool.name,
     description: tool.description,
     type: uiToolTypeToApi[tool.type],
     toolAreaId,
     iconKey: tool.iconKey,
-    visibility: uiToolVisibilityToApi[tool.visibility ?? 'all-entrepreneurs'],
-    status: tool.status ?? 'draft',
-    pdfAssetId: isPdf ? options?.pdfAssetId ?? null : null,
-    embeddedUrl: isPdf ? null : tool.embedUrl ?? null,
-    programmeIds: tool.visibility === 'programmes' ? tool.programmeIds ?? [] : [],
-    entrepreneurUserIds: tool.visibility === 'entrepreneurs' ? tool.entrepreneurIds ?? [] : [],
+    visibility: uiToolVisibilityToApi[tool.visibility ?? "all-entrepreneurs"],
+    status: tool.status ?? "draft",
+    fileAssetId: isFile ? (options?.fileAssetId ?? null) : null,
+    embeddedUrl: isFile ? null : (tool.embedUrl ?? null),
+    programmeIds:
+      tool.visibility === "programmes" ? (tool.programmeIds ?? []) : [],
+    entrepreneurUserIds:
+      tool.visibility === "entrepreneurs" ? (tool.entrepreneurIds ?? []) : [],
     hiddenEntrepreneurUserIds: options?.hiddenEntrepreneurUserIds ?? [],
   };
 }
 
-function isToolIcon(value: string): value is Tool['iconKey'] {
-  return ['canvas', 'document', 'timer', 'star', 'plus', 'calendar'].includes(value);
+function isToolIcon(value: string): value is Tool["iconKey"] {
+  return ["canvas", "document", "timer", "star", "plus", "calendar"].includes(
+    value,
+  );
 }

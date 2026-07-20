@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  FileSpreadsheet,
   FileText,
   PlayCircle,
   RotateCcw,
@@ -19,6 +20,7 @@ import { ContentRating } from "@/components/entrepreneur/ContentRating";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Skeleton } from "@/components/shared/Card";
+import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
 import { Modal } from "@/components/shared/Modal";
 import {
   type ContentItemRecord,
@@ -55,6 +57,12 @@ const typeMeta: Record<
     icon: FileText,
     tone: "blue",
     iconClass: "bg-info-light text-info",
+  },
+  excel: {
+    label: "Excel",
+    icon: FileSpreadsheet,
+    tone: "green",
+    iconClass: "bg-success-light text-success",
   },
   tool: {
     label: "Tool",
@@ -124,21 +132,29 @@ export function LearningContentPlayer({
       },
     ) => {
       if (!entry) return;
-      syncProgress.mutate([{
-        programmeId: entry.programmeId,
-        moduleId: entry.moduleId,
-        contentItemId: entry.item.id,
-        status,
-        progressPercent,
-        ...(positionSeconds === undefined
-          ? {}
-          : { lastPositionSeconds: Math.max(0, Math.round(positionSeconds)) }),
-        ...(durationSeconds === undefined || !Number.isFinite(durationSeconds)
-          ? {}
-          : { durationSeconds: Math.max(1, Math.round(durationSeconds)) }),
-        clientEventAt: new Date().toISOString(),
-        source: status === "completed" ? "explicit_action" : "player",
-      }], handlers);
+      syncProgress.mutate(
+        [
+          {
+            programmeId: entry.programmeId,
+            moduleId: entry.moduleId,
+            contentItemId: entry.item.id,
+            status,
+            progressPercent,
+            ...(positionSeconds === undefined
+              ? {}
+              : {
+                  lastPositionSeconds: Math.max(0, Math.round(positionSeconds)),
+                }),
+            ...(durationSeconds === undefined ||
+            !Number.isFinite(durationSeconds)
+              ? {}
+              : { durationSeconds: Math.max(1, Math.round(durationSeconds)) }),
+            clientEventAt: new Date().toISOString(),
+            source: status === "completed" ? "explicit_action" : "player",
+          },
+        ],
+        handlers,
+      );
     },
     [entry, syncProgress],
   );
@@ -146,11 +162,13 @@ export function LearningContentPlayer({
   React.useEffect(() => {
     if (!entry || openedItemRef.current === entry.item.id) return;
     openedItemRef.current = entry.item.id;
-    lastCheckpointRef.current = Math.floor(
-      (progress.data?.content?.progressPercent ?? 0) / 10,
-    ) * 10;
+    lastCheckpointRef.current =
+      Math.floor((progress.data?.content?.progressPercent ?? 0) / 10) * 10;
     setPlayerKey((current) => current + 1);
-    submitProgress("in_progress", Math.max(progress.data?.content?.progressPercent ?? 0, 1));
+    submitProgress(
+      "in_progress",
+      Math.max(progress.data?.content?.progressPercent ?? 0, 1),
+    );
   }, [entry, progress.data?.content?.progressPercent, submitProgress]);
 
   if (!entry || !item) return null;
@@ -183,7 +201,7 @@ export function LearningContentPlayer({
       "completed",
       100,
       currentEntry.item.type === "video"
-        ? progress.data?.content?.lastPositionSeconds ?? undefined
+        ? (progress.data?.content?.lastPositionSeconds ?? undefined)
         : undefined,
       currentEntry.item.durationSeconds ?? undefined,
       {
@@ -205,7 +223,12 @@ export function LearningContentPlayer({
           <div className="rounded-xl border border-line bg-surface-subtle p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
-                <span className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-xl", meta.iconClass)}>
+                <span
+                  className={cn(
+                    "grid h-12 w-12 shrink-0 place-items-center rounded-xl",
+                    meta.iconClass,
+                  )}
+                >
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
@@ -214,14 +237,18 @@ export function LearningContentPlayer({
                     <Badge tone="neutral">{entry.moduleTitle}</Badge>
                     {completed ? <Badge tone="green">Completed</Badge> : null}
                     {item.durationLabel ? (
-                      <span className="text-sm text-ink-muted">{item.durationLabel}</span>
+                      <span className="text-sm text-ink-muted">
+                        {item.durationLabel}
+                      </span>
                     ) : null}
                   </div>
                   <h3 className="mt-2 text-2xl font-semibold leading-tight text-ink">
                     {item.title}
                   </h3>
                   <div className="mt-1 text-sm text-ink-muted">
-                    {item.trainer ? "By " + item.trainer.name : "BID learning content"}
+                    {item.trainer
+                      ? "By " + item.trainer.name
+                      : "BID learning content"}
                   </div>
                 </div>
               </div>
@@ -290,7 +317,9 @@ export function LearningContentPlayer({
         <aside className="flex min-h-0 flex-col gap-4">
           <div className="rounded-xl border border-line bg-card p-4">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-ink">Learning progress</div>
+              <div className="text-sm font-semibold text-ink">
+                Learning progress
+              </div>
               <span className="text-xs text-ink-muted">
                 {progress.data?.content?.progressPercent ?? 0}%
               </span>
@@ -330,7 +359,12 @@ export function LearningContentPlayer({
                         : "border-line bg-card hover:bg-surface-subtle",
                     )}
                   >
-                    <span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg", candidateMeta.iconClass)}>
+                    <span
+                      className={cn(
+                        "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg",
+                        candidateMeta.iconClass,
+                      )}
+                    >
                       <CandidateIcon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -388,7 +422,9 @@ function ContentFrame({
         <AssetError
           icon={PlayCircle}
           title="Video could not be loaded"
-          description={signedVideo.error?.message ?? "Try requesting playback again."}
+          description={
+            signedVideo.error?.message ?? "Try requesting playback again."
+          }
           onRetry={() => void signedVideo.refetch()}
         />
       );
@@ -415,6 +451,10 @@ function ContentFrame({
     );
   }
 
+  if (item.type === "excel") {
+    return <SpreadsheetViewer fileId={item.file?.id} title={item.title} />;
+  }
+
   if (item.type === "pdf") {
     if (signedFile.isLoading) return <PlayerSkeleton tall />;
     if (signedFile.isError || !signedFile.data) {
@@ -422,14 +462,20 @@ function ContentFrame({
         <AssetError
           icon={FileText}
           title="PDF could not be loaded"
-          description={signedFile.error?.message ?? "Try requesting the file again."}
+          description={
+            signedFile.error?.message ?? "Try requesting the file again."
+          }
           onRetry={() => void signedFile.refetch()}
         />
       );
     }
     return (
       <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <iframe title={item.title} src={signedFile.data.download.url} className="h-[560px] w-full" />
+        <iframe
+          title={item.title}
+          src={signedFile.data.download.url}
+          className="h-[560px] w-full"
+        />
       </div>
     );
   }
@@ -458,7 +504,12 @@ function ContentFrame({
 
 function PlayerSkeleton({ tall = false }: { tall?: boolean }) {
   return (
-    <div className={cn("space-y-3 rounded-xl border border-line bg-surface-subtle p-4", tall ? "h-[560px]" : "aspect-video")}>
+    <div
+      className={cn(
+        "space-y-3 rounded-xl border border-line bg-surface-subtle p-4",
+        tall ? "h-[560px]" : "aspect-video",
+      )}
+    >
       <Skeleton className="h-full w-full" />
     </div>
   );
@@ -482,9 +533,16 @@ function AssetError({
           <Icon className="h-6 w-6" />
         </span>
         <div className="mt-4 text-base font-semibold text-ink">{title}</div>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">{description}</p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
+          {description}
+        </p>
         {onRetry ? (
-          <Button type="button" variant="outline" className="mt-4" onClick={onRetry}>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={onRetry}
+          >
             Try again
           </Button>
         ) : null}

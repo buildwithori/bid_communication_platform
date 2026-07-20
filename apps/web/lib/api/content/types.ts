@@ -1,10 +1,6 @@
-export type ContentItemType = "video" | "pdf" | "tool";
+export type ContentItemType = "video" | "pdf" | "excel" | "tool";
 export type ContentItemStatus =
-  | "draft"
-  | "processing"
-  | "ready"
-  | "failed"
-  | "archived";
+  "draft" | "processing" | "ready" | "failed" | "archived";
 
 export type ContentRatingPayload = {
   id: string;
@@ -61,7 +57,7 @@ export type ContentItemRecord = {
     externalUrl: string | null;
     source: "library" | "custom";
     toolName: string | null;
-    toolType: "pdf" | "embedded_tool" | null;
+    toolType: "pdf" | "excel" | "embedded_tool" | null;
     fileId: string | null;
     url: string | null;
   } | null;

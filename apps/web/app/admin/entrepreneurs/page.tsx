@@ -1,6 +1,6 @@
 "use client";
 
-import { useDebouncedValue } from '@/lib/search';
+import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
 import { toast } from "sonner";
 import { Mail, MapPin, Phone } from "lucide-react";
@@ -820,7 +820,12 @@ function ToolRow({
             {tool.description}
           </div>
           <div className="mt-2 text-xs font-medium text-ink-faint">
-            {tool.toolArea.name} · {tool.type === "pdf" ? "PDF" : "Online tool"}
+            {tool.toolArea.name} ·{" "}
+            {tool.type === "pdf"
+              ? "PDF"
+              : tool.type === "excel"
+                ? "Excel workbook"
+                : "Online tool"}
           </div>
         </div>
         <Button

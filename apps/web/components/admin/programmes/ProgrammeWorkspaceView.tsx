@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useDebouncedValue } from '@/lib/search';
-import * as React from 'react';
+import { useDebouncedValue } from "@/lib/search";
+import * as React from "react";
 import {
   closestCenter,
   DndContext,
@@ -10,12 +10,12 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-} from '@dnd-kit/core';
+} from "@dnd-kit/core";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+} from "@dnd-kit/sortable";
 import {
   AlertTriangle,
   CalendarDays,
@@ -24,12 +24,12 @@ import {
   GripVertical,
   Users,
   type LucideIcon,
-} from 'lucide-react';
-import { Card } from '@/components/shared/Card';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { ProgressBar } from '@/components/shared/ProgressBar';
-import { Tabs } from '@/components/shared/Tabs';
+} from "lucide-react";
+import { Card } from "@/components/shared/Card";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { ProgressBar } from "@/components/shared/ProgressBar";
+import { Tabs } from "@/components/shared/Tabs";
 import {
   DataTable,
   RowActions,
@@ -38,24 +38,31 @@ import {
   TableToolbar,
   useSortableRow,
   type Column,
-} from '@/components/shared/DataTable';
-import { ModuleModal } from '@/components/admin/ModuleModal';
-import { ManageContentModal, AddContentItemModal } from '@/components/admin/ManageContentModal';
-import { ModuleDetailModal } from '@/components/admin/programmes/ModuleDetailModal';
-import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
-import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
-import { RequiredDeliverablesSection } from '@/components/admin/programmes/BackendRequiredDeliverablesSection';
+} from "@/components/shared/DataTable";
+import { ModuleModal } from "@/components/admin/ModuleModal";
+import {
+  ManageContentModal,
+  AddContentItemModal,
+} from "@/components/admin/ManageContentModal";
+import { ModuleDetailModal } from "@/components/admin/programmes/ModuleDetailModal";
+import { MoveModulePositionModal } from "@/components/admin/programmes/MoveModulePositionModal";
+import { ProgrammeArchiveModal } from "@/components/admin/programmes/ProgrammeArchiveModal";
+import { RequiredDeliverablesSection } from "@/components/admin/programmes/BackendRequiredDeliverablesSection";
 import {
   archiveProgrammePatch,
   publishProgrammePatch,
   restoreProgrammePatch,
-} from '@/lib/programme-lifecycle';
-import { contentItems } from '@/lib/mock-data/programs';
-import { getProgrammeStatus, getProgrammeStatusLabel, getProgrammeStatusTone } from '@/lib/programme-status';
-import { useAdminStore } from '@/lib/stores/admin-store';
-import type { ContentItem, Module, Program } from '@/types';
+} from "@/lib/programme-lifecycle";
+import { contentItems } from "@/lib/mock-data/programs";
+import {
+  getProgrammeStatus,
+  getProgrammeStatusLabel,
+  getProgrammeStatusTone,
+} from "@/lib/programme-status";
+import { useAdminStore } from "@/lib/stores/admin-store";
+import type { ContentItem, Module, Program } from "@/types";
 
-type WorkspaceTab = 'curriculum' | 'deliverables' | 'readiness';
+type WorkspaceTab = "curriculum" | "deliverables" | "readiness";
 
 export function ProgrammeWorkspaceView({
   program,
@@ -66,16 +73,28 @@ export function ProgrammeWorkspaceView({
   modules: Module[];
   onEditProgram: () => void;
 }) {
-  const { updateProgram, reorderProgramModule, moveProgramModule, moveProgramModuleToPosition } = useAdminStore();
-  const [workspaceTab, setWorkspaceTab] = React.useState<WorkspaceTab>('curriculum');
+  const {
+    updateProgram,
+    reorderProgramModule,
+    moveProgramModule,
+    moveProgramModuleToPosition,
+  } = useAdminStore();
+  const [workspaceTab, setWorkspaceTab] =
+    React.useState<WorkspaceTab>("curriculum");
   const [moduleOpen, setModuleOpen] = React.useState(false);
   const [viewModule, setViewModule] = React.useState<Module | null>(null);
-  const [manageContentModule, setManageContentModule] = React.useState<Module | null>(null);
-  const [addContentModule, setAddContentModule] = React.useState<Module | null>(null);
+  const [manageContentModule, setManageContentModule] =
+    React.useState<Module | null>(null);
+  const [addContentModule, setAddContentModule] = React.useState<Module | null>(
+    null,
+  );
   const [addContentOpen, setAddContentOpen] = React.useState(false);
-  const [archiveTarget, setArchiveTarget] = React.useState<Program | null>(null);
-  const [movePositionModule, setMovePositionModule] = React.useState<Module | null>(null);
-  const [moduleQuery, setModuleQuery] = React.useState('');
+  const [archiveTarget, setArchiveTarget] = React.useState<Program | null>(
+    null,
+  );
+  const [movePositionModule, setMovePositionModule] =
+    React.useState<Module | null>(null);
+  const [moduleQuery, setModuleQuery] = React.useState("");
   const debouncedModuleQuery = useDebouncedValue(moduleQuery.trim());
   const [modulePage, setModulePage] = React.useState(1);
   const [modulePageSize, setModulePageSize] = React.useState(6);
@@ -93,11 +112,13 @@ export function ProgrammeWorkspaceView({
       const attachedItems = getModuleContentItems(module);
       return [
         module.title,
-        module.description ?? '',
+        module.description ?? "",
         String(programModules.findIndex((item) => item.id === module.id) + 1),
-        ...attachedItems.map((item) => `${item.title} ${item.type} ${item.durationLabel ?? ''}`),
+        ...attachedItems.map(
+          (item) => `${item.title} ${item.type} ${item.durationLabel ?? ""}`,
+        ),
       ]
-        .join(' ')
+        .join(" ")
         .toLowerCase()
         .includes(needle);
     });
@@ -107,25 +128,45 @@ export function ProgrammeWorkspaceView({
     const start = (modulePage - 1) * modulePageSize;
     return filteredProgramModules.slice(start, start + modulePageSize);
   }, [filteredProgramModules, modulePage, modulePageSize]);
-  const modulePageRowIds = React.useMemo(() => modulePageRows.map((module) => module.id), [modulePageRows]);
+  const modulePageRowIds = React.useMemo(
+    () => modulePageRows.map((module) => module.id),
+    [modulePageRows],
+  );
   const moduleReorderSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
-  const selectedContentItems = programModules.flatMap((module) => getModuleContentItems(module));
-  const contentTypeCounts = selectedContentItems.reduce<Record<ContentItem['type'], number>>(
-    (acc, item) => ({ ...acc, [item.type]: acc[item.type] + 1 }),
-    { video: 0, pdf: 0, tool: 0 },
+  const selectedContentItems = programModules.flatMap((module) =>
+    getModuleContentItems(module),
   );
-  const modulesWithoutContent = programModules.filter((module) => module.contentItemIds.length === 0);
-  const capacityPercentage = Math.round((program.entrepreneursCount / Math.max(program.maxEntrepreneurs, 1)) * 100);
+  const contentTypeCounts = selectedContentItems.reduce<
+    Record<ContentItem["type"], number>
+  >((acc, item) => ({ ...acc, [item.type]: acc[item.type] + 1 }), {
+    video: 0,
+    pdf: 0,
+    excel: 0,
+    tool: 0,
+  });
+  const modulesWithoutContent = programModules.filter(
+    (module) => module.contentItemIds.length === 0,
+  );
+  const capacityPercentage = Math.round(
+    (program.entrepreneursCount / Math.max(program.maxEntrepreneurs, 1)) * 100,
+  );
   const readinessScore = programModules.length
-    ? Math.round(((programModules.length - modulesWithoutContent.length) / programModules.length) * 100)
+    ? Math.round(
+        ((programModules.length - modulesWithoutContent.length) /
+          programModules.length) *
+          100,
+      )
     : 0;
   const readinessNeedsAttention = modulesWithoutContent.length > 0;
-  const capacityNeedsAttention = program.accessType !== 'free' && capacityPercentage >= 90;
+  const capacityNeedsAttention =
+    program.accessType !== "free" && capacityPercentage >= 90;
   const programmeStatus = getProgrammeStatus(program);
-  const isArchived = programmeStatus === 'archived';
+  const isArchived = programmeStatus === "archived";
   const canReorderModules = !isArchived && moduleQuery.trim().length === 0;
 
   const openAddContent = React.useCallback((module: Module) => {
@@ -140,66 +181,79 @@ export function ProgrammeWorkspaceView({
     setManageContentModule(module);
   }, []);
 
-  const handleModuleDragEnd = React.useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!canReorderModules || !over || active.id === over.id) return;
-    reorderProgramModule(program.id, String(active.id), String(over.id));
-  }, [canReorderModules, program.id, reorderProgramModule]);
+  const handleModuleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!canReorderModules || !over || active.id === over.id) return;
+      reorderProgramModule(program.id, String(active.id), String(over.id));
+    },
+    [canReorderModules, program.id, reorderProgramModule],
+  );
 
   const moduleColumns = React.useMemo<Column<Module>[]>(
     () => [
       {
-        key: 'reorder',
-        header: 'Reorder',
+        key: "reorder",
+        header: "Reorder",
         cell: (module) => {
-          const modulePosition = programModules.findIndex((item) => item.id === module.id) + 1;
-          return <ModuleReorderHandle module={module} position={modulePosition} />;
+          const modulePosition =
+            programModules.findIndex((item) => item.id === module.id) + 1;
+          return (
+            <ModuleReorderHandle module={module} position={modulePosition} />
+          );
         },
-        className: 'min-w-[132px]',
+        className: "min-w-[132px]",
       },
       {
-        key: 'actions',
-        header: 'Action',
+        key: "actions",
+        header: "Action",
         cell: (module) => {
-          const moduleIndex = programModules.findIndex((item) => item.id === module.id);
+          const moduleIndex = programModules.findIndex(
+            (item) => item.id === module.id,
+          );
           return (
             <RowActions
               actions={[
                 {
-                  label: 'Manage content',
+                  label: "Manage content",
                   disabled: isArchived,
                   onSelect: () => openManageContent(module),
                 },
                 {
-                  label: 'Add content item',
+                  label: "Add content item",
                   disabled: isArchived,
                   onSelect: () => openAddContent(module),
                 },
-                'separator',
+                "separator",
                 {
-                  label: 'Move to position',
+                  label: "Move to position",
                   disabled: isArchived,
                   onSelect: () => setMovePositionModule(module),
                 },
                 {
-                  label: 'Move up',
+                  label: "Move up",
                   disabled: !canReorderModules || moduleIndex <= 0,
-                  onSelect: () => moveProgramModule(program.id, module.id, 'up'),
+                  onSelect: () =>
+                    moveProgramModule(program.id, module.id, "up"),
                 },
                 {
-                  label: 'Move down',
-                  disabled: !canReorderModules || moduleIndex < 0 || moduleIndex >= programModules.length - 1,
-                  onSelect: () => moveProgramModule(program.id, module.id, 'down'),
+                  label: "Move down",
+                  disabled:
+                    !canReorderModules ||
+                    moduleIndex < 0 ||
+                    moduleIndex >= programModules.length - 1,
+                  onSelect: () =>
+                    moveProgramModule(program.id, module.id, "down"),
                 },
               ]}
             />
           );
         },
-        className: 'w-[84px]',
+        className: "w-[84px]",
       },
       {
-        key: 'module',
-        header: 'Module',
+        key: "module",
+        header: "Module",
         cell: (module) => (
           <div className="max-w-[420px]">
             <button
@@ -210,21 +264,23 @@ export function ProgrammeWorkspaceView({
               {module.title}
             </button>
             {module.description && (
-              <div className="mt-1 line-clamp-2 text-xs leading-5 text-ink-muted">{module.description}</div>
+              <div className="mt-1 line-clamp-2 text-xs leading-5 text-ink-muted">
+                {module.description}
+              </div>
             )}
           </div>
         ),
-        className: 'min-w-[320px]',
+        className: "min-w-[320px]",
       },
       {
-        key: 'content',
-        header: 'Content coverage',
+        key: "content",
+        header: "Content coverage",
         cell: (module) => <ContentCoverage module={module} />,
-        className: 'min-w-[280px]',
+        className: "min-w-[280px]",
       },
       {
-        key: 'reuse',
-        header: 'Reuse',
+        key: "reuse",
+        header: "Reuse",
         cell: (module) =>
           module.reuseCount ? (
             <Badge tone="blue">Used in {module.reuseCount} programmes</Badge>
@@ -233,8 +289,8 @@ export function ProgrammeWorkspaceView({
           ),
       },
       {
-        key: 'readiness',
-        header: 'Readiness',
+        key: "readiness",
+        header: "Readiness",
         cell: (module) =>
           module.contentItemIds.length > 0 ? (
             <Badge tone="green">Ready</Badge>
@@ -243,9 +299,16 @@ export function ProgrammeWorkspaceView({
           ),
       },
     ],
-    [canReorderModules, isArchived, moveProgramModule, openAddContent, openManageContent, program.id, programModules],
+    [
+      canReorderModules,
+      isArchived,
+      moveProgramModule,
+      openAddContent,
+      openManageContent,
+      program.id,
+      programModules,
+    ],
   );
-
 
   return (
     <>
@@ -255,49 +318,95 @@ export function ProgrammeWorkspaceView({
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <StatusBadge program={program} />
-                <Badge tone={program.accessType === 'free' ? 'blue' : 'brand'}>
-                  {program.accessType === 'free' ? 'Free programme' : 'Assigned programme'}
+                <Badge tone={program.accessType === "free" ? "blue" : "brand"}>
+                  {program.accessType === "free"
+                    ? "Free programme"
+                    : "Assigned programme"}
                 </Badge>
                 <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
                   <CalendarDays className="h-4 w-4" />
-                  {formatProgramDate(program.startDate)} - {formatProgramDate(program.endDate)}
+                  {formatProgramDate(program.startDate)} -{" "}
+                  {formatProgramDate(program.endDate)}
                 </span>
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">{program.name}</h2>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">
+                {program.name}
+              </h2>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-muted">
                 {program.description}
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {programmeStatus === 'draft' && (
+              {programmeStatus === "draft" && (
                 <>
-                  <Button variant="outline" onClick={onEditProgram}>Edit programme</Button>
-                  <Button variant="outline" onClick={() => updateProgram(program.id, publishProgrammePatch())}>Publish</Button>
-                  <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
+                  <Button variant="outline" onClick={onEditProgram}>
+                    Edit programme
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      updateProgram(program.id, publishProgrammePatch())
+                    }
+                  >
+                    Publish
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setArchiveTarget(program)}
+                  >
+                    Archive
+                  </Button>
                 </>
               )}
-              {programmeStatus === 'scheduled' && (
+              {programmeStatus === "scheduled" && (
                 <>
-                  <Button variant="outline" onClick={onEditProgram}>Edit programme</Button>
-                  <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
+                  <Button variant="outline" onClick={onEditProgram}>
+                    Edit programme
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setArchiveTarget(program)}
+                  >
+                    Archive
+                  </Button>
                 </>
               )}
-              {programmeStatus === 'active' && (
+              {programmeStatus === "active" && (
                 <>
-                  <Button variant="outline" onClick={onEditProgram}>Edit programme</Button>
-                  <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
+                  <Button variant="outline" onClick={onEditProgram}>
+                    Edit programme
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setArchiveTarget(program)}
+                  >
+                    Archive
+                  </Button>
                 </>
               )}
-              {programmeStatus === 'completed' && (
+              {programmeStatus === "completed" && (
                 <>
-                  <Button variant="outline" onClick={onEditProgram}>Edit timeline</Button>
-                  <Button variant="destructive" onClick={() => setArchiveTarget(program)}>Archive</Button>
+                  <Button variant="outline" onClick={onEditProgram}>
+                    Edit timeline
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setArchiveTarget(program)}
+                  >
+                    Archive
+                  </Button>
                 </>
               )}
-              {programmeStatus === 'archived' && (
-                <Button onClick={() => updateProgram(program.id, restoreProgrammePatch())}>Restore programme</Button>
+              {programmeStatus === "archived" && (
+                <Button
+                  onClick={() =>
+                    updateProgram(program.id, restoreProgrammePatch())
+                  }
+                >
+                  Restore programme
+                </Button>
               )}
-              {['draft', 'scheduled', 'active'].includes(programmeStatus) && (
+              {["draft", "scheduled", "active"].includes(programmeStatus) && (
                 <Button onClick={() => setModuleOpen(true)}>New module</Button>
               )}
             </div>
@@ -305,13 +414,17 @@ export function ProgrammeWorkspaceView({
 
           {isArchived && (
             <div className="mt-5 rounded-xl border border-danger/20 bg-danger-light px-4 py-3">
-              <div className="font-medium text-danger">This programme is archived</div>
+              <div className="font-medium text-danger">
+                This programme is archived
+              </div>
               <p className="mt-1 text-sm leading-6 text-ink-muted">
-                It remains available for audit and reporting, but editing and new content changes are disabled until it is restored.
+                It remains available for audit and reporting, but editing and
+                new content changes are disabled until it is restored.
               </p>
               {program.archiveReason && (
                 <p className="mt-2 text-sm text-ink">
-                  Archive reason: <span className="font-medium">{program.archiveReason}</span>
+                  Archive reason:{" "}
+                  <span className="font-medium">{program.archiveReason}</span>
                 </p>
               )}
             </div>
@@ -319,44 +432,72 @@ export function ProgrammeWorkspaceView({
 
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <ProgrammeHealthCard
-              label={program.accessType === 'free' ? 'Access' : 'Enrollment'}
-              value={program.accessType === 'free' ? 'All entrepreneurs' : `${program.entrepreneursCount}/${program.maxEntrepreneurs}`}
-              progress={program.accessType === 'free' ? undefined : capacityPercentage}
+              label={program.accessType === "free" ? "Access" : "Enrollment"}
+              value={
+                program.accessType === "free"
+                  ? "All entrepreneurs"
+                  : `${program.entrepreneursCount}/${program.maxEntrepreneurs}`
+              }
+              progress={
+                program.accessType === "free" ? undefined : capacityPercentage
+              }
             />
-            <ProgrammeHealthCard label="Modules" value={programModules.length} helper={`${modulesWithoutContent.length} need content`} />
-            <ProgrammeHealthCard label="Content assets" value={selectedContentItems.length} helper={`${contentTypeCounts.video} videos, ${contentTypeCounts.pdf} PDFs, ${contentTypeCounts.tool} tools`} />
-            <ProgrammeHealthCard label="Readiness" value={`${readinessScore}%`} progress={readinessScore} />
-            <ProgrammeHealthCard label="Learner progress" value={`${program.progress}%`} progress={program.progress} />
+            <ProgrammeHealthCard
+              label="Modules"
+              value={programModules.length}
+              helper={`${modulesWithoutContent.length} need content`}
+            />
+            <ProgrammeHealthCard
+              label="Content assets"
+              value={selectedContentItems.length}
+              helper={`${contentTypeCounts.video} videos,  PDFs,  Excel workbooks,  tools`}
+            />
+            <ProgrammeHealthCard
+              label="Readiness"
+              value={`${readinessScore}%`}
+              progress={readinessScore}
+            />
+            <ProgrammeHealthCard
+              label="Learner progress"
+              value={`${program.progress}%`}
+              progress={program.progress}
+            />
           </div>
         </Card>
 
         <Card>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-base font-semibold tracking-[-0.01em]">Programme workspace</div>
+              <div className="text-base font-semibold tracking-[-0.01em]">
+                Programme workspace
+              </div>
               <div className="mt-1 max-w-2xl text-sm leading-5 text-ink-muted">
-                Manage the curriculum, required submissions, and launch readiness for this programme.
+                Manage the curriculum, required submissions, and launch
+                readiness for this programme.
               </div>
             </div>
             <Tabs
               value={workspaceTab}
               onChange={setWorkspaceTab}
               tabs={[
-                { value: 'curriculum', label: 'Curriculum' },
-                { value: 'deliverables', label: 'Deliverables' },
-                { value: 'readiness', label: 'Readiness' },
+                { value: "curriculum", label: "Curriculum" },
+                { value: "deliverables", label: "Deliverables" },
+                { value: "readiness", label: "Readiness" },
               ]}
               className="mb-0 w-full overflow-x-auto sm:w-fit"
             />
           </div>
 
-          {workspaceTab === 'curriculum' && (
+          {workspaceTab === "curriculum" && (
             <div className="mt-5">
               <TableToolbar>
                 <div>
-                  <div className="text-sm font-medium text-ink">Search modules and attached content</div>
+                  <div className="text-sm font-medium text-ink">
+                    Search modules and attached content
+                  </div>
                   <div className="mt-0.5 text-sm text-ink-muted">
-                    {filteredProgramModules.length} of {programModules.length} modules shown
+                    {filteredProgramModules.length} of {programModules.length}{" "}
+                    modules shown
                   </div>
                 </div>
                 <div className="w-full sm:w-[380px]">
@@ -376,7 +517,10 @@ export function ProgrammeWorkspaceView({
                 collisionDetection={closestCenter}
                 onDragEnd={handleModuleDragEnd}
               >
-                <SortableContext items={modulePageRowIds} strategy={verticalListSortingStrategy}>
+                <SortableContext
+                  items={modulePageRowIds}
+                  strategy={verticalListSortingStrategy}
+                >
                   <DataTable
                     columns={moduleColumns}
                     rows={modulePageRows}
@@ -384,8 +528,8 @@ export function ProgrammeWorkspaceView({
                     sortableRows={canReorderModules}
                     emptyMessage={
                       programModules.length === 0
-                        ? 'No modules yet. Add a new module or reuse an existing module to start the curriculum.'
-                        : 'No modules match this search.'
+                        ? "No modules yet. Add a new module or reuse an existing module to start the curriculum."
+                        : "No modules match this search."
                     }
                     tableClassName="min-w-[980px]"
                   />
@@ -405,68 +549,95 @@ export function ProgrammeWorkspaceView({
             </div>
           )}
 
-          {workspaceTab === 'deliverables' && (
-            <RequiredDeliverablesSection programmeId={program.id} programName={program.name} />
+          {workspaceTab === "deliverables" && (
+            <RequiredDeliverablesSection
+              programmeId={program.id}
+              programName={program.name}
+            />
           )}
 
-          {workspaceTab === 'readiness' && (
+          {workspaceTab === "readiness" && (
             <div className="mt-5 space-y-4">
               <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-base font-semibold text-ink">Launch readiness</div>
-                      <Badge tone={readinessNeedsAttention ? 'amber' : 'green'}>
-                        {readinessNeedsAttention ? 'Needs attention' : 'Ready to launch'}
+                      <div className="text-base font-semibold text-ink">
+                        Launch readiness
+                      </div>
+                      <Badge tone={readinessNeedsAttention ? "amber" : "green"}>
+                        {readinessNeedsAttention
+                          ? "Needs attention"
+                          : "Ready to launch"}
                       </Badge>
                     </div>
                     <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
-                      Use this checklist before publishing or enrolling entrepreneurs. It confirms that modules have learning content, capacity is clear, and deliverable rules are easy to find.
+                      Use this checklist before publishing or enrolling
+                      entrepreneurs. It confirms that modules have learning
+                      content, capacity is clear, and deliverable rules are easy
+                      to find.
                     </p>
                   </div>
                   <div className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 lg:w-[280px]">
                     <div className="flex items-end justify-between gap-3">
                       <div>
-                        <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">Readiness score</div>
-                        <div className="mt-1 text-3xl font-semibold leading-none text-ink">{readinessScore}%</div>
+                        <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
+                          Readiness score
+                        </div>
+                        <div className="mt-1 text-3xl font-semibold leading-none text-ink">
+                          {readinessScore}%
+                        </div>
                       </div>
                       <div className="text-right text-xs leading-5 text-ink-muted">
-                        {programModules.length - modulesWithoutContent.length}/{programModules.length} modules ready
+                        {programModules.length - modulesWithoutContent.length}/
+                        {programModules.length} modules ready
                       </div>
                     </div>
-                    <ProgressBar value={readinessScore} width="100%" className="mt-3 h-1.5" />
+                    <ProgressBar
+                      value={readinessScore}
+                      width="100%"
+                      className="mt-3 h-1.5"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                 <ReadinessPanelItem
-                  icon={modulesWithoutContent.length ? AlertTriangle : CheckCircle2}
+                  icon={
+                    modulesWithoutContent.length ? AlertTriangle : CheckCircle2
+                  }
                   title="Content coverage"
-                  status={modulesWithoutContent.length ? 'Needs content' : 'Complete'}
+                  status={
+                    modulesWithoutContent.length ? "Needs content" : "Complete"
+                  }
                   description={
                     modulesWithoutContent.length
-                      ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? '' : 's'} still need at least one learning asset.`
-                      : 'Every module currently has at least one learning asset attached.'
+                      ? `${modulesWithoutContent.length} module${modulesWithoutContent.length === 1 ? "" : "s"} still need at least one learning asset.`
+                      : "Every module currently has at least one learning asset attached."
                   }
-                  tone={modulesWithoutContent.length ? 'warning' : 'success'}
+                  tone={modulesWithoutContent.length ? "warning" : "success"}
                 />
                 <ReadinessPanelItem
                   icon={Users}
-                  title={program.accessType === 'free' ? 'Access model' : 'Enrollment capacity'}
+                  title={
+                    program.accessType === "free"
+                      ? "Access model"
+                      : "Enrollment capacity"
+                  }
                   status={
-                    program.accessType === 'free'
-                      ? 'Open to all'
+                    program.accessType === "free"
+                      ? "Open to all"
                       : capacityNeedsAttention
-                        ? 'Nearly full'
-                        : 'Seats available'
+                        ? "Nearly full"
+                        : "Seats available"
                   }
                   description={
-                    program.accessType === 'free'
-                      ? 'Every entrepreneur can access this programme without manual enrollment.'
+                    program.accessType === "free"
+                      ? "Every entrepreneur can access this programme without manual enrollment."
                       : `${program.entrepreneursCount} of ${program.maxEntrepreneurs} seats are currently filled.`
                   }
-                  tone={capacityNeedsAttention ? 'warning' : 'neutral'}
+                  tone={capacityNeedsAttention ? "warning" : "neutral"}
                 />
                 <ReadinessPanelItem
                   icon={FileText}
@@ -479,14 +650,18 @@ export function ProgrammeWorkspaceView({
 
               <div>
                 <div className="mb-3">
-                  <div className="text-sm font-semibold text-ink">Module readiness</div>
-                  <div className="mt-0.5 text-sm text-ink-muted">Review each module before entrepreneurs start learning.</div>
+                  <div className="text-sm font-semibold text-ink">
+                    Module readiness
+                  </div>
+                  <div className="mt-0.5 text-sm text-ink-muted">
+                    Review each module before entrepreneurs start learning.
+                  </div>
                 </div>
                 <DataTable
                   columns={[
                     {
-                      key: 'module',
-                      header: 'Module',
+                      key: "module",
+                      header: "Module",
                       cell: (module) => (
                         <div>
                           <button
@@ -496,19 +671,21 @@ export function ProgrammeWorkspaceView({
                           >
                             {module.title}
                           </button>
-                          <div className="mt-1 text-xs text-ink-muted">Order {module.order}</div>
+                          <div className="mt-1 text-xs text-ink-muted">
+                            Order {module.order}
+                          </div>
                         </div>
                       ),
-                      className: 'min-w-[280px]',
+                      className: "min-w-[280px]",
                     },
                     {
-                      key: 'coverage',
-                      header: 'Coverage',
+                      key: "coverage",
+                      header: "Coverage",
                       cell: (module) => <ContentCoverage module={module} />,
                     },
                     {
-                      key: 'status',
-                      header: 'Launch status',
+                      key: "status",
+                      header: "Launch status",
                       cell: (module) =>
                         module.contentItemIds.length > 0 ? (
                           <Badge tone="green">Ready</Badge>
@@ -517,20 +694,20 @@ export function ProgrammeWorkspaceView({
                         ),
                     },
                     {
-                      key: 'actions',
-                      header: 'Action',
+                      key: "actions",
+                      header: "Action",
                       cell: (module) => (
                         <RowActions
                           actions={[
                             {
-                              label: 'Manage content',
+                              label: "Manage content",
                               disabled: isArchived,
                               onSelect: () => openManageContent(module),
                             },
                           ]}
                         />
                       ),
-                      className: 'w-[84px]',
+                      className: "w-[84px]",
                     },
                   ]}
                   rows={programModules}
@@ -544,7 +721,11 @@ export function ProgrammeWorkspaceView({
         </Card>
       </section>
 
-      <ModuleModal open={moduleOpen} onOpenChange={setModuleOpen} programId={program.id} />
+      <ModuleModal
+        open={moduleOpen}
+        onOpenChange={setModuleOpen}
+        programId={program.id}
+      />
       <ModuleDetailModal
         open={!!viewModule}
         onOpenChange={(open) => !open && setViewModule(null)}
@@ -571,16 +752,26 @@ export function ProgrammeWorkspaceView({
       />
 
       <MoveModulePositionModal
-        key={movePositionModule?.id ?? 'closed'}
+        key={movePositionModule?.id ?? "closed"}
         open={!!movePositionModule}
         onOpenChange={(open) => !open && setMovePositionModule(null)}
         module={movePositionModule}
         program={program}
-        currentPosition={movePositionModule ? programModules.findIndex((module) => module.id === movePositionModule.id) + 1 : 0}
+        currentPosition={
+          movePositionModule
+            ? programModules.findIndex(
+                (module) => module.id === movePositionModule.id,
+              ) + 1
+            : 0
+        }
         totalModules={programModules.length}
         onMove={(position) => {
           if (movePositionModule) {
-            moveProgramModuleToPosition(program.id, movePositionModule.id, position);
+            moveProgramModuleToPosition(
+              program.id,
+              movePositionModule.id,
+              position,
+            );
           }
         }}
       />
@@ -588,14 +779,19 @@ export function ProgrammeWorkspaceView({
         open={!!archiveTarget}
         onOpenChange={(open) => !open && setArchiveTarget(null)}
         program={archiveTarget ?? undefined}
-        onArchive={(target, reason) => updateProgram(target.id, archiveProgrammePatch(reason))}
+        onArchive={(target, reason) =>
+          updateProgram(target.id, archiveProgrammePatch(reason))
+        }
       />
     </>
   );
 }
 
 const formatProgramDate = (date: string) =>
-  new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
 
 const getModuleContentItems = (module: Module) =>
   module.contentItemIds
@@ -625,19 +821,29 @@ function ProgrammeHealthCard({
 }) {
   return (
     <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
-      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
+        {label}
+      </div>
       <div className="mt-1 text-xl font-semibold text-ink">{value}</div>
-      {typeof progress === 'number' ? (
+      {typeof progress === "number" ? (
         <ProgressBar value={progress} width="100%" className="mt-3 h-1.5" />
       ) : null}
-      {helper ? <div className="mt-2 text-xs leading-5 text-ink-muted">{helper}</div> : null}
+      {helper ? (
+        <div className="mt-2 text-xs leading-5 text-ink-muted">{helper}</div>
+      ) : null}
     </div>
   );
 }
 
-
-function ModuleReorderHandle({ module, position }: { module: Module; position: number }) {
-  const { attributes, listeners, setActivatorNodeRef, disabled, isDragging } = useSortableRow();
+function ModuleReorderHandle({
+  module,
+  position,
+}: {
+  module: Module;
+  position: number;
+}) {
+  const { attributes, listeners, setActivatorNodeRef, disabled, isDragging } =
+    useSortableRow();
 
   return (
     <div className="flex items-center gap-2">
@@ -647,7 +853,11 @@ function ModuleReorderHandle({ module, position }: { module: Module; position: n
         disabled={disabled}
         className="inline-flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted shadow-sm transition hover:bg-surface-subtle hover:text-ink active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
         aria-label={`Reorder ${module.title}`}
-        title={disabled ? 'Clear search to reorder modules' : 'Drag to reorder module'}
+        title={
+          disabled
+            ? "Clear search to reorder modules"
+            : "Drag to reorder module"
+        }
         {...attributes}
         {...listeners}
       >
@@ -656,16 +866,18 @@ function ModuleReorderHandle({ module, position }: { module: Module; position: n
       <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-surface-subtle px-2 text-xs font-semibold text-ink-muted">
         {position}
       </span>
-      {isDragging ? <span className="sr-only">Moving {module.title}</span> : null}
+      {isDragging ? (
+        <span className="sr-only">Moving {module.title}</span>
+      ) : null}
     </div>
   );
 }
 
 function ContentCoverage({ module }: { module: Module }) {
   const items = getModuleContentItems(module);
-  const counts = items.reduce<Record<ContentItem['type'], number>>(
+  const counts = items.reduce<Record<ContentItem["type"], number>>(
     (acc, item) => ({ ...acc, [item.type]: acc[item.type] + 1 }),
-    { video: 0, pdf: 0, tool: 0 },
+    { video: 0, pdf: 0, excel: 0, tool: 0 },
   );
 
   if (items.length === 0) return <Badge tone="amber">No content</Badge>;
@@ -674,6 +886,7 @@ function ContentCoverage({ module }: { module: Module }) {
     <div className="flex flex-wrap gap-1.5">
       {counts.video > 0 && <Badge tone="neutral">{counts.video} Video</Badge>}
       {counts.pdf > 0 && <Badge tone="neutral">{counts.pdf} PDF</Badge>}
+      {counts.excel > 0 && <Badge tone="green">{counts.excel} Excel</Badge>}
       {counts.tool > 0 && <Badge tone="neutral">{counts.tool} Tool</Badge>}
     </div>
   );
@@ -684,26 +897,27 @@ function ReadinessPanelItem({
   title,
   status,
   description,
-  tone = 'neutral',
+  tone = "neutral",
 }: {
   icon: LucideIcon;
   title: string;
   status: string;
   description: string;
-  tone?: 'neutral' | 'warning' | 'success';
+  tone?: "neutral" | "warning" | "success";
 }) {
-  const badgeTone = tone === 'success' ? 'green' : tone === 'warning' ? 'amber' : 'neutral';
+  const badgeTone =
+    tone === "success" ? "green" : tone === "warning" ? "amber" : "neutral";
 
   return (
     <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-4">
       <div className="flex items-start gap-3">
         <div
           className={
-            tone === 'warning'
-              ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning-light text-warning-dark'
-              : tone === 'success'
-                ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success-light text-success-dark'
-                : 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-bid'
+            tone === "warning"
+              ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning-light text-warning-dark"
+              : tone === "success"
+                ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success-light text-success-dark"
+                : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-bid"
           }
         >
           <Icon className="h-4 w-4" />
@@ -713,7 +927,9 @@ function ReadinessPanelItem({
             <div className="font-semibold text-ink">{title}</div>
             <Badge tone={badgeTone}>{status}</Badge>
           </div>
-          <div className="mt-2 text-sm leading-5 text-ink-muted">{description}</div>
+          <div className="mt-2 text-sm leading-5 text-ink-muted">
+            {description}
+          </div>
         </div>
       </div>
     </div>

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import MuxPlayer from '@mux/mux-player-react/lazy';
-import type MuxPlayerElement from '@mux/mux-player';
+import * as React from "react";
+import MuxPlayer from "@mux/mux-player-react/lazy";
+import type MuxPlayerElement from "@mux/mux-player";
 import {
   BookOpen,
   Check,
@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  FileSpreadsheet,
   FileText,
   Layers3,
   Play,
@@ -17,34 +18,35 @@ import {
   RotateCcw,
   Wrench,
   type LucideIcon,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { ContentRating } from '@/components/entrepreneur/ContentRating';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Skeleton } from '@/components/shared/Card';
-import { Modal } from '@/components/shared/Modal';
-import { ProgressBar } from '@/components/shared/ProgressBar';
-import { useSignedFileUrlQuery } from '@/lib/api/files';
+} from "lucide-react";
+import { toast } from "sonner";
+import { ContentRating } from "@/components/entrepreneur/ContentRating";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Skeleton } from "@/components/shared/Card";
+import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
+import { Modal } from "@/components/shared/Modal";
+import { ProgressBar } from "@/components/shared/ProgressBar";
+import { useSignedFileUrlQuery } from "@/lib/api/files";
 import {
   useLearnerProgressQuery,
   useSyncLearnerProgressMutation,
-} from '@/lib/api/learning';
+} from "@/lib/api/learning";
 import type {
   ProgrammePlayerItem,
   ProgrammePlayerModule,
   ProgrammePlayerPayload,
-} from '@/lib/api/programmes';
-import { useSignedVideoPlaybackQuery } from '@/lib/api/videos';
-import { cn } from '@/lib/utils';
-import type { BadgeTone } from '@/types';
+} from "@/lib/api/programmes";
+import { useSignedVideoPlaybackQuery } from "@/lib/api/videos";
+import { cn } from "@/lib/utils";
+import type { BadgeTone } from "@/types";
 
 type PlaylistEntry = {
   module: ProgrammePlayerModule;
   item: ProgrammePlayerItem;
 };
 
-type CompletionAction = 'mark' | 'next';
+type CompletionAction = "mark" | "next";
 
 type QueryState<T> = {
   data?: T;
@@ -55,12 +57,13 @@ type QueryState<T> = {
 };
 
 const typeMeta: Record<
-  ProgrammePlayerItem['type'],
+  ProgrammePlayerItem["type"],
   { label: string; icon: LucideIcon; tone: BadgeTone }
 > = {
-  video: { label: 'Video', icon: PlayCircle, tone: 'brand' },
-  pdf: { label: 'PDF', icon: FileText, tone: 'blue' },
-  tool: { label: 'Interactive tool', icon: Wrench, tone: 'green' },
+  video: { label: "Video", icon: PlayCircle, tone: "brand" },
+  pdf: { label: "PDF", icon: FileText, tone: "blue" },
+  excel: { label: "Excel", icon: FileSpreadsheet, tone: "green" },
+  tool: { label: "Interactive tool", icon: Wrench, tone: "green" },
 };
 
 const videoCheckpoints = [10, 25, 50, 75, 90];
@@ -101,8 +104,9 @@ export function ProgrammeCoursePlayer({
     () => new Set(active ? [active.module.id] : []),
   );
   const [playerKey, setPlayerKey] = React.useState(0);
-  const [restartFromBeginningKey, setRestartFromBeginningKey] =
-    React.useState<string | null>(null);
+  const [restartFromBeginningKey, setRestartFromBeginningKey] = React.useState<
+    string | null
+  >(null);
   const [ratingEntry, setRatingEntry] = React.useState<PlaylistEntry | null>(
     null,
   );
@@ -128,16 +132,15 @@ export function ProgrammeCoursePlayer({
   const [completionAction, setCompletionAction] =
     React.useState<CompletionAction | null>(null);
   const signedFile = useSignedFileUrlQuery(
-    active?.item.type === 'pdf'
+    active?.item.type === "pdf"
       ? active.item.file?.id
-      : active?.item.type === 'tool' &&
-          active.item.toolLink?.toolType === 'pdf'
-        ? active.item.toolLink.fileId ?? undefined
+      : active?.item.type === "tool" && active.item.toolLink?.toolType === "pdf"
+        ? (active.item.toolLink.fileId ?? undefined)
         : undefined,
     Boolean(active),
   );
   const signedVideo = useSignedVideoPlaybackQuery(
-    active?.item.type === 'video' ? active.item.video?.id : undefined,
+    active?.item.type === "video" ? active.item.video?.id : undefined,
     Boolean(active),
   );
 
@@ -163,7 +166,7 @@ export function ProgrammeCoursePlayer({
 
   const saveProgress = React.useCallback(
     (
-      status: 'in_progress' | 'completed',
+      status: "in_progress" | "completed",
       percent: number,
       position?: number,
       duration?: number,
@@ -188,13 +191,13 @@ export function ProgrammeCoursePlayer({
               ? {}
               : { durationSeconds: Math.max(1, Math.round(duration)) }),
             clientEventAt: new Date().toISOString(),
-            source: status === 'completed' ? 'explicit_action' : 'player',
+            source: status === "completed" ? "explicit_action" : "player",
           },
         ],
         notify || pendingAction || onSaved
           ? {
               onSuccess: () => {
-                if (notify) toast.success('Learning progress saved.');
+                if (notify) toast.success("Learning progress saved.");
                 onSaved?.();
               },
               onError: (error) => {
@@ -217,7 +220,7 @@ export function ProgrammeCoursePlayer({
       Math.floor((active.item.progress?.progressPercent ?? 0) / 10) * 10;
     setPlayerKey((value) => value + 1);
     saveProgress(
-      'in_progress',
+      "in_progress",
       Math.max(active.item.progress?.progressPercent ?? 0, 1),
       active.item.progress?.lastPositionSeconds ?? undefined,
       active.item.durationSeconds ?? undefined,
@@ -234,7 +237,7 @@ export function ProgrammeCoursePlayer({
     currentIndex < playlist.length - 1 ? playlist[currentIndex + 1] : null;
   const itemProgress = progress.data?.content ?? active.item.progress;
   const completed =
-    itemProgress?.status === 'completed' ||
+    itemProgress?.status === "completed" ||
     locallyCompletedIds.has(active.item.id);
   const meta = typeMeta[active.item.type];
   const TypeIcon = meta.icon;
@@ -247,17 +250,14 @@ export function ProgrammeCoursePlayer({
     );
     if (!value) return;
     checkpointRef.current = value;
-    saveProgress('in_progress', value, position, duration);
+    saveProgress("in_progress", value, position, duration);
   }
 
   function promptForRating(
     completedEntry: PlaylistEntry,
     target: PlaylistEntry | null,
   ) {
-    if (
-      !canTrack ||
-      promptedRatingsRef.current.has(completedEntry.item.id)
-    ) {
+    if (!canTrack || promptedRatingsRef.current.has(completedEntry.item.id)) {
       if (target) choose(target);
       return;
     }
@@ -286,7 +286,7 @@ export function ProgrammeCoursePlayer({
   return (
     <section
       className={cn(
-        'overflow-hidden rounded-2xl border border-line bg-card shadow-sm',
+        "overflow-hidden rounded-2xl border border-line bg-card shadow-sm",
         className,
       )}
     >
@@ -301,13 +301,13 @@ export function ProgrammeCoursePlayer({
                 Module {active.module.position} · {active.module.title}
               </div>
             </div>
-            <Badge tone={canTrack ? 'brand' : 'neutral'}>
-              {canTrack ? 'Learning' : 'Preview mode'}
+            <Badge tone={canTrack ? "brand" : "neutral"}>
+              {canTrack ? "Learning" : "Preview mode"}
             </Badge>
           </header>
 
           <MediaStage
-            key={playerKey + ':' + active.item.id}
+            key={playerKey + ":" + active.item.id}
             item={active.item}
             signedFile={signedFile}
             signedVideo={signedVideo}
@@ -322,7 +322,7 @@ export function ProgrammeCoursePlayer({
                 ? Math.min(99, Math.round((position / duration) * 100))
                 : (itemProgress?.progressPercent ?? 1);
               saveProgress(
-                'in_progress',
+                "in_progress",
                 Math.max(percent, 1),
                 position,
                 duration,
@@ -334,7 +334,7 @@ export function ProgrammeCoursePlayer({
                   ? duration
                   : (active.item.durationSeconds ?? undefined);
               saveProgress(
-                'completed',
+                "completed",
                 100,
                 finalDuration,
                 finalDuration,
@@ -359,7 +359,7 @@ export function ProgrammeCoursePlayer({
                     </span>
                   ) : null}
                   {completed ? <Badge tone="green">Completed</Badge> : null}
-                  {!canTrack && active.item.status !== 'ready' ? (
+                  {!canTrack && active.item.status !== "ready" ? (
                     <Badge tone="amber">{active.item.status}</Badge>
                   ) : null}
                 </div>
@@ -368,12 +368,12 @@ export function ProgrammeCoursePlayer({
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">
                   {active.item.trainer
-                    ? 'Facilitated by ' + active.item.trainer.name
-                    : 'BID Hub learning content'}
+                    ? "Facilitated by " + active.item.trainer.name
+                    : "BID Hub learning content"}
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {active.item.type === 'video' ? (
+                {active.item.type === "video" ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -382,7 +382,7 @@ export function ProgrammeCoursePlayer({
                       checkpointRef.current = 0;
                       setRestartFromBeginningKey(entryKey(active));
                       setPlayerKey((value) => value + 1);
-                      toast.success('Restarted from the beginning.');
+                      toast.success("Restarted from the beginning.");
                     }}
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -392,24 +392,24 @@ export function ProgrammeCoursePlayer({
                 {canTrack ? (
                   <Button
                     type="button"
-                    variant={completed ? 'outline' : 'success'}
+                    variant={completed ? "outline" : "success"}
                     disabled={completed || completionAction !== null}
-                    isLoading={completionAction === 'mark'}
+                    isLoading={completionAction === "mark"}
                     loadingLabel="Saving..."
                     onClick={() =>
                       saveProgress(
-                        'completed',
+                        "completed",
                         100,
                         undefined,
                         undefined,
                         true,
-                        'mark',
+                        "mark",
                         () => handleCompletionSaved(active, null),
                       )
                     }
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    {completed ? 'Completed' : 'Mark complete'}
+                    {completed ? "Completed" : "Mark complete"}
                   </Button>
                 ) : null}
               </div>
@@ -432,20 +432,19 @@ export function ProgrammeCoursePlayer({
                 disabled={
                   completionAction !== null ||
                   (!next &&
-                    (!canTrack ||
-                      (active.item.type === 'video' && !completed)))
+                    (!canTrack || (active.item.type === "video" && !completed)))
                 }
-                isLoading={completionAction === 'next'}
+                isLoading={completionAction === "next"}
                 loadingLabel="Saving..."
                 onClick={() => {
-                  if (canTrack && active.item.type !== 'video') {
+                  if (canTrack && active.item.type !== "video") {
                     saveProgress(
-                      'completed',
+                      "completed",
                       100,
                       undefined,
                       undefined,
                       false,
-                      'next',
+                      "next",
                       () => handleCompletionSaved(active, next),
                     );
                     return;
@@ -457,7 +456,7 @@ export function ProgrammeCoursePlayer({
                   if (next) choose(next);
                 }}
               >
-                {next ? 'Next' : 'Finish lesson'}
+                {next ? "Next" : "Finish lesson"}
                 {next ? <ChevronRight className="h-4 w-4" /> : null}
               </Button>
             </div>
@@ -487,7 +486,7 @@ export function ProgrammeCoursePlayer({
               <div>
                 <h3 className="font-semibold text-ink">Your progress</h3>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {data.progress?.completedContentCount ?? 0} of{' '}
+                  {data.progress?.completedContentCount ?? 0} of{" "}
                   {data.progress?.totalContentCount ?? playlist.length} lessons
                   completed
                 </p>
@@ -514,7 +513,7 @@ export function ProgrammeCoursePlayer({
         {ratingEntry ? (
           <div>
             <p className="mb-4 text-sm leading-6 text-ink-muted">
-              You completed{' '}
+              You completed{" "}
               <span className="font-medium text-ink">
                 {ratingEntry.item.title}
               </span>
@@ -531,7 +530,7 @@ export function ProgrammeCoursePlayer({
                 variant="ghost"
                 onClick={finishRatingPrompt}
               >
-                {continueAfterRating ? 'Skip and continue' : 'Maybe later'}
+                {continueAfterRating ? "Skip and continue" : "Maybe later"}
               </Button>
             </div>
           </div>
@@ -561,7 +560,7 @@ function CurriculumPanel({
           <div>
             <h3 className="font-semibold text-ink">Course content</h3>
             <p className="mt-0.5 text-xs text-ink-muted">
-              {data.summary.modules} modules · {data.summary.contentItems}{' '}
+              {data.summary.modules} modules · {data.summary.contentItems}{" "}
               lessons
             </p>
           </div>
@@ -575,8 +574,8 @@ function CurriculumPanel({
               type="button"
               onClick={() => onToggle(module.id)}
               className={cn(
-                'flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-bid-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30',
-                module.id === active.module.id && 'bg-bid-light/25',
+                "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-bid-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30",
+                module.id === active.module.id && "bg-bid-light/25",
               )}
             >
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line bg-card text-xs font-semibold text-ink-muted">
@@ -588,16 +587,16 @@ function CurriculumPanel({
                 </span>
                 <span className="mt-1 block text-xs text-ink-muted">
                   {module.items.length} lesson
-                  {module.items.length === 1 ? '' : 's'}
+                  {module.items.length === 1 ? "" : "s"}
                   {module.progress
-                    ? ' · ' + module.progress.progressPercent + '% complete'
-                    : ''}
+                    ? " · " + module.progress.progressPercent + "% complete"
+                    : ""}
                 </span>
               </span>
               <ChevronDown
                 className={cn(
-                  'mt-1 h-4 w-4 shrink-0 text-ink-muted transition-transform',
-                  expanded.has(module.id) && 'rotate-180',
+                  "mt-1 h-4 w-4 shrink-0 text-ink-muted transition-transform",
+                  expanded.has(module.id) && "rotate-180",
                 )}
               />
             </button>
@@ -609,25 +608,25 @@ function CurriculumPanel({
                       module.id === active.module.id &&
                       item.id === active.item.id;
                     const ItemIcon = typeMeta[item.type].icon;
-                    const done = item.progress?.status === 'completed';
+                    const done = item.progress?.status === "completed";
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => onSelect({ module, item })}
                         className={cn(
-                          'group flex w-full items-start gap-3 border-l-2 border-transparent px-4 py-3 text-left transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30',
-                          itemActive && 'border-l-bid bg-bid-light/35',
+                          "group flex w-full items-start gap-3 border-l-2 border-transparent px-4 py-3 text-left transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30",
+                          itemActive && "border-l-bid bg-bid-light/35",
                         )}
                       >
                         <span
                           className={cn(
-                            'mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border',
+                            "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border",
                             done
-                              ? 'border-success/30 bg-success-light text-success-dark'
+                              ? "border-success/30 bg-success-light text-success-dark"
                               : itemActive
-                                ? 'border-bid/30 bg-bid text-white'
-                                : 'border-line bg-card text-ink-muted',
+                                ? "border-bid/30 bg-bid text-white"
+                                : "border-line bg-card text-ink-muted",
                           )}
                         >
                           {done ? (
@@ -641,8 +640,8 @@ function CurriculumPanel({
                         <span className="min-w-0 flex-1">
                           <span
                             className={cn(
-                              'line-clamp-2 text-sm font-medium text-ink group-hover:text-bid',
-                              itemActive && 'text-bid',
+                              "line-clamp-2 text-sm font-medium text-ink group-hover:text-bid",
+                              itemActive && "text-bid",
                             )}
                           >
                             {item.position}. {item.title}
@@ -650,12 +649,12 @@ function CurriculumPanel({
                           <span className="mt-1 block text-xs text-ink-muted">
                             {typeMeta[item.type].label}
                             {item.durationLabel
-                              ? ' · ' + item.durationLabel
-                              : ''}
+                              ? " · " + item.durationLabel
+                              : ""}
                             {!data.viewer.canTrackProgress &&
-                            item.status !== 'ready'
-                              ? ' · ' + item.status
-                              : ''}
+                            item.status !== "ready"
+                              ? " · " + item.status
+                              : ""}
                           </span>
                         </span>
                       </button>
@@ -696,27 +695,27 @@ function MediaStage({
   onPause: (position: number, duration: number) => void;
   onEnded: (duration: number) => void;
 }) {
-  if (item.status !== 'ready') {
+  if (item.status !== "ready") {
     return (
       <StageMessage
-        icon={item.type === 'video' ? PlayCircle : FileText}
+        icon={item.type === "video" ? PlayCircle : FileText}
         title="This content is not ready to preview"
         description={
-          'Current processing status: ' +
+          "Current processing status: " +
           item.status +
-          '. The player will become available after the asset is ready.'
+          ". The player will become available after the asset is ready."
         }
       />
     );
   }
-  if (item.type === 'video') {
+  if (item.type === "video") {
     if (signedVideo.isLoading) return <StageSkeleton />;
     if (signedVideo.isError || !signedVideo.data) {
       return (
         <StageMessage
           icon={PlayCircle}
           title="Video could not be loaded"
-          description={signedVideo.error?.message ?? 'Request playback again.'}
+          description={signedVideo.error?.message ?? "Request playback again."}
           onRetry={() => void signedVideo.refetch()}
         />
       );
@@ -749,14 +748,23 @@ function MediaStage({
       </div>
     );
   }
-  if (item.type === 'pdf' || item.toolLink?.toolType === 'pdf') {
+  const workbookFileId =
+    item.type === "excel"
+      ? item.file?.id
+      : item.toolLink?.toolType === "excel"
+        ? item.toolLink.fileId
+        : null;
+  if (workbookFileId) {
+    return <SpreadsheetViewer fileId={workbookFileId} title={item.title} />;
+  }
+  if (item.type === "pdf" || item.toolLink?.toolType === "pdf") {
     if (signedFile.isLoading) return <StageSkeleton tall />;
     if (signedFile.isError || !signedFile.data) {
       return (
         <StageMessage
           icon={FileText}
           title="PDF could not be loaded"
-          description={signedFile.error?.message ?? 'Request the file again.'}
+          description={signedFile.error?.message ?? "Request the file again."}
           onRetry={() => void signedFile.refetch()}
         />
       );
@@ -792,10 +800,10 @@ function StageSkeleton({ tall = false }: { tall?: boolean }) {
   return (
     <div
       className={cn(
-        'bg-[#161116] p-5',
+        "bg-[#161116] p-5",
         tall
-          ? 'h-[620px]'
-          : 'grid min-h-[360px] place-items-center xl:min-h-[600px]',
+          ? "h-[620px]"
+          : "grid min-h-[360px] place-items-center xl:min-h-[600px]",
       )}
     >
       <Skeleton className="h-full min-h-[280px] w-full bg-white/10" />
@@ -841,7 +849,7 @@ function EmptyPlayer({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'rounded-2xl border border-dashed border-line bg-card px-6 py-20 text-center',
+        "rounded-2xl border border-dashed border-line bg-card px-6 py-20 text-center",
         className,
       )}
     >
@@ -858,7 +866,7 @@ function EmptyPlayer({ className }: { className?: string }) {
 }
 
 function entryKey(entry: PlaylistEntry) {
-  return entry.module.id + ':' + entry.item.id;
+  return entry.module.id + ":" + entry.item.id;
 }
 
 export function ProgrammeCoursePlayerSkeleton() {

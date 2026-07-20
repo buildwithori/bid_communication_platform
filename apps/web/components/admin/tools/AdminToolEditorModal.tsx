@@ -50,6 +50,7 @@ const emptyDraft: Draft = {
 };
 const typeOptions = [
   { value: "pdf", label: "PDF resource" },
+  { value: "excel", label: "Excel workbook" },
   { value: "embedded_tool", label: "Online tool" },
 ];
 const statusOptions = [
@@ -150,12 +151,15 @@ export function AdminToolEditorModal({
     )
       next.embeddedUrl = "Add the online tool link.";
     if (
-      draft.type === "pdf" &&
+      (draft.type === "pdf" || draft.type === "excel") &&
       draft.status === "published" &&
       !file &&
-      !tool?.pdfAsset
+      !(tool?.type === draft.type && tool.fileAsset)
     )
-      next.pdf = "Upload a PDF before publishing.";
+      next.file =
+        draft.type === "excel"
+          ? "Upload an Excel workbook before publishing."
+          : "Upload a PDF before publishing.";
     if (
       draft.status === "published" &&
       draft.visibility === "programmes" &&
@@ -177,7 +181,10 @@ export function AdminToolEditorModal({
     if (busy || !validate()) return;
     try {
       const asset = file
-        ? await upload.mutateAsync({ file, usage: "tool_pdf" })
+        ? await upload.mutateAsync({
+            file,
+            usage: draft.type === "excel" ? "tool_excel" : "tool_pdf",
+          })
         : null;
       const payload = {
         name: draft.name.trim(),
@@ -187,9 +194,10 @@ export function AdminToolEditorModal({
         iconKey: draft.iconKey,
         visibility: draft.visibility,
         status: draft.status,
-        pdfAssetId:
-          draft.type === "pdf"
-            ? (asset?.id ?? tool?.pdfAsset?.id ?? null)
+        fileAssetId:
+          draft.type === "pdf" || draft.type === "excel"
+            ? (asset?.id ??
+              (tool?.type === draft.type ? tool.fileAsset?.id : null))
             : null,
         embeddedUrl:
           draft.type === "embedded_tool" ? draft.embeddedUrl.trim() : null,
@@ -294,12 +302,19 @@ export function AdminToolEditorModal({
           />
         </FormField>
 
-        {draft.type === "pdf" ? (
-          <FormField label="PDF resource" error={errors.pdf}>
+        {draft.type === "pdf" || draft.type === "excel" ? (
+          <FormField
+            label={draft.type === "excel" ? "Excel workbook" : "PDF resource"}
+            error={errors.file}
+          >
             <input
               ref={fileRef}
               type="file"
-              accept="application/pdf"
+              accept={
+                draft.type === "excel"
+                  ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
+                  : "application/pdf,.pdf"
+              }
               className="hidden"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
@@ -311,13 +326,17 @@ export function AdminToolEditorModal({
               <Upload className="mb-2 h-5 w-5 text-bid" />
               <span className="text-sm font-semibold text-ink">
                 {file?.name ??
-                  tool?.pdfAsset?.originalFilename ??
-                  "Attach PDF resource"}
+                  tool?.fileAsset?.originalFilename ??
+                  (draft.type === "excel"
+                    ? "Attach Excel workbook"
+                    : "Attach PDF resource")}
               </span>
               <span className="mt-1 text-sm text-ink-muted">
-                PDF files only
+                {draft.type === "excel"
+                  ? "Excel .xlsx workbooks up to 25 MB"
+                  : "PDF files only"}
                 {upload.isPending
-                  ? ` � ${upload.progress.percent}% uploaded`
+                  ? " · " + upload.progress.percent + "% uploaded"
                   : ""}
               </span>
             </button>

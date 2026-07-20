@@ -1,6 +1,6 @@
 "use client";
 
-import { useDebouncedValue } from '@/lib/search';
+import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +26,7 @@ import {
   Skeleton,
   TableSkeleton,
 } from "@/components/shared/Card";
+import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
 import { DatePicker } from "@/components/shared/DatePicker";
 import {
   DataTable,
@@ -65,7 +66,7 @@ import { mapToolRecordToUi } from "@/lib/tools/tool-records";
 import { cn } from "@/lib/utils";
 import type { Tool } from "@/types";
 
-type ToolTab = "all" | "pdf" | "embed" | "requests";
+type ToolTab = "all" | "pdf" | "excel" | "embed" | "requests";
 
 const iconMap: Record<Tool["iconKey"], LucideIcon> = {
   canvas: LayoutGrid,
@@ -75,6 +76,12 @@ const iconMap: Record<Tool["iconKey"], LucideIcon> = {
   plus: Plus,
   calendar: CalendarDays,
 };
+
+function toolTypeLabel(type: Tool["type"]) {
+  if (type === "pdf") return "PDF resource";
+  if (type === "excel") return "Excel workbook";
+  return "Online tool";
+}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {
@@ -87,6 +94,7 @@ function formatDate(value: string) {
 function ToolCard({ tool, onClick }: { tool: Tool; onClick: () => void }) {
   const Icon = iconMap[tool.iconKey] ?? Wrench;
   const isOnline = tool.type === "embed";
+  const isExcel = tool.type === "excel";
   return (
     <Card
       onClick={onClick}
@@ -96,16 +104,23 @@ function ToolCard({ tool, onClick }: { tool: Tool; onClick: () => void }) {
         <div
           className={cn(
             "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
-            isOnline ? "bg-bid-light" : "bg-info-light",
+            isOnline
+              ? "bg-bid-light"
+              : isExcel
+                ? "bg-success-light"
+                : "bg-info-light",
           )}
         >
           <Icon
-            className={cn("h-6 w-6", isOnline ? "text-bid" : "text-info")}
+            className={cn(
+              "h-6 w-6",
+              isOnline ? "text-bid" : isExcel ? "text-success" : "text-info",
+            )}
             strokeWidth={1.7}
           />
         </div>
-        <Badge tone={isOnline ? "green" : "blue"}>
-          {isOnline ? "Online tool" : "PDF resource"}
+        <Badge tone={isOnline ? "brand" : isExcel ? "green" : "blue"}>
+          {toolTypeLabel(tool.type)}
         </Badge>
       </div>
       <div className="min-w-0 flex-1">
@@ -223,7 +238,11 @@ function ToolPreviewModal({
   if (!tool) return null;
   const Icon = iconMap[tool.iconKey] ?? Wrench;
   const isOnline = tool.type === "embed";
-  const previewUrl = isOnline ? tool.embedUrl : tool.pdfUrl;
+  const previewUrl = isOnline
+    ? tool.embedUrl
+    : tool.type === "pdf"
+      ? tool.fileUrl
+      : null;
   const currentIndex = Math.max(
     tools.findIndex((item) => item.id === tool.id),
     0,
@@ -255,8 +274,16 @@ function ToolPreviewModal({
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={isOnline ? "green" : "blue"}>
-                    {isOnline ? "Online tool" : "PDF resource"}
+                  <Badge
+                    tone={
+                      isOnline
+                        ? "brand"
+                        : tool.type === "excel"
+                          ? "green"
+                          : "blue"
+                    }
+                  >
+                    {toolTypeLabel(tool.type)}
                   </Badge>
                   <span className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
                     {currentIndex + 1} of {tools.length}
@@ -288,37 +315,41 @@ function ToolPreviewModal({
             </div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          {previewUrl ? (
-            <iframe
-              title={`${tool.name} preview`}
-              src={
-                isOnline
-                  ? previewUrl
-                  : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
-              }
-              loading="eager"
-              sandbox={
-                isOnline
-                  ? "allow-forms allow-popups allow-same-origin allow-scripts"
-                  : undefined
-              }
-              className="h-[68vh] min-h-[480px] w-full bg-white"
-            />
-          ) : (
-            <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">
-              <div>
-                <div className="text-base font-semibold text-ink">
-                  Preview is not available
+        {tool.type === "excel" ? (
+          <SpreadsheetViewer fileId={tool.fileId} title={tool.name} />
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            {previewUrl ? (
+              <iframe
+                title={`${tool.name} preview`}
+                src={
+                  isOnline
+                    ? previewUrl
+                    : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
+                }
+                loading="eager"
+                sandbox={
+                  isOnline
+                    ? "allow-forms allow-popups allow-same-origin allow-scripts"
+                    : undefined
+                }
+                className="h-[68vh] min-h-[480px] w-full bg-white"
+              />
+            ) : (
+              <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">
+                <div>
+                  <div className="text-base font-semibold text-ink">
+                    Preview is not available
+                  </div>
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
+                    This tool needs a {isOnline ? "tool link" : "PDF file"}{" "}
+                    before it can be previewed.
+                  </p>
                 </div>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-                  This tool needs a {isOnline ? "tool link" : "PDF file"} before
-                  it can be previewed.
-                </p>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -438,10 +469,11 @@ export default function ToolsPage() {
   );
   const [activeTool, setActiveTool] = React.useState<Tool | null>(null);
   const linkedRecord = linkedRequest.data as ToolRequestRecord | undefined;
-  const linkedRequestView = linkedRecord ? mapToolRequestRecordToUi(linkedRecord) : null;
+  const linkedRequestView = linkedRecord
+    ? mapToolRequestRecordToUi(linkedRecord)
+    : null;
   const displayedRequest = activeRequest ?? linkedRequestView;
   const displayedTab: ToolTab = linkedRequestId ? "requests" : tab;
-
 
   function closeRequest() {
     setActiveRequest(null);
@@ -451,7 +483,14 @@ export default function ToolsPage() {
 
   const toolPage = useToolsPage({
     search: debouncedQuery || undefined,
-    type: displayedTab === "pdf" ? "pdf" : displayedTab === "embed" ? "embedded_tool" : undefined,
+    type:
+      displayedTab === "pdf"
+        ? "pdf"
+        : displayedTab === "excel"
+          ? "excel"
+          : displayedTab === "embed"
+            ? "embedded_tool"
+            : undefined,
     take: pageSize,
   });
   const requestPage = useToolRequestsPage({
@@ -559,7 +598,7 @@ export default function ToolsPage() {
     <>
       <PageHeader
         title="Entrepreneur Tools"
-        description="Downloadable PDF resources and embedded online tools"
+        description="PDF resources, Excel workbooks, and online tools available to your business"
         actions={
           <Button onClick={() => setRequestOpen(true)}>+ Request a tool</Button>
         }
@@ -570,6 +609,7 @@ export default function ToolsPage() {
         tabs={[
           { value: "all", label: "All tools" },
           { value: "pdf", label: "PDF resources" },
+          { value: "excel", label: "Excel workbooks" },
           { value: "embed", label: "Online tools" },
           { value: "requests", label: "My requests" },
         ]}
@@ -734,9 +774,23 @@ export default function ToolsPage() {
           })
         }
       />
-      <Modal open={Boolean(linkedRequestId) && !displayedRequest} onOpenChange={(open) => !open && closeRequest()} title="Tool request details" width="wide">
-        {linkedRequest.isLoading ? <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-36 w-full" /></div> : null}
-        {linkedRequest.isError ? <div className="rounded-xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger">This tool request is unavailable or outside your access scope.</div> : null}
+      <Modal
+        open={Boolean(linkedRequestId) && !displayedRequest}
+        onOpenChange={(open) => !open && closeRequest()}
+        title="Tool request details"
+        width="wide"
+      >
+        {linkedRequest.isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-36 w-full" />
+          </div>
+        ) : null}
+        {linkedRequest.isError ? (
+          <div className="rounded-xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
+            This tool request is unavailable or outside your access scope.
+          </div>
+        ) : null}
       </Modal>
       <ViewToolRequestModal
         request={displayedRequest}

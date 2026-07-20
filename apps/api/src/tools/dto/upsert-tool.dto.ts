@@ -1,5 +1,17 @@
-import { IsArray, IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
-import { EntrepreneurToolStatus, EntrepreneurToolType, EntrepreneurToolVisibility } from '@prisma/client';
+import {
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import {
+  EntrepreneurToolStatus,
+  EntrepreneurToolType,
+  EntrepreneurToolVisibility,
+} from "@prisma/client";
 
 export class UpsertToolDto {
   @IsOptional()
@@ -38,7 +50,7 @@ export class UpsertToolDto {
 
   @IsOptional()
   @IsString()
-  pdfAssetId?: string | null;
+  fileAssetId?: string | null;
 
   @IsOptional()
   @IsUrl({ require_tld: false })

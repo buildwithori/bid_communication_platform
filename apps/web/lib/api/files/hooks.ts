@@ -7,11 +7,13 @@ import {
   completeDirectUploadRequest,
   createDirectUploadRequest,
   getSignedFileUrlRequest,
+  getWorkbookPreviewRequest,
 } from "./requests";
 import type {
   FileAsset,
   FileUploadProgress,
   UploadFileVariables,
+  WorkbookPreviewQuery,
 } from "./types";
 import { uploadToSignedUrl } from "./upload";
 
@@ -19,6 +21,15 @@ type MutationHandlers<T> = {
   onSuccess?: (data: T) => void;
   onError?: (error: Error) => void;
 };
+
+const workbookMimeType =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+const uploadMimeType = (file: File) =>
+  file.type ||
+  (file.name.toLowerCase().endsWith(".xlsx")
+    ? workbookMimeType
+    : "application/octet-stream");
 
 const initialProgress: FileUploadProgress = {
   loadedBytes: 0,
@@ -35,7 +46,7 @@ export function useDirectFileUploadMutation(
       setProgress({ loadedBytes: 0, totalBytes: file.size, percent: 0 });
       const directUpload = await createDirectUploadRequest({
         originalFilename: file.name,
-        mimeType: file.type,
+        mimeType: uploadMimeType(file),
         sizeBytes: file.size,
         usage,
         contentItemId,
@@ -80,4 +91,16 @@ export const useSignedFileUrlMutation = (
     mutationFn: getSignedFileUrlRequest,
     onSuccess: handlers?.onSuccess,
     onError: handlers?.onError,
+  });
+
+export const useWorkbookPreviewQuery = (
+  fileId: string | undefined,
+  query: WorkbookPreviewQuery,
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: fileKeys.workbookPreview(fileId ?? "none", query),
+    queryFn: () => getWorkbookPreviewRequest(fileId as string, query),
+    enabled: Boolean(fileId) && enabled,
+    placeholderData: (previous) => previous,
   });

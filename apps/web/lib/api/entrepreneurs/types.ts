@@ -120,7 +120,7 @@ export type EffectiveToolAccess = {
   id: string;
   name: string;
   description: string;
-  type: "pdf" | "embedded_tool";
+  type: "pdf" | "excel" | "embedded_tool";
   iconKey: string;
   visibility: "all_entrepreneurs" | "programmes" | "entrepreneurs";
   accessSource: "global" | "programme" | "individual" | "none";

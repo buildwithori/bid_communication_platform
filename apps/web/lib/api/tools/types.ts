@@ -1,4 +1,4 @@
-export type ApiToolType = "pdf" | "embedded_tool";
+export type ApiToolType = "pdf" | "excel" | "embedded_tool";
 export type ApiToolVisibility =
   "all_entrepreneurs" | "programmes" | "entrepreneurs";
 export type ApiToolStatus = "draft" | "published" | "archived";
@@ -13,7 +13,7 @@ export type ToolRecord = {
   visibility: ApiToolVisibility;
   status: ApiToolStatus;
   embeddedUrl: string | null;
-  pdfAsset: {
+  fileAsset: {
     id: string;
     originalFilename: string;
     mimeType: string;
@@ -70,7 +70,7 @@ export type ToolPayload = {
   iconKey?: string;
   visibility?: ApiToolVisibility;
   status?: ApiToolStatus;
-  pdfAssetId?: string | null;
+  fileAssetId?: string | null;
   embeddedUrl?: string | null;
   programmeIds?: string[];
   entrepreneurUserIds?: string[];

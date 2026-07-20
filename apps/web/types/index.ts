@@ -6,66 +6,56 @@
  * touching the components that consume these types.
  */
 
-export type Role = 'entrepreneur' | 'admin' | 'trainer';
+export type Role = "entrepreneur" | "admin" | "trainer";
 
 export type SectorId =
-  | 'fintech'
-  | 'agritech'
-  | 'healthtech'
-  | 'edtech'
-  | 'logistics'
-  | 'construction'
-  | 'renewable-energy';
+  | "fintech"
+  | "agritech"
+  | "healthtech"
+  | "edtech"
+  | "logistics"
+  | "construction"
+  | "renewable-energy";
 
 export type StageId = string;
 
-export type Country = 'Ghana' | 'Nigeria' | 'Kenya' | 'Rwanda';
+export type Country = "Ghana" | "Nigeria" | "Kenya" | "Rwanda";
 
-export type EntrepreneurSource = 'invited' | 'self-registered';
+export type EntrepreneurSource = "invited" | "self-registered";
 
-export type EntrepreneurStatus = 'active' | 'unassigned' | 'graduated' | 'inactive';
+export type EntrepreneurStatus =
+  "active" | "unassigned" | "graduated" | "inactive";
 
 export type TrainerRole =
-  | 'Mentor'
-  | 'Trainer'
-  | 'Guest Expert'
-  | 'Investment Analyst';
+  "Mentor" | "Trainer" | "Guest Expert" | "Investment Analyst";
 
-export type TrainerAccessLevel = 'full' | 'guest';
+export type TrainerAccessLevel = "full" | "guest";
 
-export type ProgramStatus = 'draft' | 'scheduled' | 'active' | 'completed' | 'archived';
-export type ProgramAccessType = 'assigned' | 'free';
+export type ProgramStatus =
+  "draft" | "scheduled" | "active" | "completed" | "archived";
+export type ProgramAccessType = "assigned" | "free";
 
-export type ModuleStatus = 'not-started' | 'in-progress' | 'completed';
+export type ModuleStatus = "not-started" | "in-progress" | "completed";
 
-export type ContentType = 'video' | 'pdf' | 'tool';
+export type ContentType = "video" | "pdf" | "excel" | "tool";
 
-export type ContentProgress = 'not-started' | 'in-progress' | 'completed';
+export type ContentProgress = "not-started" | "in-progress" | "completed";
 
 export type DeliverableStatus =
-  | 'pending'
-  | 'submitted'
-  | 'changes-requested'
-  | 'reviewed'
-  | 'overdue';
+  "pending" | "submitted" | "changes-requested" | "reviewed" | "overdue";
 
-export type DeliverableGroupKind =
-  | 'programme'
-  | 'general';
+export type DeliverableGroupKind = "programme" | "general";
 
 export type SessionType =
-  | 'mentor-checkin'
-  | 'office-hours'
-  | 'investor-prep'
-  | 'workshop'
-  | 'deadline';
+  "mentor-checkin" | "office-hours" | "investor-prep" | "workshop" | "deadline";
 
-export type SessionStatus = 'confirmed' | 'pending' | 'cancelled';
-export type MeetingProvider = 'google-meet' | 'zoom' | 'teams' | 'custom';
+export type SessionStatus = "confirmed" | "pending" | "cancelled";
+export type MeetingProvider = "google-meet" | "zoom" | "teams" | "custom";
 
-export type ToolType = 'pdf' | 'embed';
-export type ToolVisibility = 'all-entrepreneurs' | 'programmes' | 'entrepreneurs';
-export type ToolStatus = 'draft' | 'published' | 'archived';
+export type ToolType = "pdf" | "excel" | "embed";
+export type ToolVisibility =
+  "all-entrepreneurs" | "programmes" | "entrepreneurs";
+export type ToolStatus = "draft" | "published" | "archived";
 
 export type GoalType = string;
 
@@ -85,12 +75,7 @@ export interface Stage {
 }
 
 export type BadgeTone =
-  | 'brand'
-  | 'amber'
-  | 'blue'
-  | 'green'
-  | 'neutral'
-  | 'red';
+  "brand" | "amber" | "blue" | "green" | "neutral" | "red";
 
 export interface Entrepreneur {
   id: string;
@@ -176,14 +161,14 @@ export interface Trainer {
   specialisms: SectorId[];
   maxEntrepreneurs: number;
   accessExpiresOn?: string; // ISO date — only when accessLevel === 'guest'
-  calendarProvider?: 'google' | 'calendly' | 'none';
+  calendarProvider?: "google" | "calendly" | "none";
   calendarLink?: string;
   metrics: {
     entrepreneursCount: number;
     sessionsThisMonth: number;
     satisfactionAvg: number; // 0-5
     satisfactionRatingsCount: number;
-    status: 'active' | 'expires-soon' | 'inactive';
+    status: "active" | "expires-soon" | "inactive";
   };
 }
 
@@ -205,7 +190,7 @@ export interface Program {
   maxEntrepreneurs: number;
   description?: string;
   /** Accent color used for the left border on the card. */
-  accent: 'bid' | 'info' | 'success';
+  accent: "bid" | "info" | "success";
   /** Number of entrepreneurs currently active/enrolled in the programme. */
   entrepreneursCount: number;
   moduleIds: string[];
@@ -261,7 +246,7 @@ export interface Deliverable {
   dueDate?: string; // ISO date
   submittedAt?: string; // ISO date
   fileName?: string;
-  fileType?: 'pdf' | 'pptx' | 'docx' | 'xlsx';
+  fileType?: "pdf" | "pptx" | "docx" | "xlsx";
   notes?: string;
   reviewFeedback?: string;
   feedbackHistory?: DeliverableFeedback[];
@@ -281,7 +266,7 @@ export interface DeliverableGroup {
   id: string;
   label: string;
   programmeId?: string;
-  accent: 'bid' | 'info' | 'success';
+  accent: "bid" | "info" | "success";
   pendingCount: number;
   doneCount: number;
 }
@@ -294,11 +279,11 @@ export interface Session {
   date: string; // ISO date
   startTime?: string; // "10:00"
   endTime?: string; // "10:45"
-  location?: 'virtual' | 'in-person';
+  location?: "virtual" | "in-person";
   meetingProvider?: MeetingProvider;
   meetingUrl?: string;
   status: SessionStatus;
-  accent: 'bid' | 'info' | 'success' | 'warning' | 'neutral';
+  accent: "bid" | "info" | "success" | "warning" | "neutral";
   isDeadline?: boolean;
 }
 
@@ -317,16 +302,16 @@ export interface Tool {
   programmeIds?: string[];
   /** Individual entrepreneurs that can see this tool when visibility === 'entrepreneurs'. */
   entrepreneurIds?: string[];
-  /** Display name of the uploaded template file. */
-  pdfFileName?: string;
-  /** Browser-renderable PDF URL for downloadable templates. */
-  pdfUrl?: string;
+  /** Display name and secure file reference for uploaded resources. */
+  fileName?: string;
+  fileUrl?: string;
+  fileId?: string;
   /** Browser-renderable URL for embedded online tools. */
   embedUrl?: string;
   /** ISO timestamp for the last admin update. */
   updatedAt?: string;
   /** Icon key used by the rendering layer. */
-  iconKey: 'canvas' | 'document' | 'timer' | 'star' | 'plus' | 'calendar';
+  iconKey: "canvas" | "document" | "timer" | "star" | "plus" | "calendar";
 }
 
 export interface ActivityEntry {
@@ -335,7 +320,7 @@ export interface ActivityEntry {
   /** Highlighted portion of `text` rendered bold. */
   emphasis?: string;
   timestamp: string; // human readable ("2h ago")
-  accent: 'bid' | 'info' | 'warning' | 'neutral';
+  accent: "bid" | "info" | "warning" | "neutral";
 }
 
 export interface PendingAction {
@@ -361,6 +346,6 @@ export interface ProgramBreakdownRow {
   programName: string;
   value: number;
   label: string; // formatted value e.g. "$150k", "38"
-  accent: 'bid' | 'info' | 'success' | 'neutral';
+  accent: "bid" | "info" | "success" | "neutral";
   percent: number; // 0-100 bar width
 }

@@ -1,6 +1,17 @@
-import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
-import { ContentItemType } from '@prisma/client';
+import { Transform } from "class-transformer";
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateIf,
+} from "class-validator";
+import { ContentItemType } from "@prisma/client";
 
 export class CreateContentItemDto {
   @IsString()
@@ -16,13 +27,18 @@ export class CreateContentItemDto {
   trainerId?: string;
 
   @IsOptional()
-  @Transform(({ value }) => (value === undefined || value === '' ? undefined : Number(value)))
+  @Transform(({ value }) =>
+    value === undefined || value === "" ? undefined : Number(value),
+  )
   @IsInt()
   @Min(1)
   @Max(24 * 60 * 60)
   durationSeconds?: number;
 
-  @ValidateIf((dto: CreateContentItemDto) => dto.type === ContentItemType.pdf)
+  @ValidateIf(
+    (dto: CreateContentItemDto) =>
+      dto.type === ContentItemType.pdf || dto.type === ContentItemType.excel,
+  )
   @IsString()
   fileAssetId?: string;
 
@@ -30,11 +46,17 @@ export class CreateContentItemDto {
   @IsString()
   videoAssetId?: string;
 
-  @ValidateIf((dto: CreateContentItemDto) => dto.type === ContentItemType.tool && !dto.externalUrl)
+  @ValidateIf(
+    (dto: CreateContentItemDto) =>
+      dto.type === ContentItemType.tool && !dto.externalUrl,
+  )
   @IsString()
   toolId?: string;
 
-  @ValidateIf((dto: CreateContentItemDto) => dto.type === ContentItemType.tool && !dto.toolId)
+  @ValidateIf(
+    (dto: CreateContentItemDto) =>
+      dto.type === ContentItemType.tool && !dto.toolId,
+  )
   @IsUrl({ require_tld: false })
   @MaxLength(500)
   externalUrl?: string;

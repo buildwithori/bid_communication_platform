@@ -41,9 +41,9 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Programme goals are per entrepreneur user, not per business. Do not add `target_date` unless a real goal deadline workflow is introduced.
 - Fundraising rounds are per entrepreneur user, not per business. Business-level funding history should be derived through the entrepreneur's business membership.
 - Periodic updates are per entrepreneur user, not per business. They collect jobs and notes; funding belongs in fundraising rounds.
-- Entrepreneur tools need a tool area, icon, visibility, status, and either a PDF upload or embedded URL. Tool visibility is global, programme-based, or entrepreneur-specific, with per-entrepreneur hidden overrides for exceptions.
+- Entrepreneur tools need a tool area, icon, visibility, status, and either a PDF upload, Excel workbook upload, or embedded URL. Tool visibility is global, programme-based, or entrepreneur-specific, with per-entrepreneur hidden overrides for exceptions.
 - Entrepreneur tool drafts and archived tools may be incomplete. Enforce the required asset and audience only when publishing, and validate partial status updates against the tool's persisted audience instead of treating omitted relationship IDs as empty.
-- Programme learning content can reuse any published entrepreneur tool. Linked PDFs must retain authenticated file access and render inside the course player; do not expose provider URLs or force users into a new tab.
+- Programme learning content can reuse any published entrepreneur tool. Linked PDFs and Excel workbooks must retain authenticated file access and render inside the course player; do not expose provider URLs or force users into a new tab.
 - Do not show “primary programme” or “latest programme” in the UI unless the business explicitly adds a real primary-programme field and workflow. The current `programmeId` is a legacy/default pointer; `programmeIds` is the enrolment list.
 - Do not show a “Graduated” KPI unless there is a real graduation workflow/status transition behind it. Until then, use computable programme-access metrics such as “With programmes”.
 - Programme impact reporting needs explicit attribution. Jobs come from periodic job-impact updates with a reporting scope. Funds mobilised come from fundraising history with programme attribution or stay company-wide/unattributed. Do not force unattributed records into a programme chart.
@@ -249,6 +249,7 @@ Session workflow rules:
 
 - Non-video files are uploaded directly to private S3-compatible storage. Local Docker uses private MinIO; production uses DigitalOcean Spaces. The API verifies object size, MIME metadata, and supported file signatures before marking an asset ready.
 - File consumers pass an explicit usage and internal `fileAssetId`; storage keys and private provider URLs stay server-only. Reads use short-lived signed URLs after role/domain access checks.
+- Excel learning content and entrepreneur tools support verified `.xlsx` workbooks only. Workbook previews remain authenticated, are parsed by the backend into bounded row/column windows, use a small version-keyed parse cache, and render through the shared in-app spreadsheet viewer; React must not download and parse entire private workbooks.
 - Video consumers pass an internal `videoAssetId`, never a user-entered Mux upload, asset, or playback ID. Mux callbacks use the explicit public `POST /webhooks/mux` exception, raw-body HMAC verification, and durable event IDs for idempotency.
 - Ready videos use separate short-lived RS256 Mux video and thumbnail tokens after programme/content authorization. Signed thumbnails use the same authorised playback ID and expiry with Mux image audience `t`, allowing Mux Player to render its generated poster without making protected media public. Frontend file/video feature hooks own direct-upload progress, cancellation, status polling, failures, and TanStack calls.
 
@@ -256,7 +257,7 @@ Session workflow rules:
 
 - Feature 8 is complete. Admin programme lifecycle, curriculum/module management, content library, module content sequencing, and trainer attribution use authenticated NestJS APIs and feature-owned frontend hooks.
 - Trainer programme visibility is inferred from trainer-attributed learning assets. Trainer programme lists, summaries, detail, curriculum, readiness, programme entrepreneurs, and content metadata must remain server-scoped; React must not reconstruct trainer scope from broad datasets.
-- Within a programme a trainer is authorized to support, the trainer may preview the full curriculum, including content attributed to other trainers. Signed PDF and Mux access checks must verify shared programme scope and must not expose unrelated programme content.
+- Within a programme a trainer is authorized to support, the trainer may preview the full curriculum, including content attributed to other trainers. Signed PDF, Excel workbook, and Mux access checks must verify shared programme scope and must not expose unrelated programme content.
 - Programme and module management lists use cursor pagination and backend search. A content item may appear at most once within a programme, even when modules are shared across programmes; reuse lookups exclude invalid programmes/modules and the transactional attach guard locks every affected context before rechecking. The shared programme player intentionally loads the complete ordered curriculum after role-scoped authorization, then requests signed file/video access only for the active lesson.
 - Admin permanent deletion uses exact-name confirmation in both UI and API. Programme deletion removes programme-scoped entrepreneur data but preserves reusable library content; module deletion removes programme-specific progress and dependent deliverables while preserving content; global content deletion removes all module links, learner progress, ratings, and queues Mux/storage cleanup. External cleanup records are committed with the database deletion and drained idempotently by BullMQ.
 
@@ -264,7 +265,7 @@ Session workflow rules:
 
 - Feature 11 is complete across /admin/entrepreneur-tools, /admin/tool-requests, and /entrepreneur/tools.
 - Tool and request pages consume only feature integration hooks. Tool areas and growing audience/tool selectors load lazily with infinite pagination; catalogue and request lists use backend search, filtering, counts, and cursor pagination.
-- Admins retain create/edit/details/preview/status/audience flows. PDF resources use the shared private direct-upload flow; embedded tools use validated URLs; hidden entrepreneur exceptions remain supported.
+- Admins retain create/edit/details/preview/status/audience flows. PDF and Excel resources use the shared private direct-upload flow and internal viewers; embedded tools use validated URLs; hidden entrepreneur exceptions remain supported.
 - Entrepreneur requests require a real business need. Admin actions follow backend-provided transitions, and Built requires selecting the published library tool that fulfills the request.
 
 ## Sessions And Calendar Completion (2026-07-16)

@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   AssetStatus,
   ContentItemStatus,
@@ -14,18 +14,18 @@ import {
   ToolLinkSource,
   User,
   UserRole,
-} from '@prisma/client';
-import { AuditService } from '../audit/audit.service';
-import { PrismaService } from '../database/prisma.service';
-import { FilesService } from '../files/files.service';
+} from "@prisma/client";
+import { AuditService } from "../audit/audit.service";
+import { PrismaService } from "../database/prisma.service";
+import { FilesService } from "../files/files.service";
 import {
   AttachContentItemDto,
   ContentItemQueryDto,
   MoveModuleContentItemDto,
   UpdateContentItemDto,
-} from './dto/content-query.dto';
-import { CreateContentItemDto } from './dto/create-content-item.dto';
-import { UpsertContentRatingDto } from './dto/upsert-content-rating.dto';
+} from "./dto/content-query.dto";
+import { CreateContentItemDto } from "./dto/create-content-item.dto";
+import { UpsertContentRatingDto } from "./dto/upsert-content-rating.dto";
 
 const contentItemInclude = {
   trainer: {
@@ -132,7 +132,7 @@ export class ContentService {
 
     if (!module) {
       throw new ForbiddenException(
-        'You do not have access to this module content.',
+        "You do not have access to this module content.",
       );
     }
   }
@@ -150,12 +150,14 @@ export class ContentService {
       await this.ensureToolSource(input);
     }
 
-    const pdfAsset =
-      input.type === ContentItemType.pdf
+    const fileAsset =
+      input.type === ContentItemType.pdf || input.type === ContentItemType.excel
         ? await this.filesService.markReadyForUser(
             user,
             input.fileAssetId as string,
-            FileAssetUsage.content_pdf,
+            input.type === ContentItemType.excel
+              ? FileAssetUsage.content_excel
+              : FileAssetUsage.content_pdf,
           )
         : null;
     const videoAsset =
@@ -165,10 +167,10 @@ export class ContentService {
 
     const created = await this.audit.capture(
       {
-        action: 'content_items.created',
-        entityType: 'content_item',
+        action: "content_items.created",
+        entityType: "content_item",
         entityId: ({ id }) => id,
-        summary: ({ name }) => `Created content item ${name ?? ''}`.trim(),
+        summary: ({ name }) => `Created content item ${name ?? ""}`.trim(),
         payload: { moduleId, type: input.type },
       },
       async (tx) => {
@@ -194,14 +196,14 @@ export class ContentService {
           });
           if (attached.count !== 1) {
             throw new BadRequestException(
-              'This video upload is already attached.',
+              "This video upload is already attached.",
             );
           }
         }
 
-        if (pdfAsset) {
+        if (fileAsset) {
           await tx.fileAsset.update({
-            where: { id: pdfAsset.id },
+            where: { id: fileAsset.id },
             data: {
               contentItemId: contentItem.id,
               status: AssetStatus.ready,
@@ -247,24 +249,23 @@ export class ContentService {
 
     const updated = await this.audit.capture(
       {
-        action: 'content_items.updated',
-        entityType: 'content_item',
+        action: "content_items.updated",
+        entityType: "content_item",
         entityId: ({ id }) => id,
-        summary: ({ name }) => `Updated content item ${name ?? ''}`.trim(),
+        summary: ({ name }) => `Updated content item ${name ?? ""}`.trim(),
       },
       async (tx) => {
         const existing = await tx.contentItem.findUnique({
           where: { id: contentItemId },
           select: { id: true },
         });
-        if (!existing) throw new NotFoundException('Content item was not found.');
+        if (!existing)
+          throw new NotFoundException("Content item was not found.");
 
         const item = await tx.contentItem.update({
           where: { id: contentItemId },
           data: {
-            ...(input.title !== undefined
-              ? { title: input.title.trim() }
-              : {}),
+            ...(input.title !== undefined ? { title: input.title.trim() } : {}),
             ...(input.trainerId !== undefined
               ? { trainerId: input.trainerId || null }
               : {}),
@@ -286,10 +287,10 @@ export class ContentService {
 
     await this.audit.capture(
       {
-        action: 'content_items.attached',
-        entityType: 'content_item',
+        action: "content_items.attached",
+        entityType: "content_item",
         entityId: ({ id }) => id,
-        summary: ({ name }) => `Attached content item ${name ?? ''}`.trim(),
+        summary: ({ name }) => `Attached content item ${name ?? ""}`.trim(),
         payload: { moduleId },
       },
       async (tx) => {
@@ -307,9 +308,9 @@ export class ContentService {
           }),
         ]);
 
-        if (!module) throw new NotFoundException('Module was not found.');
+        if (!module) throw new NotFoundException("Module was not found.");
         if (!contentItem) {
-          throw new NotFoundException('Content item was not found.');
+          throw new NotFoundException("Content item was not found.");
         }
 
         await tx.$queryRaw(Prisma.sql`
@@ -351,8 +352,8 @@ export class ContentService {
         if (existing) {
           throw new BadRequestException(
             existing.moduleId === moduleId
-              ? 'This content item is already attached to the module.'
-              : 'This content item is already used in a programme connected to this module.',
+              ? "This content item is already attached to the module."
+              : "This content item is already used in a programme connected to this module.",
           );
         }
 
@@ -385,10 +386,10 @@ export class ContentService {
 
     await this.audit.capture(
       {
-        action: 'content_items.reordered',
-        entityType: 'content_item',
+        action: "content_items.reordered",
+        entityType: "content_item",
         entityId: ({ id }) => id,
-        summary: ({ name }) => `Reordered content item ${name ?? ''}`.trim(),
+        summary: ({ name }) => `Reordered content item ${name ?? ""}`.trim(),
         payload: { moduleId, targetPosition: input.position },
       },
       async (tx) => {
@@ -402,7 +403,7 @@ export class ContentService {
           tx.moduleContentItem.count({ where: { moduleId } }),
         ]);
         if (!link) {
-          throw new NotFoundException('Module content item was not found.');
+          throw new NotFoundException("Module content item was not found.");
         }
 
         const targetPosition = Math.min(input.position, total);
@@ -461,7 +462,7 @@ export class ContentService {
       where: { id: input.contentItemId },
       select: { id: true, trainerId: true },
     });
-    if (!contentItem) throw new NotFoundException('Content item not found.');
+    if (!contentItem) throw new NotFoundException("Content item not found.");
 
     const comment = input.comment?.trim() || null;
     const rating = await this.prisma.contentRating.upsert({
@@ -511,15 +512,13 @@ export class ContentService {
       this.prisma.moduleContentItem.findMany({
         where,
         include: { contentItem: { include: contentItemInclude } },
-        orderBy: { position: 'asc' },
+        orderBy: { position: "asc" },
         take: take + 1,
-        ...(query.cursor
-          ? { cursor: { id: query.cursor }, skip: 1 }
-          : {}),
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       }),
       this.prisma.moduleContentItem.count({ where }),
       this.prisma.contentItem.groupBy({
-        by: ['type'],
+        by: ["type"],
         where: {
           ...this.contentWhere({
             ...query,
@@ -561,25 +560,29 @@ export class ContentService {
     const learnerProgress = new Map(
       learnerProgressRows.map((row) => [row.contentItemId, row]),
     );
-    const counts = { video: 0, pdf: 0, tool: 0 };
+    const counts = { video: 0, pdf: 0, excel: 0, tool: 0 };
     for (const row of grouped) counts[row.type] = row._count.id;
 
     return {
       items: pageRows.map((row) =>
-        this.serializeContentItem(row.contentItem, {
-          ...(usage.get(row.contentItemId) ?? {
-            modules: row.contentItem._count.modules,
-            programmes: 0,
+        this.serializeContentItem(
+          row.contentItem,
+          {
+            ...(usage.get(row.contentItemId) ?? {
+              modules: row.contentItem._count.modules,
+              programmes: 0,
+              position: row.position,
+            }),
             position: row.position,
-          }),
-          position: row.position,
-        }, learnerProgress.get(row.contentItemId)),
+          },
+          learnerProgress.get(row.contentItemId),
+        ),
       ),
       nextCursor:
-        rows.length > take ? pageRows[pageRows.length - 1]?.id ?? null : null,
+        rows.length > take ? (pageRows[pageRows.length - 1]?.id ?? null) : null,
       totalItems,
       summary: {
-        total: counts.video + counts.pdf + counts.tool,
+        total: counts.video + counts.pdf + counts.excel + counts.tool,
         ...counts,
       },
     };
@@ -594,15 +597,13 @@ export class ContentService {
       this.prisma.contentItem.findMany({
         where,
         include: contentItemInclude,
-        orderBy: { id: 'desc' },
+        orderBy: { id: "desc" },
         take: take + 1,
-        ...(query.cursor
-          ? { cursor: { id: query.cursor }, skip: 1 }
-          : {}),
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       }),
       this.prisma.contentItem.count({ where }),
       this.prisma.contentItem.groupBy({
-        by: ['type'],
+        by: ["type"],
         where: summaryWhere,
         _count: { id: true },
       }),
@@ -616,6 +617,7 @@ export class ContentService {
     const counts = {
       video: 0,
       pdf: 0,
+      excel: 0,
       tool: 0,
     };
     for (const row of grouped) {
@@ -626,16 +628,19 @@ export class ContentService {
       items: items.map((item) =>
         this.serializeContentItem(item, usage.get(item.id)),
       ),
-      nextCursor: rows.length > take ? items[items.length - 1]?.id ?? null : null,
+      nextCursor:
+        rows.length > take ? (items[items.length - 1]?.id ?? null) : null,
       totalItems,
       summary: {
-        total: counts.video + counts.pdf + counts.tool,
+        total: counts.video + counts.pdf + counts.excel + counts.tool,
         ...counts,
       },
     };
   }
 
-  private contentWhere(query: ContentItemQueryDto): Prisma.ContentItemWhereInput {
+  private contentWhere(
+    query: ContentItemQueryDto,
+  ): Prisma.ContentItemWhereInput {
     const search = query.search?.trim();
     return {
       ...(query.type ? { type: query.type } : {}),
@@ -650,7 +655,7 @@ export class ContentService {
       ...(search
         ? {
             OR: [
-              { title: { contains: search, mode: 'insensitive' } },
+              { title: { contains: search, mode: "insensitive" } },
               {
                 trainer: {
                   is: {
@@ -658,19 +663,19 @@ export class ContentService {
                       {
                         firstName: {
                           contains: search,
-                          mode: 'insensitive',
+                          mode: "insensitive",
                         },
                       },
                       {
                         lastName: {
                           contains: search,
-                          mode: 'insensitive',
+                          mode: "insensitive",
                         },
                       },
                       {
                         email: {
                           contains: search,
-                          mode: 'insensitive',
+                          mode: "insensitive",
                         },
                       },
                     ],
@@ -688,12 +693,15 @@ export class ContentService {
       where: { id: contentItemId },
       include: contentItemInclude,
     });
-    if (!item) throw new NotFoundException('Content item was not found.');
+    if (!item) throw new NotFoundException("Content item was not found.");
     const usage = await this.contentUsage([contentItemId], moduleId);
     return this.serializeContentItem(item, usage.get(contentItemId));
   }
 
-  private async contentUsage(contentItemIds: string[], scopedModuleId?: string) {
+  private async contentUsage(
+    contentItemIds: string[],
+    scopedModuleId?: string,
+  ) {
     const result = new Map<string, ContentUsage>();
     if (!contentItemIds.length) return result;
 
@@ -723,8 +731,8 @@ export class ContentService {
       );
       const programmeIds = new Set<string>();
       for (const placement of contentPlacements) {
-        for (const programmeId of
-          programmesByModule.get(placement.moduleId) ?? []) {
+        for (const programmeId of programmesByModule.get(placement.moduleId) ??
+          []) {
           programmeIds.add(programmeId);
         }
       }
@@ -776,7 +784,7 @@ export class ContentService {
     });
     if (!content) {
       throw new ForbiddenException(
-        'You do not have access to this learning content.',
+        "You do not have access to this learning content.",
       );
     }
   }
@@ -786,7 +794,7 @@ export class ContentService {
       where: { id: moduleId },
       select: { id: true },
     });
-    if (!module) throw new NotFoundException('Module was not found.');
+    if (!module) throw new NotFoundException("Module was not found.");
   }
 
   private async ensureTrainerExists(trainerId?: string) {
@@ -795,17 +803,17 @@ export class ContentService {
       where: { id: trainerId, role: UserRole.trainer },
       select: { id: true },
     });
-    if (!trainer) throw new NotFoundException('Trainer was not found.');
+    if (!trainer) throw new NotFoundException("Trainer was not found.");
   }
 
   private async ensureVideoAsset(user: User, videoAssetId: string) {
     const video = await this.prisma.videoAsset.findUnique({
       where: { id: videoAssetId },
     });
-    if (!video) throw new NotFoundException('Uploaded video was not found.');
+    if (!video) throw new NotFoundException("Uploaded video was not found.");
     if (video.uploadedById !== user.id || video.contentItemId) {
       throw new ForbiddenException(
-        'Uploaded video is not in your upload scope.',
+        "Uploaded video is not in your upload scope.",
       );
     }
     if (
@@ -813,7 +821,7 @@ export class ContentService {
       video.status === AssetStatus.archived
     ) {
       throw new BadRequestException(
-        'Upload a valid video before creating this content item.',
+        "Upload a valid video before creating this content item.",
       );
     }
     return video;
@@ -828,21 +836,21 @@ export class ContentService {
           type: true,
           status: true,
           embeddedUrl: true,
-          pdfAssetId: true,
+          fileAssetId: true,
         },
       });
-      if (!tool) throw new NotFoundException('Tool was not found.');
-      if (tool.status !== 'published') {
+      if (!tool) throw new NotFoundException("Tool was not found.");
+      if (tool.status !== "published") {
         throw new ForbiddenException(
-          'Only published entrepreneur tools can be attached to learning content.',
+          "Only published entrepreneur tools can be attached to learning content.",
         );
       }
       if (
-        (tool.type === 'embedded_tool' && !tool.embeddedUrl) ||
-        (tool.type === 'pdf' && !tool.pdfAssetId)
+        (tool.type === "embedded_tool" && !tool.embeddedUrl) ||
+        ((tool.type === "pdf" || tool.type === "excel") && !tool.fileAssetId)
       ) {
         throw new ForbiddenException(
-          'This entrepreneur tool does not have a previewable resource.',
+          "This entrepreneur tool does not have a previewable resource.",
         );
       }
       return;
@@ -850,7 +858,7 @@ export class ContentService {
 
     if (!input.externalUrl?.trim()) {
       throw new ForbiddenException(
-        'Choose an existing tool or add an embedded tool link.',
+        "Choose an existing tool or add an embedded tool link.",
       );
     }
   }
@@ -913,7 +921,7 @@ export class ContentService {
             source: item.toolLink.source,
             toolName: item.toolLink.tool?.name ?? null,
             toolType: item.toolLink.tool?.type ?? null,
-            fileId: item.toolLink.tool?.pdfAssetId ?? null,
+            fileId: item.toolLink.tool?.fileAssetId ?? null,
             url: item.toolLink.tool?.embeddedUrl ?? item.toolLink.externalUrl,
           }
         : null,
@@ -942,20 +950,20 @@ export class ContentService {
     email: string;
   }) {
     const name =
-      [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+      [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
     return { id: user.id, name, email: user.email };
   }
 
   private assertAdmin(user: User) {
     if (user.role !== UserRole.admin) {
-      throw new ForbiddenException('Only admins can manage content.');
+      throw new ForbiddenException("Only admins can manage content.");
     }
   }
 
   private assertEntrepreneur(user: User) {
     if (user.role !== UserRole.entrepreneur) {
       throw new ForbiddenException(
-        'Only entrepreneurs can rate learning content.',
+        "Only entrepreneurs can rate learning content.",
       );
     }
   }

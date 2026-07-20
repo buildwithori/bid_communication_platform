@@ -243,7 +243,7 @@ Scope:
 - Free programme support.
 - Module create/edit/reuse/reorder.
 - Content library.
-- Content items: video, PDF, embedded tool.
+- Content items: video, PDF, Excel workbook, embedded tool.
 - Trainer attribution on content items.
 - Trainer readonly programme context and curriculum/content preview.
 
@@ -261,8 +261,8 @@ Business rules:
 - Completed is derived from the end date. Archive is only available after timeline completion.
 - Max entrepreneurs is required.
 - Video upload uses Mux.
-- PDF/file upload uses DigitalOcean Spaces.
-- Learning tool content can reuse any published entrepreneur tool, including PDF resources and online tools. A custom online tool may use a direct URL.
+- PDF and Excel file upload uses DigitalOcean Spaces.
+- Learning tool content can reuse any published entrepreneur tool, including PDF resources, Excel workbooks, and online tools. A custom online tool may use a direct URL.
 
 Done when:
 
@@ -271,7 +271,7 @@ Done when:
 - Module and content lists paginate or cap visually with full pagination/infinite scrolling available.
 - Drag and drop reorder exists where order matters, with a fallback move-to-position action for paginated lists.
 
-Implementation status (2026-07-20): Complete. Admin programme directory, lifecycle, detail workspace, module create/edit/reuse/reorder, content library, module content management, direct asset-backed content creation, and reusable content attachment use authenticated APIs with backend search, cursor pagination, aggregate metrics, tailored skeletons, and guarded mutations. Reuse destinations exclude programmes and shared modules that would duplicate the content within any programme, with a transactionally locked backend recheck before attachment. Entrepreneur learning and authorized admin/trainer preview now share one robust in-page course player with an expandable complete curriculum, video resume/checkpoints, signed PDF and Mux playback, embedded tools, previous/next navigation, completion progress, and completion-driven rating prompts. `GET /programmes/:id/player` returns the full ordered curriculum as a deliberate bounded programme-view contract: entrepreneurs receive ready content and their own progress, trainers receive ready content without learner progress, and only admins see processing, failed, or otherwise non-ready content. Management directories remain cursor-paginated. Permanent programme, module, and global content deletion is admin-only, exact-name confirmed in both UI and API, transactionally cascades scoped database records, preserves reusable library assets where required, and queues Mux, private-storage, and Google Calendar cleanup through a durable retrying outbox worker.
+Implementation status (2026-07-20): Complete. Admin programme directory, lifecycle, detail workspace, module create/edit/reuse/reorder, content library, module content management, direct asset-backed content creation, and reusable content attachment use authenticated APIs with backend search, cursor pagination, aggregate metrics, tailored skeletons, and guarded mutations. Reuse destinations exclude programmes and shared modules that would duplicate the content within any programme, with a transactionally locked backend recheck before attachment. Entrepreneur learning and authorized admin/trainer preview now share one robust in-page course player with an expandable complete curriculum, video resume/checkpoints, signed PDF, authenticated Excel worksheet rendering, and Mux playback, embedded tools, previous/next navigation, completion progress, and completion-driven rating prompts. `GET /programmes/:id/player` returns the full ordered curriculum as a deliberate bounded programme-view contract: entrepreneurs receive ready content and their own progress, trainers receive ready content without learner progress, and only admins see processing, failed, or otherwise non-ready content. Management directories remain cursor-paginated. Permanent programme, module, and global content deletion is admin-only, exact-name confirmed in both UI and API, transactionally cascades scoped database records, preserves reusable library assets where required, and queues Mux, private-storage, and Google Calendar cleanup through a durable retrying outbox worker.
 
 ### 9. Learner Progress And Training Library
 
@@ -361,7 +361,7 @@ Frontend routes:
 Business rules:
 
 - Tools can be globally visible, programme-scoped, entrepreneur-scoped, or hidden for specific entrepreneurs.
-- PDF tools use file upload.
+- PDF and Excel tools use private file uploads.
 - Embedded tools use a URL.
 - Tool requests have admin decisions and state transitions.
 
@@ -372,7 +372,7 @@ Done when:
 - Tool requests have complete admin and entrepreneur views.
 - Tool request states expose only valid next actions.
 
-Implementation status (2026-07-20): Complete. The admin library uses authenticated cursor pagination, backend search/filtering and aggregate metrics, lazy tool-area/programme/entrepreneur lookups, private PDF direct uploads, embedded URLs, global/programme/entrepreneur visibility, hidden entrepreneur exceptions, audited mutations, guarded publish/archive transitions, and page-specific loading states. Draft and archive transitions allow incomplete configuration, while publishing validates the complete effective asset and persisted audience even for status-only updates. Entrepreneur tools are server-scoped to effective access with management metadata redacted, searchable and paginated by type, and retain PDF/embedded preview flows. Entrepreneur requests and the admin review queue use scoped cursor pagination, backend status counts, required business-need validation, audited valid transitions, decision notes, and published-library-tool linking before Built.
+Implementation status (2026-07-20): Complete. The admin library uses authenticated cursor pagination, backend search/filtering and aggregate metrics, lazy tool-area/programme/entrepreneur lookups, private PDF and Excel direct uploads, embedded URLs, global/programme/entrepreneur visibility, hidden entrepreneur exceptions, audited mutations, guarded publish/archive transitions, and page-specific loading states. Draft and archive transitions allow incomplete configuration, while publishing validates the complete effective asset and persisted audience even for status-only updates. Entrepreneur tools are server-scoped to effective access with management metadata redacted, searchable and paginated by type, and retain PDF, Excel worksheet, and embedded preview flows. Entrepreneur requests and the admin review queue use scoped cursor pagination, backend status counts, required business-need validation, audited valid transitions, decision notes, and published-library-tool linking before Built.
 
 ### 12. Sessions And Calendar
 

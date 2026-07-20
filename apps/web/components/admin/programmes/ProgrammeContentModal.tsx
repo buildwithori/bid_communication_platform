@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useDebouncedValue } from '@/lib/search';
-import * as React from 'react';
+import { useDebouncedValue } from "@/lib/search";
+import * as React from "react";
 import {
   closestCenter,
   DndContext,
@@ -10,32 +10,38 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-} from '@dnd-kit/core';
+} from "@dnd-kit/core";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { FileText, GripVertical, PlayCircle, Wrench } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  FileSpreadsheet,
+  FileText,
+  GripVertical,
+  PlayCircle,
+  Wrench,
+} from "lucide-react";
+import { toast } from "sonner";
 import {
   CreateContentItemModal,
   EditContentItemModal,
-} from '@/components/admin/content/ContentItemModals';
-import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Skeleton } from '@/components/shared/Card';
+} from "@/components/admin/content/ContentItemModals";
+import { MoveModulePositionModal } from "@/components/admin/programmes/MoveModulePositionModal";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Skeleton } from "@/components/shared/Card";
 import {
   FormAutocomplete,
   FormField,
   FormInput,
-} from '@/components/shared/FormField';
-import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
-import { Modal } from '@/components/shared/Modal';
-import { Notice } from '@/components/shared/PageHeader';
+} from "@/components/shared/FormField";
+import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { Modal } from "@/components/shared/Modal";
+import { Notice } from "@/components/shared/PageHeader";
 import {
   useAttachContentItemMutation,
   useDeleteContentItemMutation,
@@ -43,15 +49,16 @@ import {
   useModuleContentItemsInfinite,
   useMoveModuleContentItemMutation,
   type ContentItemRecord,
-} from '@/lib/api/content';
-import { cn } from '@/lib/utils';
+} from "@/lib/api/content";
+import { cn } from "@/lib/utils";
 
 type ModuleSummary = { id: string; title: string };
 
 const typeMeta = {
-  video: { label: 'Video', icon: PlayCircle, tone: 'blue' },
-  pdf: { label: 'PDF', icon: FileText, tone: 'neutral' },
-  tool: { label: 'Tool', icon: Wrench, tone: 'green' },
+  video: { label: "Video", icon: PlayCircle, tone: "blue" },
+  pdf: { label: "PDF", icon: FileText, tone: "neutral" },
+  excel: { label: "Excel", icon: FileSpreadsheet, tone: "green" },
+  tool: { label: "Tool", icon: Wrench, tone: "green" },
 } as const;
 
 export function ProgrammeContentModal({
@@ -67,12 +74,18 @@ export function ProgrammeContentModal({
 }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [reuseOpen, setReuseOpen] = React.useState(false);
-  const [editItem, setEditItem] = React.useState<ContentItemRecord | null>(null);
-  const [moveItem, setMoveItem] = React.useState<ContentItemRecord | null>(null);
-  const [deleteItem, setDeleteItem] = React.useState<ContentItemRecord | null>(null);
-  const [search, setSearch] = React.useState('');
+  const [editItem, setEditItem] = React.useState<ContentItemRecord | null>(
+    null,
+  );
+  const [moveItem, setMoveItem] = React.useState<ContentItemRecord | null>(
+    null,
+  );
+  const [deleteItem, setDeleteItem] = React.useState<ContentItemRecord | null>(
+    null,
+  );
+  const [search, setSearch] = React.useState("");
   const debouncedSearch = useDebouncedValue(search);
-  const items = useModuleContentItemsInfinite(module?.id ?? '', {
+  const items = useModuleContentItemsInfinite(module?.id ?? "", {
     enabled: open && Boolean(module),
     search: debouncedSearch.trim() || undefined,
     take: 20,
@@ -80,18 +93,20 @@ export function ProgrammeContentModal({
   const deleteContent = useDeleteContentItemMutation({
     onSuccess: () => {
       setDeleteItem(null);
-      toast.success('Content deleted.');
+      toast.success("Content deleted.");
     },
     onError: (error) => toast.error(error.message),
   });
   const move = useMoveModuleContentItemMutation({
-    onSuccess: () => toast.success('Content position updated.'),
+    onSuccess: () => toast.success("Content position updated."),
     onError: (error) => toast.error(error.message),
   });
   const canReorder = !readOnly && !debouncedSearch.trim() && !move.isPending;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   if (!module) return null;
@@ -123,7 +138,8 @@ export function ProgrammeContentModal({
               <div>
                 <div className="font-semibold text-ink">Content sequence</div>
                 <p className="mt-1 text-sm leading-6 text-ink-muted">
-                  Add, reuse, and order the learning assets entrepreneurs see in this module.
+                  Add, reuse, and order the learning assets entrepreneurs see in
+                  this module.
                 </p>
               </div>
               {!readOnly ? (
@@ -192,12 +208,12 @@ export function ProgrammeContentModal({
           ) : (
             <div className="rounded-xl border border-dashed border-line-strong bg-surface-subtle px-5 py-10 text-center">
               <div className="font-semibold text-ink">
-                {search ? 'No matching content' : 'No content items yet'}
+                {search ? "No matching content" : "No content items yet"}
               </div>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
                 {search
-                  ? 'Try a different search.'
-                  : 'Upload a video or PDF, add an embedded tool, or reuse an existing library item.'}
+                  ? "Try a different search."
+                  : "Upload a video or PDF, add an embedded tool, or reuse an existing library item."}
               </p>
             </div>
           )}
@@ -236,7 +252,7 @@ export function ProgrammeContentModal({
         }}
       />
       <MoveModulePositionModal
-        key={moveItem?.id ?? 'closed'}
+        key={moveItem?.id ?? "closed"}
         open={Boolean(moveItem)}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setMoveItem(null);
@@ -316,8 +332,8 @@ function ContentSequenceItem({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'flex flex-col gap-3 rounded-xl border border-line bg-white p-3 shadow-sm sm:flex-row sm:items-center',
-        isDragging && 'relative z-10 border-bid/30 shadow-xl',
+        "flex flex-col gap-3 rounded-xl border border-line bg-white p-3 shadow-sm sm:flex-row sm:items-center",
+        isDragging && "relative z-10 border-bid/30 shadow-xl",
       )}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -333,7 +349,7 @@ function ContentSequenceItem({
           <GripVertical className="h-4 w-4" />
         </button>
         <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-bid-light px-2 text-xs font-semibold text-bid">
-          {item.usage.position ?? '-'}
+          {item.usage.position ?? "-"}
         </span>
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-subtle">
           <Icon className="h-5 w-5 text-bid" />
@@ -345,11 +361,13 @@ function ContentSequenceItem({
             <ContentStatusBadge status={item.status} />
           </div>
           <div className="mt-1 text-sm text-ink-muted">
-            {item.trainer?.name ?? 'No trainer owner'}
-            {item.durationLabel ? ` - ${item.durationLabel}` : ''}
+            {item.trainer?.name ?? "No trainer owner"}
+            {item.durationLabel ? ` - ${item.durationLabel}` : ""}
           </div>
           <div className="mt-1 text-xs text-ink-faint">
-            Used in {item.usage.modules} module{item.usage.modules === 1 ? '' : 's'} across {item.usage.programmes} programme{item.usage.programmes === 1 ? '' : 's'}
+            Used in {item.usage.modules} module
+            {item.usage.modules === 1 ? "" : "s"} across {item.usage.programmes}{" "}
+            programme{item.usage.programmes === 1 ? "" : "s"}
           </div>
         </div>
       </div>
@@ -379,8 +397,8 @@ function ReuseModuleContentModal({
   onOpenChange: (open: boolean) => void;
   module: ModuleSummary;
 }) {
-  const [search, setSearch] = React.useState('');
-  const [contentItemId, setContentItemId] = React.useState('');
+  const [search, setSearch] = React.useState("");
+  const [contentItemId, setContentItemId] = React.useState("");
   const reusable = useLazyReusableContentItems(module.id, {
     enabled: open,
     search: search.trim() || undefined,
@@ -391,8 +409,8 @@ function ReuseModuleContentModal({
   const close = () => {
     if (attach.isPending) return;
     onOpenChange(false);
-    setSearch('');
-    setContentItemId('');
+    setSearch("");
+    setContentItemId("");
   };
 
   return (
@@ -408,7 +426,7 @@ function ReuseModuleContentModal({
         onSubmit={async (event) => {
           event.preventDefault();
           if (!contentItemId) {
-            toast.error('Choose a content item to reuse.');
+            toast.error("Choose a content item to reuse.");
             return;
           }
           try {
@@ -416,13 +434,13 @@ function ReuseModuleContentModal({
               moduleId: module.id,
               contentItemId,
             });
-            toast.success('Existing content added to the module.');
+            toast.success("Existing content added to the module.");
             close();
           } catch (error) {
             toast.error(
               error instanceof Error
                 ? error.message
-                : 'Unable to reuse content.',
+                : "Unable to reuse content.",
             );
           }
         }}
@@ -434,7 +452,7 @@ function ReuseModuleContentModal({
             options={reusable.rows.map((item) => ({
               value: item.id,
               label: item.title,
-              description: `${typeMeta[item.type].label} - used in ${item.usage.modules} module${item.usage.modules === 1 ? '' : 's'}`,
+              description: `${typeMeta[item.type].label} - used in ${item.usage.modules} module${item.usage.modules === 1 ? "" : "s"}`,
             }))}
             placeholder="Search content library"
             searchPlaceholder="Search content..."
@@ -447,7 +465,8 @@ function ReuseModuleContentModal({
           />
         </FormField>
         <Notice>
-          Reusing keeps one content item in the library. Title, trainer ownership, and asset changes apply everywhere it is used.
+          Reusing keeps one content item in the library. Title, trainer
+          ownership, and asset changes apply everywhere it is used.
         </Notice>
         <Button
           type="submit"
@@ -465,14 +484,14 @@ function ReuseModuleContentModal({
 function ContentStatusBadge({
   status,
 }: {
-  status: ContentItemRecord['status'];
+  status: ContentItemRecord["status"];
 }) {
   const tones = {
-    draft: 'neutral',
-    processing: 'blue',
-    ready: 'green',
-    failed: 'red',
-    archived: 'neutral',
+    draft: "neutral",
+    processing: "blue",
+    ready: "green",
+    failed: "red",
+    archived: "neutral",
   } as const;
   return <Badge tone={tones[status]}>{status}</Badge>;
 }

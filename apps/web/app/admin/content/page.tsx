@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useDebouncedValue } from '@/lib/search';
-import * as React from 'react';
-import { useSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
-import { FileText, PlayCircle, Wrench } from 'lucide-react';
+import { useDebouncedValue } from "@/lib/search";
+import * as React from "react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { FileSpreadsheet, FileText, PlayCircle, Wrench } from "lucide-react";
 import {
   AttachContentItemModal,
   CreateContentItemModal,
   EditContentItemModal,
-} from '@/components/admin/content/ContentItemModals';
-import { Badge } from '@/components/shared/Badge';
-import { Button } from '@/components/shared/Button';
-import { Card, CardHeader, TableSkeleton } from '@/components/shared/Card';
+} from "@/components/admin/content/ContentItemModals";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -20,36 +20,42 @@ import {
   TablePagination,
   TableToolbar,
   type Column,
-} from '@/components/shared/DataTable';
-import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
-import { Notice, PageHeader } from '@/components/shared/PageHeader';
-import { Tabs } from '@/components/shared/Tabs';
+} from "@/components/shared/DataTable";
+import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { Notice, PageHeader } from "@/components/shared/PageHeader";
+import { Tabs } from "@/components/shared/Tabs";
 import {
   useContentItemsPage,
   useDeleteContentItemMutation,
   type ContentItemRecord,
   type ContentItemStatus,
   type ContentItemType,
-} from '@/lib/api/content';
+} from "@/lib/api/content";
 
 const typeMeta = {
   video: {
-    label: 'Video',
-    plural: 'Videos',
+    label: "Video",
+    plural: "Videos",
     icon: PlayCircle,
-    tone: 'blue',
+    tone: "blue",
   },
   pdf: {
-    label: 'PDF',
-    plural: 'PDFs',
+    label: "PDF",
+    plural: "PDFs",
     icon: FileText,
-    tone: 'neutral',
+    tone: "neutral",
+  },
+  excel: {
+    label: "Excel",
+    plural: "Excel workbooks",
+    icon: FileSpreadsheet,
+    tone: "green",
   },
   tool: {
-    label: 'Tool',
-    plural: 'Tools',
+    label: "Tool",
+    plural: "Tools",
     icon: Wrench,
-    tone: 'brand',
+    tone: "brand",
   },
 } as const;
 
@@ -63,14 +69,15 @@ export default function AdminContentPage() {
 
 function ContentLibrary() {
   const searchParams = useSearchParams();
-  const moduleId = searchParams.get('moduleId') ?? undefined;
-  const [tab, setTab] = React.useState<ContentItemType>('video');
-  const [query, setQuery] = React.useState('');
+  const moduleId = searchParams.get("moduleId") ?? undefined;
+  const [tab, setTab] = React.useState<ContentItemType>("video");
+  const [query, setQuery] = React.useState("");
   const debouncedQuery = useDebouncedValue(query);
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [editTarget, setEditTarget] =
-    React.useState<ContentItemRecord | null>(null);
+  const [editTarget, setEditTarget] = React.useState<ContentItemRecord | null>(
+    null,
+  );
   const [attachTarget, setAttachTarget] =
     React.useState<ContentItemRecord | null>(null);
   const [deleteTarget, setDeleteTarget] =
@@ -78,7 +85,7 @@ function ContentLibrary() {
   const deleteContent = useDeleteContentItemMutation({
     onSuccess: () => {
       setDeleteTarget(null);
-      toast.success('Content deleted.');
+      toast.success("Content deleted.");
     },
     onError: (error) => toast.error(error.message),
   });
@@ -98,21 +105,21 @@ function ContentLibrary() {
   const columns = React.useMemo<Column<ContentItemRecord>[]>(
     () => [
       {
-        key: 'actions',
-        header: 'Action',
+        key: "actions",
+        header: "Action",
         cell: (item) => (
           <RowActions
             actions={[
               {
-                label: 'Edit content',
+                label: "Edit content",
                 onSelect: () => setEditTarget(item),
               },
               {
-                label: 'Add to another module',
+                label: "Add to another module",
                 onSelect: () => setAttachTarget(item),
               },
               {
-                label: 'Delete content',
+                label: "Delete content",
                 destructive: true,
                 disabled: deleteContent.isPending,
                 onSelect: () => setDeleteTarget(item),
@@ -120,11 +127,11 @@ function ContentLibrary() {
             ]}
           />
         ),
-        className: 'w-[84px]',
+        className: "w-[84px]",
       },
       {
-        key: 'title',
-        header: 'Content',
+        key: "title",
+        header: "Content",
         cell: (item) => {
           const meta = typeMeta[item.type];
           const Icon = meta.icon;
@@ -145,8 +152,8 @@ function ContentLibrary() {
         },
       },
       {
-        key: 'owner',
-        header: 'Trainer owner',
+        key: "owner",
+        header: "Trainer owner",
         cell: (item) =>
           item.trainer ? (
             <div className="min-w-[190px]">
@@ -160,8 +167,8 @@ function ContentLibrary() {
           ),
       },
       {
-        key: 'source',
-        header: 'Asset',
+        key: "source",
+        header: "Asset",
         cell: (item) => (
           <div className="min-w-[180px] text-sm">
             <div className="font-medium text-ink">{sourceLabel(item)}</div>
@@ -172,17 +179,17 @@ function ContentLibrary() {
         ),
       },
       {
-        key: 'usage',
-        header: 'Used in',
+        key: "usage",
+        header: "Used in",
         cell: (item) => (
           <div className="min-w-[180px]">
             <div className="font-medium text-ink">
               {item.usage.modules} module
-              {item.usage.modules === 1 ? '' : 's'}
+              {item.usage.modules === 1 ? "" : "s"}
             </div>
             <div className="mt-1 text-xs text-ink-muted">
               Across {item.usage.programmes} programme
-              {item.usage.programmes === 1 ? '' : 's'}
+              {item.usage.programmes === 1 ? "" : "s"}
             </div>
           </div>
         ),
@@ -213,15 +220,19 @@ function ContentLibrary() {
         onChange={setTab}
         tabs={[
           {
-            value: 'video',
+            value: "video",
             label: `Videos (${content.summary.video})`,
           },
           {
-            value: 'pdf',
+            value: "pdf",
             label: `PDFs (${content.summary.pdf})`,
           },
           {
-            value: 'tool',
+            value: "excel",
+            label: "Excel (" + content.summary.excel + ")",
+          },
+          {
+            value: "tool",
             label: `Tools (${content.summary.tool})`,
           },
         ]}
@@ -230,7 +241,7 @@ function ContentLibrary() {
       <Card>
         <CardHeader
           title={`${typeMeta[tab].plural} content`}
-          description={`${content.totalItems} reusable asset${content.totalItems === 1 ? '' : 's'} found`}
+          description={`${content.totalItems} reusable asset${content.totalItems === 1 ? "" : "s"} found`}
         />
         <TableToolbar>
           <div>
@@ -255,9 +266,7 @@ function ContentLibrary() {
         {content.isLoading && !content.data ? (
           <TableSkeleton columns={5} rows={pageSize} />
         ) : content.isError ? (
-          <Notice>
-            Content could not be loaded. {content.error.message}
-          </Notice>
+          <Notice>Content could not be loaded. {content.error.message}</Notice>
         ) : (
           <DataTable
             columns={columns}
@@ -265,7 +274,7 @@ function ContentLibrary() {
             rowKey={(item) => item.id}
             emptyMessage={
               query
-                ? 'No content matches this search.'
+                ? "No content matches this search."
                 : `No ${typeMeta[tab].plural.toLowerCase()} have been added yet.`
             }
             tableClassName="min-w-[1040px]"
@@ -333,11 +342,11 @@ function ContentLibrary() {
 
 function StatusBadge({ status }: { status: ContentItemStatus }) {
   const tones = {
-    draft: 'neutral',
-    processing: 'amber',
-    ready: 'green',
-    failed: 'red',
-    archived: 'red',
+    draft: "neutral",
+    processing: "amber",
+    ready: "green",
+    failed: "red",
+    archived: "red",
   } as const;
   return (
     <Badge tone={tones[status]}>
@@ -347,20 +356,23 @@ function StatusBadge({ status }: { status: ContentItemStatus }) {
 }
 
 function sourceLabel(item: ContentItemRecord) {
-  if (item.type === 'video') {
-    return item.video?.status === 'ready' ? 'Video ready' : 'Video processing';
+  if (item.type === "video") {
+    return item.video?.status === "ready" ? "Video ready" : "Video processing";
   }
-  if (item.type === 'pdf') {
-    return item.file?.originalFilename ?? 'PDF asset';
+  if (item.type === "pdf") {
+    return item.file?.originalFilename ?? "PDF asset";
   }
-  return item.toolLink?.toolName ?? item.toolLink?.url ?? 'Embedded tool';
+  if (item.type === "excel") {
+    return item.file?.originalFilename ?? "Excel workbook";
+  }
+  return item.toolLink?.toolName ?? item.toolLink?.url ?? "Embedded tool";
 }
 
 function updatedLabel(value: string) {
-  return `Updated ${new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+  return `Updated ${new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   })}`;
 }
 

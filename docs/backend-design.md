@@ -630,11 +630,11 @@ Rules:
 - Completing content should update the relevant module/programme summaries in the same transaction or via an idempotent progress aggregation job.
 - Module-completion deliverable rules must listen to `learner_module_progress.completed_at`, not a client-only UI flag.
 - Video progress should not be written every second. The client should batch/throttle progress and sync only on meaningful changes: start, pause, close/pagehide, ended, or coarse milestones such as 25/50/75/90 percent, with a minimum time/percentage delta between writes.
-- PDF and embedded tool progress should not be inferred as completed just because the item was opened. Opening sets `in_progress`; completion requires an explicit learner action or a future tool-specific completion event.
+- PDF, Excel, and embedded tool progress should not be inferred as completed just because the item was opened. Opening sets `in_progress`; completion requires an explicit learner action or a future tool-specific completion event.
 - Progress sync endpoints must be idempotent and accept batched updates so the UI can queue local progress and flush without spamming the backend.
 - Backend writes should ignore stale progress events when an older client event arrives after a newer one.
-- Content item create UI supports exactly three asset families: video upload, PDF upload, and embedded tool. Video upload creates Mux upload metadata. PDF upload creates a DigitalOcean Spaces `file_asset`. Embedded tool either links to a published entrepreneur tool or stores a custom external URL.
-- Content preview should be powered by the content type: Mux playback for video, signed file URL for PDFs, and embedded/sandboxed URL for tools.
+- Content item create UI supports four asset families: video upload, PDF upload, Excel workbook upload, and embedded tool. Video upload creates Mux upload metadata. PDF and Excel uploads create private DigitalOcean Spaces `file_asset` records with usage-specific validation. Embedded tool either links to a published entrepreneur tool or stores a custom external URL.
+- Content preview is powered by the content type: Mux playback for video, signed file URL for PDFs, an authenticated server-parsed and windowed worksheet grid for Excel workbooks, and an embedded/sandboxed URL for online tools.
 - If we need chapter labels later, they should be stored as content item metadata or computed from item order. Current UI labels such as "Chapter 1" must not become hardcoded backend truth.
 
 ### Deliverables
@@ -801,9 +801,9 @@ Rules:
 Rules:
 
 - Tool area is required when an admin creates a tool. It powers filtering, reporting, and request triage.
-- PDF tools use uploaded file assets stored in DigitalOcean Spaces. Do not store PDF URLs entered by admins as the primary source.
+- PDF and Excel tools use uploaded file assets stored in DigitalOcean Spaces. Do not store provider URLs entered by admins as their primary source.
 - Embedded tools store a validated `embedded_url` and should be rendered in a sandboxed iframe where possible.
-- Learning content may link to any published entrepreneur tool. Linked PDF tools use authenticated file access and the in-app document viewer; linked online tools use the sandboxed in-app viewer.
+- Learning content may link to any published entrepreneur tool. Linked PDF tools use authenticated file access and the in-app document viewer; linked Excel tools use the authenticated worksheet viewer; linked online tools use the sandboxed in-app viewer.
 - `all_entrepreneurs` tools are visible to every entrepreneur unless that entrepreneur has a hidden override.
 - Programme tools are visible to entrepreneurs with access to one of the selected programmes.
 - Entrepreneur tools are visible only to selected entrepreneur users.
@@ -1137,7 +1137,7 @@ Current UI fields:
 
 - booking/session: session type, target recipient, trainer/team target, topic, date, time, notes
 - admin session create/reschedule: owner, entrepreneur, session type, topic, date/time, reschedule reason, notes
-- tool: name, description, type, tool area, icon, visibility/audience, PDF upload or embedded tool URL
+- tool: name, description, type, tool area, icon, visibility/audience, PDF or Excel upload, or embedded tool URL
 - tool request: name, category/tool area, optional needed-by date, business need/reason, admin decision state
 
 Backend mapping:
@@ -1152,7 +1152,7 @@ Backend mapping:
 
 - GET /tools is restricted to admins and entrepreneurs. Admin responses include management audience metadata; entrepreneur responses contain only usable tool data and redact creator emails and other audience IDs.
 - Tool lists use cursor pagination with backend search, type, tool area, status, and visibility filters. Backend totals and status/visibility aggregates drive the admin metrics.
-- PDF tools attach a verified private tool_pdf file asset. A PDF cannot publish without an asset. Embedded tools cannot publish without a valid URL.
+- PDF and Excel tools attach verified private usage-specific file assets. A file-backed tool cannot publish without the matching asset type. Embedded tools cannot publish without a valid URL.
 - Programme and entrepreneur audiences are normalized through access tables. Global/programme tools may also store per-entrepreneur hidden overrides.
 - Tool create, update, status, visibility, and access changes use the audit outbox lifecycle.
 - Tool request reads are restricted to admins and the owning entrepreneur. Request queues use cursor pagination, backend search/filtering, total counts, and status aggregates.

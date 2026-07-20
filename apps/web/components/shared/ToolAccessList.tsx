@@ -1,23 +1,31 @@
-'use client';
+"use client";
 
-import { useDebouncedValue } from '@/lib/search';
-import * as React from 'react';
-import { Search } from 'lucide-react';
-import { Badge } from '@/components/shared/Badge';
-import { Modal } from '@/components/shared/Modal';
-import { tools } from '@/lib/mock-data';
-import { getEntrepreneurToolAccessSource, type EntrepreneurToolAccessSource } from '@/lib/tool-access';
-import { cn } from '@/lib/utils';
-import type { BadgeTone, Entrepreneur, Tool } from '@/types';
+import { useDebouncedValue } from "@/lib/search";
+import * as React from "react";
+import { Search } from "lucide-react";
+import { Badge } from "@/components/shared/Badge";
+import { Modal } from "@/components/shared/Modal";
+import { tools } from "@/lib/mock-data";
+import {
+  getEntrepreneurToolAccessSource,
+  type EntrepreneurToolAccessSource,
+} from "@/lib/tool-access";
+import { cn } from "@/lib/utils";
+import type { BadgeTone, Entrepreneur, Tool } from "@/types";
 
-const accessSourceMeta: Record<Exclude<EntrepreneurToolAccessSource, 'none'>, { label: string; tone: BadgeTone }> = {
-  global: { label: 'Global', tone: 'green' },
-  programme: { label: 'Programme', tone: 'blue' },
-  individual: { label: 'Individual', tone: 'brand' },
+const accessSourceMeta: Record<
+  Exclude<EntrepreneurToolAccessSource, "none">,
+  { label: string; tone: BadgeTone }
+> = {
+  global: { label: "Global", tone: "green" },
+  programme: { label: "Programme", tone: "blue" },
+  individual: { label: "Individual", tone: "brand" },
 };
 
 export function getVisibleToolsForEntrepreneur(entrepreneur: Entrepreneur) {
-  return tools.filter((tool) => getEntrepreneurToolAccessSource(tool, entrepreneur) !== 'none');
+  return tools.filter(
+    (tool) => getEntrepreneurToolAccessSource(tool, entrepreneur) !== "none",
+  );
 }
 
 export function ToolAccessList({
@@ -25,7 +33,7 @@ export function ToolAccessList({
   maxVisible = 2,
   className,
   chipClassName,
-  emptyLabel = 'No tools',
+  emptyLabel = "No tools",
   modalTitle,
 }: {
   entrepreneur: Entrepreneur;
@@ -36,17 +44,25 @@ export function ToolAccessList({
   modalTitle?: string;
 }) {
   const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const debouncedQuery = useDebouncedValue(query.trim());
-  const visibleTools = React.useMemo(() => getVisibleToolsForEntrepreneur(entrepreneur), [entrepreneur]);
+  const visibleTools = React.useMemo(
+    () => getVisibleToolsForEntrepreneur(entrepreneur),
+    [entrepreneur],
+  );
   const visible = visibleTools.slice(0, maxVisible);
   const hiddenCount = Math.max(visibleTools.length - visible.length, 0);
   const filteredTools = React.useMemo(() => {
     const needle = debouncedQuery.toLowerCase();
     if (!needle) return visibleTools;
     return visibleTools.filter((tool) =>
-      [tool.name, tool.description, tool.type, getEntrepreneurToolAccessSource(tool, entrepreneur)]
-        .join(' ')
+      [
+        tool.name,
+        tool.description,
+        tool.type,
+        getEntrepreneurToolAccessSource(tool, entrepreneur),
+      ]
+        .join(" ")
         .toLowerCase()
         .includes(needle),
     );
@@ -54,12 +70,23 @@ export function ToolAccessList({
 
   return (
     <>
-      <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-1.5', className)}>
+      <div
+        className={cn(
+          "flex min-w-0 max-w-full flex-wrap items-center gap-1.5",
+          className,
+        )}
+      >
         {visible.map((tool) => (
           <Badge
             key={tool.id}
-            tone={tool.type === 'pdf' ? 'blue' : 'green'}
-            className={cn('max-w-[170px] truncate', chipClassName)}
+            tone={
+              tool.type === "pdf"
+                ? "blue"
+                : tool.type === "excel"
+                  ? "green"
+                  : "brand"
+            }
+            className={cn("max-w-[170px] truncate", chipClassName)}
             title={tool.name}
           >
             {tool.name}
@@ -77,17 +104,26 @@ export function ToolAccessList({
             +{hiddenCount} more
           </button>
         )}
-        {visibleTools.length === 0 && <span className="text-sm text-ink-faint">{emptyLabel}</span>}
+        {visibleTools.length === 0 && (
+          <span className="text-sm text-ink-faint">{emptyLabel}</span>
+        )}
       </div>
 
-      <Modal open={open} onOpenChange={setOpen} title={modalTitle ?? `${entrepreneur.businessName} tool access`} width="wide">
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        title={modalTitle ?? `${entrepreneur.businessName} tool access`}
+        width="wide"
+      >
         <div className="space-y-4">
           <div className="rounded-xl border border-line bg-surface-subtle px-4 py-3">
             <div className="text-sm font-semibold text-ink">
-              {visibleTools.length} tool{visibleTools.length === 1 ? '' : 's'} visible
+              {visibleTools.length} tool{visibleTools.length === 1 ? "" : "s"}{" "}
+              visible
             </div>
             <div className="mt-1 text-sm text-ink-muted">
-              These are the tools this entrepreneur can open from their workspace.
+              These are the tools this entrepreneur can open from their
+              workspace.
             </div>
           </div>
 
@@ -103,16 +139,38 @@ export function ToolAccessList({
 
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {filteredTools.map((tool: Tool) => {
-              const source = getEntrepreneurToolAccessSource(tool, entrepreneur) as Exclude<EntrepreneurToolAccessSource, 'none'>;
+              const source = getEntrepreneurToolAccessSource(
+                tool,
+                entrepreneur,
+              ) as Exclude<EntrepreneurToolAccessSource, "none">;
               const meta = accessSourceMeta[source];
               return (
-                <div key={tool.id} className="rounded-xl border border-line bg-card px-4 py-3">
+                <div
+                  key={tool.id}
+                  className="rounded-xl border border-line bg-card px-4 py-3"
+                >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="font-semibold text-ink">{tool.name}</div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">{tool.description}</div>
+                      <div className="mt-1 line-clamp-2 text-sm leading-6 text-ink-muted">
+                        {tool.description}
+                      </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <Badge tone={tool.type === 'pdf' ? 'blue' : 'green'}>{tool.type === 'pdf' ? 'PDF resource' : 'Online tool'}</Badge>
+                        <Badge
+                          tone={
+                            tool.type === "pdf"
+                              ? "blue"
+                              : tool.type === "excel"
+                                ? "green"
+                                : "brand"
+                          }
+                        >
+                          {tool.type === "pdf"
+                            ? "PDF resource"
+                            : tool.type === "excel"
+                              ? "Excel workbook"
+                              : "Online tool"}
+                        </Badge>
                         <Badge tone={meta.tone}>{meta.label}</Badge>
                       </div>
                     </div>
