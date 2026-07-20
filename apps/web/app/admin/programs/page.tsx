@@ -164,9 +164,9 @@ export default function AdminProgramsPage() {
           <button
             type="button"
             onClick={() => openProgrammeWorkspace(programme)}
-            className="block max-w-[340px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+            className="group/programme block max-w-[340px] rounded-lg text-left outline-none transition focus-visible:ring-2 focus-visible:ring-bid/20"
           >
-            <span className="block text-sm font-semibold text-ink">
+            <span className="block text-sm font-semibold text-ink transition-colors group-hover/programme:text-bid group-focus-visible/programme:text-bid">
               {programme.name}
             </span>
             <span className="mt-1 block line-clamp-2 text-xs leading-5 text-ink-muted">

@@ -157,6 +157,10 @@
   button {
     accent-color: hsl(var(--primary));
   }
+
+  :where(button:not(:disabled), a[href], [role='button']:not([aria-disabled='true'])) {
+    cursor: pointer;
+  }
   html,
   body {
     height: 100%;

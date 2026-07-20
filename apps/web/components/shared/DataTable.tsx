@@ -165,6 +165,11 @@ function DataTableRow<T>({
   } = useSortable({ id: rowId, disabled: !sortable });
   const extraRowProps = rowProps?.(row) ?? {};
   const { className: extraRowClassName, style: extraRowStyle, ...restRowProps } = extraRowProps;
+  const isInteractive = Boolean(
+    restRowProps.onClick ||
+      restRowProps.onDoubleClick ||
+      restRowProps.onKeyDown,
+  );
   const rowContext = React.useMemo<SortableRowContextValue>(
     () => ({
       attributes: attributes as unknown as Record<string, unknown>,
@@ -182,7 +187,10 @@ function DataTableRow<T>({
         ref={setNodeRef}
         {...restRowProps}
         className={cn(
-          'group transition-colors hover:bg-surface-subtle/70',
+          'group transition-colors',
+          isInteractive
+            ? 'cursor-pointer hover:bg-bid-light/55 focus-visible:bg-bid-light/55 focus-visible:outline-none'
+            : 'hover:bg-surface-subtle/70',
           isDragging && 'relative z-10 bg-card shadow-xl',
           rowClassName?.(row),
           extraRowClassName,
