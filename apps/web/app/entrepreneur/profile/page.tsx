@@ -387,10 +387,10 @@ export default function EntrepreneurProfilePage() {
           />
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold">
-              {record.businessName}
+              {record.representativeName}
             </h1>
             <div className="mt-1 text-sm text-white/75 dark:text-white/85">
-              {record.representativeName} · {record.country}
+              {record.businessName} · {record.country}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {record.sector ? (

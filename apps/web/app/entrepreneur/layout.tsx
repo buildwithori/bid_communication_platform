@@ -34,8 +34,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const entrepreneur = useEntrepreneurProfileQuery().data;
   const title = useTitle();
   const name =
-    entrepreneur?.businessName ||
     entrepreneur?.representativeName ||
+    entrepreneur?.businessName ||
     'Entrepreneur';
   const initials =
     name
@@ -45,13 +45,10 @@ function Shell({ children }: { children: React.ReactNode }) {
       .map((part: string) => part[0])
       .join('')
       .toUpperCase() || 'EN';
-  const context = [entrepreneur?.stage?.name, entrepreneur?.sector?.name]
-    .filter(Boolean)
-    .join(' · ');
   const user = {
     initials,
     name,
-    subtitle: context || 'Entrepreneur',
+    subtitle: entrepreneur?.businessName || 'Entrepreneur',
     tone: 'brand' as const,
   };
 
