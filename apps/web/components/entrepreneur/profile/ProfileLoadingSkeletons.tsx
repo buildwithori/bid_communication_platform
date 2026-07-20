@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, Skeleton } from "@/components/shared/Card";
+import { NotificationPreferencesContentSkeleton } from "@/components/settings/NotificationPreferencesCard";
 import type { EntrepreneurProfileTab } from "@/lib/entrepreneur-profile-tabs";
 import { cn } from "@/lib/utils";
 
@@ -163,28 +164,7 @@ function NotificationPreferencesSkeleton() {
         </div>
         <Skeleton className="h-5 w-5 rounded-full" />
       </div>
-      <div className="overflow-hidden rounded-xl border border-line">
-        <div className="grid grid-cols-[minmax(0,1fr)_68px_68px] gap-1 bg-surface-subtle px-4 py-3">
-          <Skeleton className="h-3 w-36" />
-          <Skeleton className="mx-auto h-3 w-12" />
-          <Skeleton className="mx-auto h-3 w-10" />
-        </div>
-        <div className="divide-y divide-line">
-          {Array.from({ length: 5 }, (_, index) => (
-            <div
-              key={index}
-              className="grid min-h-20 grid-cols-[minmax(0,1fr)_68px_68px] items-center gap-1 px-4 py-3"
-            >
-              <div className="space-y-2 pr-4">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-full max-w-md" />
-              </div>
-              <Skeleton className="mx-auto h-10 w-10" />
-              <Skeleton className="mx-auto h-10 w-10" />
-            </div>
-          ))}
-        </div>
-      </div>
+      <NotificationPreferencesContentSkeleton />
     </Card>
   );
 }
