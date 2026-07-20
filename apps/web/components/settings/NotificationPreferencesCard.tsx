@@ -11,7 +11,6 @@ import {
   useUpdateNotificationPreferenceGroupMutation,
   type NotificationPreferenceGroup,
   type NotificationPreferenceGroupName,
-  type NotificationPreferenceMode,
 } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
 
@@ -116,7 +115,7 @@ export function NotificationPreferencesCard({
   const update = (
     group: NotificationPreferenceGroupName,
     channel: "inAppEnabled" | "emailEnabled",
-    enabled: boolean | null,
+    enabled: boolean,
   ) => {
     if (updatePreference.isPending) return;
     updatePreference.mutate(
@@ -132,7 +131,7 @@ export function NotificationPreferencesCard({
     <Card className={className}>
       <CardHeader
         title="Notification preferences"
-        description="Use the company default or set a personal channel choice for each area of work. Personal choices remain unchanged when company defaults change."
+        description="Choose where BID Hub should send updates for each area of your work."
         actions={<BellRing className="h-5 w-5 text-bid" />}
       />
       {preferences.isLoading || automation.isLoading ? (
@@ -146,8 +145,8 @@ export function NotificationPreferencesCard({
       ) : null}
       {groups && automation.data ? (
         <div className="overflow-x-auto rounded-xl border border-line">
-          <div className="min-w-[620px]">
-            <div className="grid grid-cols-[minmax(0,1fr)_150px_150px] items-center gap-2 bg-surface-subtle px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+          <div className="min-w-[520px]">
+            <div className="grid grid-cols-[minmax(0,1fr)_80px_80px] items-center gap-1 bg-surface-subtle px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
               <span>Notification group</span>
               <span className="text-center">In app</span>
               <span className="text-center">Email</span>
@@ -169,7 +168,7 @@ export function NotificationPreferencesCard({
                 return (
                   <div
                     key={preference.group}
-                    className="grid grid-cols-[minmax(0,1fr)_150px_150px] items-center gap-2 px-4 py-4"
+                    className="grid grid-cols-[minmax(0,1fr)_80px_80px] items-center gap-1 px-4 py-4"
                   >
                     <div className="min-w-0 pr-3">
                       <p className="text-sm font-semibold text-ink">
@@ -181,9 +180,10 @@ export function NotificationPreferencesCard({
                     </div>
                     <PreferenceControl
                       label={`Show ${meta.label.toLowerCase()} in app`}
-                      mode={preference.inAppMode}
-                      effectiveEnabled={preference.inAppEnabled}
-                      companyDefault={preference.defaults.inAppEnabled}
+                      enabled={
+                        preference.inAppEnabled ??
+                        preference.defaults.inAppEnabled
+                      }
                       disabled={updatePreference.isPending}
                       isLoading={inAppPending}
                       onChange={(enabled) =>
@@ -192,9 +192,10 @@ export function NotificationPreferencesCard({
                     />
                     <PreferenceControl
                       label={`Email me about ${meta.label.toLowerCase()}`}
-                      mode={preference.emailMode}
-                      effectiveEnabled={preference.emailEnabled}
-                      companyDefault={preference.defaults.emailEnabled}
+                      enabled={
+                        preference.emailEnabled ??
+                        preference.defaults.emailEnabled
+                      }
                       disabled={updatePreference.isPending}
                       isLoading={emailPending}
                       onChange={(enabled) =>
@@ -217,9 +218,8 @@ export function NotificationPreferencesCard({
                 Scheduled notifications
               </h3>
               <p className="mt-1 text-xs leading-5 text-ink-muted">
-                Scheduled controls decide whether a reminder or summary is
-                created. The group controls above decide which enabled channels
-                deliver it.
+                Choose which scheduled updates you want to receive. Delivery
+                uses your channel choices above.
               </p>
             </div>
           </div>
@@ -227,9 +227,7 @@ export function NotificationPreferencesCard({
             <AutomationPreference
               label="Due-date and session reminders"
               description="Reminders up to 24 hours before confirmed sessions and outstanding deliverables are due."
-              mode={modeFromOverride(automation.data.reminderOverride)}
-              effectiveEnabled={automation.data.reminderEnabled}
-              companyDefault={automation.data.defaults.reminderEnabled}
+              enabled={automation.data.reminderEnabled}
               disabled={updateAutomation.isPending}
               isLoading={
                 updateAutomation.isPending &&
@@ -249,9 +247,7 @@ export function NotificationPreferencesCard({
             <AutomationPreference
               label="Weekly summary email"
               description="A Monday summary of unread activity, upcoming sessions, and deliverables due in the next seven days."
-              mode={modeFromOverride(automation.data.weeklyDigestOverride)}
-              effectiveEnabled={automation.data.weeklyDigestEnabled}
-              companyDefault={automation.data.defaults.weeklyDigestEnabled}
+              enabled={automation.data.weeklyDigestEnabled}
               disabled={updateAutomation.isPending}
               isLoading={
                 updateAutomation.isPending &&
@@ -277,96 +273,81 @@ export function NotificationPreferencesCard({
 
 function PreferenceControl({
   label,
-  mode,
-  effectiveEnabled,
-  companyDefault,
+  enabled,
   disabled,
   isLoading,
   onChange,
 }: {
   label: string;
-  mode: NotificationPreferenceMode;
-  effectiveEnabled: boolean | null;
-  companyDefault: boolean;
+  enabled: boolean;
   disabled: boolean;
   isLoading: boolean;
-  onChange: (enabled: boolean | null) => void;
+  onChange: (enabled: boolean) => void;
 }) {
-  const selected = mode;
   return (
-    <div className="mx-auto w-full max-w-[142px]">
-      <div className="relative">
-        <select
-          aria-label={label}
-          value={selected}
-          disabled={disabled}
-          onChange={(event) =>
-            onChange(
-              event.target.value === "inherit"
-                ? null
-                : event.target.value === "enabled",
-            )
-          }
-          className={cn(
-            "h-10 w-full appearance-none rounded-lg border border-line bg-card px-3 pr-8 text-xs font-medium text-ink outline-none transition focus:border-bid/50 focus:ring-2 focus:ring-bid/15 disabled:cursor-wait disabled:opacity-60",
-            selected === "enabled" && "border-bid/30 text-bid",
-            selected === "disabled" && "text-ink-muted",
-          )}
-        >
-          {mode === "mixed" ? (
-            <option value="mixed" disabled>
-              Mixed settings
-            </option>
-          ) : null}
-          <option value="inherit">Company default</option>
-          <option value="enabled">Always on</option>
-          <option value="disabled">Off</option>
-        </select>
-        {isLoading ? (
-          <LoaderCircle className="pointer-events-none absolute right-2.5 top-3 h-4 w-4 animate-spin text-bid" />
-        ) : selected === "inherit" ? (
-          <span className="pointer-events-none absolute right-2.5 top-3 text-[10px] text-ink-faint">
-            {companyDefault ? "ON" : "OFF"}
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-1 text-center text-[10px] text-ink-faint">
-        {mode === "mixed"
-          ? "Mixed event settings"
-          : "Currently " + (effectiveEnabled ? "on" : "off")}
-      </p>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-label={label}
+      aria-checked={enabled}
+      title={enabled ? "Turn off" : "Turn on"}
+      disabled={disabled}
+      onClick={() => onChange(!enabled)}
+      className={cn(
+        "relative mx-auto inline-flex h-7 w-12 shrink-0 items-center rounded-full border p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/30 focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-wait disabled:opacity-60",
+        enabled
+          ? "border-bid bg-bid shadow-sm hover:bg-bid-dark"
+          : "border-bid/25 bg-bid/10 hover:border-bid/40 hover:bg-bid/15",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "inline-flex h-5 w-5 items-center justify-center rounded-full shadow-sm ring-1 transition-transform",
+          enabled
+            ? "translate-x-5 bg-white text-bid ring-white/70"
+            : "translate-x-0 bg-bid/45 text-bid ring-bid/20",
+        )}
+      >
+        {isLoading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : null}
+      </span>
+      <span className="sr-only">{enabled ? "On" : "Off"}</span>
+    </button>
   );
 }
 
 function AutomationPreference({
   label,
   description,
-  ...control
+  enabled,
+  disabled,
+  isLoading,
+  onChange,
 }: {
   label: string;
   description: string;
-  mode: NotificationPreferenceMode;
-  effectiveEnabled: boolean;
-  companyDefault: boolean;
+  enabled: boolean;
   disabled: boolean;
   isLoading: boolean;
-  onChange: (enabled: boolean | null) => void;
+  onChange: (enabled: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-line bg-surface-subtle p-4">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-surface-subtle p-4">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-ink">{label}</p>
         <p className="mt-1 text-xs leading-5 text-ink-muted">{description}</p>
       </div>
-      <PreferenceControl label={label} {...control} />
+      <div className="ml-auto w-12 shrink-0">
+        <PreferenceControl
+          label={label}
+          enabled={enabled}
+          disabled={disabled}
+          isLoading={isLoading}
+          onChange={onChange}
+        />
+      </div>
     </div>
   );
-}
-
-function modeFromOverride(value: boolean | null): NotificationPreferenceMode {
-  if (value === null) return "inherit";
-  return value ? "enabled" : "disabled";
 }
 
 function PreferencesSkeleton() {
@@ -376,7 +357,7 @@ function PreferencesSkeleton() {
       aria-busy="true"
       className="overflow-hidden rounded-xl border border-line"
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_150px_150px] gap-2 bg-surface-subtle px-4 py-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_80px_80px] gap-2 bg-surface-subtle px-4 py-3">
         <Skeleton className="h-3 w-36" />
         <Skeleton className="mx-auto h-3 w-12" />
         <Skeleton className="mx-auto h-3 w-10" />
@@ -385,14 +366,14 @@ function PreferencesSkeleton() {
         {Array.from({ length: 5 }, (_, index) => (
           <div
             key={index}
-            className="grid min-h-20 grid-cols-[minmax(0,1fr)_150px_150px] items-center gap-2 px-4 py-3"
+            className="grid min-h-20 grid-cols-[minmax(0,1fr)_80px_80px] items-center gap-1 px-4 py-3"
           >
             <div className="space-y-2 pr-4">
               <Skeleton className="h-4 w-40" />
               <Skeleton className="h-3 w-full max-w-md" />
             </div>
-            <Skeleton className="mx-auto h-10 w-10" />
-            <Skeleton className="mx-auto h-10 w-10" />
+            <Skeleton className="mx-auto h-7 w-12 rounded-full" />
+            <Skeleton className="mx-auto h-7 w-12 rounded-full" />
           </div>
         ))}
       </div>
