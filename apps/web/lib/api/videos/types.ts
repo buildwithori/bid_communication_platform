@@ -36,5 +36,6 @@ export type UploadVideoVariables = {
 export type SignedVideoPlayback = {
   playbackId: string;
   token: string;
+  thumbnailToken: string;
   expiresAt: string;
 };

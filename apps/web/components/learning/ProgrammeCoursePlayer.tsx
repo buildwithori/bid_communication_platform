@@ -686,7 +686,11 @@ function MediaStage({
 }: {
   item: ProgrammePlayerItem;
   signedFile: QueryState<{ download: { url: string } }>;
-  signedVideo: QueryState<{ playbackId: string; token: string }>;
+  signedVideo: QueryState<{
+    playbackId: string;
+    token: string;
+    thumbnailToken: string;
+  }>;
   resumePosition: number;
   onProgress: (position: number, duration: number) => void;
   onPause: (position: number, duration: number) => void;
@@ -721,7 +725,10 @@ function MediaStage({
       <div className="grid min-h-[360px] place-items-center bg-black xl:min-h-[600px]">
         <MuxPlayer
           playbackId={signedVideo.data.playbackId}
-          tokens={{ playback: signedVideo.data.token }}
+          tokens={{
+            playback: signedVideo.data.token,
+            thumbnail: signedVideo.data.thumbnailToken,
+          }}
           metadataVideoTitle={item.title}
           streamType="on-demand"
           startTime={resumePosition}

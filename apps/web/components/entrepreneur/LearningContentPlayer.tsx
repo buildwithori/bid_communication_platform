@@ -372,7 +372,11 @@ function ContentFrame({
 }: {
   item: ContentItemRecord;
   signedFile: QueryState<{ download: { url: string } }>;
-  signedVideo: QueryState<{ playbackId: string; token: string }>;
+  signedVideo: QueryState<{
+    playbackId: string;
+    token: string;
+    thumbnailToken: string;
+  }>;
   resumePosition: number;
   onVideoProgress: (position: number, duration: number) => void;
   onVideoEnded: () => void;
@@ -393,7 +397,10 @@ function ContentFrame({
       <div className="overflow-hidden rounded-xl border border-black bg-black">
         <MuxPlayer
           playbackId={signedVideo.data.playbackId}
-          tokens={{ playback: signedVideo.data.token }}
+          tokens={{
+            playback: signedVideo.data.token,
+            thumbnail: signedVideo.data.thumbnailToken,
+          }}
           metadataVideoTitle={item.title}
           streamType="on-demand"
           startTime={resumePosition || undefined}

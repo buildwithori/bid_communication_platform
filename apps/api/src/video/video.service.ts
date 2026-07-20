@@ -133,7 +133,12 @@ export class VideoService {
       Math.max(2 * 60 * 60, (video.duration ?? 0) + 30 * 60);
     return {
       playbackId: video.playbackId,
-      token: this.signPlaybackToken(video.playbackId, expiresAtSeconds),
+      token: this.signMuxToken(video.playbackId, expiresAtSeconds, "v"),
+      thumbnailToken: this.signMuxToken(
+        video.playbackId,
+        expiresAtSeconds,
+        "t",
+      ),
       expiresAt: new Date(expiresAtSeconds * 1000).toISOString(),
     };
   }
@@ -352,7 +357,11 @@ export class VideoService {
     return video;
   }
 
-  private signPlaybackToken(playbackId: string, expiresAt: number) {
+  private signMuxToken(
+    playbackId: string,
+    expiresAt: number,
+    audience: "v" | "t",
+  ) {
     const keyId = this.config.get<string>("MUX_SIGNING_KEY_ID");
     const encodedPrivateKey = this.config.get<string>(
       "MUX_SIGNING_PRIVATE_KEY",
@@ -366,7 +375,7 @@ export class VideoService {
     const header = this.base64Url({ alg: "RS256", typ: "JWT", kid: keyId });
     const payload = this.base64Url({
       sub: playbackId,
-      aud: "v",
+      aud: audience,
       exp: expiresAt,
       iat: Math.floor(Date.now() / 1000),
     });

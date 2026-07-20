@@ -247,7 +247,7 @@ Session workflow rules:
 - Non-video files are uploaded directly to private S3-compatible storage. Local Docker uses private MinIO; production uses DigitalOcean Spaces. The API verifies object size, MIME metadata, and supported file signatures before marking an asset ready.
 - File consumers pass an explicit usage and internal `fileAssetId`; storage keys and private provider URLs stay server-only. Reads use short-lived signed URLs after role/domain access checks.
 - Video consumers pass an internal `videoAssetId`, never a user-entered Mux upload, asset, or playback ID. Mux callbacks use the explicit public `POST /webhooks/mux` exception, raw-body HMAC verification, and durable event IDs for idempotency.
-- Ready videos use short-lived RS256 Mux playback tokens after programme/content authorization. Frontend file/video feature hooks own direct-upload progress, cancellation, status polling, failures, and TanStack calls.
+- Ready videos use separate short-lived RS256 Mux video and thumbnail tokens after programme/content authorization. Signed thumbnails use the same authorised playback ID and expiry with Mux image audience `t`, allowing Mux Player to render its generated poster without making protected media public. Frontend file/video feature hooks own direct-upload progress, cancellation, status polling, failures, and TanStack calls.
 
 ## Programmes And Content Library Completion (2026-07-16)
 

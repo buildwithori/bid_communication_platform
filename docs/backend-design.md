@@ -1496,7 +1496,7 @@ Content item becomes ready when Mux asset is ready
 
 ### Access Control
 
-Use private/signed Mux playback from day one. Training content is restricted to authorised entrepreneurs, so public playback IDs should not be the default.
+Use private/signed Mux playback from day one. Training content is restricted to authorised entrepreneurs, so public playback IDs should not be the default. Authorised playback responses must issue separate video (`aud: v`) and thumbnail (`aud: t`) tokens so Mux-generated poster images remain protected and render in every shared player.
 
 ### Playback Data
 
