@@ -127,7 +127,7 @@ test('programme player returns the complete ordered ready curriculum with learne
   });
 });
 
-test('staff preview includes non-ready content and never returns learner progress', async () => {
+test('preview visibility exposes non-ready content only to admins', async () => {
   let contentWhere: unknown = 'not-called';
   const prisma = {
     programme: {
@@ -141,6 +141,7 @@ test('staff preview includes non-ready content and never returns learner progres
         startDate: new Date('2026-01-01'),
         endDate: new Date('2027-01-01'),
       }),
+      count: async () => 1,
     },
     programmeModule: {
       findMany: async (query: any) => {
@@ -164,4 +165,16 @@ test('staff preview includes non-ready content and never returns learner progres
   assert.equal(result.viewer.canTrackProgress, false);
   assert.equal(result.progress, null);
   assert.deepEqual(result.modules, []);
+
+  contentWhere = 'not-called';
+  const trainerResult = await service.getProgrammePlayer(
+    { id: 'trainer-1', role: UserRole.trainer } as never,
+    'programme-1',
+  );
+
+  assert.deepEqual(contentWhere, {
+    contentItem: { status: ContentItemStatus.ready },
+  });
+  assert.equal(trainerResult.viewer.canTrackProgress, false);
+  assert.equal(trainerResult.progress, null);
 });

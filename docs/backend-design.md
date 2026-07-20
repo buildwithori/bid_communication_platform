@@ -1339,7 +1339,7 @@ Programmes:
 - `PATCH /programmes/:id/modules/reorder`
 - `DELETE /programmes/:id/modules/:moduleId` with exact-name confirmation
 
-`GET /programmes/:id/player` is the deliberate exception to ordinary list pagination. It returns one authorized programme's complete ordered curriculum for the shared learner/staff player. Entrepreneur responses include only ready content and the authenticated learner's progress; authorized admin/trainer responses include all content states for preview and never create learner progress.
+`GET /programmes/:id/player` is the deliberate exception to ordinary list pagination. It returns one authorized programme's complete ordered curriculum for the shared learner/staff player. Entrepreneur responses include only ready content and the authenticated learner's progress; trainer responses include only ready content and never create learner progress. Only admin responses include processing, failed, or otherwise non-ready content for operational preview.
 
 Permanent deletion is admin-only and separately guarded from archive/restore. Programme deletion removes programme-scoped enrolment, learning progress, goals, updates, deliverables, submissions, sessions, reports, and notifications while preserving reusable library modules and content. Module deletion removes the module from that programme and its dependent programme records while preserving reusable content. Global content deletion removes every module link, learner progress, and rating. External Mux assets, object-storage files, and Calendar events are written to a durable deletion outbox in the same database transaction and removed by an idempotent retrying BullMQ worker.
 

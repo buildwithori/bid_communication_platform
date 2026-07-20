@@ -826,7 +826,10 @@ export class ProgrammesService {
         module: {
           include: {
             contentItems: {
-              where: user.role === UserRole.entrepreneur ? { contentItem: { status: ContentItemStatus.ready } } : undefined,
+              where:
+                user.role === UserRole.admin
+                  ? undefined
+                  : { contentItem: { status: ContentItemStatus.ready } },
               orderBy: [{ position: 'asc' }, { id: 'asc' }],
               include: {
                 contentItem: {
