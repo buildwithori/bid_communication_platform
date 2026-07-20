@@ -11,6 +11,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { NotificationType, User } from "@prisma/client";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { NotificationQueryDto } from "./dto/notification-query.dto";
+import { UpdateNotificationAutomationPreferenceDto } from "./dto/update-notification-automation-preference.dto";
 import { UpdateNotificationPreferenceDto } from "./dto/update-notification-preference.dto";
 import { NotificationsService } from "./notifications.service";
 
@@ -50,6 +51,19 @@ export class NotificationsController {
   @Get("notification-preferences/groups")
   listPreferenceGroups(@CurrentUser() user: User) {
     return this.notificationsService.listPreferenceGroups(user);
+  }
+
+  @Get("notification-preferences/automation")
+  getAutomationPreference(@CurrentUser() user: User) {
+    return this.notificationsService.getAutomationPreference(user);
+  }
+
+  @Patch("notification-preferences/automation")
+  updateAutomationPreference(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateNotificationAutomationPreferenceDto,
+  ) {
+    return this.notificationsService.updateAutomationPreference(user, dto);
   }
 
   @Patch("notification-preferences/groups/:group")

@@ -185,11 +185,14 @@ enum NotificationType {
   session_declined
   session_cancelled
   session_completed
+  session_reminder
   deliverable_review
   deliverable_changes_requested
+  deliverable_due_reminder
   tool_request_updated
   trainer_nudge
   system
+  weekly_digest
 }
 
 enum NotificationSeverity {
@@ -287,57 +290,58 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  invitedBy                   User?                      @relation("UserInvitations", fields: [invitedById], references: [id])
-  invitedUsers                User[]                     @relation("UserInvitations")
-  sentInvitations             Invitation[]               @relation("InvitationInvitedBy")
-  calendarConnections         CalendarConnection[]
-  oauthAccounts               OAuthAccount[]
-  refreshTokens               RefreshToken[]
-  emailVerificationTokens     EmailVerificationToken[]
-  passwordResetTokens         PasswordResetToken[]
-  businessMemberships         BusinessMembership[]
-  trainerCapability           TrainerCapability?
-  trainerSpecialisms          TrainerSpecialism[]
-  publishedProgrammes         Programme[]                @relation("ProgrammePublishedBy")
-  archivedProgrammes          Programme[]                @relation("ProgrammeArchivedBy")
-  grantedProgrammeAccess      ProgrammeAccessGrant[]     @relation("ProgrammeAccessGrantedBy")
-  entrepreneurProgrammeGrants ProgrammeAccessGrant[]     @relation("ProgrammeAccessEntrepreneur")
-  ownedContentItems           ContentItem[]              @relation("ContentTrainer")
-  contentRatings              ContentRating[]            @relation("ContentRatingEntrepreneur")
-  trainerContentRatings       ContentRating[]            @relation("ContentRatingTrainer")
-  createdTools                Tool[]                     @relation("ToolCreatedBy")
-  updatedTools                Tool[]                     @relation("ToolUpdatedBy")
-  toolAccess                  ToolEntrepreneurAccess[]   @relation("ToolAccessEntrepreneur")
-  grantedToolAccess           ToolEntrepreneurAccess[]   @relation("ToolAccessGrantedBy")
-  hiddenTools                 ToolHiddenEntrepreneur[]   @relation("ToolHiddenEntrepreneur")
-  hiddenToolOverrides         ToolHiddenEntrepreneur[]   @relation("ToolHiddenBy")
-  toolRequests                ToolRequest[]              @relation("ToolRequestEntrepreneur")
-  decidedToolRequests         ToolRequest[]              @relation("ToolRequestDecidedBy")
-  programmeGoals              ProgrammeGoal[]            @relation("ProgrammeGoalEntrepreneur")
-  fundraisingRounds           FundraisingRound[]         @relation("FundraisingRoundEntrepreneur")
-  periodicUpdates             PeriodicUpdate[]           @relation("PeriodicUpdateEntrepreneur")
-  deliverableInstances        DeliverableInstance[]      @relation("DeliverableInstanceEntrepreneur")
-  deliverableSubmissions      DeliverableSubmission[]    @relation("DeliverableSubmissionSubmittedBy")
-  deliverableReviews          DeliverableReview[]        @relation("DeliverableReviewReviewer")
-  updatedDeliverableDueDates  DeliverableInstance[]      @relation("DeliverableDueDateUpdatedBy")
-  requestedSessions           Session[]                  @relation("SessionEntrepreneur")
-  ownedSessions               Session[]                  @relation("SessionOwner")
-  targetedSessions            Session[]                  @relation("SessionTarget")
-  createdSessions             Session[]                  @relation("SessionCreatedBy")
-  sessionNotes                SessionNote[]              @relation("SessionNoteAuthor")
-  sessionReschedules          SessionReschedule[]        @relation("SessionRescheduleActor")
-  declinedSessionRequests     SessionRequestDecline[]    @relation("SessionRequestDeclineUser")
-  receivedNotifications       Notification[]             @relation("NotificationRecipient")
-  actedNotifications          Notification[]             @relation("NotificationActor")
-  notificationPreferences     NotificationPreference[]
-  auditLogs                   AuditLog[]                 @relation("AuditLogActor")
-  auditOutboxEvents           AuditOutbox[]              @relation("AuditOutboxActor")
-  contentProgress             LearnerContentProgress[]   @relation("LearnerContentProgressEntrepreneur")
-  moduleProgress              LearnerModuleProgress[]    @relation("LearnerModuleProgressEntrepreneur")
-  programmeProgress           LearnerProgrammeProgress[] @relation("LearnerProgrammeProgressEntrepreneur")
-  uploadedFiles               FileAsset[]                @relation("FileAssetUploadedBy")
-  uploadedVideos              VideoAsset[]               @relation("VideoAssetUploadedBy")
-  requestedReportExports      ReportExport[]             @relation("ReportExportRequestedBy")
+  invitedBy                        User?                             @relation("UserInvitations", fields: [invitedById], references: [id])
+  invitedUsers                     User[]                            @relation("UserInvitations")
+  sentInvitations                  Invitation[]                      @relation("InvitationInvitedBy")
+  calendarConnections              CalendarConnection[]
+  oauthAccounts                    OAuthAccount[]
+  refreshTokens                    RefreshToken[]
+  emailVerificationTokens          EmailVerificationToken[]
+  passwordResetTokens              PasswordResetToken[]
+  businessMemberships              BusinessMembership[]
+  trainerCapability                TrainerCapability?
+  trainerSpecialisms               TrainerSpecialism[]
+  publishedProgrammes              Programme[]                       @relation("ProgrammePublishedBy")
+  archivedProgrammes               Programme[]                       @relation("ProgrammeArchivedBy")
+  grantedProgrammeAccess           ProgrammeAccessGrant[]            @relation("ProgrammeAccessGrantedBy")
+  entrepreneurProgrammeGrants      ProgrammeAccessGrant[]            @relation("ProgrammeAccessEntrepreneur")
+  ownedContentItems                ContentItem[]                     @relation("ContentTrainer")
+  contentRatings                   ContentRating[]                   @relation("ContentRatingEntrepreneur")
+  trainerContentRatings            ContentRating[]                   @relation("ContentRatingTrainer")
+  createdTools                     Tool[]                            @relation("ToolCreatedBy")
+  updatedTools                     Tool[]                            @relation("ToolUpdatedBy")
+  toolAccess                       ToolEntrepreneurAccess[]          @relation("ToolAccessEntrepreneur")
+  grantedToolAccess                ToolEntrepreneurAccess[]          @relation("ToolAccessGrantedBy")
+  hiddenTools                      ToolHiddenEntrepreneur[]          @relation("ToolHiddenEntrepreneur")
+  hiddenToolOverrides              ToolHiddenEntrepreneur[]          @relation("ToolHiddenBy")
+  toolRequests                     ToolRequest[]                     @relation("ToolRequestEntrepreneur")
+  decidedToolRequests              ToolRequest[]                     @relation("ToolRequestDecidedBy")
+  programmeGoals                   ProgrammeGoal[]                   @relation("ProgrammeGoalEntrepreneur")
+  fundraisingRounds                FundraisingRound[]                @relation("FundraisingRoundEntrepreneur")
+  periodicUpdates                  PeriodicUpdate[]                  @relation("PeriodicUpdateEntrepreneur")
+  deliverableInstances             DeliverableInstance[]             @relation("DeliverableInstanceEntrepreneur")
+  deliverableSubmissions           DeliverableSubmission[]           @relation("DeliverableSubmissionSubmittedBy")
+  deliverableReviews               DeliverableReview[]               @relation("DeliverableReviewReviewer")
+  updatedDeliverableDueDates       DeliverableInstance[]             @relation("DeliverableDueDateUpdatedBy")
+  requestedSessions                Session[]                         @relation("SessionEntrepreneur")
+  ownedSessions                    Session[]                         @relation("SessionOwner")
+  targetedSessions                 Session[]                         @relation("SessionTarget")
+  createdSessions                  Session[]                         @relation("SessionCreatedBy")
+  sessionNotes                     SessionNote[]                     @relation("SessionNoteAuthor")
+  sessionReschedules               SessionReschedule[]               @relation("SessionRescheduleActor")
+  declinedSessionRequests          SessionRequestDecline[]           @relation("SessionRequestDeclineUser")
+  receivedNotifications            Notification[]                    @relation("NotificationRecipient")
+  actedNotifications               Notification[]                    @relation("NotificationActor")
+  notificationPreferences          NotificationPreference[]
+  notificationAutomationPreference NotificationAutomationPreference?
+  auditLogs                        AuditLog[]                        @relation("AuditLogActor")
+  auditOutboxEvents                AuditOutbox[]                     @relation("AuditOutboxActor")
+  contentProgress                  LearnerContentProgress[]          @relation("LearnerContentProgressEntrepreneur")
+  moduleProgress                   LearnerModuleProgress[]           @relation("LearnerModuleProgressEntrepreneur")
+  programmeProgress                LearnerProgrammeProgress[]        @relation("LearnerProgrammeProgressEntrepreneur")
+  uploadedFiles                    FileAsset[]                       @relation("FileAssetUploadedBy")
+  uploadedVideos                   VideoAsset[]                      @relation("VideoAssetUploadedBy")
+  requestedReportExports           ReportExport[]                    @relation("ReportExportRequestedBy")
 
   @@index([role, status])
   @@index([invitedById])
@@ -1185,6 +1189,7 @@ model DeliverableInstance {
   @@index([entrepreneurUserId, status])
   @@index([programmeId, status])
   @@index([dueDate])
+  @@index([status, dueDate])
   @@index([periodStart, periodEnd])
   @@index([dueUpdatedById])
   @@map("deliverable_instances")
@@ -1334,6 +1339,7 @@ model Notification {
   entityType      NotificationEntityType? @map("entity_type")
   entityId        String?                 @map("entity_id")
   actionUrl       String?                 @map("action_url")
+  dedupeKey       String?                 @unique @map("dedupe_key")
   readAt          DateTime?               @map("read_at")
   createdAt       DateTime                @default(now()) @map("created_at")
   updatedAt       DateTime                @updatedAt @map("updated_at")
@@ -1372,8 +1378,8 @@ model NotificationPreference {
   id           String           @id @default(cuid())
   userId       String           @map("user_id")
   type         NotificationType
-  inAppEnabled Boolean          @default(true) @map("in_app_enabled")
-  emailEnabled Boolean          @default(true) @map("email_enabled")
+  inAppEnabled Boolean?         @map("in_app_enabled")
+  emailEnabled Boolean?         @map("email_enabled")
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
 
@@ -1382,6 +1388,18 @@ model NotificationPreference {
   @@unique([userId, type])
   @@index([userId])
   @@map("notification_preferences")
+}
+
+model NotificationAutomationPreference {
+  userId              String   @id @map("user_id")
+  reminderEnabled     Boolean? @map("reminder_enabled")
+  weeklyDigestEnabled Boolean? @map("weekly_digest_enabled")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_automation_preferences")
 }
 
 model AuditLog {

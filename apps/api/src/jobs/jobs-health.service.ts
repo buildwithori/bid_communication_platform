@@ -10,6 +10,8 @@ export class JobsHealthService {
     private readonly auditQueue: Queue,
     @InjectQueue(QUEUE_NAMES.notificationDelivery)
     private readonly notificationQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.notificationAutomation)
+    private readonly notificationAutomationQueue: Queue,
     @InjectQueue(QUEUE_NAMES.recurringDeliverables)
     private readonly recurringQueue: Queue,
     @InjectQueue(QUEUE_NAMES.transactionalEmail)
@@ -40,6 +42,7 @@ export class JobsHealthService {
       [
         this.auditQueue,
         this.notificationQueue,
+        this.notificationAutomationQueue,
         this.recurringQueue,
         this.transactionalEmailQueue,
         this.reportExportQueue,

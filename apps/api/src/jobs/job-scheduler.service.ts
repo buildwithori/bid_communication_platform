@@ -20,6 +20,8 @@ export class JobSchedulerService implements OnApplicationBootstrap {
     private readonly auditQueue: Queue,
     @InjectQueue(QUEUE_NAMES.notificationDelivery)
     private readonly notificationQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.notificationAutomation)
+    private readonly notificationAutomationQueue: Queue,
     @InjectQueue(QUEUE_NAMES.recurringDeliverables)
     private readonly recurringQueue: Queue,
     private readonly config: ConfigService,
@@ -35,6 +37,9 @@ export class JobSchedulerService implements OnApplicationBootstrap {
     const recurringInterval = this.config.getOrThrow<number>(
       "DELIVERABLE_RECURRENCE_INTERVAL_MS",
     );
+    const automationInterval = this.config.getOrThrow<number>(
+      "NOTIFICATION_AUTOMATION_INTERVAL_MS",
+    );
 
     await Promise.all([
       this.installScheduler(
@@ -48,6 +53,12 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         "notification-delivery-scheduler",
         JOB_NAMES.deliverNotifications,
         notificationInterval,
+      ),
+      this.installScheduler(
+        this.notificationAutomationQueue,
+        "notification-automation-scheduler",
+        JOB_NAMES.runNotificationAutomation,
+        automationInterval,
       ),
       this.installScheduler(
         this.recurringQueue,
@@ -69,6 +80,14 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         this.startupOptions(
           JOB_NAMES.deliverNotifications,
           notificationInterval,
+        ),
+      ),
+      this.notificationAutomationQueue.add(
+        JOB_NAMES.runNotificationAutomation,
+        {},
+        this.startupOptions(
+          JOB_NAMES.runNotificationAutomation,
+          automationInterval,
         ),
       ),
       this.recurringQueue.add(

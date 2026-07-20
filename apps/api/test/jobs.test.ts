@@ -54,9 +54,11 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
   const configValues: Record<string, number> = {
     AUDIT_PROCESS_INTERVAL_MS: 5_000,
     NOTIFICATION_DELIVERY_INTERVAL_MS: 5_000,
+    NOTIFICATION_AUTOMATION_INTERVAL_MS: 900_000,
     DELIVERABLE_RECURRENCE_INTERVAL_MS: 900_000,
   };
   const scheduler = new JobSchedulerService(
+    queue() as never,
     queue() as never,
     queue() as never,
     queue() as never,
@@ -65,8 +67,8 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
 
   await scheduler.onApplicationBootstrap();
 
-  assert.equal(calls.filter((call) => call.method === "schedule").length, 3);
-  assert.equal(calls.filter((call) => call.method === "add").length, 3);
+  assert.equal(calls.filter((call) => call.method === "schedule").length, 4);
+  assert.equal(calls.filter((call) => call.method === "add").length, 4);
   assert.deepEqual(
     calls
       .filter((call) => call.method === "schedule")
@@ -74,6 +76,7 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
     [
       "audit-outbox-scheduler",
       "notification-delivery-scheduler",
+      "notification-automation-scheduler",
       "recurring-deliverables-scheduler",
     ],
   );

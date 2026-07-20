@@ -11,6 +11,7 @@ import {
 import { BadRequestException } from "@nestjs/common";
 import { NotificationsService } from "../src/notifications/notifications.service";
 import { NotificationDeliveryService } from "../src/notifications/notification-delivery.service";
+import { NotificationAutomationService } from "../src/notifications/notification-automation.service";
 
 const user = {
   id: "recipient-1",
@@ -209,7 +210,7 @@ test("group updates atomically upsert only notification types relevant to the us
     { emailEnabled: false },
   );
 
-  assert.equal(upserts.length, 5);
+  assert.equal(upserts.length, 6);
   assert.equal(
     upserts.some(
       (item) => item.create.type === NotificationType.session_request,
@@ -225,8 +226,143 @@ test("group updates atomically upsert only notification types relevant to the us
     true,
   );
   assert.equal(result.group, "sessions");
+  assert.equal(result.inAppMode, "inherit");
+  assert.equal(result.emailMode, "disabled");
   assert.equal(result.inAppEnabled, true);
   assert.equal(result.emailEnabled, false);
+});
+
+test("clearing one channel restores company inheritance without changing the other", async () => {
+  const stored = new Map<
+    NotificationType,
+    {
+      inAppEnabled: boolean | null;
+      emailEnabled: boolean | null;
+    }
+  >();
+  const prisma = {
+    notificationPreference: {
+      upsert: async ({ create, update }: any) => {
+        const current = stored.get(create.type) ?? {
+          inAppEnabled: null,
+          emailEnabled: null,
+        };
+        const value = { ...current, ...update };
+        stored.set(create.type, value);
+        return {
+          ...create,
+          ...value,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      },
+      findMany: async () =>
+        [...stored].map(([type, value]) => ({
+          type,
+          ...value,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+    },
+    companySettings: {
+      findUnique: async () => ({
+        inAppNotificationsEnabledByDefault: false,
+        emailNotificationsEnabledByDefault: true,
+      }),
+    },
+    $transaction: async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+  };
+  const service = new NotificationsService(prisma as never);
+
+  await service.updatePreferenceGroup(user as never, "sessions", {
+    emailEnabled: false,
+  });
+  const inherited = await service.updatePreferenceGroup(
+    user as never,
+    "sessions",
+    { emailEnabled: null },
+  );
+
+  assert.equal(inherited.inAppMode, "inherit");
+  assert.equal(inherited.emailMode, "inherit");
+  assert.equal(inherited.inAppEnabled, false);
+  assert.equal(inherited.emailEnabled, true);
+});
+
+test("automation creates deduplicated session reminders for enabled participants", async () => {
+  let sessionPage = 0;
+  const created: any[] = [];
+  const now = new Date("2026-07-20T08:00:00.000Z");
+  const prisma = {
+    companySettings: {
+      findUnique: async () => ({
+        reminderNotificationsEnabledByDefault: true,
+        weeklyDigestEnabledByDefault: false,
+        defaultTimezone: "Africa/Kigali",
+      }),
+    },
+    session: {
+      findMany: async () =>
+        sessionPage++ === 0
+          ? [
+              {
+                id: "session-1",
+                topic: "Investment readiness",
+                startAt: new Date("2026-07-21T07:00:00.000Z"),
+                entrepreneur: {
+                  id: "entrepreneur-1",
+                  role: UserRole.entrepreneur,
+                  timezone: "Africa/Kigali",
+                  status: "active",
+                },
+                owner: {
+                  id: "trainer-1",
+                  role: UserRole.trainer,
+                  timezone: "Africa/Kigali",
+                  status: "active",
+                },
+              },
+            ]
+          : [],
+      groupBy: async () => [],
+    },
+    deliverableInstance: {
+      findMany: async () => [],
+      groupBy: async () => [],
+    },
+    user: { findMany: async () => [] },
+    notification: {
+      groupBy: async () => [],
+      findMany: async () => [],
+    },
+    notificationAutomationPreference: { findMany: async () => [] },
+  };
+  const automation = new NotificationAutomationService(
+    prisma as never,
+    {
+      createNotifications: async (inputs: any[]) => {
+        created.push(...inputs);
+        return inputs;
+      },
+    } as never,
+  );
+
+  const result = await automation.process(now);
+
+  assert.equal(result.sessionReminders, 2);
+  assert.deepEqual(
+    created.map((item) => item.dedupeKey),
+    [
+      "session-reminder:session-1:entrepreneur-1",
+      "session-reminder:session-1:trainer-1",
+    ],
+  );
+  assert.equal(
+    created[0].actionUrl,
+    "/entrepreneur/schedule?sessionId=session-1",
+  );
+  assert.equal(created[1].actionUrl, "/trainer/sessions?sessionId=session-1");
 });
 
 test("email worker claims a pending delivery and persists successful delivery", async () => {

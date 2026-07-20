@@ -15,12 +15,15 @@ import {
 import { PrismaService } from "../database/prisma.service";
 import { NotificationQueryDto } from "./dto/notification-query.dto";
 import { UpdateNotificationPreferenceDto } from "./dto/update-notification-preference.dto";
+import { UpdateNotificationAutomationPreferenceDto } from "./dto/update-notification-automation-preference.dto";
 import {
   isNotificationPreferenceGroupName,
   notificationPreferenceGroupsForRole,
 } from "./notification-preference-groups";
 
 const DEFAULT_TAKE = 20;
+
+type PreferenceMode = "inherit" | "enabled" | "disabled" | "mixed";
 
 const notificationInclude = {
   actor: {
@@ -41,7 +44,7 @@ type NotificationWithInclude = Prisma.NotificationGetPayload<{
   include: typeof notificationInclude;
 }>;
 
-type CreateNotificationInput = {
+export type CreateNotificationInput = {
   recipientUserId: string;
   actorUserId?: string | null;
   type: NotificationType;
@@ -51,6 +54,7 @@ type CreateNotificationInput = {
   entityType?: NotificationEntityType | null;
   entityId?: string | null;
   actionUrl?: string | null;
+  dedupeKey?: string | null;
   channels?: NotificationChannel[];
 };
 
@@ -177,6 +181,8 @@ export class NotificationsService {
       const preference = byType.get(type);
       return {
         type,
+        inAppOverride: preference?.inAppEnabled ?? null,
+        emailOverride: preference?.emailEnabled ?? null,
         inAppEnabled: preference?.inAppEnabled ?? defaults.inAppEnabled,
         emailEnabled: preference?.emailEnabled ?? defaults.emailEnabled,
         createdAt: preference?.createdAt.toISOString() ?? null,
@@ -193,39 +199,47 @@ export class NotificationsService {
     if (!Object.values(NotificationType).includes(type)) {
       throw new BadRequestException("Choose a valid notification type.");
     }
+    if (dto.inAppEnabled === undefined && dto.emailEnabled === undefined) {
+      throw new BadRequestException(
+        "Choose at least one notification channel.",
+      );
+    }
 
     const defaults = await this.channelDefaults();
-    const existing = await this.prisma.notificationPreference.findUnique({
-      where: { userId_type: { userId: user.id, type } },
-    });
-
     const updated = await this.prisma.notificationPreference.upsert({
       where: { userId_type: { userId: user.id, type } },
       create: {
         userId: user.id,
         type,
-        inAppEnabled: dto.inAppEnabled ?? defaults.inAppEnabled,
-        emailEnabled: dto.emailEnabled ?? defaults.emailEnabled,
+        inAppEnabled: dto.inAppEnabled,
+        emailEnabled: dto.emailEnabled,
       },
       update: {
-        inAppEnabled:
-          dto.inAppEnabled ?? existing?.inAppEnabled ?? defaults.inAppEnabled,
-        emailEnabled:
-          dto.emailEnabled ?? existing?.emailEnabled ?? defaults.emailEnabled,
+        ...(dto.inAppEnabled === undefined
+          ? {}
+          : { inAppEnabled: dto.inAppEnabled }),
+        ...(dto.emailEnabled === undefined
+          ? {}
+          : { emailEnabled: dto.emailEnabled }),
       },
     });
 
     return {
       type: updated.type,
-      inAppEnabled: updated.inAppEnabled,
-      emailEnabled: updated.emailEnabled,
+      inAppOverride: updated.inAppEnabled,
+      emailOverride: updated.emailEnabled,
+      inAppEnabled: updated.inAppEnabled ?? defaults.inAppEnabled,
+      emailEnabled: updated.emailEnabled ?? defaults.emailEnabled,
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     };
   }
 
   async listPreferenceGroups(user: User) {
-    const preferences = await this.listPreferences(user);
+    const [preferences, defaults] = await Promise.all([
+      this.listPreferences(user),
+      this.channelDefaults(),
+    ]);
     const byType = new Map(
       preferences.map((preference) => [preference.type, preference]),
     );
@@ -236,12 +250,19 @@ export class NotificationsService {
         return {
           group,
           types,
+          inAppMode: this.preferenceMode(
+            entries.map((entry) => entry.inAppOverride),
+          ),
+          emailMode: this.preferenceMode(
+            entries.map((entry) => entry.emailOverride),
+          ),
           inAppEnabled: this.groupedChannelState(
             entries.map((entry) => entry.inAppEnabled),
           ),
           emailEnabled: this.groupedChannelState(
             entries.map((entry) => entry.emailEnabled),
           ),
+          defaults,
         };
       },
     );
@@ -272,7 +293,6 @@ export class NotificationsService {
       );
     }
 
-    const defaults = await this.channelDefaults();
     await this.prisma.$transaction(
       definition.types.map((type) =>
         this.prisma.notificationPreference.upsert({
@@ -280,8 +300,8 @@ export class NotificationsService {
           create: {
             userId: user.id,
             type,
-            inAppEnabled: dto.inAppEnabled ?? defaults.inAppEnabled,
-            emailEnabled: dto.emailEnabled ?? defaults.emailEnabled,
+            inAppEnabled: dto.inAppEnabled,
+            emailEnabled: dto.emailEnabled,
           },
           update: {
             ...(dto.inAppEnabled === undefined
@@ -299,10 +319,63 @@ export class NotificationsService {
     return groups.find((item) => item.group === group)!;
   }
 
+  private preferenceMode(values: Array<boolean | null>): PreferenceMode {
+    if (values.every((value) => value === null)) return "inherit";
+    if (values.every((value) => value === true)) return "enabled";
+    if (values.every((value) => value === false)) return "disabled";
+    return "mixed";
+  }
+
   private groupedChannelState(values: boolean[]) {
     if (values.every(Boolean)) return true;
     if (values.every((value) => !value)) return false;
     return null;
+  }
+
+  async getAutomationPreference(user: User) {
+    const [preference, defaults] = await Promise.all([
+      this.prisma.notificationAutomationPreference.findUnique({
+        where: { userId: user.id },
+      }),
+      this.automationDefaults(),
+    ]);
+    return {
+      reminderOverride: preference?.reminderEnabled ?? null,
+      reminderEnabled: preference?.reminderEnabled ?? defaults.reminderEnabled,
+      weeklyDigestOverride: preference?.weeklyDigestEnabled ?? null,
+      weeklyDigestEnabled:
+        preference?.weeklyDigestEnabled ?? defaults.weeklyDigestEnabled,
+      defaults,
+    };
+  }
+
+  async updateAutomationPreference(
+    user: User,
+    dto: UpdateNotificationAutomationPreferenceDto,
+  ) {
+    if (
+      dto.reminderEnabled === undefined &&
+      dto.weeklyDigestEnabled === undefined
+    ) {
+      throw new BadRequestException("Choose at least one automation setting.");
+    }
+    await this.prisma.notificationAutomationPreference.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        reminderEnabled: dto.reminderEnabled,
+        weeklyDigestEnabled: dto.weeklyDigestEnabled,
+      },
+      update: {
+        ...(dto.reminderEnabled === undefined
+          ? {}
+          : { reminderEnabled: dto.reminderEnabled }),
+        ...(dto.weeklyDigestEnabled === undefined
+          ? {}
+          : { weeklyDigestEnabled: dto.weeklyDigestEnabled }),
+      },
+    });
+    return this.getAutomationPreference(user);
   }
 
   async createNotification(input: CreateNotificationInput) {
@@ -359,7 +432,7 @@ export class NotificationsService {
           preferencesByRecipientAndType.get(
             input.recipientUserId + ":" + input.type,
           ) ?? null;
-        return this.prisma.notification.create({
+        const createArgs = {
           data: {
             recipientUserId: input.recipientUserId,
             actorUserId: input.actorUserId ?? null,
@@ -370,6 +443,7 @@ export class NotificationsService {
             entityType: input.entityType ?? null,
             entityId: input.entityId ?? null,
             actionUrl: input.actionUrl,
+            dedupeKey: input.dedupeKey ?? null,
             deliveries: {
               create: input.channels.map((channel) => ({
                 channel,
@@ -383,7 +457,16 @@ export class NotificationsService {
             },
           },
           include: notificationInclude,
-        });
+        };
+        if (input.dedupeKey) {
+          return this.prisma.notification.upsert({
+            where: { dedupeKey: input.dedupeKey },
+            update: {},
+            create: createArgs.data,
+            include: notificationInclude,
+          });
+        }
+        return this.prisma.notification.create(createArgs);
       }),
     );
   }
@@ -412,9 +495,26 @@ export class NotificationsService {
     };
   }
 
+  private async automationDefaults() {
+    const settings = await this.prisma.companySettings.findUnique({
+      where: { singletonKey: "default" },
+      select: {
+        reminderNotificationsEnabledByDefault: true,
+        weeklyDigestEnabledByDefault: true,
+      },
+    });
+    return {
+      reminderEnabled: settings?.reminderNotificationsEnabledByDefault ?? true,
+      weeklyDigestEnabled: settings?.weeklyDigestEnabledByDefault ?? false,
+    };
+  }
+
   private deliveryStatusFor(
     channel: NotificationChannel,
-    preferences: { inAppEnabled: boolean; emailEnabled: boolean } | null,
+    preferences: {
+      inAppEnabled: boolean | null;
+      emailEnabled: boolean | null;
+    } | null,
     defaults: { inAppEnabled: boolean; emailEnabled: boolean },
   ) {
     if (channel === NotificationChannel.in_app) {

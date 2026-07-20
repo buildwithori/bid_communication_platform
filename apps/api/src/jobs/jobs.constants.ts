@@ -1,6 +1,7 @@
 export const QUEUE_NAMES = {
   audit: "bid-audit",
   notificationDelivery: "bid-notification-delivery",
+  notificationAutomation: "bid-notification-automation",
   recurringDeliverables: "bid-recurring-deliverables",
   transactionalEmail: "bid-transactional-email",
   reportExports: "bid-report-exports",
@@ -9,6 +10,7 @@ export const QUEUE_NAMES = {
 export const JOB_NAMES = {
   processAuditOutbox: "process-audit-outbox",
   deliverNotifications: "deliver-notifications",
+  runNotificationAutomation: "run-notification-automation",
   syncRecurringDeliverables: "sync-recurring-deliverables",
   authVerificationEmail: "auth-verification-email",
   authPasswordResetEmail: "auth-password-reset-email",

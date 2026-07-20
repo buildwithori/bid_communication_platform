@@ -50,11 +50,19 @@ const preferenceDefinitionByType: Record<
     group: "sessions",
     roles: [UserRole.entrepreneur],
   },
+  [NotificationType.session_reminder]: {
+    group: "sessions",
+    roles: allRoles,
+  },
   [NotificationType.deliverable_review]: {
     group: "deliverables",
     roles: allRoles,
   },
   [NotificationType.deliverable_changes_requested]: {
+    group: "deliverables",
+    roles: [UserRole.entrepreneur],
+  },
+  [NotificationType.deliverable_due_reminder]: {
     group: "deliverables",
     roles: [UserRole.entrepreneur],
   },
@@ -67,6 +75,10 @@ const preferenceDefinitionByType: Record<
     roles: [UserRole.trainer],
   },
   [NotificationType.system]: {
+    group: "product",
+    roles: allRoles,
+  },
+  [NotificationType.weekly_digest]: {
     group: "product",
     roles: allRoles,
   },

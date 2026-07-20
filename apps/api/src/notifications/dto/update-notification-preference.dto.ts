@@ -1,11 +1,11 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional } from "class-validator";
 
 export class UpdateNotificationPreferenceDto {
   @IsOptional()
   @IsBoolean()
-  inAppEnabled?: boolean;
+  inAppEnabled?: boolean | null;
 
   @IsOptional()
   @IsBoolean()
-  emailEnabled?: boolean;
+  emailEnabled?: boolean | null;
 }

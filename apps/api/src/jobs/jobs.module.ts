@@ -28,6 +28,7 @@ import { JobsHealthService } from "./jobs-health.service";
     BullModule.registerQueue(
       { name: QUEUE_NAMES.audit },
       { name: QUEUE_NAMES.notificationDelivery },
+      { name: QUEUE_NAMES.notificationAutomation },
       { name: QUEUE_NAMES.recurringDeliverables },
       { name: QUEUE_NAMES.transactionalEmail },
       { name: QUEUE_NAMES.reportExports },
