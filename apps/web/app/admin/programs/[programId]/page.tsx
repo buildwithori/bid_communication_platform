@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -83,12 +84,12 @@ export default function AdminProgrammeWorkspacePage() {
     React.useState<ProgrammeModuleRecord | null>(null);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
   const [moduleSearch, setModuleSearch] = React.useState('');
-  const deferredModuleSearch = React.useDeferredValue(moduleSearch);
+  const debouncedModuleSearch = useDebouncedValue(moduleSearch);
   const [pageSize, setPageSize] = React.useState(6);
 
   const detail = useProgrammeDetailQuery(programmeId);
   const modules = useProgrammeModulesPage(programmeId, {
-    search: deferredModuleSearch.trim() || undefined,
+    search: debouncedModuleSearch.trim() || undefined,
     take: pageSize,
   });
   const publishProgramme = usePublishProgrammeMutation({
@@ -111,12 +112,12 @@ export default function AdminProgrammeWorkspacePage() {
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredModuleSearch, pageSize, resetPagination]);
+  }, [debouncedModuleSearch, pageSize, resetPagination]);
 
   const isArchived = detail.data?.lifecycle === 'archived';
   const canReorder =
     !isArchived &&
-    deferredModuleSearch.trim().length === 0 &&
+    debouncedModuleSearch.trim().length === 0 &&
     !moveProgramme.isPending;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),

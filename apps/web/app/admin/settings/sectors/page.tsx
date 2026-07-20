@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,12 +29,13 @@ import { newSectorSchema, type NewSectorForm } from "@/lib/forms/schemas";
 
 export default function AdminSectorsPage() {
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [activeSector, setActiveSector] = React.useState<LookupRecord | null>(
     null,
   );
-  const sectors = useSectorsPage({ search: query, take: pageSize });
+  const sectors = useSectorsPage({ search: debouncedQuery || undefined, take: pageSize });
   const createSector = useCreateSectorMutation({
     onSuccess: () => {
       setCreateOpen(false);

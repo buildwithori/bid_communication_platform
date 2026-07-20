@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -74,12 +75,12 @@ export function SessionManagementPage({
 }) {
   const currentUser = useCurrentUserQuery();
   const [search, setSearch] = React.useState("");
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = React.useState<typeof ALL | SessionStatus>(ALL);
   const [type, setType] = React.useState<typeof ALL | SessionType>(ALL);
   const [pageSize, setPageSize] = React.useState(10);
   const sessions = useSessionsPage({
-    search: deferredSearch || undefined,
+    search: debouncedSearch || undefined,
     status: status === ALL ? undefined : status,
     type: type === ALL ? undefined : type,
     take: pageSize,
@@ -105,7 +106,7 @@ export function SessionManagementPage({
   const { resetPagination } = sessions;
   React.useEffect(() => {
     resetPagination();
-  }, [deferredSearch, pageSize, resetPagination, status, type]);
+  }, [debouncedSearch, pageSize, resetPagination, status, type]);
 
   const mutationHandlers = (message: string, close: () => void) => ({
     onSuccess: () => {

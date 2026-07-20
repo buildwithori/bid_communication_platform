@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -119,17 +120,17 @@ export default function EntrepreneurProfilePage() {
   const entrepreneurId = profile.data?.entrepreneurUserId ?? null;
   const goals = useProgrammeGoalsQuery(
     entrepreneurId,
-    { search: React.useDeferredValue(goalSearch) || undefined, take: 10 },
+    { search: useDebouncedValue(goalSearch) || undefined, take: 10 },
     tab === "goals",
   );
   const funding = useFundraisingRoundsQuery(
     entrepreneurId,
-    { search: React.useDeferredValue(fundingSearch) || undefined, take: 10 },
+    { search: useDebouncedValue(fundingSearch) || undefined, take: 10 },
     tab === "funding",
   );
   const updates = usePeriodicUpdatesQuery(
     entrepreneurId,
-    { search: React.useDeferredValue(updateSearch) || undefined, take: 10 },
+    { search: useDebouncedValue(updateSearch) || undefined, take: 10 },
     tab === "updates",
   );
 
@@ -592,13 +593,13 @@ function BusinessTab({
   const [timezoneOpen, setTimezoneOpen] = React.useState(false);
   const sectors = useLazySectorsQuery({
     enabled: sectorLookup.open,
-    search: React.useDeferredValue(sectorLookup.search) || undefined,
+    search: sectorLookup.search || undefined,
     active: true,
     take: 20,
   });
   const stages = useLazyBusinessStagesQuery({
     enabled: stageLookup.open,
-    search: React.useDeferredValue(stageLookup.search) || undefined,
+    search: stageLookup.search || undefined,
     active: true,
     take: 20,
   });

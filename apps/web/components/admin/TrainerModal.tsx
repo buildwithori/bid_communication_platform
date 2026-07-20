@@ -43,10 +43,9 @@ export function TrainerModal({
   const isEdit = mode === "edit" && Boolean(trainer);
   const [specialismOpen, setSpecialismOpen] = React.useState(false);
   const [specialismSearch, setSpecialismSearch] = React.useState("");
-  const deferredSearch = React.useDeferredValue(specialismSearch);
   const sectors = useLazySectorsQuery({
     enabled: open && specialismOpen,
-    search: deferredSearch || undefined,
+    search: specialismSearch || undefined,
     active: true,
     take: 20,
   });

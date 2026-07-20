@@ -80,14 +80,14 @@ export function ProgrammeGoalRecordModal({
   });
   const goalTypes = useLazyProgrammeGoalTypesQuery({
     enabled: open && typeLookup.open,
-    search: React.useDeferredValue(typeLookup.search) || undefined,
+    search: typeLookup.search || undefined,
     active: true,
     take: 20,
   });
   const programmes = useProgrammeAccessQuery(
     open ? entrepreneurId : null,
     {
-      search: React.useDeferredValue(programmeLookup.search) || undefined,
+      search: programmeLookup.search || undefined,
       take: 20,
     },
     programmeLookup.open,
@@ -256,7 +256,7 @@ export function FundraisingRoundRecordModal({
   const programmes = useProgrammeAccessQuery(
     open ? entrepreneurId : null,
     {
-      search: React.useDeferredValue(programmeLookup.search) || undefined,
+      search: programmeLookup.search || undefined,
       take: 20,
     },
     programmeLookup.open,
@@ -264,7 +264,7 @@ export function FundraisingRoundRecordModal({
   const goals = useProgrammeGoalsQuery(
     open ? entrepreneurId : null,
     {
-      search: React.useDeferredValue(goalLookup.search) || undefined,
+      search: goalLookup.search || undefined,
       linkableOnly: true,
       take: 20,
     },
@@ -438,7 +438,7 @@ export function PeriodicUpdateRecordModal({
   const programmes = useProgrammeAccessQuery(
     open ? entrepreneurId : null,
     {
-      search: React.useDeferredValue(programmeLookup.search) || undefined,
+      search: programmeLookup.search || undefined,
       take: 20,
     },
     programmeLookup.open,

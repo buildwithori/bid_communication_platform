@@ -40,11 +40,10 @@ export function ModuleModal({
   const [mode, setMode] = React.useState<ModuleMode>('create');
   const [reuseOpen, setReuseOpen] = React.useState(false);
   const [reuseSearch, setReuseSearch] = React.useState('');
-  const deferredReuseSearch = React.useDeferredValue(reuseSearch);
   const reusableModules = useLazyReusableProgrammeModules({
     programmeId: programId,
     enabled: open && mode === 'reuse' && reuseOpen,
-    search: deferredReuseSearch.trim() || undefined,
+    search: reuseSearch.trim() || undefined,
     take: 20,
   });
   const createModule = useCreateProgrammeModuleMutation();

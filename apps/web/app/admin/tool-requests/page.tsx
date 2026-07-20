@@ -1,6 +1,7 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDebouncedValue } from '@/lib/search';
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/shared/Badge";
@@ -59,7 +60,7 @@ export default function AdminToolRequestsPage() {
   const linkedRequestId = searchParams.get("requestId");
   const linkedRequest = useToolRequestDetailQuery(linkedRequestId);
   const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
+  const debouncedQuery = useDebouncedValue(query);
   const [statusFilter, setStatusFilter] = useState<"all" | ToolRequestStatus>(
     "all",
   );
@@ -81,7 +82,7 @@ export default function AdminToolRequestsPage() {
   const [areaSearch, setAreaSearch] = useState("");
 
   const requests = useToolRequestsPage({
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     status:
       statusFilter === "all"
         ? undefined

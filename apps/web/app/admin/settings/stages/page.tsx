@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,11 +36,12 @@ import {
 
 export default function AdminBusinessStagesPage() {
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [activeStage, setActiveStage] =
     React.useState<BusinessStageRecord | null>(null);
-  const stages = useBusinessStagesPage({ search: query, take: pageSize });
+  const stages = useBusinessStagesPage({ search: debouncedQuery || undefined, take: pageSize });
   const createStage = useCreateBusinessStageMutation({
     onSuccess: () => {
       setCreateOpen(false);

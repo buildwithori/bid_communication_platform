@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { FileText, Layers3, PlayCircle, Wrench } from 'lucide-react';
 import { Badge } from '@/components/shared/Badge';
@@ -51,9 +52,11 @@ function ModuleDetailModalContent({
 }: ModuleDetailModalProps) {
   const { contentItems, programs, trainers } = useAdminStore();
   const [contentQuery, setContentQuery] = React.useState('');
+  const debouncedContentQuery = useDebouncedValue(contentQuery.trim());
   const [contentPage, setContentPage] = React.useState(1);
   const [contentPageSize, setContentPageSize] = React.useState(5);
   const [usageQuery, setUsageQuery] = React.useState('');
+  const debouncedUsageQuery = useDebouncedValue(usageQuery.trim());
   const [usagePage, setUsagePage] = React.useState(1);
   const [usagePageSize, setUsagePageSize] = React.useState(5);
 
@@ -67,7 +70,7 @@ function ModuleDetailModalContent({
   );
 
   const filteredItems = React.useMemo(() => {
-    const needle = contentQuery.trim().toLowerCase();
+    const needle = debouncedContentQuery.toLowerCase();
     if (!needle) return items;
     return items.filter((item) => {
       const trainer = trainers.find((entry) => entry.id === item.trainerId);
@@ -85,10 +88,10 @@ function ModuleDetailModalContent({
         .toLowerCase()
         .includes(needle);
     });
-  }, [contentQuery, items, trainers]);
+  }, [debouncedContentQuery, items, trainers]);
 
   const filteredUsage = React.useMemo(() => {
-    const needle = usageQuery.trim().toLowerCase();
+    const needle = debouncedUsageQuery.toLowerCase();
     if (!needle) return usedInPrograms;
     return usedInPrograms.filter((item) =>
       [
@@ -101,7 +104,7 @@ function ModuleDetailModalContent({
         .toLowerCase()
         .includes(needle),
     );
-  }, [program?.id, usageQuery, usedInPrograms]);
+  }, [debouncedUsageQuery, program?.id, usedInPrograms]);
 
   const contentPageRows = React.useMemo(() => {
     const start = (contentPage - 1) * contentPageSize;

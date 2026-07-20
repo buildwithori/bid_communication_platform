@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -130,7 +131,7 @@ export function RequiredDeliverablesSection({
   programName: string;
 }) {
   const [query, setQuery] = React.useState('');
-  const deferredQuery = React.useDeferredValue(query);
+  const debouncedQuery = useDebouncedValue(query);
   const [pageSize, setPageSize] = React.useState(5);
   const [addOpen, setAddOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<ProgrammeDeliverableRule | null>(null);
@@ -138,19 +139,19 @@ export function RequiredDeliverablesSection({
   const [moduleLookup, setModuleLookup] = React.useState({ open: false, search: '' });
   const modalOpen = addOpen || Boolean(editTarget);
   const rules = useProgrammeDeliverableRulesPage(programmeId, {
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     take: pageSize,
   });
   const stages = useLazyBusinessStagesQuery({
     enabled: modalOpen && stageLookup.open,
-    search: React.useDeferredValue(stageLookup.search) || undefined,
+    search: stageLookup.search || undefined,
     active: true,
     take: 20,
   });
   const modules = useLazyProgrammeModules({
     programmeId,
     enabled: modalOpen && moduleLookup.open,
-    search: React.useDeferredValue(moduleLookup.search) || undefined,
+    search: moduleLookup.search || undefined,
     take: 20,
   });
   const addForm = useForm<RequiredDeliverableForm>({
@@ -180,7 +181,7 @@ export function RequiredDeliverablesSection({
   const resetRulePagination = rules.resetPagination;
   React.useEffect(() => {
     resetRulePagination();
-  }, [deferredQuery, pageSize, resetRulePagination]);
+  }, [debouncedQuery, pageSize, resetRulePagination]);
 
   const stageOptions = uniqueOptions([
     { value: ALL, label: 'All entrepreneurs in this programme' },

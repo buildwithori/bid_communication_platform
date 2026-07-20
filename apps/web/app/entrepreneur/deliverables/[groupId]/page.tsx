@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
@@ -61,12 +62,12 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
     if (linkedDeliverableId) router.replace(`/entrepreneur/deliverables/${programmeId}`);
   }
   const [query, setQuery] = React.useState('');
-  const deferredQuery = React.useDeferredValue(query.trim());
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [statusFilter, setStatusFilter] = React.useState<typeof ALL | DeliverableStatus>(ALL);
   const [pageSize, setPageSize] = React.useState(10);
   const instances = useDeliverableInstancesPage({
     programmeId,
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     status: statusFilter === ALL ? undefined : statusFilter,
     take: pageSize,
   });

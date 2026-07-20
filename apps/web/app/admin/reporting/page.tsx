@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
@@ -92,7 +93,7 @@ export default function AdminReportingPage() {
   const [overdueProgrammeSearch, setOverdueProgrammeSearch] =
     React.useState("");
   const [overdueQuery, setOverdueQuery] = React.useState("");
-  const deferredOverdueQuery = React.useDeferredValue(overdueQuery.trim());
+  const debouncedOverdueQuery = useDebouncedValue(overdueQuery.trim());
   const [overdueProgramme, setOverdueProgramme] = React.useState(ALL);
   const [overduePriority, setOverduePriority] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(10);
@@ -122,7 +123,7 @@ export default function AdminReportingPage() {
   const effectiveOverdueProgramme =
     selectedProgramme !== ALL ? selectedProgramme : overdueProgramme;
   const overdue = useOverdueUpdatesPage({
-    search: deferredOverdueQuery || undefined,
+    search: debouncedOverdueQuery || undefined,
     programmeId:
       effectiveOverdueProgramme === ALL ? undefined : effectiveOverdueProgramme,
     priority:
@@ -133,7 +134,7 @@ export default function AdminReportingPage() {
   React.useEffect(() => {
     resetOverduePagination();
   }, [
-    deferredOverdueQuery,
+    debouncedOverdueQuery,
     effectiveOverdueProgramme,
     overduePriority,
     pageSize,

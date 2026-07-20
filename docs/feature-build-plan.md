@@ -15,6 +15,7 @@ This document is the working plan for backend and frontend integration. The goal
 - Keep local and production Docker separate. Local includes developer tools like Mailpit and pgAdmin; production does not.
 - Every list, lookup, autocomplete, and table endpoint must be designed for growth. Do not hard-cap results as a hidden product limit. Use cursor pagination or infinite-scroll friendly pagination everywhere, including autocomplete sources.
 - Autocomplete/select data should be fetched lazily when the control opens or when the user searches, not eagerly for every page load.
+- All search inputs must use the shared 300 ms debounce boundary. Remote autocomplete search is debounced by the shared control, so consumers must avoid adding a second delay.
 - Frontend screens must show a page-specific skeleton whenever server-side or client-side data is loading. Do not leave blank pages or generic spinners for full-page fetches.
 - Buttons that trigger async work must show an inline loading spinner beside the button label and prevent duplicate submission while pending.
 - Backend APIs should do the heavy lifting: filtering, searching, aggregation, counts, dashboard metrics, and report summaries should be computed in the database/query layer, not assembled with large client-side datasets.

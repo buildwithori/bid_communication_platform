@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -50,13 +51,13 @@ export default function AdminProgramsPage() {
   const [archiveTarget, setArchiveTarget] =
     React.useState<ProgrammeListItem | null>(null);
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = React.useState<StatusFilter>('current');
   const [access, setAccess] = React.useState<AccessFilter>('all');
   const [pageSize, setPageSize] = React.useState(8);
 
   const directory = useProgrammesPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     lifecycle:
       status === 'current' || status === 'all' ? undefined : status,
     includeArchived: status === 'all' ? true : undefined,
@@ -80,7 +81,7 @@ export default function AdminProgramsPage() {
 
   React.useEffect(() => {
     resetPagination();
-  }, [access, deferredSearch, pageSize, resetPagination, status]);
+  }, [access, debouncedSearch, pageSize, resetPagination, status]);
 
   const openProgrammeWorkspace = React.useCallback(
     (programme: ProgrammeListItem) => {

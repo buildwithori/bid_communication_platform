@@ -54,19 +54,19 @@ export function EntrepreneurFormModal({
   });
   const sectors = useLazySectorsQuery({
     enabled: open && sectorLookup.open,
-    search: React.useDeferredValue(sectorLookup.search) || undefined,
+    search: sectorLookup.search || undefined,
     active: true,
     take: 20,
   });
   const stages = useLazyBusinessStagesQuery({
     enabled: open && stageLookup.open,
-    search: React.useDeferredValue(stageLookup.search) || undefined,
+    search: stageLookup.search || undefined,
     active: true,
     take: 20,
   });
   const programmes = useLazyGrantableProgrammesQuery({
     enabled: open && !isEdit && programmeLookup.open,
-    search: React.useDeferredValue(programmeLookup.search) || undefined,
+    search: programmeLookup.search || undefined,
   });
   const form = useForm<EntrepreneurProfileForm>({
     resolver: zodResolver(entrepreneurProfileSchema),

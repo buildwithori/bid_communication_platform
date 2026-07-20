@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDebouncedValue } from '@/lib/search';
 import { InlineSpinner } from '@/components/shared/Button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -205,7 +206,18 @@ export function FormAutocomplete({
   onLoadMore,
 }: FormAutocompleteProps) {
   const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search);
+  const onSearchChangeRef = React.useRef(onSearchChange);
   const selected = options.find((option) => option.value === value);
+
+  React.useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
+
+  React.useEffect(() => {
+    onSearchChangeRef.current?.(debouncedSearch);
+  }, [debouncedSearch]);
 
   const handleListWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     const list = event.currentTarget;
@@ -217,7 +229,11 @@ export function FormAutocomplete({
   };
 
   return (
-    <Popover open={open} onOpenChange={(nextOpen: boolean) => { setOpen(nextOpen); onOpenChange?.(nextOpen); }}>
+    <Popover open={open} onOpenChange={(nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (!nextOpen) setSearch('');
+      onOpenChange?.(nextOpen);
+    }}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -234,7 +250,11 @@ export function FormAutocomplete({
       </PopoverTrigger>
       <PopoverContent align="start" className={cn('w-[var(--radix-popover-trigger-width)] p-0', popoverClassName)}>
         <Command shouldFilter={!onSearchChange}>
-          <CommandInput placeholder={searchPlaceholder} onValueChange={onSearchChange} />
+          <CommandInput
+            value={search}
+            placeholder={searchPlaceholder}
+            onValueChange={setSearch}
+          />
           <CommandList className={listClassName} onWheel={handleListWheel}>
             {!isLoading ? <CommandEmpty>{emptyMessage}</CommandEmpty> : null}
             <CommandGroup>

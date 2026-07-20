@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { FileText, LayoutGrid, Plus, Search, Timer, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
@@ -77,6 +78,7 @@ export function ManageEntrepreneurToolsModal({
   const { entrepreneurs, updateEntrepreneur } = useAdminStore();
   const currentEntrepreneur = entrepreneurs.find((item) => item.id === entrepreneur.id) ?? entrepreneur;
   const [query, setQuery] = React.useState('');
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [typeFilter, setTypeFilter] = React.useState<'all' | ToolType>('all');
   const [sourceFilter, setSourceFilter] = React.useState<'all' | EntrepreneurToolAccessSource>('all');
   const [page, setPage] = React.useState(1);
@@ -109,7 +111,7 @@ export function ManageEntrepreneurToolsModal({
   );
 
   const filteredTools = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = debouncedQuery.toLowerCase();
     return visibleTools.filter((tool) => {
       const source = getEntrepreneurToolAccessSource(tool, currentEntrepreneur);
       const audience = describeToolAudience(tool, programs, entrepreneurs);
@@ -121,7 +123,7 @@ export function ManageEntrepreneurToolsModal({
       const matchesSource = sourceFilter === 'all' || source === sourceFilter;
       return matchesQuery && matchesType && matchesSource;
     });
-  }, [currentEntrepreneur, entrepreneurs, query, sourceFilter, typeFilter, visibleTools]);
+  }, [currentEntrepreneur, debouncedQuery, entrepreneurs, sourceFilter, typeFilter, visibleTools]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {

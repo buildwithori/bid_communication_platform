@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, FileText, PlayCircle, Wrench } from 'lucide-react';
@@ -32,11 +33,11 @@ type StatusFilter = 'current' | 'all' | ProgrammeLifecycle;
 export default function TrainerProgrammesPage() {
   const router = useRouter();
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = React.useState<StatusFilter>('current');
   const [pageSize, setPageSize] = React.useState(10);
   const directory = useProgrammesPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     lifecycle: status === 'current' || status === 'all' ? undefined : status,
     includeArchived: status === 'all' ? true : undefined,
     take: pageSize,
@@ -46,7 +47,7 @@ export default function TrainerProgrammesPage() {
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredSearch, pageSize, resetPagination, status]);
+  }, [debouncedSearch, pageSize, resetPagination, status]);
 
   const openProgramme = React.useCallback(
     (programme: ProgrammeListItem) => {

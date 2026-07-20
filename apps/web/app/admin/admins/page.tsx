@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { MailPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -69,12 +70,13 @@ export default function AdminsPage() {
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [viewAdminId, setViewAdminId] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [status, setStatus] = React.useState(ALL_FILTER);
   const [calendar, setCalendar] = React.useState(ALL_FILTER);
   const [pageSize, setPageSize] = React.useState(10);
 
   const admins = useAdminsPage({
-    search: query,
+    search: debouncedQuery || undefined,
     status:
       status === ALL_FILTER ? undefined : (status as AdminDirectoryStatus),
     calendarStatus:

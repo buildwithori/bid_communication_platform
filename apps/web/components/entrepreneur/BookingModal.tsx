@@ -62,7 +62,6 @@ export function BookingModal({
   const timezone = profile.data?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
   const [teamLookupOpen, setTeamLookupOpen] = React.useState(false);
   const [trainerSearch, setTrainerSearch] = React.useState("");
-  const deferredTrainerSearch = React.useDeferredValue(trainerSearch);
   const form = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
@@ -84,7 +83,7 @@ export function BookingModal({
 
   const trainers = useLazySessionTeamMembers({
     enabled: open && recipient === "specific" && teamLookupOpen,
-    search: deferredTrainerSearch || undefined,
+    search: trainerSearch || undefined,
     take: 20,
     role: "trainer",
   });

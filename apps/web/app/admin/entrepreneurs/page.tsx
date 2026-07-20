@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { toast } from "sonner";
 import { Mail, MapPin, Phone } from "lucide-react";
@@ -99,9 +100,9 @@ export default function AdminEntrepreneursPage() {
     search: "",
   });
   const [pageSize, setPageSize] = React.useState(10);
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const directory = useEntrepreneursPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     status: status === "all" ? undefined : status,
     source: source === "all" ? undefined : source,
     sectorId: sectorId === "all" ? undefined : sectorId,
@@ -110,13 +111,13 @@ export default function AdminEntrepreneursPage() {
   });
   const sectors = useLazySectorsQuery({
     enabled: sectorLookup.open,
-    search: React.useDeferredValue(sectorLookup.search) || undefined,
+    search: sectorLookup.search || undefined,
     active: true,
     take: 20,
   });
   const stages = useLazyBusinessStagesQuery({
     enabled: stageLookup.open,
-    search: React.useDeferredValue(stageLookup.search) || undefined,
+    search: stageLookup.search || undefined,
     active: true,
     take: 20,
   });
@@ -126,7 +127,7 @@ export default function AdminEntrepreneursPage() {
   React.useEffect(
     () => resetPagination(),
     [
-      deferredSearch,
+      debouncedSearch,
       pageSize,
       resetPagination,
       sectorId,
@@ -544,7 +545,7 @@ function ProgrammeAccessModal({
   const access = useProgrammeAccessQuery(entrepreneurId, { take: 10 });
   const programmes = useLazyGrantableProgrammesQuery({
     enabled: Boolean(entrepreneurId && lookup.open),
-    search: React.useDeferredValue(lookup.search) || undefined,
+    search: lookup.search || undefined,
   });
   const grant = useGrantProgrammeAccessMutation({
     onSuccess: () => {
@@ -660,7 +661,7 @@ function ToolAccessModal({
 }) {
   const [search, setSearch] = React.useState("");
   const tools = useEffectiveToolsQuery(entrepreneurId, {
-    search: React.useDeferredValue(search) || undefined,
+    search: useDebouncedValue(search) || undefined,
     includeUnavailable: true,
     take: 10,
   });

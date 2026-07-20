@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -60,9 +61,9 @@ export default function AdminDashboardPage() {
   const [source, setSource] = React.useState("all");
   const [status, setStatus] = React.useState("all");
   const [pageSize, setPageSize] = React.useState(5);
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const recent = useAdminRecentEntrepreneursPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     source: source === "all" ? undefined : source as DashboardRecentEntrepreneur["source"],
     status: status === "all" ? undefined : status as "active" | "without_programme",
     take: pageSize,
@@ -71,7 +72,7 @@ export default function AdminDashboardPage() {
   const resetRecentPagination = recent.resetPagination;
   React.useEffect(() => {
     resetRecentPagination();
-  }, [deferredSearch, pageSize, resetRecentPagination, source, status]);
+  }, [debouncedSearch, pageSize, resetRecentPagination, source, status]);
 
   if (dashboard.isLoading && !dashboard.data) return <AdminDashboardSkeleton />;
   if (dashboard.isError || !dashboard.data) {

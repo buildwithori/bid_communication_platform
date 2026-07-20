@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { Search } from "lucide-react";
 import { Badge } from "@/components/shared/Badge";
@@ -42,6 +43,7 @@ export function ProgrammeAccessList({
 }: ProgrammeAccessListProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query.trim());
   const assignedProgrammes = React.useMemo(
     () =>
       programmes.filter(
@@ -55,7 +57,7 @@ export function ProgrammeAccessList({
     0,
   );
   const filteredProgrammes = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = debouncedQuery.toLowerCase();
     if (!needle) return assignedProgrammes;
     return assignedProgrammes.filter((programme) =>
       [programme.name, programme.description ?? "", programme.accessType]
@@ -63,7 +65,7 @@ export function ProgrammeAccessList({
         .toLowerCase()
         .includes(needle),
     );
-  }, [assignedProgrammes, query]);
+  }, [assignedProgrammes, debouncedQuery]);
 
   return (
     <>

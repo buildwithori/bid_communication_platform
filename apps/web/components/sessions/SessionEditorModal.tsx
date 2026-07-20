@@ -109,17 +109,15 @@ function SessionEditorModalForm({
   const [ownerOpen, setOwnerOpen] = React.useState(false);
   const [entrepreneurSearch, setEntrepreneurSearch] = React.useState("");
   const [ownerSearch, setOwnerSearch] = React.useState("");
-  const deferredEntrepreneurSearch = React.useDeferredValue(entrepreneurSearch);
-  const deferredOwnerSearch = React.useDeferredValue(ownerSearch);
 
   const entrepreneurs = useLazyEntrepreneursLookup({
     enabled: open && entrepreneurOpen && mode === "create",
-    search: deferredEntrepreneurSearch || undefined,
+    search: entrepreneurSearch || undefined,
     take: 20,
   });
   const owners = useLazySessionTeamMembers({
     enabled: open && ownerOpen && actor === "admin" && mode === "create",
-    search: deferredOwnerSearch || undefined,
+    search: ownerSearch || undefined,
     take: 20,
   });
   const effectiveOwnerId =

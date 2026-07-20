@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { Search } from 'lucide-react';
 import { Badge } from '@/components/shared/Badge';
@@ -36,11 +37,12 @@ export function ToolAccessList({
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
+  const debouncedQuery = useDebouncedValue(query.trim());
   const visibleTools = React.useMemo(() => getVisibleToolsForEntrepreneur(entrepreneur), [entrepreneur]);
   const visible = visibleTools.slice(0, maxVisible);
   const hiddenCount = Math.max(visibleTools.length - visible.length, 0);
   const filteredTools = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = debouncedQuery.toLowerCase();
     if (!needle) return visibleTools;
     return visibleTools.filter((tool) =>
       [tool.name, tool.description, tool.type, getEntrepreneurToolAccessSource(tool, entrepreneur)]
@@ -48,7 +50,7 @@ export function ToolAccessList({
         .toLowerCase()
         .includes(needle),
     );
-  }, [entrepreneur, query, visibleTools]);
+  }, [debouncedQuery, entrepreneur, visibleTools]);
 
   return (
     <>

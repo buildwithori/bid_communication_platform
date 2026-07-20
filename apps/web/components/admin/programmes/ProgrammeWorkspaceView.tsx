@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import {
   closestCenter,
@@ -75,6 +76,7 @@ export function ProgrammeWorkspaceView({
   const [archiveTarget, setArchiveTarget] = React.useState<Program | null>(null);
   const [movePositionModule, setMovePositionModule] = React.useState<Module | null>(null);
   const [moduleQuery, setModuleQuery] = React.useState('');
+  const debouncedModuleQuery = useDebouncedValue(moduleQuery.trim());
   const [modulePage, setModulePage] = React.useState(1);
   const [modulePageSize, setModulePageSize] = React.useState(6);
 
@@ -85,7 +87,7 @@ export function ProgrammeWorkspaceView({
       .filter((module): module is Module => Boolean(module));
   }, [modules, program.moduleIds]);
   const filteredProgramModules = React.useMemo(() => {
-    const needle = moduleQuery.trim().toLowerCase();
+    const needle = debouncedModuleQuery.toLowerCase();
     if (!needle) return programModules;
     return programModules.filter((module) => {
       const attachedItems = getModuleContentItems(module);
@@ -99,7 +101,7 @@ export function ProgrammeWorkspaceView({
         .toLowerCase()
         .includes(needle);
     });
-  }, [moduleQuery, programModules]);
+  }, [debouncedModuleQuery, programModules]);
 
   const modulePageRows = React.useMemo(() => {
     const start = (modulePage - 1) * modulePageSize;

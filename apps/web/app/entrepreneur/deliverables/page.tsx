@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowRight, CalendarClock, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
@@ -35,14 +36,14 @@ export default function DeliverablesPage() {
   const router = useRouter();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
-  const deferredQuery = React.useDeferredValue(query.trim());
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(ALL);
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(6);
   const [lookupOpen, setLookupOpen] = React.useState(false);
   const [lookupSearch, setLookupSearch] = React.useState('');
   const groups = useDeliverableGroupsPage({
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     programmeId: programmeFilter === ALL ? undefined : programmeFilter,
     view: statusFilter === ALL ? undefined : statusFilter,
     take: pageSize,

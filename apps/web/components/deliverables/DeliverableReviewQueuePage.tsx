@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -63,14 +64,14 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
   const [previewTarget, setPreviewTarget] = React.useState<DeliverableReviewRow | null>(null);
   const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReviewRow | null>(null);
   const [query, setQuery] = React.useState('');
-  const deferredQuery = React.useDeferredValue(query.trim());
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [statusFilter, setStatusFilter] = React.useState<ReviewStatusFilter>(ALL);
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(10);
   const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState('');
   const queue = useDeliverableReviewQueuePage({
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     programmeId: programmeFilter === ALL ? undefined : programmeFilter,
     take: pageSize,
     ...apiFilters(statusFilter),

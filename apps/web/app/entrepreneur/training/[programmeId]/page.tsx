@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -76,12 +77,12 @@ export default function ProgrammeModulesPage() {
   const params = useParams<{ programmeId: string }>();
   const programme = useProgrammeDetailQuery(params.programmeId);
   const [search, setSearch] = React.useState("");
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [contentFilter, setContentFilter] = React.useState<ContentFilter>("all");
   const [progressFilter, setProgressFilter] = React.useState<ProgressFilter>("all");
   const [pageSize, setPageSize] = React.useState(5);
   const modules = useProgrammeModulesPage(params.programmeId, {
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     contentType: contentFilter === "all" ? undefined : contentFilter,
     progressStatus: progressFilter === "all" ? undefined : progressFilter,
     take: pageSize,
@@ -93,7 +94,7 @@ export default function ProgrammeModulesPage() {
 
   React.useEffect(() => {
     resetPagination();
-  }, [contentFilter, deferredSearch, pageSize, progressFilter, resetPagination]);
+  }, [contentFilter, debouncedSearch, pageSize, progressFilter, resetPagination]);
 
   function toggleModule(moduleId: string) {
     setExpandedModuleIds((current) =>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FileText, PlayCircle, Wrench } from 'lucide-react';
@@ -62,7 +63,7 @@ function ContentLibrary() {
   const moduleId = searchParams.get('moduleId') ?? undefined;
   const [tab, setTab] = React.useState<ContentItemType>('video');
   const [query, setQuery] = React.useState('');
-  const deferredQuery = React.useDeferredValue(query);
+  const debouncedQuery = useDebouncedValue(query);
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editTarget, setEditTarget] =
@@ -72,7 +73,7 @@ function ContentLibrary() {
 
   const content = useContentItemsPage({
     type: tab,
-    search: deferredQuery.trim() || undefined,
+    search: debouncedQuery.trim() || undefined,
     moduleId,
     take: pageSize,
   });
@@ -80,7 +81,7 @@ function ContentLibrary() {
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredQuery, moduleId, pageSize, resetPagination, tab]);
+  }, [debouncedQuery, moduleId, pageSize, resetPagination, tab]);
 
   const columns = React.useMemo<Column<ContentItemRecord>[]>(
     () => [

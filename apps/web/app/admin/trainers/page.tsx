@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { toast } from "sonner";
 import { BookOpenCheck, CalendarDays, GraduationCap, Mail, Phone, Star, UsersRound } from "lucide-react";
@@ -111,18 +112,17 @@ export default function AdminTrainersPage() {
   const [editTarget, setEditTarget] = React.useState<TrainerRecord | null>(null);
   const [detailId, setDetailId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [access, setAccess] = React.useState<AllOr<TrainerAccessLevel>>("all");
   const [status, setStatus] = React.useState<AllOr<TrainerDirectoryStatus>>("all");
   const [calendar, setCalendar] = React.useState<AllOr<TrainerCalendarFilter>>("all");
   const [sectorId, setSectorId] = React.useState("all");
   const [sectorOpen, setSectorOpen] = React.useState(false);
   const [sectorSearch, setSectorSearch] = React.useState("");
-  const deferredSectorSearch = React.useDeferredValue(sectorSearch);
   const [pageSize, setPageSize] = React.useState(10);
 
   const trainers = useTrainersPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     accessLevel: access === "all" ? undefined : access,
     status: status === "all" ? undefined : status,
     calendarStatus: calendar === "all" ? undefined : calendar,
@@ -131,7 +131,7 @@ export default function AdminTrainersPage() {
   });
   const sectors = useLazySectorsQuery({
     enabled: sectorOpen,
-    search: deferredSectorSearch.trim() || undefined,
+    search: sectorSearch.trim() || undefined,
     active: true,
     take: 20,
   });
@@ -144,7 +144,7 @@ export default function AdminTrainersPage() {
   }, [
     access,
     calendar,
-    deferredSearch,
+    debouncedSearch,
     pageSize,
     sectorId,
     status,

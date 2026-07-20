@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -42,12 +43,12 @@ type ProgressFilter = 'all' | 'not_started' | 'in_progress' | 'completed';
 export default function TrainingLibraryPage() {
   const router = useRouter();
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [access, setAccess] = React.useState<AccessFilter>('all');
   const [progress, setProgress] = React.useState<ProgressFilter>('all');
   const [pageSize, setPageSize] = React.useState(10);
   const directory = useProgrammesPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     accessType: access === 'all' ? undefined : access,
     progressStatus: progress === 'all' ? undefined : progress,
     take: pageSize,
@@ -62,7 +63,7 @@ export default function TrainingLibraryPage() {
 
   React.useEffect(() => {
     resetPagination();
-  }, [access, deferredSearch, pageSize, progress, resetPagination]);
+  }, [access, debouncedSearch, pageSize, progress, resetPagination]);
 
   const openProgramme = React.useCallback(
     (programme: ProgrammeListItem) => {

@@ -36,3 +36,5 @@ They must not import `@tanstack/react-query`, `apiRequest`, `requests.ts`, or qu
 ## Pagination and lazy lookups
 
 List and lookup hooks must expose cursor pagination or infinite-query behavior. Autocomplete hooks must remain disabled until the control opens or receives a search term, and query keys must include normalized filters/search state.
+
+All user-entered searches use `useDebouncedValue` from `lib/search` before reaching API hooks or expensive local filters. The standard delay is 300 ms, while clearing is propagated on the next event-loop tick. `FormAutocomplete` owns remote-search debouncing globally; consumers pass its already-debounced search state directly to lazy hooks and must not wrap it in another debounce.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -307,7 +308,7 @@ function OverviewTab({ programme }: { programme: ProgrammeDetail }) {
 
 function CurriculumTab({ programmeId }: { programmeId: string }) {
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [pageSize, setPageSize] = React.useState(6);
   const [activeModule, setActiveModule] =
     React.useState<ProgrammeModuleRecord | null>(null);
@@ -315,14 +316,14 @@ function CurriculumTab({ programmeId }: { programmeId: string }) {
     React.useState<ContentItemRecord | null>(null);
   const [previewItems, setPreviewItems] = React.useState<ContentItemRecord[]>([]);
   const modules = useProgrammeModulesPage(programmeId, {
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     take: pageSize,
   });
   const resetPagination = modules.resetPagination;
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredSearch, pageSize, resetPagination]);
+  }, [debouncedSearch, pageSize, resetPagination]);
 
   const columns = React.useMemo<Column<ProgrammeModuleRecord>[]>(
     () => [
@@ -459,18 +460,18 @@ function TrainerModuleContentModal({
   onPreview: (item: ContentItemRecord, items: ContentItemRecord[]) => void;
 }) {
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [pageSize, setPageSize] = React.useState(5);
   const content = useModuleContentItemsPage(
     module?.id ?? '',
-    { search: deferredSearch.trim() || undefined, take: pageSize },
+    { search: debouncedSearch.trim() || undefined, take: pageSize },
     Boolean(module),
   );
   const resetPagination = content.resetPagination;
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredSearch, pageSize, resetPagination]);
+  }, [debouncedSearch, pageSize, resetPagination]);
 
   const columns = React.useMemo<Column<ContentItemRecord>[]>(
     () => [
@@ -771,17 +772,17 @@ function TrainerContentPreviewModal({
 
 function DeliverablesTab({ programmeId }: { programmeId: string }) {
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [pageSize, setPageSize] = React.useState(5);
   const rules = useProgrammeDeliverableRulesPage(programmeId, {
-    search: deferredSearch || undefined,
+    search: debouncedSearch || undefined,
     take: pageSize,
   });
 
   const resetRulePagination = rules.resetPagination;
   React.useEffect(() => {
     resetRulePagination();
-  }, [deferredSearch, pageSize, resetRulePagination]);
+  }, [debouncedSearch, pageSize, resetRulePagination]);
 
   const columns: Column<ProgrammeDeliverableRule>[] = [
     {
@@ -984,14 +985,14 @@ function ReadinessTab({ programme }: { programme: ProgrammeDetail }) {
 
 function EntrepreneursTab({ programmeId }: { programmeId: string }) {
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [stageId, setStageId] = React.useState('all');
   const [stageLookupOpen, setStageLookupOpen] = React.useState(false);
   const [stageSearch, setStageSearch] = React.useState('');
   const [pageSize, setPageSize] = React.useState(5);
   const entrepreneurs = useEntrepreneursPage({
     programmeId,
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     stageId: stageId === 'all' ? undefined : stageId,
     take: pageSize,
   });
@@ -1007,7 +1008,7 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredSearch, pageSize, resetPagination, stageId]);
+  }, [debouncedSearch, pageSize, resetPagination, stageId]);
 
   const columns: Column<EntrepreneurRecord>[] = [
     {

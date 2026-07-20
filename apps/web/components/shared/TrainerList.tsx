@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { Search } from 'lucide-react';
 import { Avatar } from '@/components/shared/Avatar';
@@ -27,10 +28,11 @@ export function TrainerList({
 }: TrainerListProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
+  const debouncedQuery = useDebouncedValue(query.trim());
   const visibleTrainers = trainers.slice(0, maxVisible);
   const hiddenCount = Math.max(trainers.length - visibleTrainers.length, 0);
   const filteredTrainers = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = debouncedQuery.toLowerCase();
     if (!needle) return trainers;
     return trainers.filter((trainer) =>
       [trainer.fullName, trainer.email, trainer.role]
@@ -38,7 +40,7 @@ export function TrainerList({
         .toLowerCase()
         .includes(needle),
     );
-  }, [query, trainers]);
+  }, [debouncedQuery, trainers]);
 
   if (trainers.length === 0) {
     return <span className="text-sm text-ink-faint">{emptyLabel}</span>;

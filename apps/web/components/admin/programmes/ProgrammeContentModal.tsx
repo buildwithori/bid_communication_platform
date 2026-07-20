@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import {
   closestCenter,
@@ -67,17 +68,17 @@ export function ProgrammeContentModal({
   const [editItem, setEditItem] = React.useState<ContentItemRecord | null>(null);
   const [moveItem, setMoveItem] = React.useState<ContentItemRecord | null>(null);
   const [search, setSearch] = React.useState('');
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const items = useModuleContentItemsInfinite(module?.id ?? '', {
     enabled: open && Boolean(module),
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     take: 20,
   });
   const move = useMoveModuleContentItemMutation({
     onSuccess: () => toast.success('Content position updated.'),
     onError: (error) => toast.error(error.message),
   });
-  const canReorder = !readOnly && !deferredSearch.trim() && !move.isPending;
+  const canReorder = !readOnly && !debouncedSearch.trim() && !move.isPending;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),

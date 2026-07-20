@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -429,10 +430,10 @@ export default function ToolsPage() {
   const linkedRequest = useToolRequestDetailQuery(linkedRequestId);
   const [tab, setTab] = React.useState<ToolTab>("all");
   const [query, setQuery] = React.useState("");
-  const deferredQuery = React.useDeferredValue(query);
+  const debouncedQuery = useDebouncedValue(query);
   const [pageSize, setPageSize] = React.useState(6);
   const [requestQuery, setRequestQuery] = React.useState("");
-  const deferredRequestQuery = React.useDeferredValue(requestQuery);
+  const debouncedRequestQuery = useDebouncedValue(requestQuery);
   const [requestStatus, setRequestStatus] = React.useState<
     "all" | ToolRequest["status"]
   >("all");
@@ -457,12 +458,12 @@ export default function ToolsPage() {
   const [areaSearch, setAreaSearch] = React.useState("");
 
   const toolPage = useToolsPage({
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     type: displayedTab === "pdf" ? "pdf" : displayedTab === "embed" ? "embedded_tool" : undefined,
     take: pageSize,
   });
   const requestPage = useToolRequestsPage({
-    search: deferredRequestQuery || undefined,
+    search: debouncedRequestQuery || undefined,
     status:
       requestStatus === "all"
         ? undefined

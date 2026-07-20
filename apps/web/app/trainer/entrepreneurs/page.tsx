@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { Eye, GraduationCap, Star, Target } from "lucide-react";
 import { Avatar } from "@/components/shared/Avatar";
@@ -33,28 +34,27 @@ const ALL = "all";
 
 export default function TrainerEntrepreneursPage() {
   const [search, setSearch] = React.useState("");
-  const deferredSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [programmeId, setProgrammeId] = React.useState(ALL);
   const [programmeOpen, setProgrammeOpen] = React.useState(false);
   const [programmeSearch, setProgrammeSearch] = React.useState("");
-  const deferredProgrammeSearch = React.useDeferredValue(programmeSearch);
   const [pageSize, setPageSize] = React.useState(10);
   const [viewId, setViewId] = React.useState<string | null>(null);
   const entrepreneurs = useEntrepreneursPage({
-    search: deferredSearch.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
     programmeId: programmeId === ALL ? undefined : programmeId,
     take: pageSize,
   });
   const programmes = useLazyProgrammesLookup({
     enabled: programmeOpen,
-    search: deferredProgrammeSearch.trim() || undefined,
+    search: programmeSearch.trim() || undefined,
     take: 20,
   });
   const resetPagination = entrepreneurs.resetPagination;
 
   React.useEffect(() => {
     resetPagination();
-  }, [deferredSearch, pageSize, programmeId, resetPagination]);
+  }, [debouncedSearch, pageSize, programmeId, resetPagination]);
 
   const columns = React.useMemo<Column<EntrepreneurRecord>[]>(
     () => [

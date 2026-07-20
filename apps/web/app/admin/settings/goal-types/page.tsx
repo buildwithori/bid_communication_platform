@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,12 +36,13 @@ import {
 
 export default function AdminGoalTypesPage() {
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [pageSize, setPageSize] = React.useState(10);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [activeGoalType, setActiveGoalType] =
     React.useState<ProgrammeGoalTypeRecord | null>(null);
   const goalTypes = useProgrammeGoalTypesPage({
-    search: query,
+    search: debouncedQuery || undefined,
     take: pageSize,
   });
   const createGoalType = useCreateProgrammeGoalTypeMutation({

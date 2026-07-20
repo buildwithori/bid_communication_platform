@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
 import {
   CalendarDays,
@@ -109,7 +110,7 @@ function audienceDetail(tool: ToolRecord) {
 
 export default function AdminEntrepreneurToolsPage() {
   const [query, setQuery] = React.useState("");
-  const deferredQuery = React.useDeferredValue(query);
+  const debouncedQuery = useDebouncedValue(query);
   const [typeFilter, setTypeFilter] = React.useState<"all" | ApiToolType>(
     "all",
   );
@@ -128,7 +129,7 @@ export default function AdminEntrepreneurToolsPage() {
   const [areaSearch, setAreaSearch] = React.useState("");
 
   const tools = useToolsPage({
-    search: deferredQuery || undefined,
+    search: debouncedQuery || undefined,
     type: typeFilter === "all" ? undefined : typeFilter,
     toolAreaId: toolAreaFilter === "all" ? undefined : toolAreaFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
