@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BusinessMembership, Prisma, User, UserRole } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { PLATFORM_DEFAULT_TIMEZONE } from '../common/constants/platform.constants';
 import { PrismaService } from '../database/prisma.service';
 import { EntrepreneurQueryDto } from './dto/entrepreneur-query.dto';
 import { ProfileRecordQueryDto, ProgrammeAccessQueryDto } from './dto/profile-record-query.dto';
@@ -1028,13 +1029,13 @@ export class EntrepreneursService {
       where: { singletonKey: 'default' }, update: {}, create: { singletonKey: 'default' },
       select: { defaultTimezone: true },
     });
-    return settings.defaultTimezone || 'UTC';
+    return settings.defaultTimezone || PLATFORM_DEFAULT_TIMEZONE;
   }
 
   private mapEntrepreneur(
     row: EntrepreneurMembership,
     learnerProgress = { average: 0, trackedProgrammes: 0 },
-    defaultTimezone = 'UTC',
+    defaultTimezone = PLATFORM_DEFAULT_TIMEZONE,
   ) {
     const programmes = row.user.entrepreneurProgrammeGrants.map((grant) =>
       this.mapProgrammeAccess(grant),

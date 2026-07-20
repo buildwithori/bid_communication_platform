@@ -399,7 +399,7 @@ This is the first schema plan. Exact Prisma names can change, but the relationsh
   - periodic_update_overdue_after_days
   - module_completion_deliverable_due_days nullable
   - default_currency
-  - default timezone
+  - default timezone (`Africa/Kigali` for new/seeded settings; administrators may change it)
   - default session provider
   - notification defaults: in-app enabled, email enabled, reminder notifications, weekly digest
 - `sectors`
@@ -1563,7 +1563,7 @@ Rules:
 - For open team requests, show slots that at least one eligible connected owner can cover.
 - When a user accepts a request, recheck availability inside the transaction/workflow.
 - Company working days and working-hour bounds are interpreted in `company_settings.default_timezone`.
-- Availability is returned in the requesting user’s effective timezone: personal user timezone, then company default, then UTC as a defensive fallback.
+- Availability is returned in the requesting user’s effective timezone: personal user timezone, then company default, then `Africa/Kigali` as the defensive platform fallback.
 - Each session stores the effective timezone as a historical snapshot for calendar creation and display.
 
 ### Meeting Link Creation

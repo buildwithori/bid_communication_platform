@@ -1,3 +1,5 @@
+import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
+
 export const companyConfig = {
   reporting: {
     periodicUpdateOverdueAfterDays: 30,
@@ -7,7 +9,7 @@ export const companyConfig = {
   },
   defaults: {
     currency: "USD",
-    timezone: "Africa/Accra",
+    timezone: PLATFORM_DEFAULT_TIMEZONE,
     sessionProvider: "google-meet",
   },
   sessions: {

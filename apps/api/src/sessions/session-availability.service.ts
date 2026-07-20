@@ -10,6 +10,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import { CalendarService } from "../calendar/calendar.service";
+import { PLATFORM_DEFAULT_TIMEZONE } from "../common/constants/platform.constants";
 import { PrismaService } from "../database/prisma.service";
 import {
   SessionAvailabilityQueryDto,
@@ -257,7 +258,7 @@ export class SessionAvailabilityService {
       create: { singletonKey: "default" },
       select: { defaultTimezone: true },
     });
-    const timezone = settings.defaultTimezone || "UTC";
+    const timezone = settings.defaultTimezone || PLATFORM_DEFAULT_TIMEZONE;
     this.assertTimezone(timezone);
     return timezone;
   }

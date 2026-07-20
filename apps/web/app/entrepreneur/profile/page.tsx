@@ -60,7 +60,7 @@ import {
   useLazySectorsQuery,
 } from "@/lib/api/settings";
 import { countries } from "@/lib/mock-data/definitions";
-import { getTimezoneOptions } from "@/lib/timezones";
+import { getTimezoneOptions, PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import {
   entrepreneurProfileTabFromQuery,
   entrepreneurProfileTabQueryValues,
@@ -939,7 +939,7 @@ function profileDefaults(
     country: record.country as ProfileForm["country"],
     sectorId: record.sector?.id ?? "",
     stageId: record.stage?.id ?? "",
-    timezone: record.timezone || "UTC",
+    timezone: record.timezone || PLATFORM_DEFAULT_TIMEZONE,
   };
 }
 function initials(firstName: string, lastName: string, email: string) {

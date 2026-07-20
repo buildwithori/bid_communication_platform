@@ -16,6 +16,7 @@ import { Button } from "@/components/shared/Button";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { Notice } from "@/components/shared/PageHeader";
 import { bookingSchema, type BookingForm } from "@/lib/forms/schemas";
+import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import { useEntrepreneurProfileQuery } from "@/lib/api/entrepreneurs";
 import {
   useCreateSessionMutation,
@@ -58,7 +59,7 @@ export function BookingModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const profile = useEntrepreneurProfileQuery();
-  const timezone = profile.data?.timezone ?? "UTC";
+  const timezone = profile.data?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
   const [teamLookupOpen, setTeamLookupOpen] = React.useState(false);
   const [trainerSearch, setTrainerSearch] = React.useState("");
   const deferredTrainerSearch = React.useDeferredValue(trainerSearch);

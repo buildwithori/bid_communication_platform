@@ -13,6 +13,7 @@ import { Button } from "@/components/shared/Button";
 import { Modal } from "@/components/shared/Modal";
 import { Notice } from "@/components/shared/PageHeader";
 import { useCurrentUserQuery } from "@/lib/api/auth";
+import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import { useLazyEntrepreneursLookup } from "@/lib/api/entrepreneurs";
 import {
   useLazySessionTeamMembers,
@@ -83,7 +84,8 @@ function SessionEditorModalForm({
   isSubmitting = false,
 }: Props) {
   const currentUser = useCurrentUserQuery();
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    PLATFORM_DEFAULT_TIMEZONE;
   const initialStartAt = initialSession
     ? new Date(initialSession.startAt)
     : null;

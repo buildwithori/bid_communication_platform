@@ -259,7 +259,7 @@ Session workflow rules:
 - Specific-trainer booking slots come only from that active trainer's connected Google Calendar. Open-team slots exist only when at least one eligible connected admin/trainer is free, and acceptance rechecks the accepting user's Google and local availability before an atomic claim.
 - An open-team decline opts only that user out; it does not close the entrepreneur's request. A targeted-trainer decline closes the targeted request.
 - Confirmation creates a real Google Calendar event and Meet link. Reschedule updates that event, writes immutable previous/new time history and reason, and performs compensating Calendar rollback on a database race. Cancellation removes the Calendar event.
-- Company settings own session working days, start/end minutes, slot interval, and default duration. Backend availability and all create/reschedule mutations enforce the configured policy.
+- Company settings own session working days, start/end minutes, slot interval, default duration, and the configurable IANA timezone. New and seeded settings use `Africa/Kigali`; personal timezone, company timezone, and platform fallback precedence is enforced consistently across profile and session flows.
 - The sessions frontend integration lives under `lib/api/sessions/`. Booking trainer/owner/entrepreneur lookups are lazy and cursor-paginated; schedule windows use infinite cursor loading; queue search, filters, totals, and status metrics remain backend-owned.
 - Meeting links are exposed only for real confirmed/completed Calendar-backed sessions. Internal session notes are never returned to entrepreneurs.
 

@@ -1,4 +1,5 @@
 import { apiRequest } from "../client";
+import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import type {
   BusinessStagePayload,
   BusinessStageRecord,
@@ -26,7 +27,7 @@ function toApiSessionProvider(provider: string | undefined) {
 
 function mapCompanySettings(settings: CompanySettingsResponse): CompanyConfig {
   const currency = settings.defaultCurrency.trim().toUpperCase() || "USD";
-  const timezone = settings.defaultTimezone.trim() || "UTC";
+  const timezone = settings.defaultTimezone.trim() || PLATFORM_DEFAULT_TIMEZONE;
 
   return {
     reporting: {

@@ -7,6 +7,7 @@ import { PageHeader, Notice } from "@/components/shared/PageHeader";
 import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import { Button } from "@/components/shared/Button";
 import {
+  FormAutocomplete,
   FormField,
   FormInput,
   FormSelect,
@@ -14,6 +15,7 @@ import {
 import { StatCard } from "@/components/shared/StatCard";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { cn } from "@/lib/utils";
+import { getTimezoneOptions, PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import {
   useCompanySettingsQuery,
   useUpdateCompanySettingsMutation,
@@ -26,14 +28,6 @@ const currencyOptions = [
   { value: "NGN", label: "NGN - Nigerian Naira" },
   { value: "KES", label: "KES - Kenyan Shilling" },
   { value: "RWF", label: "RWF - Rwandan Franc" },
-];
-
-const timezoneOptions = [
-  { value: "Africa/Accra", label: "Africa/Accra" },
-  { value: "Africa/Lagos", label: "Africa/Lagos" },
-  { value: "Africa/Nairobi", label: "Africa/Nairobi" },
-  { value: "Africa/Kigali", label: "Africa/Kigali" },
-  { value: "UTC", label: "UTC" },
 ];
 
 const sessionProviderOptions = [{ value: "google-meet", label: "Google Meet" }];
@@ -144,6 +138,7 @@ function CompanySettingsForm({
   const [timezone, setTimezone] = React.useState(
     companyConfig.defaults.timezone,
   );
+  const [timezoneOpen, setTimezoneOpen] = React.useState(false);
   const [sessionProvider, setSessionProvider] = React.useState(
     companyConfig.defaults.sessionProvider,
   );
@@ -319,10 +314,23 @@ function CompanySettingsForm({
               />
             </FormField>
             <FormField label="Default timezone">
-              <FormSelect
+              <FormAutocomplete
                 value={timezone}
                 onValueChange={setTimezone}
-                options={timezoneOptions}
+                options={
+                  timezoneOpen
+                    ? getTimezoneOptions()
+                    : [
+                        {
+                          value: timezone,
+                          label: timezone.replaceAll("_", " "),
+                        },
+                      ]
+                }
+                placeholder="Select timezone"
+                searchPlaceholder="Search timezones..."
+                emptyMessage="No timezone found."
+                onOpenChange={setTimezoneOpen}
               />
             </FormField>
             <FormField label="Default session provider">
@@ -516,7 +524,7 @@ function CompanySettingsForm({
               setOverdueAfterDays("30");
               setModuleDueDays("7");
               setCurrency("USD");
-              setTimezone("Africa/Accra");
+              setTimezone(PLATFORM_DEFAULT_TIMEZONE);
               setSessionProvider("google-meet");
               setSessionPolicy({
                 workingDays: [1, 2, 3, 4, 5],
