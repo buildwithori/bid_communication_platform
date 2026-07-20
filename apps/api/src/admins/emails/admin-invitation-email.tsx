@@ -20,7 +20,16 @@ export function AdminInvitationEmail({
       preview="You have been invited to the BID Hub admin workspace"
       heading="Join the BID Hub admin team"
       greeting={`Hello ${name},`}
-      body={`${inviterName} invited you to help operate programmes, entrepreneurs, sessions, and reporting in BID Hub.`}
+      body={
+        inviterName +
+        " invited you to join the BID Hub operations team and help manage programmes, entrepreneur support, sessions, deliverables, and reporting."
+      }
+      supportingText="Accept the invitation to create your password and activate your admin workspace."
+      details={[
+        { label: "Role", value: "Administrator" },
+        { label: "Invited by", value: inviterName },
+        { label: "Invitation validity", value: "7 days" },
+      ]}
       actionLabel="Accept invitation"
       actionUrl={url}
       logoUrl={logoUrl}
