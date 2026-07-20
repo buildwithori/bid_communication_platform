@@ -125,12 +125,8 @@ export default function AdminProgrammeWorkspacePage() {
     onError: (error) => toast.error(error.message),
   });
   const deleteProgramme = useDeleteProgrammeMutation({
-    onSuccess: (result) => {
-      toast.success(
-        result.externalCleanupQueued
-          ? 'Programme deleted. External files and calendar events are being removed in the background.'
-          : 'Programme deleted.',
-      );
+    onSuccess: () => {
+      toast.success('Programme deleted.');
       router.replace(routes.admin.programs);
     },
     onError: (error) => toast.error(error.message),
@@ -589,7 +585,7 @@ export default function AdminProgrammeWorkspacePage() {
         description="This permanently deletes the programme and all entrepreneur activity recorded specifically against it."
         consequences={[
           "Enrolments, learning progress, goals, updates, deliverables, submissions, reviews, and programme sessions will be deleted.",
-          "Programme submission files, report exports, and connected calendar events will be removed by the background cleanup worker.",
+          "Programme submission files, generated reports, and connected calendar events will also be permanently removed.",
           "Reusable modules and content-library media are preserved so other programmes are not damaged.",
         ]}
         confirmLabel="Delete programme"

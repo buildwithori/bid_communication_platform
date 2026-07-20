@@ -78,13 +78,9 @@ export function ProgrammeContentModal({
     take: 20,
   });
   const deleteContent = useDeleteContentItemMutation({
-    onSuccess: (result) => {
+    onSuccess: () => {
       setDeleteItem(null);
-      toast.success(
-        result.externalCleanupQueued
-          ? 'Content deleted. Media cleanup is continuing in the background.'
-          : 'Content deleted.',
-      );
+      toast.success('Content deleted.');
     },
     onError: (error) => toast.error(error.message),
   });
@@ -270,11 +266,9 @@ export function ProgrammeContentModal({
         consequences={[
           "The content will disappear from all modules and programmes that currently use it.",
           "Learner progress and ratings for this content will be permanently deleted.",
-          deleteItem?.type === "video"
-            ? "The source video will be deleted from Mux in the background."
-            : deleteItem?.type === "pdf"
-              ? "The uploaded file will be deleted from object storage in the background."
-              : "Any linked tool remains available; only this learning content item is deleted.",
+          deleteItem?.type === "tool"
+            ? "Any linked tool remains available; only this learning content item is deleted."
+            : "The uploaded media file will also be permanently deleted.",
         ]}
         confirmLabel="Delete content"
         isPending={deleteContent.isPending}

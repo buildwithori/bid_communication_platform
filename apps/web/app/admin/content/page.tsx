@@ -76,13 +76,9 @@ function ContentLibrary() {
   const [deleteTarget, setDeleteTarget] =
     React.useState<ContentItemRecord | null>(null);
   const deleteContent = useDeleteContentItemMutation({
-    onSuccess: (result) => {
+    onSuccess: () => {
       setDeleteTarget(null);
-      toast.success(
-        result.externalCleanupQueued
-          ? 'Content deleted. Media cleanup is continuing securely in the background.'
-          : 'Content deleted.',
-      );
+      toast.success('Content deleted.');
     },
     onError: (error) => toast.error(error.message),
   });
@@ -317,11 +313,9 @@ function ContentLibrary() {
             (deleteTarget?.usage.modules === 1 ? "" : "s") +
             " will lose this content.",
           "Learner progress and ratings for this content will be permanently deleted.",
-          deleteTarget?.type === "video"
-            ? "The source video will be deleted from Mux by the background cleanup worker."
-            : deleteTarget?.type === "pdf"
-              ? "The uploaded file will be deleted from object storage by the background cleanup worker."
-              : "Any linked tool remains available; only this learning content link is deleted.",
+          deleteTarget?.type === "tool"
+            ? "Any linked tool remains available; only this learning content link is deleted."
+            : "The uploaded media file will also be permanently deleted.",
         ]}
         confirmLabel="Delete content"
         isPending={deleteContent.isPending}

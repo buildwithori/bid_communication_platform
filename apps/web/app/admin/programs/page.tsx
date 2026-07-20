@@ -82,13 +82,9 @@ export default function AdminProgramsPage() {
     onError: (error) => toast.error(error.message),
   });
   const deleteProgramme = useDeleteProgrammeMutation({
-    onSuccess: (result) => {
+    onSuccess: () => {
       setDeleteTarget(null);
-      toast.success(
-        result.externalCleanupQueued
-          ? 'Programme deleted. External cleanup is continuing in the background.'
-          : 'Programme deleted.',
-      );
+      toast.success('Programme deleted.');
     },
     onError: (error) => toast.error(error.message),
   });
