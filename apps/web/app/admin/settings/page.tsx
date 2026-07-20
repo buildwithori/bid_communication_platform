@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShieldCheck, UserRound } from "lucide-react";
@@ -25,8 +27,31 @@ import {
 } from "@/lib/api/calendar";
 import { adminProfileSchema, type AdminProfileForm } from "@/lib/forms/schemas";
 
+type SettingsTab = "account" | "notifications";
+
+function settingsTabFromQuery(value: string | null): SettingsTab {
+  return value === "notifications" ? "notifications" : "account";
+}
+
 export default function AdminSettingsPage() {
-  const [tab, setTab] = React.useState<"account" | "notifications">("account");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = settingsTabFromQuery(searchParams.get("tab"));
+  const setTab = React.useCallback(
+    (nextTab: SettingsTab) => {
+      if (nextTab === tab) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(
+        "tab",
+        nextTab === "notifications" ? "notifications" : "profile-calendar",
+      );
+      router.push((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    },
+    [pathname, router, searchParams, tab],
+  );
   const profile = useAdminProfileQuery();
   const calendar = useCalendarConnectionQuery();
   const form = useForm<AdminProfileForm>({
@@ -59,11 +84,11 @@ export default function AdminSettingsPage() {
     });
   }, [form, profile.data]);
 
-  if (profile.isLoading || calendar.isLoading) {
+  if (tab === "account" && (profile.isLoading || calendar.isLoading)) {
     return <AdminSettingsSkeleton />;
   }
 
-  if (profile.isError || calendar.isError || !profile.data) {
+  if (tab === "account" && (profile.isError || calendar.isError || !profile.data)) {
     const error =
       profile.error?.message ??
       calendar.error?.message ??

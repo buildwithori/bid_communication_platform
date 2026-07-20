@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UserRound } from "lucide-react";
@@ -37,8 +39,31 @@ const roleLabels = {
   investment_analyst: "Investment Analyst",
 } as const;
 
+type SettingsTab = "account" | "notifications";
+
+function settingsTabFromQuery(value: string | null): SettingsTab {
+  return value === "notifications" ? "notifications" : "account";
+}
+
 export default function TrainerSettingsPage() {
-  const [tab, setTab] = React.useState<"account" | "notifications">("account");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = settingsTabFromQuery(searchParams.get("tab"));
+  const setTab = React.useCallback(
+    (nextTab: SettingsTab) => {
+      if (nextTab === tab) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(
+        "tab",
+        nextTab === "notifications" ? "notifications" : "profile-calendar",
+      );
+      router.push((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    },
+    [pathname, router, searchParams, tab],
+  );
   const profile = useTrainerProfileQuery();
   const calendar = useCalendarConnectionQuery();
   const form = useForm<TrainerProfileForm>({
@@ -67,11 +92,11 @@ export default function TrainerSettingsPage() {
     });
   }, [form, profile.data]);
 
-  if (profile.isLoading || calendar.isLoading) {
+  if (tab === "account" && (profile.isLoading || calendar.isLoading)) {
     return <TrainerSettingsSkeleton />;
   }
 
-  if (profile.isError || calendar.isError || !profile.data) {
+  if (tab === "account" && (profile.isError || calendar.isError || !profile.data)) {
     const error = profile.error ?? calendar.error;
     return (
       <>

@@ -214,6 +214,7 @@ Session workflow rules:
 - API payload, response, and shared domain types must live in feature `types.ts` files, not pages. A page/component may define a type locally only when it is private presentation state for that file, such as its tab union, modal draft, or table-only view row.
 - ESLint enforces the page/component import boundary. See `docs/frontend-api-integration.md` for the canonical structure.
 - Forms whose initial values come from a query must mount their editable form only after the query succeeds and initialize local state from that response. Do not hydrate every field through a synchronous effect, because it adds a blank/fallback render and can overwrite user edits during cache updates.
+- Workspace tabs that represent distinct views must be URL-backed so reload, direct links, and browser back/forward preserve the active tab. Each tab must render its own relevant loading state rather than being blocked by queries required only by another tab.
 
 ## UI Form And Backend Design Reconciliation (2026-07-15)
 
