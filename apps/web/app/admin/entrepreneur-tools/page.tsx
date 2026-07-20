@@ -226,6 +226,7 @@ export default function AdminEntrepreneurToolsPage() {
     {
       key: "type",
       header: "Type",
+      className: "min-w-[156px]",
       cell: (tool) => (
         <Badge tone={tool.type === "pdf" ? "blue" : "green"}>
           {tool.type === "pdf" ? "PDF resource" : "Online tool"}
@@ -254,11 +255,15 @@ export default function AdminEntrepreneurToolsPage() {
     {
       key: "source",
       header: "Source",
-      cell: (tool) => (
-        <div className="min-w-[160px] text-sm text-ink-muted">
-          {sourceLabel(tool)}
-        </div>
-      ),
+      className: "w-[220px] max-w-[220px]",
+      cell: (tool) => {
+        const source = sourceLabel(tool);
+        return (
+          <div className="truncate text-sm text-ink-muted" title={source}>
+            {source}
+          </div>
+        );
+      },
     },
     {
       key: "status",
