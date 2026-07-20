@@ -288,8 +288,8 @@ export class ToolRequestsService {
         recipientUserId: admin.id,
         actorUserId: actor.id,
         type: NotificationType.tool_request_updated,
-        title: "New entrepreneur tool request",
-        body: `${business} requested ${request.title}.`,
+        title: "New tool request: " + request.title,
+        body: this.newRequestNotificationBody(request, business),
         severity: NotificationSeverity.info,
         entityType: NotificationEntityType.tool_request,
         entityId: request.id,
@@ -313,8 +313,11 @@ export class ToolRequestsService {
       recipientUserId: request.entrepreneurUserId,
       actorUserId: actor.id,
       type: NotificationType.tool_request_updated,
-      title: "Tool request updated",
-      body: `${request.title} was ${labels[request.status]}.`,
+      title: "Tool request update: " + request.title,
+      body: this.requestDecisionNotificationBody(
+        request,
+        labels[request.status],
+      ),
       severity:
         request.status === ToolRequestStatus.declined
           ? NotificationSeverity.warning
@@ -326,6 +329,52 @@ export class ToolRequestsService {
       actionUrl: `/entrepreneur/tools?requestId=${request.id}`,
       channels: [NotificationChannel.in_app, NotificationChannel.email],
     });
+  }
+
+  private newRequestNotificationBody(
+    request: ToolRequestWithInclude,
+    business: string,
+  ) {
+    const programmes = request.entrepreneurUser.entrepreneurProgrammeGrants
+      .map((grant) => grant.programme.name)
+      .join(", ");
+    return (
+      business +
+      " requested “" +
+      request.title +
+      "” in " +
+      request.toolArea.name +
+      ". Business need: " +
+      this.emailExcerpt(request.businessNeed) +
+      (programmes ? ". Programme access: " + programmes : "") +
+      ". Review the request before updating its status."
+    );
+  }
+
+  private requestDecisionNotificationBody(
+    request: ToolRequestWithInclude,
+    statusLabel: string,
+  ) {
+    return (
+      "Your request “" +
+      request.title +
+      "” was " +
+      statusLabel +
+      (request.adminDecisionNote
+        ? ". BID team note: " + this.emailExcerpt(request.adminDecisionNote)
+        : "") +
+      (request.linkedTool
+        ? ". Available resource: " + request.linkedTool.name
+        : "") +
+      ". Open the request to review the full update."
+    );
+  }
+
+  private emailExcerpt(value: string, maxLength = 280) {
+    const normalized = value.trim().replace(/\s+/g, " ");
+    return normalized.length <= maxLength
+      ? normalized
+      : normalized.slice(0, maxLength - 1).trimEnd() + "…";
   }
 
   private ensureAllowedTransition(

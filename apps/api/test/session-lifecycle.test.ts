@@ -244,3 +244,60 @@ test("entrepreneurs receive participant notes but never internal notes", async (
     ["participant"],
   );
 });
+
+test("an entrepreneur cancellation notifies the session owner with context", async () => {
+  const session = fixture({
+    ownerUserId: trainer.id,
+    owner: trainer,
+    status: SessionStatus.confirmed,
+    calendarEventId: "google-event-1",
+    meetingUrl: "https://meet.google.com/real-link",
+  });
+  const deps = dependencies(session);
+  let notifications: Array<Record<string, unknown>> = [];
+  const notificationService = {
+    createNotification: async () => undefined,
+    createNotifications: async (items: Array<Record<string, unknown>>) => {
+      notifications = items;
+    },
+  };
+  const audit = {
+    capture: async (
+      _definition: unknown,
+      mutation: (tx: unknown) => Promise<unknown>,
+    ) =>
+      mutation({
+        session: {
+          update: async () => ({
+            ...session,
+            status: SessionStatus.cancelled,
+            cancelledReason: "The founder is travelling",
+          }),
+        },
+      }),
+  };
+  const service = new SessionsService(
+    deps.prisma as never,
+    notificationService as never,
+    deps.calendar as never,
+    deps.availability as never,
+    audit as never,
+  );
+  const entrepreneur = {
+    id: "entrepreneur-1",
+    email: "entrepreneur@bid.org",
+    firstName: "Eni",
+    lastName: "Founder",
+    role: UserRole.entrepreneur,
+  };
+
+  await service.cancelSession(entrepreneur as never, session.id, {
+    reason: "The founder is travelling",
+  });
+
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0]?.recipientUserId, trainer.id);
+  assert.match(String(notifications[0]?.title), /Pricing review/);
+  assert.match(String(notifications[0]?.body), /founder is travelling/i);
+  assert.match(String(notifications[0]?.body), /UTC/);
+});

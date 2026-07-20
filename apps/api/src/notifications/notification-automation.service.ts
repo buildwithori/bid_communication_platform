@@ -66,10 +66,26 @@ export class NotificationAutomationService {
           topic: true,
           startAt: true,
           entrepreneur: {
-            select: { id: true, role: true, timezone: true, status: true },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              timezone: true,
+              status: true,
+            },
           },
           owner: {
-            select: { id: true, role: true, timezone: true, status: true },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              timezone: true,
+              status: true,
+            },
           },
         },
       });
@@ -90,21 +106,32 @@ export class NotificationAutomationService {
         [session.entrepreneur, session.owner]
           .filter((user): user is NonNullable<typeof user> => Boolean(user))
           .filter((user) => enabled.has(user.id))
-          .map((user) => ({
-            recipientUserId: user.id,
-            type: NotificationType.session_reminder,
-            title: "Upcoming BID Hub session",
-            body: `${session.topic} starts ${this.formatDateTime(
-              session.startAt,
-              user.timezone ?? defaults.timezone,
-            )}.`,
-            severity: NotificationSeverity.info,
-            entityType: NotificationEntityType.session,
-            entityId: session.id,
-            actionUrl: this.sessionUrl(user.role, session.id),
-            dedupeKey: `session-reminder:${session.id}:${user.id}`,
-            channels: [NotificationChannel.in_app, NotificationChannel.email],
-          })),
+          .map((user) => {
+            const counterpart =
+              user.id === session.entrepreneur.id
+                ? session.owner
+                : session.entrepreneur;
+            return {
+              recipientUserId: user.id,
+              type: NotificationType.session_reminder,
+              title: "Upcoming session: " + session.topic,
+              body:
+                "Your session with " +
+                this.userName(counterpart) +
+                " starts " +
+                this.formatDateTime(
+                  session.startAt,
+                  user.timezone ?? defaults.timezone,
+                ) +
+                ". Open it for the topic and joining details.",
+              severity: NotificationSeverity.info,
+              entityType: NotificationEntityType.session,
+              entityId: session.id,
+              actionUrl: this.sessionUrl(user.role, session.id),
+              dedupeKey: "session-reminder:" + session.id + ":" + user.id,
+              channels: [NotificationChannel.in_app, NotificationChannel.email],
+            };
+          }),
       );
       created += await this.createMissing(inputs);
     } while (true);
@@ -139,7 +166,9 @@ export class NotificationAutomationService {
           id: true,
           programmeId: true,
           dueDate: true,
+          status: true,
           rule: { select: { name: true } },
+          programme: { select: { name: true } },
           entrepreneur: { select: { id: true, timezone: true } },
         },
       });
@@ -155,11 +184,20 @@ export class NotificationAutomationService {
         .map((item) => ({
           recipientUserId: item.entrepreneur.id,
           type: NotificationType.deliverable_due_reminder,
-          title: "Deliverable due soon",
-          body: `${item.rule.name} is due ${this.formatDateTime(
-            item.dueDate,
-            item.entrepreneur.timezone ?? defaults.timezone,
-          )}.`,
+          title: "Deliverable due soon: " + item.rule.name,
+          body:
+            "“" +
+            item.rule.name +
+            "” for " +
+            item.programme.name +
+            " is due " +
+            this.formatDateTime(
+              item.dueDate,
+              item.entrepreneur.timezone ?? defaults.timezone,
+            ) +
+            (item.status === DeliverableInstanceStatus.changes_required
+              ? ". Changes are still required before you resubmit."
+              : ". Open the requirement and submit your work before the deadline."),
           severity: NotificationSeverity.warning,
           entityType: NotificationEntityType.deliverable_instance,
           entityId: item.id,
@@ -392,18 +430,34 @@ export class NotificationAutomationService {
     summary: { unread: number; sessions: number; deliverables: number },
   ) {
     const activity =
-      summary.unread +
-      " unread update(s) and " +
-      summary.sessions +
-      " upcoming session(s)";
+      this.countLabel(summary.unread, "unread update") +
+      " and " +
+      this.countLabel(summary.sessions, "upcoming session");
     if (role !== UserRole.entrepreneur) {
       return activity + " in the next 7 days.";
     }
     return (
       activity +
       ", with " +
-      summary.deliverables +
-      " deliverable(s) due in the next 7 days."
+      this.countLabel(summary.deliverables, "deliverable") +
+      " due in the next 7 days."
+    );
+  }
+
+  private countLabel(count: number, noun: string) {
+    return count + " " + noun + (count === 1 ? "" : "s");
+  }
+
+  private userName(
+    user: {
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+    } | null,
+  ) {
+    if (!user) return "your BID team member";
+    return (
+      [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email
     );
   }
 

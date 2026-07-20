@@ -32,11 +32,11 @@ const preferenceDefinitionByType: Record<
   },
   [NotificationType.session_confirmed]: {
     group: "sessions",
-    roles: [UserRole.entrepreneur],
+    roles: allRoles,
   },
   [NotificationType.session_rescheduled]: {
     group: "sessions",
-    roles: [UserRole.entrepreneur],
+    roles: allRoles,
   },
   [NotificationType.session_declined]: {
     group: "sessions",
@@ -44,7 +44,7 @@ const preferenceDefinitionByType: Record<
   },
   [NotificationType.session_cancelled]: {
     group: "sessions",
-    roles: [UserRole.entrepreneur],
+    roles: allRoles,
   },
   [NotificationType.session_completed]: {
     group: "sessions",

@@ -37,6 +37,12 @@ import { SessionAvailabilityService } from "./session-availability.service";
 
 const DEFAULT_TAKE = 20;
 
+type SessionEmailActor = Pick<User, "email" | "firstName" | "lastName">;
+type SessionEmailSchedule = Pick<
+  SessionWithInclude,
+  "startAt" | "endAt" | "timezone"
+>;
+
 const sessionInclude = {
   entrepreneur: {
     select: {
@@ -315,8 +321,16 @@ export class SessionsService {
         user,
         created,
         NotificationType.session_confirmed,
-        "Session booked",
-        this.userName(user) + " booked " + created.topic + ".",
+        "Session booked: " + created.topic,
+        this.sessionConfirmedBody(created.owner ?? user, created),
+        NotificationSeverity.success,
+      );
+      await this.notifyTeamParticipant(
+        user,
+        created,
+        NotificationType.session_confirmed,
+        "Session booked: " + created.topic,
+        this.sessionBookedForTeamBody(created),
         NotificationSeverity.success,
       );
     }
@@ -396,8 +410,8 @@ export class SessionsService {
       user,
       updated,
       NotificationType.session_confirmed,
-      "Session confirmed",
-      this.userName(user) + " accepted " + updated.topic + ".",
+      "Session confirmed: " + updated.topic,
+      this.sessionConfirmedBody(user, updated),
       NotificationSeverity.success,
     );
 
@@ -467,8 +481,8 @@ export class SessionsService {
       user,
       updated,
       NotificationType.session_declined,
-      "Session declined",
-      this.userName(user) + " declined " + updated.topic + ".",
+      "Session request declined: " + updated.topic,
+      this.sessionDeclinedBody(user, updated),
       NotificationSeverity.warning,
     );
     return this.mapSession(updated, user.role);
@@ -514,8 +528,16 @@ export class SessionsService {
       user,
       updated,
       NotificationType.session_cancelled,
-      "Session cancelled",
-      this.userName(user) + " cancelled " + updated.topic + ".",
+      "Session cancelled: " + updated.topic,
+      this.sessionCancelledBody(user, updated),
+      NotificationSeverity.warning,
+    );
+    await this.notifyTeamParticipant(
+      user,
+      updated,
+      NotificationType.session_cancelled,
+      "Session cancelled: " + updated.topic,
+      this.sessionCancelledBody(user, updated),
       NotificationSeverity.warning,
     );
     return this.mapSession(updated, user.role);
@@ -654,8 +676,16 @@ export class SessionsService {
       user,
       updated,
       NotificationType.session_rescheduled,
-      "Session rescheduled",
-      this.userName(user) + " rescheduled " + updated.topic + ".",
+      "Session rescheduled: " + updated.topic,
+      this.sessionRescheduledBody(user, session, updated, dto.reason),
+      NotificationSeverity.info,
+    );
+    await this.notifyTeamParticipant(
+      user,
+      updated,
+      NotificationType.session_rescheduled,
+      "Session rescheduled: " + updated.topic,
+      this.sessionRescheduledBody(user, session, updated, dto.reason),
       NotificationSeverity.info,
     );
     return this.mapSession(updated, user.role);
@@ -711,8 +741,8 @@ export class SessionsService {
       user,
       updated,
       NotificationType.session_completed,
-      "Session completed",
-      this.userName(user) + " marked " + updated.topic + " as completed.",
+      "Session completed: " + updated.topic,
+      this.sessionCompletedBody(user, updated),
       NotificationSeverity.success,
     );
     return this.mapSession(updated, user.role);
@@ -990,8 +1020,8 @@ export class SessionsService {
         recipientUserId: recipient.id,
         actorUserId: actor.id,
         type: NotificationType.session_request,
-        title: "New session request",
-        body: `${this.sessionEntrepreneurName(session)} requested ${this.sessionTypeLabel(session.type)}.`,
+        title: "Session request: " + session.topic,
+        body: this.sessionRequestBody(session),
         severity: NotificationSeverity.info,
         entityType: NotificationEntityType.session,
         entityId: session.id,
@@ -1028,9 +1058,173 @@ export class SessionsService {
     });
   }
 
+  private async notifyTeamParticipant(
+    actor: User,
+    session: SessionWithInclude,
+    type: NotificationType,
+    title: string,
+    body: string,
+    severity: NotificationSeverity,
+  ) {
+    if (actor.role !== UserRole.entrepreneur) return;
+
+    const includedRecipient = session.owner ?? session.target;
+    const recipients = includedRecipient
+      ? [{ id: includedRecipient.id, role: includedRecipient.role }]
+      : await this.prisma.user.findMany({
+          where: {
+            role: { in: [UserRole.admin, UserRole.trainer] },
+            status: "active",
+          },
+          select: { id: true, role: true },
+        });
+
+    await this.notifications.createNotifications(
+      recipients
+        .filter((recipient) => recipient.id !== actor.id)
+        .map((recipient) => ({
+          recipientUserId: recipient.id,
+          actorUserId: actor.id,
+          type,
+          title,
+          body,
+          severity,
+          entityType: NotificationEntityType.session,
+          entityId: session.id,
+          actionUrl:
+            recipient.role === UserRole.admin
+              ? `/admin/sessions?sessionId=${session.id}`
+              : `/trainer/sessions?sessionId=${session.id}`,
+          channels: [NotificationChannel.in_app, NotificationChannel.email],
+        })),
+    );
+  }
+
   private sessionEntrepreneurName(session: SessionWithInclude) {
     const business = session.entrepreneur.businessMemberships[0]?.business;
     return business?.name ?? this.userName(session.entrepreneur);
+  }
+
+  private sessionRequestBody(session: SessionWithInclude) {
+    return (
+      this.sessionEntrepreneurName(session) +
+      " requested " +
+      this.sessionTypeLabel(session.type) +
+      " for “" +
+      session.topic +
+      "” on " +
+      this.sessionSchedule(session) +
+      (session.programme ? ". Programme: " + session.programme.name : "") +
+      ". Review the request details before responding."
+    );
+  }
+
+  private sessionBookedForTeamBody(session: SessionWithInclude) {
+    return (
+      this.sessionEntrepreneurName(session) +
+      " booked " +
+      this.sessionTypeLabel(session.type) +
+      " for “" +
+      session.topic +
+      "”. It is scheduled for " +
+      this.sessionSchedule(session) +
+      ". Open the session to review the participant and joining details."
+    );
+  }
+
+  private sessionConfirmedBody(
+    actor: SessionEmailActor,
+    session: SessionWithInclude,
+  ) {
+    return (
+      this.userName(actor) +
+      " confirmed your " +
+      this.sessionTypeLabel(session.type) +
+      " for “" +
+      session.topic +
+      "”. It is scheduled for " +
+      this.sessionSchedule(session) +
+      ". Open the session for meeting and calendar details."
+    );
+  }
+
+  private sessionDeclinedBody(
+    actor: SessionEmailActor,
+    session: SessionWithInclude,
+  ) {
+    return (
+      this.userName(actor) +
+      " declined your request for “" +
+      session.topic +
+      "”, requested for " +
+      this.sessionSchedule(session) +
+      ". Reason: " +
+      (session.declinedReason ?? "No reason was provided") +
+      ". You can review the request and book another suitable time."
+    );
+  }
+
+  private sessionCancelledBody(
+    actor: SessionEmailActor,
+    session: SessionWithInclude,
+  ) {
+    return (
+      this.userName(actor) +
+      " cancelled “" +
+      session.topic +
+      "”, scheduled for " +
+      this.sessionSchedule(session) +
+      ". Reason: " +
+      (session.cancelledReason ?? "No reason was provided") +
+      "."
+    );
+  }
+
+  private sessionRescheduledBody(
+    actor: SessionEmailActor,
+    previous: SessionEmailSchedule,
+    updated: SessionWithInclude,
+    reason?: string,
+  ) {
+    return (
+      this.userName(actor) +
+      " moved “" +
+      updated.topic +
+      "” from " +
+      this.sessionSchedule(previous) +
+      " to " +
+      this.sessionSchedule(updated) +
+      (reason?.trim() ? ". Reason: " + reason.trim() : "") +
+      ". Your connected calendar invitation has been updated."
+    );
+  }
+
+  private sessionCompletedBody(
+    actor: SessionEmailActor,
+    session: SessionWithInclude,
+  ) {
+    return (
+      "Your session “" +
+      session.topic +
+      "” with " +
+      this.userName(session.owner ?? actor) +
+      ", scheduled for " +
+      this.sessionSchedule(session) +
+      ", has been marked complete."
+    );
+  }
+
+  private sessionSchedule(session: SessionEmailSchedule) {
+    const start = new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: session.timezone,
+    }).format(session.startAt);
+    const end = new Intl.DateTimeFormat("en-GB", {
+      timeStyle: "short",
+      timeZone: session.timezone,
+    }).format(session.endAt);
+    return start + "–" + end + " (" + session.timezone + ")";
   }
 
   private sessionTypeLabel(type: SessionWithInclude["type"]) {

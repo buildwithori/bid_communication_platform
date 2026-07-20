@@ -2,10 +2,15 @@ import { Injectable } from "@nestjs/common";
 import {
   NotificationChannel,
   NotificationDeliveryStatus,
+  NotificationType,
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
+import { DeliverableNotificationEmail } from "../deliverables/emails/deliverable-notification-email";
 import { EmailService } from "../email/email.service";
+import { SessionNotificationEmail } from "../sessions/emails/session-notification-email";
+import { ToolRequestNotificationEmail } from "../tools/emails/tool-request-notification-email";
+import { AutomationEmail } from "./emails/automation-email";
 import { NotificationEmail } from "./emails/notification-email";
 
 const BATCH_SIZE = 25;
@@ -19,6 +24,7 @@ const deliveryInclude = {
           email: true,
           firstName: true,
           lastName: true,
+          role: true,
         },
       },
     },
@@ -114,9 +120,11 @@ export class NotificationDeliveryService {
     try {
       await this.email.send({
         to: recipient.email,
-        subject: notification.title,
-        template: NotificationEmail({
+        subject: "BID Hub: " + notification.title,
+        template: this.templateFor(notification.type, {
           recipientName,
+          recipientRole: recipient.role,
+          type: notification.type,
           title: notification.title,
           body: notification.body,
           actionUrl,
@@ -148,6 +156,45 @@ export class NotificationDeliveryService {
         },
       });
     }
+  }
+
+  private templateFor(
+    type: NotificationType,
+    props: {
+      recipientName: string;
+      recipientRole: ClaimedDelivery["notification"]["recipient"]["role"];
+      type: NotificationType;
+      title: string;
+      body: string;
+      actionUrl: string;
+      logoUrl: string;
+    },
+  ) {
+    if (
+      type === NotificationType.session_request ||
+      type === NotificationType.session_confirmed ||
+      type === NotificationType.session_rescheduled ||
+      type === NotificationType.session_declined ||
+      type === NotificationType.session_cancelled ||
+      type === NotificationType.session_completed ||
+      type === NotificationType.session_reminder
+    ) {
+      return SessionNotificationEmail(props);
+    }
+    if (
+      type === NotificationType.deliverable_review ||
+      type === NotificationType.deliverable_changes_requested ||
+      type === NotificationType.deliverable_due_reminder
+    ) {
+      return DeliverableNotificationEmail(props);
+    }
+    if (type === NotificationType.tool_request_updated) {
+      return ToolRequestNotificationEmail(props);
+    }
+    if (type === NotificationType.weekly_digest) {
+      return AutomationEmail(props);
+    }
+    return NotificationEmail(props);
   }
 
   private failureMessage(error: unknown) {

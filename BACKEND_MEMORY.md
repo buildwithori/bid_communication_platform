@@ -379,6 +379,7 @@ Before merging backend work, ask:
 - Notification actionUrl accepts only application-relative paths beginning with one slash. Frontend routing ignores unsafe values and exact-detail routes refetch the resource through a role-scoped endpoint.
 - Session, deliverable, and tool-request lifecycles currently emit in-app and email notifications. Auth and invitation messages remain direct module-owned transactional email where the recipient may not have an active user record; reporting and system producers should reuse the notification service when their owning features are built.
 - Every runtime email URL, including CTA and logo URLs, must use EmailService.appUrl()/logoUrl(), which read APP_WEB_URL. Do not assemble roots inside feature email services.
+- Notification delivery selects a module-owned session, deliverable, tool-request, or automation template by event type, with the generic notification template reserved as a fallback. Domain producers own concise role-aware context; templates own presentation and next-step guidance.
 
 ## BullMQ Worker Topology (2026-07-16)
 

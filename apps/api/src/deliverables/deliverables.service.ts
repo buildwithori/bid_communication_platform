@@ -80,6 +80,7 @@ const deliverableInstanceInclude = {
   entrepreneur: {
     select: {
       ...userSelect,
+      timezone: true,
       businessMemberships: {
         where: { isPrimary: true },
         take: 1,
@@ -815,8 +816,8 @@ export class DeliverablesService {
         recipientUserId: reviewer.id,
         actorUserId: actor.id,
         type: NotificationType.deliverable_review,
-        title: "Deliverable ready for review",
-        body: `${business} submitted ${instance.rule.name}.`,
+        title: "Deliverable ready for review: " + instance.rule.name,
+        body: this.submissionNotificationBody(instance, business),
         severity: NotificationSeverity.info,
         entityType: NotificationEntityType.deliverable_instance,
         entityId: instance.id,
@@ -843,11 +844,13 @@ export class DeliverablesService {
         ? NotificationType.deliverable_changes_requested
         : NotificationType.deliverable_review,
       title: changesRequired
-        ? "Changes requested on your deliverable"
-        : "Deliverable approved",
-      body: changesRequired
-        ? `Review the feedback for ${instance.rule.name} and submit an updated file.`
-        : `${instance.rule.name} was approved.`,
+        ? "Changes requested: " + instance.rule.name
+        : "Deliverable approved: " + instance.rule.name,
+      body: this.reviewDecisionNotificationBody(
+        actor,
+        instance,
+        changesRequired,
+      ),
       severity: changesRequired
         ? NotificationSeverity.warning
         : NotificationSeverity.success,
@@ -856,6 +859,71 @@ export class DeliverablesService {
       actionUrl: `/entrepreneur/deliverables/${instance.programmeId}?deliverableId=${instance.id}`,
       channels: [NotificationChannel.in_app, NotificationChannel.email],
     });
+  }
+
+  private submissionNotificationBody(
+    instance: DeliverableInstanceRow,
+    business: string,
+  ) {
+    const fileName = instance.submissions[0]?.fileAsset.originalFilename;
+    return (
+      business +
+      " submitted “" +
+      instance.rule.name +
+      "” for " +
+      instance.programme.name +
+      (fileName ? ". File: " + fileName : "") +
+      ". The deliverable is due " +
+      this.formatDeliverableDate(instance) +
+      ". Review the latest submission and record a decision."
+    );
+  }
+
+  private reviewDecisionNotificationBody(
+    actor: User,
+    instance: DeliverableInstanceRow,
+    changesRequired: boolean,
+  ) {
+    const feedback = instance.submissions[0]?.reviews[0]?.feedback;
+    if (changesRequired) {
+      return (
+        this.userName(actor) +
+        " requested changes to “" +
+        instance.rule.name +
+        "” for " +
+        instance.programme.name +
+        ". Feedback: " +
+        this.emailExcerpt(
+          feedback ?? "Open the review to see the requested updates",
+        ) +
+        ". Submit a revised file by " +
+        this.formatDeliverableDate(instance) +
+        "."
+      );
+    }
+    return (
+      this.userName(actor) +
+      " approved “" +
+      instance.rule.name +
+      "” for " +
+      instance.programme.name +
+      ". No further submission is required for this deliverable."
+    );
+  }
+
+  private formatDeliverableDate(instance: DeliverableInstanceRow) {
+    return new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: instance.entrepreneur.timezone ?? "Africa/Kigali",
+    }).format(instance.dueDate);
+  }
+
+  private emailExcerpt(value: string, maxLength = 280) {
+    const normalized = value.trim().replace(/\s+/g, " ");
+    return normalized.length <= maxLength
+      ? normalized
+      : normalized.slice(0, maxLength - 1).trimEnd() + "…";
   }
 
   private statusSummary(

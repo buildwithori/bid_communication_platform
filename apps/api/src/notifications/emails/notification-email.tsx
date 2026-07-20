@@ -7,6 +7,9 @@ export type NotificationEmailProps = {
   body: string;
   actionUrl: string;
   logoUrl: string;
+  eyebrow?: string;
+  actionLabel?: string;
+  supportingText?: string;
 };
 
 export function NotificationEmail({
@@ -15,18 +18,22 @@ export function NotificationEmail({
   body = "There is new activity in your BID Hub workspace.",
   actionUrl = "http://localhost:3000",
   logoUrl = "http://localhost:3000/bid-logo.png",
+  eyebrow = "BID Hub notification",
+  actionLabel = "View in BID Hub",
+  supportingText,
 }: NotificationEmailProps) {
   return (
     <BidActionEmail
       preview={title}
-      eyebrow="BID Hub notification"
+      eyebrow={eyebrow}
       heading={title}
       greeting={`Hello ${recipientName},`}
       body={body}
-      actionLabel="View in BID Hub"
+      actionLabel={actionLabel}
       actionUrl={actionUrl}
+      supportingText={supportingText}
       logoUrl={logoUrl}
-      expiryNote="You can manage email and in-app notification preferences from your workspace settings."
+      preferenceNote="You can manage email and in-app notification preferences from your workspace settings."
     />
   );
 }
