@@ -123,6 +123,9 @@ The current phase is UI-first. Backend/auth/storage APIs are intentionally not w
 - Programmes and Training Library are core content surfaces and must be robust:
   - Admin Programs should support growing programme portfolios with search, status filters, pagination, and module search/pagination.
   - Entrepreneur Training Library should feel learner-facing, with featured programme cards, searchable catalogue, standalone resources, and detailed programme learning paths.
+  - Programme playback uses one reusable, in-page course player across entrepreneur learning and admin/trainer preview. Its curriculum sidebar receives the complete ordered module/content tree without pagination; this is a deliberate bounded programme-view contract, while management lists remain cursor-paginated.
+  - Entrepreneurs see ready content only. Authorized admins/trainers can preview the full curriculum and see draft, processing, failed, or archived item state without creating learner progress.
+  - Content rating is completion-driven: prompt entrepreneurs when a video ends or when they continue/finish a PDF or tool lesson. Rating must be dismissible and must never block navigation.
 - Learner progress is tracked only for entrepreneurs. The UI should not send progress updates on every player tick; use a batched/throttled sync model and flush only on meaningful events such as open, pause, milestones, ended, close/pagehide, or explicit completion.
 - Training library content can grow fast, so avoid pure card grids without search/pagination.
 - Programme lifecycle is derived from business fields, not a loose mock status. Archive wins over every other status: `archivedAt` -> Archived, no `publishedAt` -> Draft, future start date -> Scheduled, passed end date -> Completed, otherwise Active.
@@ -248,7 +251,7 @@ Session workflow rules:
 - Feature 8 is complete. Admin programme lifecycle, curriculum/module management, content library, module content sequencing, and trainer attribution use authenticated NestJS APIs and feature-owned frontend hooks.
 - Trainer programme visibility is inferred from trainer-attributed learning assets. Trainer programme lists, summaries, detail, curriculum, readiness, programme entrepreneurs, and content metadata must remain server-scoped; React must not reconstruct trainer scope from broad datasets.
 - Within a programme a trainer is authorized to support, the trainer may preview the full curriculum, including content attributed to other trainers. Signed PDF and Mux access checks must verify shared programme scope and must not expose unrelated programme content.
-- Programme and module lists use cursor pagination and backend search. Module content is fetched only when its modal opens, and signed file/video access is requested only when a preview opens.
+- Programme and module management lists use cursor pagination and backend search. The shared programme player intentionally loads the complete ordered curriculum after role-scoped authorization, then requests signed file/video access only for the active lesson.
 
 ## Entrepreneur Tools Integration Completion (2026-07-16)
 

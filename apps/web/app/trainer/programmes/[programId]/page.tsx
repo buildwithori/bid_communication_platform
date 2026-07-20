@@ -4,17 +4,14 @@ import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import MuxPlayer from '@mux/mux-player-react/lazy';
 import {
   ArrowLeft,
   BookOpen,
   CalendarDays,
   CheckCircle2,
-  ExternalLink,
   FileText,
   PlayCircle,
   Users,
-  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/shared/Badge';
@@ -29,38 +26,34 @@ import {
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
-import { Modal } from '@/components/shared/Modal';
 import { Notice, PageHeader } from '@/components/shared/PageHeader';
 import { ProgressBar } from '@/components/shared/ProgressBar';
 import { Tabs } from '@/components/shared/Tabs';
 import {
-  useModuleContentItemsPage,
-  type ContentItemRecord,
-  type ContentItemStatus,
-  type ContentItemType,
-} from '@/lib/api/content';
+  ProgrammeCoursePlayer,
+  ProgrammeCoursePlayerSkeleton,
+} from '@/components/learning/ProgrammeCoursePlayer';
 import {
   useEntrepreneursPage,
   type EntrepreneurRecord,
 } from '@/lib/api/entrepreneurs';
-import { useSignedFileUrlQuery } from '@/lib/api/files';
 import {
   useProgrammeDeliverableRulesPage,
   useProgrammeDetailQuery,
   useProgrammeModulesPage,
+  useProgrammePlayerQuery,
   type ProgrammeDeliverableRule,
   type ProgrammeDetail,
   type ProgrammeLifecycle,
   type ProgrammeModuleRecord,
 } from '@/lib/api/programmes';
 import { useLazyBusinessStagesQuery } from '@/lib/api/settings';
-import { useSignedVideoPlaybackQuery } from '@/lib/api/videos';
 import { routes } from '@/lib/routes';
-import type { BadgeTone } from '@/types';
 
 type WorkspaceTab =
   | 'overview'
   | 'curriculum'
+  | 'preview'
   | 'deliverables'
   | 'readiness'
   | 'entrepreneurs';
@@ -69,6 +62,9 @@ export default function TrainerProgrammeDetailPage() {
   const params = useParams<{ programId: string }>();
   const programme = useProgrammeDetailQuery(params.programId);
   const [tab, setTab] = React.useState<WorkspaceTab>('overview');
+  const [previewModuleId, setPreviewModuleId] = React.useState<string | null>(
+    null,
+  );
 
   if (programme.isLoading && !programme.data) {
     return <TrainerProgrammeDetailSkeleton />;
@@ -120,7 +116,8 @@ export default function TrainerProgrammeDetailPage() {
                 </Badge>
                 <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
                   <CalendarDays className="h-4 w-4" />
-                  {formatMonth(detail.startDate)} - {formatMonth(detail.endDate)}
+                  {formatMonth(detail.startDate)} -{' '}
+                  {formatMonth(detail.endDate)}
                 </span>
               </div>
               <h2 className="text-2xl font-semibold tracking-tight text-ink">
@@ -204,6 +201,7 @@ export default function TrainerProgrammeDetailPage() {
               tabs={[
                 { value: 'overview', label: 'Overview' },
                 { value: 'curriculum', label: 'Curriculum' },
+                { value: 'preview', label: 'Preview' },
                 { value: 'deliverables', label: 'Deliverables' },
                 { value: 'readiness', label: 'Readiness' },
                 { value: 'entrepreneurs', label: 'Entrepreneurs' },
@@ -214,20 +212,78 @@ export default function TrainerProgrammeDetailPage() {
 
           {tab === 'overview' ? <OverviewTab programme={detail} /> : null}
           {tab === 'curriculum' ? (
-            <CurriculumTab programmeId={detail.id} />
+            <CurriculumTab
+              programmeId={detail.id}
+              onPreviewModule={(moduleId) => {
+                setPreviewModuleId(moduleId);
+                setTab('preview');
+              }}
+            />
+          ) : null}
+          {tab === 'preview' ? (
+            <TrainerProgrammePreview
+              programmeId={detail.id}
+              initialModuleId={previewModuleId}
+            />
           ) : null}
           {tab === 'deliverables' ? (
             <DeliverablesTab programmeId={detail.id} />
           ) : null}
-          {tab === 'readiness' ? (
-            <ReadinessTab programme={detail} />
-          ) : null}
+          {tab === 'readiness' ? <ReadinessTab programme={detail} /> : null}
           {tab === 'entrepreneurs' ? (
             <EntrepreneursTab programmeId={detail.id} />
           ) : null}
         </Card>
       </section>
     </>
+  );
+}
+
+function TrainerProgrammePreview({
+  programmeId,
+  initialModuleId,
+}: {
+  programmeId: string;
+  initialModuleId: string | null;
+}) {
+  const player = useProgrammePlayerQuery(programmeId);
+
+  if (player.isLoading && !player.data) {
+    return (
+      <div className="mt-5">
+        <ProgrammeCoursePlayerSkeleton />
+      </div>
+    );
+  }
+
+  if (player.isError || !player.data) {
+    return (
+      <div className="mt-5">
+        <Notice>
+          Programme preview could not be loaded. {player.error?.message}
+        </Notice>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3"
+          onClick={() => void player.refetch()}
+        >
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <ProgrammeCoursePlayer
+      data={player.data}
+      initialContentId={
+        player.data.modules.find(
+          (module: { id: string }) => module.id === initialModuleId,
+        )?.items[0]?.id ?? null
+      }
+      className="mt-5"
+    />
   );
 }
 
@@ -306,15 +362,16 @@ function OverviewTab({ programme }: { programme: ProgrammeDetail }) {
   );
 }
 
-function CurriculumTab({ programmeId }: { programmeId: string }) {
+function CurriculumTab({
+  programmeId,
+  onPreviewModule,
+}: {
+  programmeId: string;
+  onPreviewModule: (moduleId: string) => void;
+}) {
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search);
   const [pageSize, setPageSize] = React.useState(6);
-  const [activeModule, setActiveModule] =
-    React.useState<ProgrammeModuleRecord | null>(null);
-  const [previewItem, setPreviewItem] =
-    React.useState<ContentItemRecord | null>(null);
-  const [previewItems, setPreviewItems] = React.useState<ContentItemRecord[]>([]);
   const modules = useProgrammeModulesPage(programmeId, {
     search: debouncedSearch.trim() || undefined,
     take: pageSize,
@@ -334,8 +391,8 @@ function CurriculumTab({ programmeId }: { programmeId: string }) {
           <RowActions
             actions={[
               {
-                label: 'View module content',
-                onSelect: () => setActiveModule(module),
+                label: 'Preview module',
+                onSelect: () => onPreviewModule(module.id),
               },
             ]}
           />
@@ -357,7 +414,7 @@ function CurriculumTab({ programmeId }: { programmeId: string }) {
         cell: (module) => (
           <button
             type="button"
-            onClick={() => setActiveModule(module)}
+            onClick={() => onPreviewModule(module.id)}
             className="block min-w-[280px] rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
           >
             <span className="block font-semibold text-ink">{module.title}</span>
@@ -384,7 +441,7 @@ function CurriculumTab({ programmeId }: { programmeId: string }) {
         ),
       },
     ],
-    [],
+    [onPreviewModule],
   );
 
   return (
@@ -431,342 +488,7 @@ function CurriculumTab({ programmeId }: { programmeId: string }) {
           />
         </>
       )}
-      <TrainerModuleContentModal
-        key={activeModule?.id ?? 'closed'}
-        module={activeModule}
-        onClose={() => setActiveModule(null)}
-        onPreview={(item, items) => {
-          setPreviewItems(items);
-          setPreviewItem(item);
-        }}
-      />
-      <TrainerContentPreviewModal
-        items={previewItems}
-        item={previewItem}
-        onChangeItem={setPreviewItem}
-        onClose={() => setPreviewItem(null)}
-      />
     </div>
-  );
-}
-
-function TrainerModuleContentModal({
-  module,
-  onClose,
-  onPreview,
-}: {
-  module: ProgrammeModuleRecord | null;
-  onClose: () => void;
-  onPreview: (item: ContentItemRecord, items: ContentItemRecord[]) => void;
-}) {
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebouncedValue(search);
-  const [pageSize, setPageSize] = React.useState(5);
-  const content = useModuleContentItemsPage(
-    module?.id ?? '',
-    { search: debouncedSearch.trim() || undefined, take: pageSize },
-    Boolean(module),
-  );
-  const resetPagination = content.resetPagination;
-
-  React.useEffect(() => {
-    resetPagination();
-  }, [debouncedSearch, pageSize, resetPagination]);
-
-  const columns = React.useMemo<Column<ContentItemRecord>[]>(
-    () => [
-      {
-        key: 'actions',
-        header: 'Action',
-        cell: (item) => (
-          <RowActions
-            actions={[
-              {
-                label: 'Preview content',
-                onSelect: () => onPreview(item, content.rows),
-              },
-            ]}
-          />
-        ),
-        className: 'w-[84px]',
-      },
-      {
-        key: 'content',
-        header: 'Content item',
-        cell: (item) => <ContentItemButton item={item} onOpen={() => onPreview(item, content.rows)} />,
-      },
-      {
-        key: 'type',
-        header: 'Type',
-        cell: (item) => (
-          <Badge tone={contentTypeMeta[item.type].tone}>
-            {contentTypeMeta[item.type].label}
-          </Badge>
-        ),
-      },
-      {
-        key: 'trainer',
-        header: 'Trainer',
-        cell: (item) => (
-          <span className="text-sm text-ink-muted">
-            {item.trainer?.name ?? 'No trainer attributed'}
-          </span>
-        ),
-      },
-      {
-        key: 'status',
-        header: 'Status',
-        cell: (item) => <ContentStatusBadge status={item.status} />,
-      },
-    ],
-    [content.rows, onPreview],
-  );
-
-  return (
-    <Modal
-      open={Boolean(module)}
-      onOpenChange={(open) => !open && onClose()}
-      title={module ? 'Module content: ' + module.title : 'Module content'}
-      width="xl"
-    >
-      {module ? (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-line bg-surface-subtle p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={module.readiness === 'ready' ? 'green' : 'amber'}>
-                    {module.readiness === 'ready' ? 'Ready' : 'Needs content'}
-                  </Badge>
-                  <Badge tone="neutral">Module {module.position}</Badge>
-                </div>
-                <h3 className="mt-3 text-xl font-semibold text-ink">
-                  {module.title}
-                </h3>
-                {module.description ? (
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
-                    {module.description}
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                disabled={!content.rows[0]}
-                onClick={() =>
-                  content.rows[0] && onPreview(content.rows[0], content.rows)
-                }
-              >
-                <PlayCircle className="h-4 w-4" />
-                Play from start
-              </Button>
-            </div>
-          </div>
-          <TableToolbar>
-            <div>
-              <div className="text-sm font-medium text-ink">Find content</div>
-              <div className="mt-0.5 text-sm text-ink-muted">
-                {content.totalItems} learning asset
-                {content.totalItems === 1 ? '' : 's'}
-              </div>
-            </div>
-            <div className="w-full sm:w-[360px]">
-              <TableFilterInput
-                icon
-                placeholder="Search title or trainer..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-          </TableToolbar>
-          {content.isLoading && !content.data ? (
-            <TableSkeleton columns={5} rows={5} />
-          ) : content.isError ? (
-            <Notice>
-              Module content could not be loaded. {content.error.message}
-            </Notice>
-          ) : (
-            <>
-              <DataTable
-                columns={columns}
-                rows={content.rows}
-                rowKey={(item) => item.id}
-                emptyMessage="No content item matches this search."
-                tableClassName="min-w-[980px]"
-              />
-              <TablePagination
-                page={content.page}
-                pageSize={pageSize}
-                totalItems={content.totalItems}
-                pageSizeOptions={[5, 10, 20]}
-                onPageChange={content.setPage}
-                onPageSizeChange={setPageSize}
-              />
-            </>
-          )}
-        </div>
-      ) : null}
-    </Modal>
-  );
-}
-
-function TrainerContentPreviewModal({
-  items,
-  item,
-  onChangeItem,
-  onClose,
-}: {
-  items: ContentItemRecord[];
-  item: ContentItemRecord | null;
-  onChangeItem: (item: ContentItemRecord | null) => void;
-  onClose: () => void;
-}) {
-  const file = useSignedFileUrlQuery(
-    item?.type === 'pdf' ? item.file?.id : undefined,
-    Boolean(item),
-  );
-  const playback = useSignedVideoPlaybackQuery(
-    item?.type === 'video' ? item.video?.id : undefined,
-    Boolean(item),
-  );
-
-  if (!item) return null;
-  const meta = contentTypeMeta[item.type];
-  const Icon = meta.icon;
-  const currentIndex = Math.max(
-    items.findIndex((candidate) => candidate.id === item.id),
-    0,
-  );
-  const previousItem = currentIndex > 0 ? items[currentIndex - 1] : undefined;
-  const nextItem =
-    currentIndex < items.length - 1 ? items[currentIndex + 1] : undefined;
-  const externalUrl =
-    item.type === 'pdf'
-      ? file.data?.download.url
-      : item.type === 'tool'
-        ? item.toolLink?.url
-        : undefined;
-
-  return (
-    <Modal
-      open
-      onOpenChange={(open) => !open && onClose()}
-      title="Preview curriculum content"
-      width="xl"
-    >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-line bg-surface-subtle p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ' + meta.bg}>
-                <Icon className={'h-5 w-5 ' + meta.fg} />
-              </span>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={meta.tone}>{meta.label}</Badge>
-                  <ContentStatusBadge status={item.status} />
-                  <span className="text-sm text-ink-muted">
-                    {currentIndex + 1} of {items.length}
-                  </span>
-                </div>
-                <h3 className="mt-2 text-xl font-semibold text-ink">
-                  {item.title}
-                </h3>
-                <div className="mt-1 text-sm text-ink-muted">
-                  {item.durationLabel ?? meta.label} -{' '}
-                  {item.trainer?.name ?? 'No trainer attributed'}
-                </div>
-              </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!previousItem}
-                onClick={() => previousItem && onChangeItem(previousItem)}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!nextItem}
-                onClick={() => nextItem && onChangeItem(nextItem)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-line bg-black">
-          {item.type === 'video' ? (
-            playback.isLoading ? (
-              <PreviewLoading />
-            ) : playback.isError ? (
-              <PreviewFallback
-                title="Video unavailable"
-                description={playback.error.message}
-              />
-            ) : playback.data ? (
-              <MuxPlayer
-                playbackId={playback.data.playbackId}
-                tokens={{ playback: playback.data.token }}
-                metadataVideoTitle={item.title}
-                streamType="on-demand"
-                className="aspect-video w-full"
-              />
-            ) : (
-              <PreviewFallback
-                title="Video not ready"
-                description="This video is still being prepared."
-              />
-            )
-          ) : item.type === 'pdf' ? (
-            file.isLoading ? (
-              <PreviewLoading />
-            ) : file.isError ? (
-              <PreviewFallback
-                title="PDF unavailable"
-                description={file.error.message}
-              />
-            ) : file.data ? (
-              <iframe
-                title={item.title}
-                src={file.data.download.url}
-                className="h-[68vh] w-full bg-white"
-              />
-            ) : (
-              <PreviewFallback
-                title="PDF not attached"
-                description="This content item does not have a ready PDF file."
-              />
-            )
-          ) : item.toolLink?.url ? (
-            <iframe
-              title={item.title}
-              src={item.toolLink.url}
-              className="h-[68vh] w-full bg-white"
-            />
-          ) : (
-            <PreviewFallback
-              title="Tool link missing"
-              description="This embedded tool does not have a link yet."
-            />
-          )}
-        </div>
-
-        {externalUrl ? (
-          <div className="flex justify-end">
-            <Button asChild variant="outline">
-              <a href={externalUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                Open in new tab
-              </a>
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </Modal>
   );
 }
 
@@ -1002,8 +724,7 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
     take: 20,
   });
   const resetPagination = entrepreneurs.resetPagination;
-  const stageRows =
-    stages.data?.pages.flatMap((page) => page.items) ?? [];
+  const stageRows = stages.data?.pages.flatMap((page) => page.items) ?? [];
 
   React.useEffect(() => {
     resetPagination();
@@ -1130,81 +851,11 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
   );
 }
 
-const contentTypeMeta: Record<
-  ContentItemType,
-  {
-    label: string;
-    icon: LucideIcon;
-    tone: BadgeTone;
-    bg: string;
-    fg: string;
-  }
-> = {
-  video: {
-    label: 'Video',
-    icon: PlayCircle,
-    tone: 'brand',
-    bg: 'bg-bid-light',
-    fg: 'text-bid',
-  },
-  pdf: {
-    label: 'PDF',
-    icon: FileText,
-    tone: 'blue',
-    bg: 'bg-info-light',
-    fg: 'text-info',
-  },
-  tool: {
-    label: 'Tool',
-    icon: Wrench,
-    tone: 'green',
-    bg: 'bg-success-light',
-    fg: 'text-success-dark',
-  },
-};
-
-function ContentItemButton({
-  item,
-  onOpen,
-}: {
-  item: ContentItemRecord;
-  onOpen: () => void;
-}) {
-  const meta = contentTypeMeta[item.type];
-  const Icon = meta.icon;
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex min-w-[320px] items-start gap-3 rounded-lg text-left outline-none transition hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
-    >
-      <span className={'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ' + meta.bg}>
-        <Icon className={'h-4 w-4 ' + meta.fg} />
-      </span>
-      <span className="min-w-0">
-        <span className="block font-semibold text-ink">{item.title}</span>
-        <span className="mt-1 block text-sm text-ink-muted">
-          {item.durationLabel ?? meta.label}
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function ContentStatusBadge({ status }: { status: ContentItemStatus }) {
-  const meta: Record<ContentItemStatus, { label: string; tone: BadgeTone }> = {
-    draft: { label: 'Draft', tone: 'neutral' },
-    processing: { label: 'Processing', tone: 'amber' },
-    ready: { label: 'Ready', tone: 'green' },
-    failed: { label: 'Failed', tone: 'red' },
-    archived: { label: 'Archived', tone: 'neutral' },
-  };
-  return <Badge tone={meta[status].tone}>{meta[status].label}</Badge>;
-}
-
 function ContentSummary({ module }: { module: ProgrammeModuleRecord }) {
   if (module.content.total === 0) {
-    return <span className="text-sm text-ink-muted">No learning assets yet</span>;
+    return (
+      <span className="text-sm text-ink-muted">No learning assets yet</span>
+    );
   }
   return (
     <div className="flex min-w-[240px] flex-wrap gap-1.5">
@@ -1310,7 +961,12 @@ function ReadinessPanelItem({
   return (
     <div className="rounded-xl border border-line bg-white px-4 py-4">
       <div className="flex items-start gap-3">
-        <div className={'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ' + iconClass}>
+        <div
+          className={
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ' +
+            iconClass
+          }
+        >
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">

@@ -1,19 +1,15 @@
-"use client";
+'use client';
 
-import { useCallback, useState } from "react";
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { programmeKeys } from "./keys";
+import { useCallback, useState } from 'react';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { programmeKeys } from './keys';
 import {
   archiveProgrammeRequest,
   createProgrammeDeliverableRuleRequest,
   createProgrammeModuleRequest,
   createProgrammeRequest,
   getProgrammeModuleRequest,
+  getProgrammePlayerRequest,
   getProgrammeRequest,
   getProgrammeSummaryRequest,
   listProgrammeDeliverableRulesRequest,
@@ -27,7 +23,7 @@ import {
   updateProgrammeDeliverableRuleRequest,
   updateProgrammeModuleRequest,
   updateProgrammeRequest,
-} from "./requests";
+} from './requests';
 import type {
   ArchiveProgrammeVariables,
   CreateProgrammeDeliverableRuleVariables,
@@ -44,21 +40,19 @@ import type {
   UpdateProgrammeDeliverableRuleVariables,
   UpdateProgrammeModuleVariables,
   UpdateProgrammeVariables,
-} from "./types";
+} from './types';
 
 type MutationHandlers<TData> = {
   onSuccess?: (data: TData) => void;
   onError?: (error: Error) => void;
 };
 
-type ProgrammePageQuery = Omit<ProgrammeQuery, "cursor">;
-type ProgrammeModulePageQuery = Omit<ProgrammeModuleQuery, "cursor">;
+type ProgrammePageQuery = Omit<ProgrammeQuery, 'cursor'>;
+type ProgrammeModulePageQuery = Omit<ProgrammeModuleQuery, 'cursor'>;
 
 export function useProgrammesPage(query: ProgrammePageQuery) {
   const [page, setCurrentPage] = useState(1);
-  const [cursors, setCursors] = useState<Array<string | undefined>>([
-    undefined,
-  ]);
+  const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const cursor = cursors[page - 1];
   const result = useQuery({
     queryKey: programmeKeys.list({ ...query, cursor }),
@@ -73,10 +67,7 @@ export function useProgrammesPage(query: ProgrammePageQuery) {
   const setPage = useCallback(
     (nextPage: number) => {
       if (nextPage < 1 || nextPage === page) return;
-      if (
-        (nextPage < page && cursors[nextPage - 1] !== undefined) ||
-        nextPage === 1
-      ) {
+      if ((nextPage < page && cursors[nextPage - 1] !== undefined) || nextPage === 1) {
         setCurrentPage(nextPage);
         return;
       }
@@ -102,14 +93,11 @@ export function useProgrammesPage(query: ProgrammePageQuery) {
   };
 }
 
-export function useLazyProgrammesLookup(
-  query: ProgrammePageQuery & { enabled: boolean },
-) {
+export function useLazyProgrammesLookup(query: ProgrammePageQuery & { enabled: boolean }) {
   const { enabled, ...filters } = query;
   const result = useInfiniteQuery({
     queryKey: programmeKeys.list(filters),
-    queryFn: ({ pageParam }) =>
-      listProgrammesRequest({ ...filters, cursor: pageParam }),
+    queryFn: ({ pageParam }) => listProgrammesRequest({ ...filters, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
@@ -129,38 +117,32 @@ export const useProgrammeSummaryQuery = () =>
 
 export const useProgrammeDetailQuery = (id: string | null) =>
   useQuery({
-    queryKey: programmeKeys.detail(id ?? "none"),
+    queryKey: programmeKeys.detail(id ?? 'none'),
     queryFn: () => getProgrammeRequest(id as string),
     enabled: Boolean(id),
   });
 
-export const useProgrammeModuleDetailQuery = (
-  programmeId: string | null,
-  moduleId: string | null,
-) =>
+export const useProgrammePlayerQuery = (id: string | null, enabled = true) =>
   useQuery({
-    queryKey: programmeKeys.moduleDetail(
-      programmeId ?? "none",
-      moduleId ?? "none",
-    ),
-    queryFn: () =>
-      getProgrammeModuleRequest(programmeId as string, moduleId as string),
+    queryKey: programmeKeys.player(id ?? 'none'),
+    queryFn: () => getProgrammePlayerRequest(id as string),
+    enabled: enabled && Boolean(id),
+  });
+
+export const useProgrammeModuleDetailQuery = (programmeId: string | null, moduleId: string | null) =>
+  useQuery({
+    queryKey: programmeKeys.moduleDetail(programmeId ?? 'none', moduleId ?? 'none'),
+    queryFn: () => getProgrammeModuleRequest(programmeId as string, moduleId as string),
     enabled: Boolean(programmeId && moduleId),
   });
 
-export function useProgrammeModulesPage(
-  programmeId: string,
-  query: ProgrammeModulePageQuery,
-) {
+export function useProgrammeModulesPage(programmeId: string, query: ProgrammeModulePageQuery) {
   const [page, setCurrentPage] = useState(1);
-  const [cursors, setCursors] = useState<Array<string | undefined>>([
-    undefined,
-  ]);
+  const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const cursor = cursors[page - 1];
   const result = useQuery({
     queryKey: programmeKeys.moduleList(programmeId, { ...query, cursor }),
-    queryFn: () =>
-      listProgrammeModulesRequest(programmeId, { ...query, cursor }),
+    queryFn: () => listProgrammeModulesRequest(programmeId, { ...query, cursor }),
     enabled: Boolean(programmeId),
   });
   const rows: ProgrammeModuleRecord[] = result.data?.items ?? [];
@@ -173,10 +155,7 @@ export function useProgrammeModulesPage(
   const setPage = useCallback(
     (nextPage: number) => {
       if (nextPage < 1 || nextPage === page) return;
-      if (
-        (nextPage < page && cursors[nextPage - 1] !== undefined) ||
-        nextPage === 1
-      ) {
+      if ((nextPage < page && cursors[nextPage - 1] !== undefined) || nextPage === 1) {
         setCurrentPage(nextPage);
         return;
       }
@@ -252,17 +231,13 @@ export function useLazyReusableProgrammeModules(
   };
 }
 
-export function useProgrammeDeliverableRulesPage(
-  programmeId: string,
-  query: Omit<ProgrammeDeliverableRuleQuery, "cursor">,
-) {
+export function useProgrammeDeliverableRulesPage(programmeId: string, query: Omit<ProgrammeDeliverableRuleQuery, 'cursor'>) {
   const [page, setCurrentPage] = useState(1);
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const cursor = cursors[page - 1];
   const result = useQuery({
     queryKey: programmeKeys.deliverableRules(programmeId, { ...query, cursor }),
-    queryFn: () =>
-      listProgrammeDeliverableRulesRequest(programmeId, { ...query, cursor }),
+    queryFn: () => listProgrammeDeliverableRulesRequest(programmeId, { ...query, cursor }),
     enabled: Boolean(programmeId),
   });
 
@@ -271,21 +246,24 @@ export function useProgrammeDeliverableRulesPage(
     setCursors([undefined]);
   }, []);
 
-  const setPage = useCallback((nextPage: number) => {
-    if (nextPage < 1 || nextPage === page) return;
-    if ((nextPage < page && cursors[nextPage - 1] !== undefined) || nextPage === 1) {
-      setCurrentPage(nextPage);
-      return;
-    }
-    if (nextPage === page + 1 && result.data?.nextCursor) {
-      setCursors((current) => {
-        const next = [...current];
-        next[nextPage - 1] = result.data?.nextCursor ?? undefined;
-        return next;
-      });
-      setCurrentPage(nextPage);
-    }
-  }, [cursors, page, result.data?.nextCursor]);
+  const setPage = useCallback(
+    (nextPage: number) => {
+      if (nextPage < 1 || nextPage === page) return;
+      if ((nextPage < page && cursors[nextPage - 1] !== undefined) || nextPage === 1) {
+        setCurrentPage(nextPage);
+        return;
+      }
+      if (nextPage === page + 1 && result.data?.nextCursor) {
+        setCursors((current) => {
+          const next = [...current];
+          next[nextPage - 1] = result.data?.nextCursor ?? undefined;
+          return next;
+        });
+        setCurrentPage(nextPage);
+      }
+    },
+    [cursors, page, result.data?.nextCursor],
+  );
 
   return {
     ...result,
@@ -297,10 +275,7 @@ export function useProgrammeDeliverableRulesPage(
   };
 }
 
-function useProgrammeMutation<TVariables>(
-  mutationFn: (variables: TVariables) => Promise<ProgrammeDetail>,
-  handlers?: MutationHandlers<ProgrammeDetail>,
-) {
+function useProgrammeMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<ProgrammeDetail>, handlers?: MutationHandlers<ProgrammeDetail>) {
   const queryClient = useQueryClient();
   return useMutation<ProgrammeDetail, Error, TVariables>({
     mutationFn,
@@ -314,41 +289,17 @@ function useProgrammeMutation<TVariables>(
   });
 }
 
-export const useCreateProgrammeMutation = (
-  handlers?: MutationHandlers<ProgrammeDetail>,
-) =>
-  useProgrammeMutation<CreateProgrammePayload>(
-    createProgrammeRequest,
-    handlers,
-  );
+export const useCreateProgrammeMutation = (handlers?: MutationHandlers<ProgrammeDetail>) => useProgrammeMutation<CreateProgrammePayload>(createProgrammeRequest, handlers);
 
-export const useUpdateProgrammeMutation = (
-  handlers?: MutationHandlers<ProgrammeDetail>,
-) =>
-  useProgrammeMutation<UpdateProgrammeVariables>(
-    updateProgrammeRequest,
-    handlers,
-  );
+export const useUpdateProgrammeMutation = (handlers?: MutationHandlers<ProgrammeDetail>) => useProgrammeMutation<UpdateProgrammeVariables>(updateProgrammeRequest, handlers);
 
-export const usePublishProgrammeMutation = (
-  handlers?: MutationHandlers<ProgrammeDetail>,
-) => useProgrammeMutation<string>(publishProgrammeRequest, handlers);
+export const usePublishProgrammeMutation = (handlers?: MutationHandlers<ProgrammeDetail>) => useProgrammeMutation<string>(publishProgrammeRequest, handlers);
 
-export const useArchiveProgrammeMutation = (
-  handlers?: MutationHandlers<ProgrammeDetail>,
-) =>
-  useProgrammeMutation<ArchiveProgrammeVariables>(
-    archiveProgrammeRequest,
-    handlers,
-  );
+export const useArchiveProgrammeMutation = (handlers?: MutationHandlers<ProgrammeDetail>) => useProgrammeMutation<ArchiveProgrammeVariables>(archiveProgrammeRequest, handlers);
 
-export const useRestoreProgrammeMutation = (
-  handlers?: MutationHandlers<ProgrammeDetail>,
-) => useProgrammeMutation<string>(restoreProgrammeRequest, handlers);
+export const useRestoreProgrammeMutation = (handlers?: MutationHandlers<ProgrammeDetail>) => useProgrammeMutation<string>(restoreProgrammeRequest, handlers);
 
-function useProgrammeModuleMutation<
-  TVariables extends { programmeId: string },
->(
+function useProgrammeModuleMutation<TVariables extends { programmeId: string }>(
   mutationFn: (variables: TVariables) => Promise<ProgrammeModuleRecord>,
   handlers?: MutationHandlers<ProgrammeModuleRecord>,
 ) {
@@ -373,42 +324,17 @@ function useProgrammeModuleMutation<
   });
 }
 
-export const useCreateProgrammeModuleMutation = (
-  handlers?: MutationHandlers<ProgrammeModuleRecord>,
-) =>
-  useProgrammeModuleMutation<CreateProgrammeModuleVariables>(
-    createProgrammeModuleRequest,
-    handlers,
-  );
+export const useCreateProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) =>
+  useProgrammeModuleMutation<CreateProgrammeModuleVariables>(createProgrammeModuleRequest, handlers);
 
-export const useUpdateProgrammeModuleMutation = (
-  handlers?: MutationHandlers<ProgrammeModuleRecord>,
-) =>
-  useProgrammeModuleMutation<UpdateProgrammeModuleVariables>(
-    updateProgrammeModuleRequest,
-    handlers,
-  );
+export const useUpdateProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) =>
+  useProgrammeModuleMutation<UpdateProgrammeModuleVariables>(updateProgrammeModuleRequest, handlers);
 
-export const useReuseProgrammeModuleMutation = (
-  handlers?: MutationHandlers<ProgrammeModuleRecord>,
-) =>
-  useProgrammeModuleMutation<ReuseProgrammeModuleVariables>(
-    reuseProgrammeModuleRequest,
-    handlers,
-  );
+export const useReuseProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) => useProgrammeModuleMutation<ReuseProgrammeModuleVariables>(reuseProgrammeModuleRequest, handlers);
 
-export const useMoveProgrammeModuleMutation = (
-  handlers?: MutationHandlers<ProgrammeModuleRecord>,
-) =>
-  useProgrammeModuleMutation<MoveProgrammeModuleVariables>(
-    moveProgrammeModuleRequest,
-    handlers,
-  );
+export const useMoveProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) => useProgrammeModuleMutation<MoveProgrammeModuleVariables>(moveProgrammeModuleRequest, handlers);
 
-function useDeliverableRuleMutation<TVariables>(
-  mutationFn: (variables: TVariables) => Promise<ProgrammeDeliverableRule>,
-  handlers?: MutationHandlers<ProgrammeDeliverableRule>,
-) {
+function useDeliverableRuleMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<ProgrammeDeliverableRule>, handlers?: MutationHandlers<ProgrammeDeliverableRule>) {
   const queryClient = useQueryClient();
   return useMutation<ProgrammeDeliverableRule, Error, TVariables>({
     mutationFn,
@@ -422,18 +348,8 @@ function useDeliverableRuleMutation<TVariables>(
   });
 }
 
-export const useCreateProgrammeDeliverableRuleMutation = (
-  handlers?: MutationHandlers<ProgrammeDeliverableRule>,
-) =>
-  useDeliverableRuleMutation<CreateProgrammeDeliverableRuleVariables>(
-    createProgrammeDeliverableRuleRequest,
-    handlers,
-  );
+export const useCreateProgrammeDeliverableRuleMutation = (handlers?: MutationHandlers<ProgrammeDeliverableRule>) =>
+  useDeliverableRuleMutation<CreateProgrammeDeliverableRuleVariables>(createProgrammeDeliverableRuleRequest, handlers);
 
-export const useUpdateProgrammeDeliverableRuleMutation = (
-  handlers?: MutationHandlers<ProgrammeDeliverableRule>,
-) =>
-  useDeliverableRuleMutation<UpdateProgrammeDeliverableRuleVariables>(
-    updateProgrammeDeliverableRuleRequest,
-    handlers,
-  );
+export const useUpdateProgrammeDeliverableRuleMutation = (handlers?: MutationHandlers<ProgrammeDeliverableRule>) =>
+  useDeliverableRuleMutation<UpdateProgrammeDeliverableRuleVariables>(updateProgrammeDeliverableRuleRequest, handlers);

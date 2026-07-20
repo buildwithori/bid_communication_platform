@@ -11,6 +11,7 @@ export {
   useProgrammeDetailQuery,
   useProgrammeModuleDetailQuery,
   useProgrammeModulesPage,
+  useProgrammePlayerQuery,
   useProgrammeSummaryQuery,
   useProgrammesPage,
   usePublishProgrammeMutation,
@@ -19,7 +20,7 @@ export {
   useUpdateProgrammeDeliverableRuleMutation,
   useUpdateProgrammeModuleMutation,
   useUpdateProgrammeMutation,
-} from "./hooks";
+} from './hooks';
 
 export type {
   ArchiveProgrammeVariables,
@@ -43,6 +44,10 @@ export type {
   ProgrammeModulePage,
   ProgrammeModuleQuery,
   ProgrammeModuleRecord,
+  ProgrammePlayerItem,
+  ProgrammePlayerModule,
+  ProgrammePlayerPayload,
+  ProgrammePlayerProgressStatus,
   ProgrammePage,
   ProgrammePublishState,
   ProgrammeQuery,
@@ -56,4 +61,4 @@ export type {
   UpdateProgrammePayload,
   UpdateProgrammeVariables,
   UpsertProgrammeDeliverableRulePayload,
-} from "./types";
+} from './types';

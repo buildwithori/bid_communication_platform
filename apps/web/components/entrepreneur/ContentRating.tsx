@@ -1,21 +1,30 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Star } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/shared/Button";
-import { Skeleton } from "@/components/shared/Card";
+import * as React from 'react';
+import { Star } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/shared/Button';
+import { Skeleton } from '@/components/shared/Card';
 import {
   useMyContentRatingQuery,
   useSaveContentRatingMutation,
   type ContentItemRecord,
   type ContentRatingPayload,
-} from "@/lib/api/content";
-import { cn } from "@/lib/utils";
+} from '@/lib/api/content';
+import { cn } from '@/lib/utils';
 
-type RatingContent = Pick<ContentItemRecord, "id" | "trainer">;
+type RatingContent = {
+  id: ContentItemRecord['id'];
+  trainer: { name: string } | null;
+};
 
-export function ContentRating({ content }: { content: RatingContent }) {
+export function ContentRating({
+  content,
+  onSaved,
+}: {
+  content: RatingContent;
+  onSaved?: () => void;
+}) {
   const savedRating = useMyContentRatingQuery(content.id);
 
   if (savedRating.isLoading && !savedRating.data) {
@@ -47,9 +56,10 @@ export function ContentRating({ content }: { content: RatingContent }) {
 
   return (
     <RatingForm
-      key={content.id + ":" + (savedRating.data?.updatedAt ?? "new")}
+      key={content.id + ':' + (savedRating.data?.updatedAt ?? 'new')}
       content={content}
       initial={savedRating.data ?? null}
+      onSaved={onSaved}
     />
   );
 }
@@ -57,22 +67,27 @@ export function ContentRating({ content }: { content: RatingContent }) {
 function RatingForm({
   content,
   initial,
+  onSaved,
 }: {
   content: RatingContent;
   initial: ContentRatingPayload | null;
+  onSaved?: () => void;
 }) {
   const saveRating = useSaveContentRatingMutation({
-    onSuccess: () => toast.success("Your content rating was saved."),
+    onSuccess: () => {
+      toast.success('Your content rating was saved.');
+      onSaved?.();
+    },
     onError: (error) => toast.error(error.message),
   });
   const [hovered, setHovered] = React.useState(0);
   const [rating, setRating] = React.useState(initial?.rating ?? 0);
-  const [comment, setComment] = React.useState(initial?.comment ?? "");
+  const [comment, setComment] = React.useState(initial?.comment ?? '');
   const [dirty, setDirty] = React.useState(false);
 
   function handleSave() {
     if (!rating) {
-      toast.error("Choose a star rating first.");
+      toast.error('Choose a star rating first.');
       return;
     }
     saveRating.mutate(
@@ -93,8 +108,8 @@ function RatingForm({
       <div className="text-sm font-semibold text-ink">Rate this content</div>
       <p className="mt-1 text-xs leading-5 text-ink-muted">
         {content.trainer
-          ? "Your feedback is attributed to " + content.trainer.name + "."
-          : "Your feedback helps BID improve this learning content."}
+          ? 'Your feedback is attributed to ' + content.trainer.name + '.'
+          : 'Your feedback helps BID improve this learning content.'}
       </p>
 
       <div className="mt-3 flex items-center gap-1">
@@ -102,7 +117,7 @@ function RatingForm({
           <button
             key={star}
             type="button"
-            aria-label={"Rate " + star + " star" + (star > 1 ? "s" : "")}
+            aria-label={'Rate ' + star + ' star' + (star > 1 ? 's' : '')}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(0)}
             onClick={() => {
@@ -113,10 +128,10 @@ function RatingForm({
           >
             <Star
               className={cn(
-                "h-6 w-6 transition-colors",
+                'h-6 w-6 transition-colors',
                 star <= displayed
-                  ? "fill-warning text-warning-dark"
-                  : "fill-transparent text-ink-faint",
+                  ? 'fill-warning text-warning-dark'
+                  : 'fill-transparent text-ink-faint',
               )}
               strokeWidth={1.5}
             />
@@ -131,12 +146,12 @@ function RatingForm({
 
       <label
         className="mt-4 block text-xs font-medium text-ink"
-        htmlFor={"rating-comment-" + content.id}
+        htmlFor={'rating-comment-' + content.id}
       >
         Comment <span className="font-normal text-ink-muted">(optional)</span>
       </label>
       <textarea
-        id={"rating-comment-" + content.id}
+        id={'rating-comment-' + content.id}
         value={comment}
         maxLength={1000}
         onChange={(event) => {
@@ -150,7 +165,7 @@ function RatingForm({
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-xs text-ink-muted">
-          {unchanged ? "Saved" : comment.length + "/1000"}
+          {unchanged ? 'Saved' : comment.length + '/1000'}
         </span>
         <Button
           type="button"
@@ -160,7 +175,7 @@ function RatingForm({
           isLoading={saveRating.isPending}
           loadingLabel="Saving..."
         >
-          {initial ? "Update rating" : "Save rating"}
+          {initial ? 'Update rating' : 'Save rating'}
         </Button>
       </div>
     </div>
@@ -168,5 +183,5 @@ function RatingForm({
 }
 
 function ratingLabel(rating: number) {
-  return ["", "Poor", "Fair", "Good", "Very good", "Excellent"][rating] ?? "";
+  return ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][rating] ?? '';
 }

@@ -42,7 +42,11 @@ import {
   useSortableRow,
   type Column,
 } from '@/components/shared/DataTable';
-import { FormField, FormInput, FormTextarea } from '@/components/shared/FormField';
+import {
+  FormField,
+  FormInput,
+  FormTextarea,
+} from '@/components/shared/FormField';
 import { Modal } from '@/components/shared/Modal';
 import { Notice, PageHeader } from '@/components/shared/PageHeader';
 import { ProgressBar } from '@/components/shared/ProgressBar';
@@ -52,12 +56,17 @@ import { ModuleModal } from '@/components/admin/ModuleModal';
 import { MoveModulePositionModal } from '@/components/admin/programmes/MoveModulePositionModal';
 import { ProgrammeArchiveModal } from '@/components/admin/programmes/ProgrammeArchiveModal';
 import { ProgrammeContentModal } from '@/components/admin/programmes/ProgrammeContentModal';
+import {
+  ProgrammeCoursePlayer,
+  ProgrammeCoursePlayerSkeleton,
+} from '@/components/learning/ProgrammeCoursePlayer';
 import { RequiredDeliverablesSection } from '@/components/admin/programmes/BackendRequiredDeliverablesSection';
 import {
   useArchiveProgrammeMutation,
   useMoveProgrammeModuleMutation,
   useProgrammeDetailQuery,
   useProgrammeModulesPage,
+  useProgrammePlayerQuery,
   usePublishProgrammeMutation,
   useRestoreProgrammeMutation,
   useUpdateProgrammeModuleMutation,
@@ -68,12 +77,15 @@ import {
 import { moduleSchema, type ModuleForm } from '@/lib/forms/schemas';
 import { routes } from '@/lib/routes';
 
-type WorkspaceTab = 'curriculum' | 'deliverables' | 'readiness';
+type WorkspaceTab = 'curriculum' | 'preview' | 'deliverables' | 'readiness';
 
 export default function AdminProgrammeWorkspacePage() {
   const params = useParams<{ programId: string }>();
   const programmeId = params.programId;
   const [tab, setTab] = React.useState<WorkspaceTab>('curriculum');
+  const [previewModuleId, setPreviewModuleId] = React.useState<string | null>(
+    null,
+  );
   const [moduleOpen, setModuleOpen] = React.useState(false);
   const [contentModule, setContentModule] =
     React.useState<ProgrammeModuleRecord | null>(null);
@@ -88,6 +100,7 @@ export default function AdminProgrammeWorkspacePage() {
   const [pageSize, setPageSize] = React.useState(6);
 
   const detail = useProgrammeDetailQuery(programmeId);
+  const player = useProgrammePlayerQuery(programmeId, tab === 'preview');
   const modules = useProgrammeModulesPage(programmeId, {
     search: debouncedModuleSearch.trim() || undefined,
     take: pageSize,
@@ -121,7 +134,9 @@ export default function AdminProgrammeWorkspacePage() {
     !moveProgramme.isPending;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const handleDragEnd = React.useCallback(
@@ -155,6 +170,13 @@ export default function AdminProgrammeWorkspacePage() {
         cell: (module) => (
           <RowActions
             actions={[
+              {
+                label: 'Preview module',
+                onSelect: () => {
+                  setPreviewModuleId(module.id);
+                  setTab('preview');
+                },
+              },
               {
                 label: 'Manage content',
                 disabled: isArchived,
@@ -209,9 +231,7 @@ export default function AdminProgrammeWorkspacePage() {
         header: 'Reuse',
         cell: (module) =>
           module.programmeUses > 1 ? (
-            <Badge tone="blue">
-              Used in {module.programmeUses} programmes
-            </Badge>
+            <Badge tone="blue">Used in {module.programmeUses} programmes</Badge>
           ) : (
             <span className="text-sm text-ink-muted">Single programme</span>
           ),
@@ -266,7 +286,9 @@ export default function AdminProgrammeWorkspacePage() {
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <ProgrammeStatusBadge status={programme.lifecycle} />
-                <Badge tone={programme.accessType === 'free' ? 'blue' : 'brand'}>
+                <Badge
+                  tone={programme.accessType === 'free' ? 'blue' : 'brand'}
+                >
                   {programme.accessType === 'free'
                     ? 'Free programme'
                     : 'Assigned programme'}
@@ -302,7 +324,8 @@ export default function AdminProgrammeWorkspacePage() {
                 This programme is archived
               </div>
               <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Editing and curriculum changes are disabled until it is restored.
+                Editing and curriculum changes are disabled until it is
+                restored.
               </p>
               {programme.archiveReason ? (
                 <p className="mt-2 text-sm text-ink">
@@ -361,7 +384,8 @@ export default function AdminProgrammeWorkspacePage() {
                 Programme workspace
               </div>
               <div className="mt-1 max-w-2xl text-sm leading-5 text-ink-muted">
-                Manage the curriculum, required submissions, and launch readiness for this programme.
+                Manage the curriculum, required submissions, and launch
+                readiness for this programme.
               </div>
             </div>
             <Tabs
@@ -369,6 +393,7 @@ export default function AdminProgrammeWorkspacePage() {
               onChange={setTab}
               tabs={[
                 { value: 'curriculum', label: 'Curriculum' },
+                { value: 'preview', label: 'Preview' },
                 { value: 'deliverables', label: 'Deliverables' },
                 { value: 'readiness', label: 'Readiness' },
               ]}
@@ -389,6 +414,38 @@ export default function AdminProgrammeWorkspacePage() {
               onDragEnd={handleDragEnd}
               emptyProgramme={programme.modules.total === 0}
             />
+          ) : null}
+
+          {tab === 'preview' ? (
+            player.isLoading && !player.data ? (
+              <div className="mt-5">
+                <ProgrammeCoursePlayerSkeleton />
+              </div>
+            ) : player.isError || !player.data ? (
+              <div className="mt-5">
+                <Notice>
+                  Programme preview could not be loaded. {player.error?.message}
+                </Notice>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => void player.refetch()}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : (
+              <ProgrammeCoursePlayer
+                data={player.data}
+                initialContentId={
+                  player.data.modules.find(
+                    (module: { id: string }) => module.id === previewModuleId,
+                  )?.items[0]?.id ?? null
+                }
+                className="mt-5"
+              />
+            )
           ) : null}
 
           {tab === 'deliverables' ? (
@@ -499,7 +556,8 @@ function CurriculumTable({
             Search modules and attached content
           </div>
           <div className="mt-0.5 text-sm text-ink-muted">
-            {modules.totalItems} module{modules.totalItems === 1 ? '' : 's'} in this view
+            {modules.totalItems} module{modules.totalItems === 1 ? '' : 's'} in
+            this view
             {modules.isFetching ? ' · Updating...' : ''}
           </div>
         </div>
@@ -718,7 +776,8 @@ function ReadinessView({
               </Badge>
             </div>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
-              Readiness is derived from ready learning content across the programme modules.
+              Readiness is derived from ready learning content across the
+              programme modules.
             </p>
           </div>
           <div className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 lg:w-[280px]">
@@ -821,8 +880,12 @@ function ModuleReorderHandle({
   module: ProgrammeModuleRecord;
   disabled: boolean;
 }) {
-  const { attributes, listeners, setActivatorNodeRef, disabled: rowDisabled } =
-    useSortableRow();
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    disabled: rowDisabled,
+  } = useSortableRow();
   return (
     <div className="flex items-center gap-2">
       <button
@@ -841,11 +904,7 @@ function ModuleReorderHandle({
   );
 }
 
-function ModuleContentSummary({
-  module,
-}: {
-  module: ProgrammeModuleRecord;
-}) {
+function ModuleContentSummary({ module }: { module: ProgrammeModuleRecord }) {
   if (module.content.total === 0) {
     return <span className="text-sm text-ink-muted">No content yet</span>;
   }
@@ -907,7 +966,9 @@ function ReadinessItem({
   return (
     <div className="rounded-xl border border-black/[0.08] bg-white p-4">
       <div className="flex items-center gap-2">
-        <Icon className={`h-5 w-5 ${warning ? 'text-warning' : 'text-success'}`} />
+        <Icon
+          className={`h-5 w-5 ${warning ? 'text-warning' : 'text-success'}`}
+        />
         <div className="font-semibold text-ink">{title}</div>
       </div>
       <Badge tone={warning ? 'amber' : 'neutral'} className="mt-3">
@@ -918,11 +979,7 @@ function ReadinessItem({
   );
 }
 
-function ProgrammeStatusBadge({
-  status,
-}: {
-  status: ProgrammeLifecycle;
-}) {
+function ProgrammeStatusBadge({ status }: { status: ProgrammeLifecycle }) {
   const tones = {
     draft: 'neutral',
     scheduled: 'blue',

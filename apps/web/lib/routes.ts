@@ -15,8 +15,7 @@ export const routes = {
     dashboard: '/entrepreneur/dashboard',
     training: '/entrepreneur/training',
     trainingProgram: (programmeId: string): Route => `/entrepreneur/training/${programmeId}` as Route,
-    trainingModule: (programmeId: string, moduleId: string): Route =>
-      `/entrepreneur/training/${programmeId}/${moduleId}` as Route,
+    trainingModule: (programmeId: string, moduleId: string): Route => `/entrepreneur/training/${programmeId}?module=${moduleId}` as Route,
     profile: '/entrepreneur/profile',
     deliverables: '/entrepreneur/deliverables',
     deliverableGroup: (groupId: string): Route => `/entrepreneur/deliverables/${groupId}` as Route,
