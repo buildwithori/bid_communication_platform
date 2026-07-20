@@ -301,3 +301,20 @@ test("an entrepreneur cancellation notifies the session owner with context", asy
   assert.match(String(notifications[0]?.body), /founder is travelling/i);
   assert.match(String(notifications[0]?.body), /UTC/);
 });
+
+test("session confirmation copy uses a possessive label without an extra article", () => {
+  const session = fixture({ owner: trainer });
+  const deps = dependencies(session);
+  const service = new SessionsService(
+    deps.prisma as never,
+    deps.notifications as never,
+    deps.calendar as never,
+    deps.availability as never,
+    {} as never,
+  );
+
+  const body = (service as any).sessionConfirmedBody(trainer, session);
+
+  assert.match(body, /confirmed your mentor check-in/);
+  assert.doesNotMatch(body, /your a mentor/);
+});

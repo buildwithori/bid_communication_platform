@@ -1109,7 +1109,7 @@ export class SessionsService {
     return (
       this.sessionEntrepreneurName(session) +
       " requested " +
-      this.sessionTypeLabel(session.type) +
+      this.sessionTypeWithArticle(session.type) +
       " for “" +
       session.topic +
       "” on " +
@@ -1123,7 +1123,7 @@ export class SessionsService {
     return (
       this.sessionEntrepreneurName(session) +
       " booked " +
-      this.sessionTypeLabel(session.type) +
+      this.sessionTypeWithArticle(session.type) +
       " for “" +
       session.topic +
       "”. It is scheduled for " +
@@ -1229,11 +1229,17 @@ export class SessionsService {
 
   private sessionTypeLabel(type: SessionWithInclude["type"]) {
     const labels: Record<SessionWithInclude["type"], string> = {
-      mentor_checkin: "a mentor check-in",
-      office_hours: "an office hours session",
-      investor_prep: "an investor prep session",
+      mentor_checkin: "mentor check-in",
+      office_hours: "office hours session",
+      investor_prep: "investor prep session",
     };
     return labels[type];
+  }
+
+  private sessionTypeWithArticle(type: SessionWithInclude["type"]) {
+    return (
+      (type === "mentor_checkin" ? "a " : "an ") + this.sessionTypeLabel(type)
+    );
   }
 
   private mapSession(
