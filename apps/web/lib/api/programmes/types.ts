@@ -208,6 +208,21 @@ export type ArchiveProgrammeVariables = {
   reason: string;
 };
 
+export type ResourceDeletionResult = {
+  id: string;
+  name: string;
+  deleted: true;
+  externalCleanupQueued: number;
+  reusableAssetsPreserved?: boolean;
+};
+
+export type DeleteProgrammeVariables = { id: string; confirmation: string };
+export type DeleteProgrammeModuleVariables = {
+  programmeId: string;
+  moduleId: string;
+  confirmation: string;
+};
+
 export type ProgrammeDeliverableDueType = 'fixed_date' | 'module_completion' | 'recurring';
 export type ProgrammeDeliverableRecurringCadence = 'monthly' | 'quarterly' | 'six_monthly';
 export type ProgrammeDeliverableRequiredScope = 'all' | 'stage';

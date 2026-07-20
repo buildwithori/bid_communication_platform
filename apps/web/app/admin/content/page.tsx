@@ -3,6 +3,7 @@
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { FileText, PlayCircle, Wrench } from 'lucide-react';
 import {
   AttachContentItemModal,
@@ -20,10 +21,12 @@ import {
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
+import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
 import { Notice, PageHeader } from '@/components/shared/PageHeader';
 import { Tabs } from '@/components/shared/Tabs';
 import {
   useContentItemsPage,
+  useDeleteContentItemMutation,
   type ContentItemRecord,
   type ContentItemStatus,
   type ContentItemType,
@@ -70,6 +73,19 @@ function ContentLibrary() {
     React.useState<ContentItemRecord | null>(null);
   const [attachTarget, setAttachTarget] =
     React.useState<ContentItemRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    React.useState<ContentItemRecord | null>(null);
+  const deleteContent = useDeleteContentItemMutation({
+    onSuccess: (result) => {
+      setDeleteTarget(null);
+      toast.success(
+        result.externalCleanupQueued
+          ? 'Content deleted. Media cleanup is continuing securely in the background.'
+          : 'Content deleted.',
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const content = useContentItemsPage({
     type: tab,
@@ -98,6 +114,12 @@ function ContentLibrary() {
               {
                 label: 'Add to another module',
                 onSelect: () => setAttachTarget(item),
+              },
+              {
+                label: 'Delete content',
+                destructive: true,
+                disabled: deleteContent.isPending,
+                onSelect: () => setDeleteTarget(item),
               },
             ]}
           />
@@ -170,7 +192,7 @@ function ContentLibrary() {
         ),
       },
     ],
-    [],
+    [deleteContent.isPending],
   );
 
   return (
@@ -279,6 +301,36 @@ function ContentLibrary() {
         item={attachTarget}
         onOpenChange={(open) => {
           if (!open) setAttachTarget(null);
+        }}
+      />
+      <DestructiveActionModal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete content"
+        resourceName={deleteTarget?.title ?? ""}
+        description="This permanently removes the content item from the BID Hub content library and every module that uses it."
+        consequences={[
+          (deleteTarget?.usage.modules ?? 0) +
+            " module" +
+            (deleteTarget?.usage.modules === 1 ? "" : "s") +
+            " will lose this content.",
+          "Learner progress and ratings for this content will be permanently deleted.",
+          deleteTarget?.type === "video"
+            ? "The source video will be deleted from Mux by the background cleanup worker."
+            : deleteTarget?.type === "pdf"
+              ? "The uploaded file will be deleted from object storage by the background cleanup worker."
+              : "Any linked tool remains available; only this learning content link is deleted.",
+        ]}
+        confirmLabel="Delete content"
+        isPending={deleteContent.isPending}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteContent.mutateAsync({
+            contentItemId: deleteTarget.id,
+            confirmation: deleteTarget.title,
+          });
         }}
       />
     </>

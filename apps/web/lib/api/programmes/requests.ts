@@ -2,6 +2,8 @@ import { apiRequest } from '../client';
 import type {
   ArchiveProgrammeVariables,
   CreateProgrammeDeliverableRuleVariables,
+  DeleteProgrammeModuleVariables,
+  DeleteProgrammeVariables,
   CreateProgrammeModuleVariables,
   CreateProgrammePayload,
   MoveProgrammeModuleVariables,
@@ -9,6 +11,7 @@ import type {
   ProgrammeDeliverableRulePage,
   ProgrammeDeliverableRuleQuery,
   ProgrammeDetail,
+  ResourceDeletionResult,
   ProgrammeModuleDetail,
   ProgrammeModulePage,
   ProgrammePlayerPayload,
@@ -56,6 +59,12 @@ export const createProgrammeRequest = (payload: CreateProgrammePayload) =>
   apiRequest<ProgrammeDetail>('/programmes', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+
+export const deleteProgrammeRequest = ({ id, confirmation }: DeleteProgrammeVariables) =>
+  apiRequest<ResourceDeletionResult>("/programmes/" + id, {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmation }),
   });
 
 export const updateProgrammeRequest = ({ id, payload }: UpdateProgrammeVariables) =>
@@ -116,6 +125,12 @@ export const reuseProgrammeModuleRequest = ({ programmeId, moduleId }: ReuseProg
   apiRequest<ProgrammeModuleRecord>(`/programmes/${programmeId}/modules/reuse`, {
     method: 'POST',
     body: JSON.stringify({ moduleId }),
+  });
+
+export const deleteProgrammeModuleRequest = ({ programmeId, moduleId, confirmation }: DeleteProgrammeModuleVariables) =>
+  apiRequest<ResourceDeletionResult>("/programmes/" + programmeId + "/modules/" + moduleId, {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmation }),
   });
 
 export const moveProgrammeModuleRequest = ({ programmeId, moduleId, position }: MoveProgrammeModuleVariables) =>

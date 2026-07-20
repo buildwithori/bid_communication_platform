@@ -8,6 +8,8 @@ import {
   createProgrammeDeliverableRuleRequest,
   createProgrammeModuleRequest,
   createProgrammeRequest,
+  deleteProgrammeModuleRequest,
+  deleteProgrammeRequest,
   getProgrammeModuleRequest,
   getProgrammePlayerRequest,
   getProgrammeRequest,
@@ -29,6 +31,8 @@ import type {
   CreateProgrammeDeliverableRuleVariables,
   CreateProgrammeModuleVariables,
   CreateProgrammePayload,
+  DeleteProgrammeModuleVariables,
+  DeleteProgrammeVariables,
   MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
   ProgrammeDeliverableRuleQuery,
@@ -36,6 +40,7 @@ import type {
   ProgrammeModuleQuery,
   ProgrammeModuleRecord,
   ProgrammeQuery,
+  ResourceDeletionResult,
   ReuseProgrammeModuleVariables,
   UpdateProgrammeDeliverableRuleVariables,
   UpdateProgrammeModuleVariables,
@@ -299,6 +304,19 @@ export const useArchiveProgrammeMutation = (handlers?: MutationHandlers<Programm
 
 export const useRestoreProgrammeMutation = (handlers?: MutationHandlers<ProgrammeDetail>) => useProgrammeMutation<string>(restoreProgrammeRequest, handlers);
 
+export const useDeleteProgrammeMutation = (handlers?: MutationHandlers<ResourceDeletionResult>) => {
+  const queryClient = useQueryClient();
+  return useMutation<ResourceDeletionResult, Error, DeleteProgrammeVariables>({
+    mutationFn: deleteProgrammeRequest,
+    onSuccess: (data) => {
+      queryClient.removeQueries({ queryKey: programmeKeys.detail(data.id) });
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.all });
+      handlers?.onSuccess?.(data);
+    },
+    onError: handlers?.onError,
+  });
+};
+
 function useProgrammeModuleMutation<TVariables extends { programmeId: string }>(
   mutationFn: (variables: TVariables) => Promise<ProgrammeModuleRecord>,
   handlers?: MutationHandlers<ProgrammeModuleRecord>,
@@ -333,6 +351,19 @@ export const useUpdateProgrammeModuleMutation = (handlers?: MutationHandlers<Pro
 export const useReuseProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) => useProgrammeModuleMutation<ReuseProgrammeModuleVariables>(reuseProgrammeModuleRequest, handlers);
 
 export const useMoveProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) => useProgrammeModuleMutation<MoveProgrammeModuleVariables>(moveProgrammeModuleRequest, handlers);
+
+export const useDeleteProgrammeModuleMutation = (handlers?: MutationHandlers<ResourceDeletionResult>) => {
+  const queryClient = useQueryClient();
+  return useMutation<ResourceDeletionResult, Error, DeleteProgrammeModuleVariables>({
+    mutationFn: deleteProgrammeModuleRequest,
+    onSuccess: (data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.all });
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.modules(variables.programmeId) });
+      handlers?.onSuccess?.(data);
+    },
+    onError: handlers?.onError,
+  });
+};
 
 function useDeliverableRuleMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<ProgrammeDeliverableRule>, handlers?: MutationHandlers<ProgrammeDeliverableRule>) {
   const queryClient = useQueryClient();

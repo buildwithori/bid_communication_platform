@@ -33,10 +33,12 @@ import {
   FormField,
   FormInput,
 } from '@/components/shared/FormField';
+import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
 import { Modal } from '@/components/shared/Modal';
 import { Notice } from '@/components/shared/PageHeader';
 import {
   useAttachContentItemMutation,
+  useDeleteContentItemMutation,
   useLazyReusableContentItems,
   useModuleContentItemsInfinite,
   useMoveModuleContentItemMutation,
@@ -67,12 +69,24 @@ export function ProgrammeContentModal({
   const [reuseOpen, setReuseOpen] = React.useState(false);
   const [editItem, setEditItem] = React.useState<ContentItemRecord | null>(null);
   const [moveItem, setMoveItem] = React.useState<ContentItemRecord | null>(null);
+  const [deleteItem, setDeleteItem] = React.useState<ContentItemRecord | null>(null);
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search);
   const items = useModuleContentItemsInfinite(module?.id ?? '', {
     enabled: open && Boolean(module),
     search: debouncedSearch.trim() || undefined,
     take: 20,
+  });
+  const deleteContent = useDeleteContentItemMutation({
+    onSuccess: (result) => {
+      setDeleteItem(null);
+      toast.success(
+        result.externalCleanupQueued
+          ? 'Content deleted. Media cleanup is continuing in the background.'
+          : 'Content deleted.',
+      );
+    },
+    onError: (error) => toast.error(error.message),
   });
   const move = useMoveModuleContentItemMutation({
     onSuccess: () => toast.success('Content position updated.'),
@@ -173,6 +187,7 @@ export function ProgrammeContentModal({
                       readOnly={readOnly}
                       onEdit={() => setEditItem(item)}
                       onMove={() => setMoveItem(item)}
+                      onDelete={() => setDeleteItem(item)}
                     />
                   ))}
                 </div>
@@ -244,6 +259,33 @@ export function ProgrammeContentModal({
           });
         }}
       />
+      <DestructiveActionModal
+        open={Boolean(deleteItem)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setDeleteItem(null);
+        }}
+        title="Delete content"
+        resourceName={deleteItem?.title ?? ""}
+        description="This permanently removes the content from the library and every module that reuses it."
+        consequences={[
+          "The content will disappear from all modules and programmes that currently use it.",
+          "Learner progress and ratings for this content will be permanently deleted.",
+          deleteItem?.type === "video"
+            ? "The source video will be deleted from Mux in the background."
+            : deleteItem?.type === "pdf"
+              ? "The uploaded file will be deleted from object storage in the background."
+              : "Any linked tool remains available; only this learning content item is deleted.",
+        ]}
+        confirmLabel="Delete content"
+        isPending={deleteContent.isPending}
+        onConfirm={async () => {
+          if (!deleteItem) return;
+          await deleteContent.mutateAsync({
+            contentItemId: deleteItem.id,
+            confirmation: deleteItem.title,
+          });
+        }}
+      />
     </>
   );
 }
@@ -254,12 +296,14 @@ function ContentSequenceItem({
   readOnly,
   onEdit,
   onMove,
+  onDelete,
 }: {
   item: ContentItemRecord;
   canReorder: boolean;
   readOnly: boolean;
   onEdit: () => void;
   onMove: () => void;
+  onDelete: () => void;
 }) {
   const meta = typeMeta[item.type];
   const Icon = meta.icon;
@@ -322,6 +366,9 @@ function ContentSequenceItem({
           </Button>
           <Button variant="outline" size="sm" onClick={onMove}>
             Move
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onDelete}>
+            Delete
           </Button>
         </div>
       ) : null}

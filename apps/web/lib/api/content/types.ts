@@ -78,6 +78,18 @@ export type ContentItemRecord = {
   updatedAt: string;
 };
 
+export type ContentDeletionResult = {
+  id: string;
+  name: string;
+  deleted: true;
+  externalCleanupQueued: number;
+};
+
+export type DeleteContentItemVariables = {
+  contentItemId: string;
+  confirmation: string;
+};
+
 export type ContentItemPage = {
   items: ContentItemRecord[];
   nextCursor: string | null;

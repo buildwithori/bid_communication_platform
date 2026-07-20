@@ -4,6 +4,8 @@ import type {
   ContentItemPage,
   ContentItemQuery,
   ContentItemRecord,
+  ContentDeletionResult,
+  DeleteContentItemVariables,
   ContentRatingPayload,
   CreateModuleContentVariables,
   MoveModuleContentItemVariables,
@@ -46,6 +48,12 @@ export const createModuleContentItemRequest = ({
   apiRequest<ContentItemRecord>(`/content/modules/${moduleId}/items`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+
+export const deleteContentItemRequest = ({ contentItemId, confirmation }: DeleteContentItemVariables) =>
+  apiRequest<ContentDeletionResult>("/content/items/" + contentItemId, {
+    method: "DELETE",
+    body: JSON.stringify({ confirmation }),
   });
 
 export const updateContentItemRequest = ({

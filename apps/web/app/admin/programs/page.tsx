@@ -25,10 +25,12 @@ import {
   TableToolbar,
   type Column,
 } from '@/components/shared/DataTable';
+import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
 import { PageHeader, Notice } from '@/components/shared/PageHeader';
 import { ProgressBar } from '@/components/shared/ProgressBar';
 import {
   useArchiveProgrammeMutation,
+  useDeleteProgrammeMutation,
   useProgrammeSummaryQuery,
   useProgrammesPage,
   usePublishProgrammeMutation,
@@ -49,6 +51,8 @@ export default function AdminProgramsPage() {
     null,
   );
   const [archiveTarget, setArchiveTarget] =
+    React.useState<ProgrammeListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] =
     React.useState<ProgrammeListItem | null>(null);
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -75,6 +79,17 @@ export default function AdminProgramsPage() {
   });
   const archiveProgramme = useArchiveProgrammeMutation({
     onSuccess: () => toast.success('Programme archived.'),
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteProgramme = useDeleteProgrammeMutation({
+    onSuccess: (result) => {
+      setDeleteTarget(null);
+      toast.success(
+        result.externalCleanupQueued
+          ? 'Programme deleted. External cleanup is continuing in the background.'
+          : 'Programme deleted.',
+      );
+    },
     onError: (error) => toast.error(error.message),
   });
   const resetPagination = directory.resetPagination;
@@ -140,10 +155,17 @@ export default function AdminProgramsPage() {
               },
             ]
           : []),
+        {
+          label: 'Delete programme',
+          destructive: true,
+          disabled: deleteProgramme.isPending,
+          onSelect: () => setDeleteTarget(programme),
+        },
       ];
     },
     [
       archiveProgramme.isPending,
+      deleteProgramme.isPending,
       openProgrammeWorkspace,
       publishProgramme,
       restoreProgramme,
@@ -420,6 +442,29 @@ export default function AdminProgramsPage() {
         onArchive={async (programme, reason) =>
           void (await archiveProgramme.mutateAsync({ id: programme.id, reason }))
         }
+      />
+      <DestructiveActionModal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete programme"
+        resourceName={deleteTarget?.name ?? ""}
+        description="This permanently deletes the programme and all entrepreneur activity recorded specifically against it."
+        consequences={[
+          "Enrolments, progress, goals, updates, deliverables, submissions, reviews, and programme sessions will be deleted.",
+          "Programme submission files, report exports, and connected calendar events will be removed in the background.",
+          "Reusable modules and content-library media are preserved so other programmes are not damaged.",
+        ]}
+        confirmLabel="Delete programme"
+        isPending={deleteProgramme.isPending}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteProgramme.mutateAsync({
+            id: deleteTarget.id,
+            confirmation: deleteTarget.name,
+          });
+        }}
       />
     </>
   );

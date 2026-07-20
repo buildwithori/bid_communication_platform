@@ -8,6 +8,7 @@ import { listToolsRequest } from '../tools/requests';
 import {
   attachContentItemRequest,
   createModuleContentItemRequest,
+  deleteContentItemRequest,
   getMyContentRatingRequest,
   listContentItemsRequest,
   listModuleContentItemsRequest,
@@ -19,6 +20,8 @@ import type {
   AttachContentItemVariables,
   ContentItemQuery,
   ContentItemRecord,
+  ContentDeletionResult,
+  DeleteContentItemVariables,
   ContentRatingPayload,
   CreateModuleContentVariables,
   MoveModuleContentItemVariables,
@@ -188,6 +191,19 @@ function useContentMutation<TVariables>(mutationFn: (variables: TVariables) => P
 export const useCreateModuleContentMutation = (handlers?: Handlers) => useContentMutation<CreateModuleContentVariables>(createModuleContentItemRequest, handlers);
 
 export const useUpdateContentItemMutation = (handlers?: Handlers) => useContentMutation<UpdateContentItemVariables>(updateContentItemRequest, handlers);
+
+export const useDeleteContentItemMutation = (handlers?: { onSuccess?: (data: ContentDeletionResult) => void; onError?: (error: Error) => void }) => {
+  const client = useQueryClient();
+  return useMutation<ContentDeletionResult, Error, DeleteContentItemVariables>({
+    mutationFn: deleteContentItemRequest,
+    onSuccess: (data) => {
+      void client.invalidateQueries({ queryKey: contentKeys.all });
+      void client.invalidateQueries({ queryKey: programmeKeys.all });
+      handlers?.onSuccess?.(data);
+    },
+    onError: handlers?.onError,
+  });
+};
 
 export const useAttachContentItemMutation = (handlers?: Handlers) => useContentMutation<AttachContentItemVariables>(attachContentItemRequest, handlers);
 

@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   closestCenter,
   DndContext,
@@ -47,6 +47,7 @@ import {
   FormInput,
   FormTextarea,
 } from '@/components/shared/FormField';
+import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
 import { Modal } from '@/components/shared/Modal';
 import { Notice, PageHeader } from '@/components/shared/PageHeader';
 import { ProgressBar } from '@/components/shared/ProgressBar';
@@ -63,6 +64,8 @@ import {
 import { RequiredDeliverablesSection } from '@/components/admin/programmes/BackendRequiredDeliverablesSection';
 import {
   useArchiveProgrammeMutation,
+  useDeleteProgrammeModuleMutation,
+  useDeleteProgrammeMutation,
   useMoveProgrammeModuleMutation,
   useProgrammeDetailQuery,
   useProgrammeModulesPage,
@@ -81,6 +84,7 @@ type WorkspaceTab = 'curriculum' | 'preview' | 'deliverables' | 'readiness';
 
 export default function AdminProgrammeWorkspacePage() {
   const params = useParams<{ programId: string }>();
+  const router = useRouter();
   const programmeId = params.programId;
   const [tab, setTab] = React.useState<WorkspaceTab>('curriculum');
   const [previewModuleId, setPreviewModuleId] = React.useState<string | null>(
@@ -95,6 +99,9 @@ export default function AdminProgrammeWorkspacePage() {
   const [moveModule, setMoveModule] =
     React.useState<ProgrammeModuleRecord | null>(null);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
+  const [deleteProgrammeOpen, setDeleteProgrammeOpen] = React.useState(false);
+  const [deleteModuleTarget, setDeleteModuleTarget] =
+    React.useState<ProgrammeModuleRecord | null>(null);
   const [moduleSearch, setModuleSearch] = React.useState('');
   const debouncedModuleSearch = useDebouncedValue(moduleSearch);
   const [pageSize, setPageSize] = React.useState(6);
@@ -115,6 +122,24 @@ export default function AdminProgrammeWorkspacePage() {
   });
   const archiveProgramme = useArchiveProgrammeMutation({
     onSuccess: () => toast.success('Programme archived.'),
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteProgramme = useDeleteProgrammeMutation({
+    onSuccess: (result) => {
+      toast.success(
+        result.externalCleanupQueued
+          ? 'Programme deleted. External files and calendar events are being removed in the background.'
+          : 'Programme deleted.',
+      );
+      router.replace(routes.admin.programs);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteModule = useDeleteProgrammeModuleMutation({
+    onSuccess: (result) => {
+      setDeleteModuleTarget(null);
+      toast.success(result.name + ' removed from the programme.');
+    },
     onError: (error) => toast.error(error.message),
   });
   const moveProgramme = useMoveProgrammeModuleMutation({
@@ -193,6 +218,13 @@ export default function AdminProgrammeWorkspacePage() {
                 disabled: isArchived,
                 onSelect: () => setMoveModule(module),
               },
+              'separator',
+              {
+                label: 'Delete module',
+                destructive: true,
+                disabled: deleteModule.isPending,
+                onSelect: () => setDeleteModuleTarget(module),
+              },
             ]}
           />
         ),
@@ -246,7 +278,7 @@ export default function AdminProgrammeWorkspacePage() {
         ),
       },
     ],
-    [canReorder, isArchived, setContentModule],
+    [canReorder, deleteModule.isPending, isArchived, setContentModule],
   );
 
   if (detail.isLoading && !detail.data) {
@@ -311,10 +343,12 @@ export default function AdminProgrammeWorkspacePage() {
               onEdit={() => setEditProgrammeOpen(true)}
               onNewModule={() => setModuleOpen(true)}
               onArchive={() => setArchiveOpen(true)}
+              onDelete={() => setDeleteProgrammeOpen(true)}
               onPublish={() => publishProgramme.mutate(programme.id)}
               onRestore={() => restoreProgramme.mutate(programme.id)}
               publishing={publishProgramme.isPending}
               restoring={restoreProgramme.isPending}
+              deleting={deleteProgramme.isPending}
             />
           </div>
 
@@ -521,6 +555,52 @@ export default function AdminProgrammeWorkspacePage() {
           }));
         }}
       />
+      <DestructiveActionModal
+        open={Boolean(deleteModuleTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteModuleTarget(null);
+        }}
+        title="Delete module"
+        resourceName={deleteModuleTarget?.title ?? ""}
+        description="This removes the module from this programme and permanently clears its programme-specific learner records."
+        consequences={[
+          "Learner module and content progress in this programme will be deleted.",
+          "Deliverable rules tied to completing this module, including submissions and reviews, will be deleted.",
+          deleteModuleTarget && deleteModuleTarget.programmeUses > 1
+            ? "The reusable module remains available in its other programmes."
+            : "The module definition will be deleted, but its reusable content stays in the content library.",
+        ]}
+        confirmLabel="Delete module"
+        isPending={deleteModule.isPending}
+        onConfirm={async () => {
+          if (!deleteModuleTarget) return;
+          await deleteModule.mutateAsync({
+            programmeId: programme.id,
+            moduleId: deleteModuleTarget.id,
+            confirmation: deleteModuleTarget.title,
+          });
+        }}
+      />
+      <DestructiveActionModal
+        open={deleteProgrammeOpen}
+        onOpenChange={setDeleteProgrammeOpen}
+        title="Delete programme"
+        resourceName={programme.name}
+        description="This permanently deletes the programme and all entrepreneur activity recorded specifically against it."
+        consequences={[
+          "Enrolments, learning progress, goals, updates, deliverables, submissions, reviews, and programme sessions will be deleted.",
+          "Programme submission files, report exports, and connected calendar events will be removed by the background cleanup worker.",
+          "Reusable modules and content-library media are preserved so other programmes are not damaged.",
+        ]}
+        confirmLabel="Delete programme"
+        isPending={deleteProgramme.isPending}
+        onConfirm={async () => {
+          await deleteProgramme.mutateAsync({
+            id: programme.id,
+            confirmation: programme.name,
+          });
+        }}
+      />
     </>
   );
 }
@@ -695,29 +775,43 @@ function ProgrammeActions({
   onEdit,
   onNewModule,
   onArchive,
+  onDelete,
   onPublish,
   onRestore,
   publishing,
   restoring,
+  deleting,
 }: {
   programme: ProgrammeDetail;
   onEdit: () => void;
   onNewModule: () => void;
   onArchive: () => void;
+  onDelete: () => void;
   onPublish: () => void;
   onRestore: () => void;
   publishing: boolean;
   restoring: boolean;
+  deleting: boolean;
 }) {
   if (programme.lifecycle === 'archived') {
     return (
-      <Button
-        onClick={onRestore}
-        isLoading={restoring}
-        loadingLabel="Restoring..."
-      >
-        Restore programme
-      </Button>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        <Button
+          onClick={onRestore}
+          isLoading={restoring}
+          loadingLabel="Restoring..."
+        >
+          Restore programme
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={onDelete}
+          isLoading={deleting}
+          loadingLabel="Deleting..."
+        >
+          Delete programme
+        </Button>
+      </div>
     );
   }
 
@@ -746,6 +840,14 @@ function ProgrammeActions({
       {['draft', 'scheduled', 'active'].includes(programme.lifecycle) ? (
         <Button onClick={onNewModule}>New module</Button>
       ) : null}
+      <Button
+        variant="destructive"
+        onClick={onDelete}
+        isLoading={deleting}
+        loadingLabel="Deleting..."
+      >
+        Delete programme
+      </Button>
     </div>
   );
 }
