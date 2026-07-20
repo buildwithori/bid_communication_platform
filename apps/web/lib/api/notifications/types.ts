@@ -5,11 +5,14 @@ export type NotificationType =
   | "session_declined"
   | "session_cancelled"
   | "session_completed"
+  | "session_reminder"
   | "deliverable_review"
   | "deliverable_changes_requested"
+  | "deliverable_due_reminder"
   | "tool_request_updated"
   | "trainer_nudge"
-  | "system";
+  | "system"
+  | "weekly_digest";
 
 export type NotificationSeverity = "info" | "success" | "warning" | "critical";
 export type NotificationEntityType =
@@ -48,6 +51,8 @@ export type NotificationRecord = {
 
 export type NotificationPreference = {
   type: NotificationType;
+  inAppOverride: boolean | null;
+  emailOverride: boolean | null;
   inAppEnabled: boolean;
   emailEnabled: boolean;
   createdAt: string | null;
@@ -60,13 +65,32 @@ export type NotificationPreferenceGroupName =
 export type NotificationPreferenceGroup = {
   group: NotificationPreferenceGroupName;
   types: NotificationType[];
+  inAppMode: NotificationPreferenceMode;
+  emailMode: NotificationPreferenceMode;
   inAppEnabled: boolean | null;
   emailEnabled: boolean | null;
+  defaults: { inAppEnabled: boolean; emailEnabled: boolean };
 };
 
+export type NotificationPreferenceMode =
+  "inherit" | "enabled" | "disabled" | "mixed";
+
 export type NotificationPreferenceUpdate = {
-  inAppEnabled?: boolean;
-  emailEnabled?: boolean;
+  inAppEnabled?: boolean | null;
+  emailEnabled?: boolean | null;
+};
+
+export type NotificationAutomationPreference = {
+  reminderOverride: boolean | null;
+  reminderEnabled: boolean;
+  weeklyDigestOverride: boolean | null;
+  weeklyDigestEnabled: boolean;
+  defaults: { reminderEnabled: boolean; weeklyDigestEnabled: boolean };
+};
+
+export type NotificationAutomationPreferenceUpdate = {
+  reminderEnabled?: boolean | null;
+  weeklyDigestEnabled?: boolean | null;
 };
 
 export type NotificationSummary = {

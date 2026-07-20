@@ -456,14 +456,14 @@ function CompanySettingsForm({
 
         <Card>
           <CardHeader
-            title="Notification defaults"
-            description="Set the default notification channels and reminder behavior for users."
+            title="Company notification policy"
+            description="Set fallback channels and scheduled-notification policy. A scheduled notice is delivered only through its enabled channel; users can inherit either setting or choose personal overrides."
             actions={<Bell className="h-5 w-5 text-ink-faint" />}
           />
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <SettingToggle
               label="In-app notifications"
-              description="Show important product activity in the notification center."
+              description="Fallback for users who keep their in-app preference on company default."
               checked={notifications.inAppNotifications}
               onChange={(checked) =>
                 setNotifications((current) => ({
@@ -474,7 +474,7 @@ function CompanySettingsForm({
             />
             <SettingToggle
               label="Email notifications"
-              description="Send important account, programme, session, and review updates by email."
+              description="Fallback for users who keep their email preference on company default."
               checked={notifications.emailNotifications}
               onChange={(checked) =>
                 setNotifications((current) => ({
@@ -485,7 +485,7 @@ function CompanySettingsForm({
             />
             <SettingToggle
               label="Reminder notifications"
-              description="Send reminders for due dates, sessions, follow-ups, and pending work."
+              description="Default for reminders up to 24 hours before confirmed sessions and outstanding deliverables are due."
               checked={notifications.reminderNotifications}
               onChange={(checked) =>
                 setNotifications((current) => ({
@@ -496,7 +496,7 @@ function CompanySettingsForm({
             />
             <SettingToggle
               label="Weekly summary digest"
-              description="Send a weekly summary of unread activity and upcoming work."
+              description="Default for a Monday email summary of unread activity and work due in the next seven days."
               checked={notifications.weeklyDigest}
               onChange={(checked) =>
                 setNotifications((current) => ({

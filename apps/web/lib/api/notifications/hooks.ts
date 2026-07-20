@@ -9,6 +9,7 @@ import {
 import { notificationKeys } from "./keys";
 import {
   listNotificationPreferenceGroupsRequest,
+  getNotificationAutomationPreferenceRequest,
   listNotificationPreferencesRequest,
   listNotificationsRequest,
   notificationSummaryRequest,
@@ -16,9 +17,11 @@ import {
   markNotificationReadRequest,
   updateNotificationPreferenceGroupRequest,
   updateNotificationPreferenceRequest,
+  updateNotificationAutomationPreferenceRequest,
 } from "./requests";
 import type {
   NotificationPreferenceGroupName,
+  NotificationAutomationPreferenceUpdate,
   NotificationPreferenceUpdate,
   NotificationQuery,
   NotificationType,
@@ -49,6 +52,25 @@ export function useNotificationPreferenceGroupsQuery() {
   return useQuery({
     queryKey: [...notificationKeys.preferences(), "groups"],
     queryFn: listNotificationPreferenceGroupsRequest,
+  });
+}
+
+export function useNotificationAutomationPreferenceQuery() {
+  return useQuery({
+    queryKey: [...notificationKeys.preferences(), "automation"],
+    queryFn: getNotificationAutomationPreferenceRequest,
+  });
+}
+
+export function useUpdateNotificationAutomationPreferenceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: NotificationAutomationPreferenceUpdate) =>
+      updateNotificationAutomationPreferenceRequest(payload),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: notificationKeys.preferences(),
+      }),
   });
 }
 
@@ -84,7 +106,7 @@ export function useUpdateNotificationPreferenceMutation() {
       payload,
     }: {
       type: NotificationType;
-      payload: { inAppEnabled?: boolean; emailEnabled?: boolean };
+      payload: NotificationPreferenceUpdate;
     }) => updateNotificationPreferenceRequest(type, payload),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: notificationKeys.all }),

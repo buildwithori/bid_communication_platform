@@ -1,5 +1,7 @@
 import { apiRequest } from "../client";
 import type {
+  NotificationAutomationPreference,
+  NotificationAutomationPreferenceUpdate,
   NotificationPage,
   NotificationPreference,
   NotificationPreferenceGroup,
@@ -52,6 +54,21 @@ export function listNotificationPreferenceGroupsRequest() {
   );
 }
 
+export function getNotificationAutomationPreferenceRequest() {
+  return apiRequest<NotificationAutomationPreference>(
+    "/notification-preferences/automation",
+  );
+}
+
+export function updateNotificationAutomationPreferenceRequest(
+  payload: NotificationAutomationPreferenceUpdate,
+) {
+  return apiRequest<NotificationAutomationPreference>(
+    "/notification-preferences/automation",
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
 export function updateNotificationPreferenceGroupRequest(
   group: NotificationPreferenceGroupName,
   payload: NotificationPreferenceUpdate,
@@ -64,7 +81,7 @@ export function updateNotificationPreferenceGroupRequest(
 
 export function updateNotificationPreferenceRequest(
   type: NotificationType,
-  payload: { inAppEnabled?: boolean; emailEnabled?: boolean },
+  payload: NotificationPreferenceUpdate,
 ) {
   return apiRequest<NotificationPreference>(
     `/notification-preferences/${type}`,

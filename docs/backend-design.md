@@ -915,7 +915,7 @@ Rules:
 
 - Notifications are first-class records, not transient toasts.
 - Create one durable notification for a business event, then fan out delivery by channel through jobs.
-- Company notification defaults seed the initial preference shape. User-level preferences can override them later.
+- Company notification defaults are live fallbacks, not copied snapshots. Each user channel and scheduled-notification setting is nullable: null inherits the current company value, while true or false remains an explicit personal override. A scheduled notice must pass both gates: its reminder or digest policy decides whether it is created, then its role-scoped event-group preference decides which requested channels may deliver it.
 - Delivery status belongs in `notification_deliveries` so email failures, skipped preferences, and future retries are visible.
 - In-app notification UI is shared across roles and should read from the same notification model.
 - Email notifications must use React Email templates through Resend in production and Mailpit in development.
@@ -1587,6 +1587,8 @@ Notifications should be a full system:
 - company defaults plus per-event user overrides exposed through role-scoped preference groups
 - atomic grouped preference updates with explicit mixed-channel state
 - BullMQ jobs for delivery, reminders, retries, and weekly digests
+- cursor-paged reminder and digest scans with durable unique dedupe keys, so recurring worker runs are idempotent
+- confirmed-session and outstanding-deliverable reminders run up to 24 hours before due time; weekly digests run from Monday 08:00 in each user timezone and summarize backend-computed unread and upcoming work
 
 Email delivery stack:
 

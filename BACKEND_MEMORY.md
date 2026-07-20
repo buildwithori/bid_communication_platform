@@ -256,7 +256,7 @@ Use BullMQ/Redis for:
 - long-running exports
 - future AI summarization or analysis
 
-Jobs must be idempotent. Store job records or idempotency keys when a job can be triggered more than once.
+Jobs must be idempotent. Store job records or idempotency keys when a job can be triggered more than once. Notification automation uses a dedicated BullMQ queue, cursor-paged database scans, user-timezone digest windows, and unique durable dedupe keys. Nullable user preferences inherit current company channel and reminder/digest defaults; explicit user choices override them. Scheduled generation and per-event channel delivery are separate gates and both must allow a notice.
 
 Controllers should enqueue jobs and return a job/status reference instead of doing long-running work inline.
 
