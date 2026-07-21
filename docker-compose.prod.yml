@@ -39,6 +39,7 @@ services:
       - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: production
+      PORT: 3000
     init: true
     expose:
       - "3000"
