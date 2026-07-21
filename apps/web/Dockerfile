@@ -16,7 +16,7 @@ COPY packages/shared packages/shared
 FROM base AS development
 
 EXPOSE 3000
-CMD ["npm", "run", "dev:web", "--", "--hostname", "0.0.0.0"]
+CMD ["npm", "--workspace", "@bid/web", "run", "dev", "--", "--hostname", "0.0.0.0"]
 
 FROM base AS builder
 
@@ -44,4 +44,4 @@ COPY --chown=node:node --from=builder /workspace/packages/shared/dist packages/s
 
 EXPOSE 3000
 USER node
-CMD ["npm", "run", "start:web", "--", "--hostname", "0.0.0.0"]
+CMD ["npm", "--workspace", "@bid/web", "run", "start", "--", "--hostname", "0.0.0.0"]
