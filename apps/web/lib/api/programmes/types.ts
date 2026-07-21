@@ -328,7 +328,9 @@ export type ProgrammePlayerItem = {
     status: ProgrammePlayerProgressStatus;
     progressPercent: number;
     lastPositionSeconds: number | null;
+    durationSeconds: number | null;
     completedAt: string | null;
+    lastSyncedAt: string | null;
   } | null;
 };
 
@@ -356,6 +358,7 @@ export type ProgrammePlayerPayload = {
     accessType: ProgrammeAccessType;
   };
   viewer: {
+    userId: string;
     role: "admin" | "trainer" | "entrepreneur";
     canTrackProgress: boolean;
   };

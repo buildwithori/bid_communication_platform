@@ -64,6 +64,25 @@ test("programme player returns the complete ordered ready curriculum with learne
                     toolLink: null,
                   },
                 },
+                {
+                  contentItemId: "content-2",
+                  position: 2,
+                  contentItem: {
+                    id: "content-2",
+                    title: "Next steps",
+                    type: "video",
+                    status: ContentItemStatus.ready,
+                    durationSeconds: 300,
+                    trainer: null,
+                    videoAsset: {
+                      id: "video-2",
+                      duration: 300,
+                      status: "ready",
+                    },
+                    fileAssets: [],
+                    toolLink: null,
+                  },
+                },
               ],
             },
           },
@@ -92,7 +111,21 @@ test("programme player returns the complete ordered ready curriculum with learne
           status: "in_progress",
           progressPercent: 25,
           lastPositionSeconds: 150,
+          durationSeconds: 600,
           completedAt: null,
+          lastSyncedAt: new Date("2026-06-01T12:00:00.000Z"),
+          lastOpenedAt: new Date("2026-06-01T12:00:00.000Z"),
+        },
+        {
+          moduleId: "module-1",
+          contentItemId: "content-2",
+          status: "in_progress",
+          progressPercent: 5,
+          lastPositionSeconds: 20,
+          durationSeconds: 300,
+          completedAt: null,
+          lastSyncedAt: new Date("2026-06-02T12:00:00.000Z"),
+          lastOpenedAt: new Date("2026-06-02T12:00:00.000Z"),
         },
       ],
     },
@@ -116,16 +149,22 @@ test("programme player returns the complete ordered ready curriculum with learne
     contentItem: { status: ContentItemStatus.ready },
   });
   assert.equal(result.modules.length, 1);
-  assert.equal(result.modules[0]?.items.length, 1);
+  assert.equal(result.modules[0]?.items.length, 2);
   assert.equal(result.modules[0]?.items[0]?.progress?.lastPositionSeconds, 150);
+  assert.equal(result.modules[0]?.items[0]?.progress?.durationSeconds, 600);
+  assert.equal(
+    result.modules[0]?.items[0]?.progress?.lastSyncedAt,
+    "2026-06-01T12:00:00.000Z",
+  );
+  assert.equal(result.viewer.userId, entrepreneur.id);
   assert.deepEqual(result.resume, {
     moduleId: "module-1",
-    contentItemId: "content-1",
+    contentItemId: "content-2",
   });
   assert.deepEqual(result.summary, {
     modules: 1,
-    contentItems: 1,
-    videos: 1,
+    contentItems: 2,
+    videos: 2,
     pdfs: 0,
     excels: 0,
     tools: 0,

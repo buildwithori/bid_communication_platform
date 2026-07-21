@@ -27,8 +27,10 @@ export const getLearnerProgressRequest = (query: LearnerProgressQuery) =>
 
 export const syncLearnerProgressRequest = (
   items: LearnerContentProgressInput[],
+  options?: { keepalive?: boolean },
 ) =>
   apiRequest<SyncLearnerProgressResult>("/learning/progress/sync", {
     method: "POST",
+    keepalive: options?.keepalive,
     body: JSON.stringify({ items }),
   });

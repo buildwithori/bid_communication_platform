@@ -30,6 +30,7 @@ import { ProgressBar } from "@/components/shared/ProgressBar";
 import { useSignedFileUrlQuery } from "@/lib/api/files";
 import {
   useLearnerProgressQuery,
+  usePlaybackProgressCheckpoint,
   useSyncLearnerProgressMutation,
 } from "@/lib/api/learning";
 import type {
@@ -66,7 +67,6 @@ const typeMeta: Record<
   tool: { label: "Interactive tool", icon: Wrench, tone: "green" },
 };
 
-const videoCheckpoints = [10, 25, 50, 75, 90];
 
 export function ProgrammeCoursePlayer({
   data,
@@ -117,7 +117,6 @@ export function ProgrammeCoursePlayer({
   );
   const promptedRatingsRef = React.useRef(new Set<string>());
   const openedRef = React.useRef<string | null>(null);
-  const checkpointRef = React.useRef(0);
   const canTrack = data.viewer.canTrackProgress;
   const progress = useLearnerProgressQuery(
     canTrack && active
@@ -143,15 +142,44 @@ export function ProgrammeCoursePlayer({
     active?.item.type === "video" ? active.item.video?.id : undefined,
     Boolean(active),
   );
+  const itemProgress = progress.data?.content ?? active?.item.progress;
+  const activeModuleId = active?.module.id;
+  const activeContentItemId = active?.item.id;
+  const playbackContext = React.useMemo(
+    () =>
+      activeModuleId && activeContentItemId
+        ? {
+            userId: data.viewer.userId,
+            programmeId: data.programme.id,
+            moduleId: activeModuleId,
+            contentItemId: activeContentItemId,
+          }
+        : null,
+    [
+      activeContentItemId,
+      activeModuleId,
+      data.programme.id,
+      data.viewer.userId,
+    ],
+  );
+  const playback = usePlaybackProgressCheckpoint({
+    enabled: Boolean(canTrack && active?.item.type === "video"),
+    context: playbackContext,
+    serverProgress: itemProgress,
+    contentDurationSeconds:
+      active?.item.video?.durationSeconds ?? active?.item.durationSeconds,
+  });
+  const flushPlayback = playback.flush;
 
   const choose = React.useCallback(
     (entry: PlaylistEntry) => {
+      void flushPlayback();
       setRestartFromBeginningKey(null);
       setActiveKey(entryKey(entry));
       setExpanded((current) => new Set(current).add(entry.module.id));
       onContentChange?.(entry.item.id);
     },
-    [onContentChange],
+    [flushPlayback, onContentChange],
   );
 
   React.useEffect(() => {
@@ -216,16 +244,8 @@ export function ProgrammeCoursePlayer({
   React.useEffect(() => {
     if (!active || !canTrack || openedRef.current === entryKey(active)) return;
     openedRef.current = entryKey(active);
-    checkpointRef.current =
-      Math.floor((active.item.progress?.progressPercent ?? 0) / 10) * 10;
     setPlayerKey((value) => value + 1);
-    saveProgress(
-      "in_progress",
-      Math.max(active.item.progress?.progressPercent ?? 0, 1),
-      active.item.progress?.lastPositionSeconds ?? undefined,
-      active.item.durationSeconds ?? undefined,
-    );
-  }, [active, canTrack, saveProgress]);
+  }, [active, canTrack]);
 
   if (!active) return <EmptyPlayer className={className} />;
 
@@ -235,23 +255,11 @@ export function ProgrammeCoursePlayer({
   const previous = currentIndex > 0 ? playlist[currentIndex - 1] : null;
   const next =
     currentIndex < playlist.length - 1 ? playlist[currentIndex + 1] : null;
-  const itemProgress = progress.data?.content ?? active.item.progress;
   const completed =
     itemProgress?.status === "completed" ||
     locallyCompletedIds.has(active.item.id);
   const meta = typeMeta[active.item.type];
   const TypeIcon = meta.icon;
-
-  function checkpoint(position: number, duration: number) {
-    if (!duration || !Number.isFinite(duration)) return;
-    const percent = Math.min(99, Math.round((position / duration) * 100));
-    const value = videoCheckpoints.find(
-      (candidate) => percent >= candidate && checkpointRef.current < candidate,
-    );
-    if (!value) return;
-    checkpointRef.current = value;
-    saveProgress("in_progress", value, position, duration);
-  }
 
   function promptForRating(
     completedEntry: PlaylistEntry,
@@ -269,6 +277,7 @@ export function ProgrammeCoursePlayer({
     completedEntry: PlaylistEntry,
     target: PlaylistEntry | null,
   ) {
+    playback.clear();
     setLocallyCompletedIds((current) =>
       new Set(current).add(completedEntry.item.id),
     );
@@ -311,28 +320,25 @@ export function ProgrammeCoursePlayer({
             item={active.item}
             signedFile={signedFile}
             signedVideo={signedVideo}
+            resumeReady={playback.isHydrated}
             resumePosition={
               restartFromBeginningKey === entryKey(active)
                 ? 0
-                : (itemProgress?.lastPositionSeconds ?? 0)
+                : playback.resumePositionSeconds
             }
-            onProgress={checkpoint}
+            onProgress={playback.record}
             onPause={(position, duration) => {
-              const percent = duration
-                ? Math.min(99, Math.round((position / duration) * 100))
-                : (itemProgress?.progressPercent ?? 1);
-              saveProgress(
-                "in_progress",
-                Math.max(percent, 1),
-                position,
-                duration,
-              );
+              playback.record(position, duration);
+              void playback.flush();
             }}
             onEnded={(duration) => {
               const finalDuration =
                 Number.isFinite(duration) && duration > 0
                   ? duration
                   : (active.item.durationSeconds ?? undefined);
+              if (finalDuration !== undefined) {
+                playback.record(finalDuration, finalDuration);
+              }
               saveProgress(
                 "completed",
                 100,
@@ -379,7 +385,7 @@ export function ProgrammeCoursePlayer({
                     variant="outline"
                     title="Restart playback at 00:00. Your completion stays saved."
                     onClick={() => {
-                      checkpointRef.current = 0;
+                      playback.restart();
                       setRestartFromBeginningKey(entryKey(active));
                       setPlayerKey((value) => value + 1);
                       toast.success("Restarted from the beginning.");
@@ -678,6 +684,7 @@ function MediaStage({
   item,
   signedFile,
   signedVideo,
+  resumeReady,
   resumePosition,
   onProgress,
   onPause,
@@ -690,6 +697,7 @@ function MediaStage({
     token: string;
     thumbnailToken: string;
   }>;
+  resumeReady: boolean;
   resumePosition: number;
   onProgress: (position: number, duration: number) => void;
   onPause: (position: number, duration: number) => void;
@@ -709,6 +717,7 @@ function MediaStage({
     );
   }
   if (item.type === "video") {
+    if (!resumeReady) return <StageSkeleton />;
     if (signedVideo.isLoading) return <StageSkeleton />;
     if (signedVideo.isError || !signedVideo.data) {
       return (
@@ -731,6 +740,16 @@ function MediaStage({
           metadataVideoTitle={item.title}
           streamType="on-demand"
           startTime={resumePosition}
+          onLoadedMetadata={(event: Event) => {
+            const player = event.currentTarget as MuxPlayerElement;
+            const maximum = Number.isFinite(player.duration)
+              ? Math.max(0, player.duration - 1)
+              : resumePosition;
+            const target = Math.min(resumePosition, maximum);
+            if (target > 0 && Math.abs(player.currentTime - target) > 1) {
+              player.currentTime = target;
+            }
+          }}
           onTimeUpdate={(event: Event) => {
             const player = event.currentTarget as MuxPlayerElement;
             onProgress(player.currentTime, player.duration);

@@ -8,6 +8,7 @@ import {
   DeliverableDueType,
   DeliverableInstanceStatus,
   DeliverableRequiredScope,
+  LearnerProgressStatus,
   ContentItemStatus,
   Prisma,
   Programme,
@@ -1088,7 +1089,10 @@ export class ProgrammesService {
                 status: true,
                 progressPercent: true,
                 lastPositionSeconds: true,
+                durationSeconds: true,
                 completedAt: true,
+                lastSyncedAt: true,
+                lastOpenedAt: true,
               },
             }),
           ])
@@ -1183,8 +1187,11 @@ export class ProgrammesService {
                     progressPercent: itemProgress?.progressPercent ?? 0,
                     lastPositionSeconds:
                       itemProgress?.lastPositionSeconds ?? null,
+                    durationSeconds: itemProgress?.durationSeconds ?? null,
                     completedAt:
                       itemProgress?.completedAt?.toISOString() ?? null,
+                    lastSyncedAt:
+                      itemProgress?.lastSyncedAt?.toISOString() ?? null,
                   }
                 : null,
           };
@@ -1194,7 +1201,25 @@ export class ProgrammesService {
     const playlist = modules.flatMap((module) =>
       module.items.map((item) => ({ moduleId: module.id, item })),
     );
+    const latestInProgress = contentProgress
+      .filter(
+        (progress) =>
+          progress.status !== LearnerProgressStatus.completed &&
+          progress.lastOpenedAt,
+      )
+      .sort(
+        (left, right) =>
+          (right.lastOpenedAt?.getTime() ?? 0) -
+          (left.lastOpenedAt?.getTime() ?? 0),
+      )[0];
     const resume =
+      (latestInProgress
+        ? playlist.find(
+            (entry) =>
+              entry.moduleId === latestInProgress.moduleId &&
+              entry.item.id === latestInProgress.contentItemId,
+          )
+        : null) ??
       playlist.find((entry) => entry.item.progress?.status !== "completed") ??
       playlist[0] ??
       null;
@@ -1208,6 +1233,7 @@ export class ProgrammesService {
         accessType: programme.accessType,
       },
       viewer: {
+        userId: user.id,
         role: user.role,
         canTrackProgress: user.role === UserRole.entrepreneur,
       },

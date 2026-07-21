@@ -37,11 +37,13 @@ export class LearnerContentProgressInputDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(86400)
   lastPositionSeconds?: number;
 
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(86400)
   durationSeconds?: number;
 
   @IsDateString()

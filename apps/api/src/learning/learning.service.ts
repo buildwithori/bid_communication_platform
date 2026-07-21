@@ -90,16 +90,18 @@ export class LearningService {
 
       for (const item of input.items) {
         const clientEventAt = this.clientEventDate(item.clientEventAt);
+        this.validatePlaybackMetrics(item);
         await this.assertCanSyncContent(tx, user.id, item);
-        const applied = await this.upsertContentProgress(
+        const progressResult = await this.upsertContentProgress(
           tx,
           user.id,
           item,
           clientEventAt,
         );
-        if (!applied) continue;
+        if (!progressResult.applied) continue;
 
         syncedItems += 1;
+        if (!progressResult.aggregateChanged) continue;
         const moduleIds =
           touchedProgrammes.get(item.programmeId) ?? new Set<string>();
         moduleIds.add(item.moduleId);
@@ -152,6 +154,18 @@ export class LearningService {
       );
     }
     return clientEventAt;
+  }
+
+  private validatePlaybackMetrics(item: LearnerContentProgressInputDto) {
+    if (
+      item.lastPositionSeconds !== undefined &&
+      item.durationSeconds !== undefined &&
+      item.lastPositionSeconds > item.durationSeconds
+    ) {
+      throw new BadRequestException(
+        'Playback position cannot be greater than the content duration.',
+      );
+    }
   }
 
   private async resolveProgressOwner(user: User, query: LearnerProgressQueryDto) {
@@ -269,10 +283,26 @@ export class LearningService {
         startedAt: true,
         status: true,
         lastSyncedAt: true,
+        durationSeconds: true,
+        lastPositionSeconds: true,
       },
     });
 
-    if (existing && clientEventAt <= existing.lastSyncedAt) return false;
+    if (existing && clientEventAt <= existing.lastSyncedAt) {
+      return { applied: false, aggregateChanged: false };
+    }
+
+    const effectiveDuration =
+      item.durationSeconds ?? existing?.durationSeconds ?? undefined;
+    if (
+      item.lastPositionSeconds !== undefined &&
+      effectiveDuration !== undefined &&
+      item.lastPositionSeconds > effectiveDuration
+    ) {
+      throw new BadRequestException(
+        'Playback position cannot be greater than the content duration.',
+      );
+    }
 
     const requestedCompleted = item.status === LearnerProgressStatus.completed;
     const incomingPercent = requestedCompleted ? 100 : item.progressPercent;
@@ -294,6 +324,11 @@ export class LearningService {
       item.source === ProgressSource.explicit_action
         ? ProgressSource.explicit_action
         : ProgressSource.player;
+
+    const aggregateChanged =
+      !existing ||
+      existing.status !== status ||
+      existing.progressPercent !== progressPercent;
 
     await tx.learnerContentProgress.upsert({
       where: { entrepreneurUserId_programmeId_moduleId_contentItemId: key },
@@ -325,7 +360,7 @@ export class LearningService {
         source,
       },
     });
-    return true;
+    return { applied: true, aggregateChanged };
   }
 
   private async recomputeProgrammeProgress(

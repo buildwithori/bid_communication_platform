@@ -22,6 +22,93 @@ import { normalizeTraceId } from "../src/common/request-context/trace-id";
 import { OperationalHealthService } from "../src/health/operational-health.service";
 import { ReportExportService } from "../src/reporting/report-export.service";
 import { ToolsService } from "../src/tools/tools.service";
+import { LearningService } from "../src/learning/learning.service";
+
+test("learner progress rejects a playback position beyond its duration", async () => {
+  const service = new LearningService({
+    $transaction: async (operation: (tx: unknown) => Promise<unknown>) =>
+      operation({}),
+  } as never);
+
+  await assert.rejects(
+    service.syncProgress(
+      { id: "entrepreneur-1", role: UserRole.entrepreneur } as never,
+      {
+        items: [
+          {
+            programmeId: "programme-1",
+            moduleId: "module-1",
+            contentItemId: "content-1",
+            status: "in_progress",
+            progressPercent: 50,
+            lastPositionSeconds: 301,
+            durationSeconds: 300,
+            clientEventAt: new Date().toISOString(),
+            source: "player",
+          },
+        ],
+      },
+    ),
+    BadRequestException,
+  );
+});
+
+test("position-only playback checkpoints skip aggregate recomputation", async () => {
+  let aggregateRead = false;
+  let savedPosition: number | undefined;
+  const tx = {
+    programme: {
+      findFirst: async () => ({ id: "programme-1" }),
+      findUnique: async () => {
+        aggregateRead = true;
+        return null;
+      },
+    },
+    learnerContentProgress: {
+      findUnique: async () => ({
+        completedAt: null,
+        progressPercent: 25,
+        startedAt: new Date("2026-07-01T00:00:00.000Z"),
+        status: "in_progress",
+        lastSyncedAt: new Date("2026-07-01T00:01:00.000Z"),
+        durationSeconds: 600,
+        lastPositionSeconds: 150,
+      }),
+      upsert: async (query: any) => {
+        savedPosition = query.update.lastPositionSeconds;
+        return {};
+      },
+    },
+  };
+  const service = new LearningService({
+    $transaction: async (operation: (client: typeof tx) => Promise<unknown>) =>
+      operation(tx),
+  } as never);
+
+  const result = await service.syncProgress(
+    { id: "entrepreneur-1", role: UserRole.entrepreneur } as never,
+    {
+      items: [
+        {
+          programmeId: "programme-1",
+          moduleId: "module-1",
+          contentItemId: "content-1",
+          status: "in_progress",
+          progressPercent: 25,
+          lastPositionSeconds: 180,
+          durationSeconds: 600,
+          clientEventAt: "2026-07-01T00:02:00.000Z",
+          source: "player",
+        },
+      ],
+    },
+  );
+
+  assert.equal(savedPosition, 180);
+  assert.equal(aggregateRead, false);
+  assert.deepEqual(result.programmeIds, []);
+  assert.equal(result.syncedItems, 1);
+});
 
 test("trace IDs accept bounded safe values and reject injection-shaped input", () => {
   assert.equal(normalizeTraceId(" request-123:child "), "request-123:child");

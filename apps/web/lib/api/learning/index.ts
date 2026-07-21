@@ -3,6 +3,7 @@ export {
   useSyncLearnerProgressMutation,
   useTrainingCatalogueSummaryQuery,
 } from "./hooks";
+export { usePlaybackProgressCheckpoint } from "./playback";
 export type {
   ClientProgressSource,
   ContentProgressRecord,
