@@ -99,7 +99,7 @@ Production Compose is intentionally separate and includes Caddy-managed HTTPS, a
 npm run docker:prod
 ```
 
-Use `.env.docker.example` as the only local environment template. Production Compose intentionally reads the root `.env` that will be provisioned for deployment; it does not use `.env.local`.
+Use `.env.docker.example` as the local environment template. For deployment, copy `.env.production.example` to the ignored root `.env`; production Compose never loads `.env.local`.
 
 Read [docs/production-deployment.md](./docs/production-deployment.md) before a production deployment. It documents required secrets and integrations, DNS/TLS, deployment, verification, backups, and rollback.
 

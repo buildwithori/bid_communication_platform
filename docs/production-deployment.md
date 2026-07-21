@@ -91,7 +91,7 @@ Create `/opt/bid-hub/app/.env` on the host and set its permissions to `0600`. Do
 
 ```bash
 cd /opt/bid-hub/app
-cp .env.docker.example .env
+cp .env.production.example .env
 chmod 600 .env
 nano .env
 ```
@@ -131,7 +131,7 @@ MUX_TOKEN_ID=<secret>
 MUX_TOKEN_SECRET=<secret>
 MUX_WEBHOOK_SECRET=<secret>
 MUX_SIGNING_KEY_ID=<secret>
-MUX_SIGNING_PRIVATE_KEY=<private-key-value>
+MUX_SIGNING_PRIVATE_KEY=<base64-encoded-private-key-value>
 
 PRODUCTION_ADMIN_EMAIL=<real-admin-email>
 PRODUCTION_ADMIN_FIRST_NAME=<first-name>
