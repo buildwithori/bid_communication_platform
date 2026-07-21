@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   FileText,
   Layers3,
+  LoaderCircle,
   Play,
   PlayCircle,
   RotateCcw,
@@ -38,7 +39,10 @@ import type {
   ProgrammePlayerModule,
   ProgrammePlayerPayload,
 } from "@/lib/api/programmes";
-import { useSignedVideoPlaybackQuery } from "@/lib/api/videos";
+import {
+  usePrefetchSignedVideoPlayback,
+  useSignedVideoPlaybackQuery,
+} from "@/lib/api/videos";
 import { cn } from "@/lib/utils";
 import type { BadgeTone } from "@/types";
 
@@ -100,10 +104,20 @@ export function ProgrammeCoursePlayer({
   );
   const active =
     playlist.find((entry) => entryKey(entry) === activeKey) ?? preferred;
+  const activeIndex = active
+    ? playlist.findIndex((entry) => entryKey(entry) === entryKey(active))
+    : -1;
+  const nextEntry =
+    activeIndex >= 0 && activeIndex < playlist.length - 1
+      ? playlist[activeIndex + 1]
+      : null;
   const [expanded, setExpanded] = React.useState<Set<string>>(
     () => new Set(active ? [active.module.id] : []),
   );
   const [playerKey, setPlayerKey] = React.useState(0);
+  const [transitioningToKey, setTransitioningToKey] = React.useState<
+    string | null
+  >(null);
   const [restartFromBeginningKey, setRestartFromBeginningKey] = React.useState<
     string | null
   >(null);
@@ -116,7 +130,6 @@ export function ProgrammeCoursePlayer({
     () => new Set<string>(),
   );
   const promptedRatingsRef = React.useRef(new Set<string>());
-  const openedRef = React.useRef<string | null>(null);
   const canTrack = data.viewer.canTrackProgress;
   const progress = useLearnerProgressQuery(
     canTrack && active
@@ -141,6 +154,9 @@ export function ProgrammeCoursePlayer({
   const signedVideo = useSignedVideoPlaybackQuery(
     active?.item.type === "video" ? active.item.video?.id : undefined,
     Boolean(active),
+  );
+  usePrefetchSignedVideoPlayback(
+    nextEntry?.item.type === "video" ? nextEntry.item.video?.id : undefined,
   );
   const itemProgress = progress.data?.content ?? active?.item.progress;
   const activeModuleId = active?.module.id;
@@ -173,13 +189,16 @@ export function ProgrammeCoursePlayer({
 
   const choose = React.useCallback(
     (entry: PlaylistEntry) => {
+      const nextKey = entryKey(entry);
+      if (nextKey === activeKey) return;
       void flushPlayback();
+      setTransitioningToKey(entry.item.type === "video" ? nextKey : null);
       setRestartFromBeginningKey(null);
-      setActiveKey(entryKey(entry));
+      setActiveKey(nextKey);
       setExpanded((current) => new Set(current).add(entry.module.id));
       onContentChange?.(entry.item.id);
     },
-    [flushPlayback, onContentChange],
+    [activeKey, flushPlayback, onContentChange],
   );
 
   React.useEffect(() => {
@@ -241,20 +260,11 @@ export function ProgrammeCoursePlayer({
     [active, canTrack, data.programme.id, syncProgress],
   );
 
-  React.useEffect(() => {
-    if (!active || !canTrack || openedRef.current === entryKey(active)) return;
-    openedRef.current = entryKey(active);
-    setPlayerKey((value) => value + 1);
-  }, [active, canTrack]);
-
   if (!active) return <EmptyPlayer className={className} />;
 
-  const currentIndex = playlist.findIndex(
-    (entry) => entryKey(entry) === entryKey(active),
-  );
+  const currentIndex = activeIndex;
   const previous = currentIndex > 0 ? playlist[currentIndex - 1] : null;
-  const next =
-    currentIndex < playlist.length - 1 ? playlist[currentIndex + 1] : null;
+  const next = nextEntry;
   const completed =
     itemProgress?.status === "completed" ||
     locallyCompletedIds.has(active.item.id);
@@ -320,6 +330,8 @@ export function ProgrammeCoursePlayer({
             item={active.item}
             signedFile={signedFile}
             signedVideo={signedVideo}
+            transitioning={transitioningToKey === entryKey(active)}
+            onReady={() => setTransitioningToKey(null)}
             resumeReady={playback.isHydrated}
             resumePosition={
               restartFromBeginningKey === entryKey(active)
@@ -684,6 +696,8 @@ function MediaStage({
   item,
   signedFile,
   signedVideo,
+  transitioning,
+  onReady,
   resumeReady,
   resumePosition,
   onProgress,
@@ -697,6 +711,8 @@ function MediaStage({
     token: string;
     thumbnailToken: string;
   }>;
+  transitioning: boolean;
+  onReady: () => void;
   resumeReady: boolean;
   resumePosition: number;
   onProgress: (position: number, duration: number) => void;
@@ -717,53 +733,76 @@ function MediaStage({
     );
   }
   if (item.type === "video") {
-    if (!resumeReady) return <StageSkeleton />;
-    if (signedVideo.isLoading) return <StageSkeleton />;
-    if (signedVideo.isError || !signedVideo.data) {
-      return (
-        <StageMessage
-          icon={PlayCircle}
-          title="Video could not be loaded"
-          description={signedVideo.error?.message ?? "Request playback again."}
-          onRetry={() => void signedVideo.refetch()}
-        />
-      );
-    }
+    const loading = !resumeReady || signedVideo.isLoading;
     return (
-      <div className="grid min-h-[360px] place-items-center bg-black xl:min-h-[600px]">
-        <MuxPlayer
-          playbackId={signedVideo.data.playbackId}
-          tokens={{
-            playback: signedVideo.data.token,
-            thumbnail: signedVideo.data.thumbnailToken,
-          }}
-          metadataVideoTitle={item.title}
-          streamType="on-demand"
-          startTime={resumePosition}
-          onLoadedMetadata={(event: Event) => {
-            const player = event.currentTarget as MuxPlayerElement;
-            const maximum = Number.isFinite(player.duration)
-              ? Math.max(0, player.duration - 1)
-              : resumePosition;
-            const target = Math.min(resumePosition, maximum);
-            if (target > 0 && Math.abs(player.currentTime - target) > 1) {
-              player.currentTime = target;
-            }
-          }}
-          onTimeUpdate={(event: Event) => {
-            const player = event.currentTarget as MuxPlayerElement;
-            onProgress(player.currentTime, player.duration);
-          }}
-          onPause={(event: Event) => {
-            const player = event.currentTarget as MuxPlayerElement;
-            onPause(player.currentTime, player.duration);
-          }}
-          onEnded={(event: Event) => {
-            const player = event.currentTarget as MuxPlayerElement;
-            onEnded(player.duration);
-          }}
-          className="aspect-video max-h-[720px] w-full"
-        />
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
+        {loading ? (
+          <VideoStageLoading title={item.title} switching={transitioning} />
+        ) : signedVideo.isError || !signedVideo.data ? (
+          <div className="absolute inset-0">
+            <StageMessage
+              compact
+              icon={PlayCircle}
+              title="Video could not be loaded"
+              description={
+                signedVideo.error?.message ?? "Request playback again."
+              }
+              onRetry={() => void signedVideo.refetch()}
+            />
+          </div>
+        ) : (
+          <>
+            <MuxPlayer
+              playbackId={signedVideo.data.playbackId}
+              tokens={{
+                playback: signedVideo.data.token,
+                thumbnail: signedVideo.data.thumbnailToken,
+              }}
+              metadataVideoTitle={item.title}
+              streamType="on-demand"
+              startTime={resumePosition}
+              onLoadedMetadata={(event: Event) => {
+                const player = event.currentTarget as MuxPlayerElement;
+                const maximum = Number.isFinite(player.duration)
+                  ? Math.max(0, player.duration - 1)
+                  : resumePosition;
+                const target = Math.min(resumePosition, maximum);
+                if (target > 0 && Math.abs(player.currentTime - target) > 1) {
+                  player.currentTime = target;
+                }
+              }}
+              onCanPlay={() => window.requestAnimationFrame(onReady)}
+              onTimeUpdate={(event: Event) => {
+                const player = event.currentTarget as MuxPlayerElement;
+                onProgress(player.currentTime, player.duration);
+              }}
+              onPause={(event: Event) => {
+                const player = event.currentTarget as MuxPlayerElement;
+                onPause(player.currentTime, player.duration);
+              }}
+              onEnded={(event: Event) => {
+                const player = event.currentTarget as MuxPlayerElement;
+                onEnded(player.duration);
+              }}
+              className="absolute inset-0 h-full w-full"
+            />
+            <div
+              aria-hidden={!transitioning}
+              className={cn(
+                "pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[#0d0a0d]/92 px-6 text-center text-white transition-opacity duration-300 motion-reduce:transition-none",
+                transitioning ? "opacity-100" : "opacity-0",
+              )}
+            >
+              <div>
+                <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-bid-pink" />
+                <p className="mt-3 text-sm font-semibold">Loading next lesson</p>
+                <p className="mt-1 max-w-sm truncate text-xs text-white/55">
+                  {item.title}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -815,6 +854,26 @@ function MediaStage({
   );
 }
 
+function VideoStageLoading({
+  title,
+  switching,
+}: {
+  title: string;
+  switching: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 grid place-items-center bg-[#0d0a0d] px-6 text-center text-white">
+      <div>
+        <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-bid-pink" />
+        <p className="mt-3 text-sm font-semibold">
+          {switching ? "Loading next lesson" : "Preparing video"}
+        </p>
+        <p className="mt-1 max-w-sm truncate text-xs text-white/55">{title}</p>
+      </div>
+    </div>
+  );
+}
+
 function StageSkeleton({ tall = false }: { tall?: boolean }) {
   return (
     <div
@@ -835,14 +894,23 @@ function StageMessage({
   title,
   description,
   onRetry,
+  compact = false,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
   onRetry?: () => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="grid min-h-[420px] place-items-center bg-[#161116] px-6 py-16 text-center text-white xl:min-h-[600px]">
+    <div
+      className={cn(
+        "grid place-items-center bg-[#161116] px-6 text-center text-white",
+        compact
+          ? "h-full min-h-0 py-8"
+          : "min-h-[420px] py-16 xl:min-h-[600px]",
+      )}
+    >
       <div className="max-w-md">
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/70">
           <Icon className="h-6 w-6" />

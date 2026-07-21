@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { videoKeys } from "./keys";
 import {
   cancelDirectVideoUploadRequest,
@@ -92,6 +92,19 @@ export const useSignedVideoPlaybackQuery = (
     enabled: Boolean(videoAssetId) && enabled,
     staleTime: 60 * 60 * 1000,
   });
+
+export function usePrefetchSignedVideoPlayback(videoAssetId?: string) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!videoAssetId) return;
+    void queryClient.prefetchQuery({
+      queryKey: videoKeys.playback(videoAssetId),
+      queryFn: () => getSignedVideoPlaybackRequest(videoAssetId),
+      staleTime: 60 * 60 * 1000,
+    });
+  }, [queryClient, videoAssetId]);
+}
 
 export const useCancelVideoUploadMutation = (
   handlers?: MutationHandlers<VideoAsset>,
