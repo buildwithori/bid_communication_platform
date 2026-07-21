@@ -549,7 +549,7 @@ function ToolDetailsModal({
         {tool.type === "excel" ? (
           <SpreadsheetViewer fileId={tool.fileAsset?.id} title={tool.name} />
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-line bg-white">
+          <div className="overflow-hidden rounded-2xl border border-line bg-card">
             {previewUrl ? (
               <iframe
                 title={`${tool.name} preview`}
@@ -589,7 +589,7 @@ function InfoBlock({
   detail?: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-3">
+    <div className="rounded-xl border border-line bg-card p-3">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">
         {label}
       </div>

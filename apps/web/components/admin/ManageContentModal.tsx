@@ -131,7 +131,7 @@ export function ManageContentModal({
       width="xl"
     >
       <div className="space-y-4">
-        <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-3">
+        <div className="rounded-xl border border-border bg-surface-subtle px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="text-base font-semibold text-ink">
@@ -143,7 +143,7 @@ export function ManageContentModal({
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <div className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-ink-muted shadow-sm">
+              <div className="rounded-full bg-card px-3 py-1.5 text-sm font-medium text-ink-muted shadow-sm">
                 {items.length} {items.length === 1 ? "item" : "items"}
               </div>
               <Button
@@ -246,7 +246,7 @@ function SortableContentItem({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-black/[0.08] bg-white px-3 py-3 shadow-sm transition sm:flex-row sm:items-center sm:px-4",
+        "flex flex-col gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-sm transition sm:flex-row sm:items-center sm:px-4",
         isDragging && "relative z-10 border-bid/25 shadow-2xl",
       )}
       style={{ transform: CSS.Transform.toString(transform), transition }}
@@ -255,7 +255,7 @@ function SortableContentItem({
         <button
           type="button"
           ref={setActivatorNodeRef}
-          className="mt-1 inline-flex h-9 w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg border border-black/[0.08] bg-surface-subtle text-ink-muted transition hover:bg-bid-light hover:text-bid active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-bid/20"
+          className="mt-1 inline-flex h-9 w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg border border-border bg-surface-subtle text-ink-muted transition hover:bg-bid-light hover:text-bid active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-bid/20"
           aria-label={`Reorder ${item.title}`}
           title="Drag to reorder content item"
           {...attributes}
@@ -347,7 +347,7 @@ function ContentPreviewModal({
       width="media"
     >
       <div className="space-y-4">
-        <div className="rounded-2xl border border-black/[0.08] bg-surface-subtle p-4">
+        <div className="rounded-2xl border border-border bg-surface-subtle p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span
@@ -357,13 +357,13 @@ function ContentPreviewModal({
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
+                  <span className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
                     {meta.label}
                   </span>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
+                  <span className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
                     {item.chapter}
                   </span>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
+                  <span className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-ink-muted shadow-sm">
                     {currentIndex + 1} of {items.length}
                   </span>
                 </div>
@@ -410,11 +410,11 @@ function ContentPreviewModal({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-[#111] shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-border bg-[#111] shadow-sm">
           <ContentPreviewFrame item={item} />
         </div>
 
-        <div className="flex flex-col gap-2 rounded-2xl border border-black/[0.08] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 text-sm text-ink-muted">
             {previousItem ? (
               <span className="block truncate">
@@ -747,7 +747,7 @@ export function AddContentItemModal({
           </FormField>
         ) : null}
         {contentType === "tool" ? (
-          <div className="mb-4 rounded-xl border border-black/[0.08] bg-surface-subtle p-3">
+          <div className="mb-4 rounded-xl border border-border bg-surface-subtle p-3">
             <FormField
               label="Tool source"
               error={form.formState.errors.toolSource?.message}

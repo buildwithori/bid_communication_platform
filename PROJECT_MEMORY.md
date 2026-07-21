@@ -344,3 +344,8 @@ Session workflow rules:
 - Email delivery is always background work. The HTTP API may enqueue transactional or notification delivery but cannot resolve the send-capable `EmailService`; only the dedicated BullMQ worker imports `EmailModule`. API readiness uses a separate email-health service.
 - Production environment validation requires secure HTTPS roots and complete Resend, Google, Spaces, Mux, database, Redis, and encryption configuration. Deployment and rollback operations follow `docs/production-deployment.md`.
 - The production dependency baseline uses one aligned NestJS 11 family and a reproducible `npm ci` lockfile. Targeted root overrides keep transitive PostCSS, UUID, Babel runtime, and brace-expansion releases on audited patched versions while their parent packages lag; the full development and production dependency audit must remain at zero findings.
+
+## Application-wide Theme Contract (2026-07-21)
+
+- Dark mode is supported across auth, admin, trainer, and entrepreneur workspaces, including shared modals, tables, forms, loading states, previews, and dashboard charts. New UI must use the semantic theme tokens (`background`, `card`, `popover`, `surface-*`, `ink-*`, `border`/`line`, and semantic chart colors) instead of hardcoded light surfaces, black borders, or fixed chart text/grid colors.
+- Intentionally fixed rendering canvases are limited to content that requires its native presentation, such as PDF/embedded document frames and dark media stages. Surrounding application chrome must remain theme-aware.

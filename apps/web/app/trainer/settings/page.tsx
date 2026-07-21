@@ -220,7 +220,7 @@ export default function TrainerSettingsPage() {
                     <FormInput value={roleLabels[trainer.roleLabel]} disabled />
                   </FormField>
                   <FormField label="Specialisms">
-                    <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-black/[0.1] bg-surface-subtle px-3 py-2">
+                    <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface-subtle px-3 py-2">
                       {trainer.specialisms.length ? (
                         trainer.specialisms.map((specialism) => (
                           <Badge key={specialism.id} tone="blue">

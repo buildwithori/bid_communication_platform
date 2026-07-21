@@ -321,7 +321,7 @@ export function AdminToolEditorModal({
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex min-h-[92px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-white px-4 py-5 text-center transition hover:border-bid/40 hover:bg-bid-light/20"
+              className="flex min-h-[92px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-card px-4 py-5 text-center transition hover:border-bid/40 hover:bg-bid-light/20"
             >
               <Upload className="mb-2 h-5 w-5 text-bid" />
               <span className="text-sm font-semibold text-ink">

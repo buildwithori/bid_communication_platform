@@ -171,7 +171,7 @@ export function ProgramModal({
         </FormField>
         {isPublishedProgram ? (
           <FormField label="Publishing">
-            <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-3 text-sm text-ink">
+            <div className="rounded-xl border border-border bg-surface-subtle px-4 py-3 text-sm text-ink">
               Published
               <p className="mt-1 text-xs leading-5 text-ink-muted">
                 Published programmes stay published. Completed programmes can be archived from the directory.

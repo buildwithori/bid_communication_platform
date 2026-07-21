@@ -55,7 +55,7 @@ export function AssignEntrepreneurModal({
           />
         </FormField>
 
-        <div className="mb-4 rounded-xl border border-line bg-white p-3">
+        <div className="mb-4 rounded-xl border border-line bg-card p-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-ink">Current programmes</div>

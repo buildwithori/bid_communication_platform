@@ -558,7 +558,7 @@ export function ProgrammeWorkspaceView({
 
           {workspaceTab === "readiness" && (
             <div className="mt-5 space-y-4">
-              <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-4">
+              <div className="rounded-xl border border-border bg-surface-subtle px-4 py-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -578,7 +578,7 @@ export function ProgrammeWorkspaceView({
                       to find.
                     </p>
                   </div>
-                  <div className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 lg:w-[280px]">
+                  <div className="w-full rounded-xl border border-border bg-card px-4 py-3 lg:w-[280px]">
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
@@ -820,7 +820,7 @@ function ProgrammeHealthCard({
   progress?: number;
 }) {
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
+    <div className="rounded-xl border border-border bg-card px-3 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
         {label}
       </div>
@@ -851,7 +851,7 @@ function ModuleReorderHandle({
         type="button"
         ref={setActivatorNodeRef}
         disabled={disabled}
-        className="inline-flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted shadow-sm transition hover:bg-surface-subtle hover:text-ink active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
+        className="inline-flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-lg border border-border bg-card text-ink-muted shadow-sm transition hover:bg-surface-subtle hover:text-ink active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
         aria-label={`Reorder ${module.title}`}
         title={
           disabled
@@ -909,7 +909,7 @@ function ReadinessPanelItem({
     tone === "success" ? "green" : tone === "warning" ? "amber" : "neutral";
 
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-4">
+    <div className="rounded-xl border border-border bg-card px-4 py-4">
       <div className="flex items-start gap-3">
         <div
           className={

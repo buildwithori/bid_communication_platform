@@ -430,7 +430,7 @@ function ContentFrame({
       );
     }
     return (
-      <div className="overflow-hidden rounded-xl border border-black bg-black">
+      <div className="overflow-hidden rounded-xl border border-border bg-black">
         <MuxPlayer
           playbackId={signedVideo.data.playbackId}
           tokens={{

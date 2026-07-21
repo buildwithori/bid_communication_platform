@@ -28,12 +28,12 @@ import { useTrainerDashboardQuery, type TrainerDashboard } from "@/lib/api/dashb
 import { formatRating } from "@/lib/format-rating";
 import { routes } from "@/lib/routes";
 
-const chartColors = ["#842751", "#185FA5", "#1D9E75", "#BA7517"];
+const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
 const reviewMeta = {
-  pending: { label: "Pending", color: "#BA7517", legend: "bg-warning" },
-  changes_requested: { label: "Changes", color: "#185FA5", legend: "bg-info" },
-  approved: { label: "Approved", color: "#1D9E75", legend: "bg-success" },
-  overdue: { label: "Overdue", color: "#842751", legend: "bg-bid" },
+  pending: { label: "Pending", color: "hsl(var(--chart-4))", legend: "bg-warning" },
+  changes_requested: { label: "Changes", color: "hsl(var(--chart-2))", legend: "bg-info" },
+  approved: { label: "Approved", color: "hsl(var(--chart-3))", legend: "bg-success" },
+  overdue: { label: "Overdue", color: "hsl(var(--chart-1))", legend: "bg-bid" },
 } as const;
 
 export default function TrainerDashboardPage() {
@@ -68,12 +68,12 @@ export default function TrainerDashboardPage() {
           {data.programmeProgressPreview.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.programmeProgressPreview} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-                <XAxis dataKey="name" tickFormatter={shortLabel} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 11 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
-                <Bar dataKey="learners" name="Learners" fill="#185FA5" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="averageProgress" name="Average progress %" fill="#842751" radius={[8, 8, 0, 0]} />
+                <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="name" tickFormatter={shortLabel} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <Bar dataKey="learners" name="Learners" fill="hsl(var(--chart-2))" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="averageProgress" name="Average progress %" fill="hsl(var(--chart-1))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <ChartEmpty label="Your content is not attached to a published programme yet." />}
@@ -85,7 +85,7 @@ export default function TrainerDashboardPage() {
               <PieChart>
                 <text x="50%" y="47%" textAnchor="middle" className="fill-ink text-3xl font-semibold">{data.metrics.learnersReached}</text>
                 <text x="50%" y="56%" textAnchor="middle" className="fill-ink-muted text-sm">Learners</text>
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
                 <Pie data={data.progressBands} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={3}>
                   {data.progressBands.map((band, index) => <Cell key={band.name} fill={chartColors[index % chartColors.length]} />)}
                 </Pie>
@@ -99,12 +99,12 @@ export default function TrainerDashboardPage() {
         <ChartCard title="Content impact trend" description="Weekly completions across content you own" legend={[{ label: "Content completions", colorClassName: "bg-bid" }]} bodyClassName="h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.contentImpactTrend} margin={{ top: 8, right: 16, left: -18, bottom: 0 }}>
-              <defs><linearGradient id="trainerContentCompletions" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#842751" stopOpacity={0.28} /><stop offset="95%" stopColor="#842751" stopOpacity={0.02} /></linearGradient></defs>
-              <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-              <XAxis dataKey="date" tickFormatter={formatWeek} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-              <Tooltip labelFormatter={(value) => formatWeek(String(value))} contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
-              <Area type="monotone" dataKey="completions" name="Content completions" stroke="#842751" fill="url(#trainerContentCompletions)" strokeWidth={2.5} />
+              <defs><linearGradient id="trainerContentCompletions" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.28} /><stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.02} /></linearGradient></defs>
+              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="date" tickFormatter={formatWeek} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <Tooltip labelFormatter={(value) => formatWeek(String(value))} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+              <Area type="monotone" dataKey="completions" name="Content completions" stroke="hsl(var(--chart-1))" fill="url(#trainerContentCompletions)" strokeWidth={2.5} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -112,10 +112,10 @@ export default function TrainerDashboardPage() {
         <ChartCard title="Review workload" description="Current deliverable states for learners in your content scope" legend={reviewRows.map((item) => ({ label: item.name, colorClassName: reviewMeta[item.status].legend }))} bodyClassName="h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={reviewRows} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
+              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
               <Bar dataKey="value" name="Deliverables" radius={[8, 8, 0, 0]}>{reviewRows.map((item) => <Cell key={item.status} fill={item.fill} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -126,7 +126,7 @@ export default function TrainerDashboardPage() {
         <CardHeader title="Next sessions" description="Upcoming support moments in your session queue" actions={<Link href={routes.trainer.sessions}><Button variant="outline" size="sm">View all</Button></Link>} />
         <div className="grid gap-3 lg:grid-cols-3">
           {data.upcomingSessions.map((session) => (
-            <Link key={session.id} href={`${routes.trainer.sessions}?session=${encodeURIComponent(session.id)}`} className="flex min-h-[164px] flex-col rounded-xl border border-line bg-surface-subtle p-4 text-left transition hover:border-bid/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20">
+            <Link key={session.id} href={`${routes.trainer.sessions}?session=${encodeURIComponent(session.id)}`} className="flex min-h-[164px] flex-col rounded-xl border border-line bg-surface-subtle p-4 text-left transition hover:border-bid/30 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20">
               <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">{sessionTypeLabel(session.type)}</div><div className="mt-2 text-base font-semibold text-ink">{session.topic}</div><div className="mt-1 text-sm text-ink-muted">{session.entrepreneurName}</div></div><Badge tone={session.status === "confirmed" ? "green" : "amber"}>{session.status === "confirmed" ? "Confirmed" : "Awaiting response"}</Badge></div>
               <div className="mt-auto flex flex-wrap gap-3 pt-5 text-sm text-ink-muted"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{formatDate(session.startsAt)}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{formatTime(session.startsAt, session.timezone)}</span></div>
             </Link>

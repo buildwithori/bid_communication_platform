@@ -42,7 +42,7 @@ import {
 } from "@/lib/api/dashboards";
 import { routes } from "@/lib/routes";
 
-const chartColors = ["#842751", "#185FA5", "#1D9E75", "#BA7517", "#5c1a38", "#666666"];
+const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 const sourceOptions = [
   { value: "all", label: "All sources" },
   { value: "admin_invited", label: "Admin-invited" },
@@ -164,15 +164,15 @@ export default function AdminDashboardPage() {
           {data.programmeHealthPreview.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data.programmeHealthPreview} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 11 }} tickFormatter={shortLabel} />
-                <YAxis yAxisId="count" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-                <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
-                <Bar yAxisId="count" dataKey="active" name="Active participants" stackId="people" fill="#185FA5" />
-                <Bar yAxisId="count" dataKey="left" name="Left programme" stackId="people" fill="#BA7517" />
-                <Bar yAxisId="count" dataKey="openSeats" name="Open seats" stackId="people" fill="#8A8A8A" radius={[8, 8, 0, 0]} />
-                <Line yAxisId="percent" type="monotone" dataKey="completion" name="Completion %" stroke="#842751" strokeWidth={3} dot={{ r: 4, fill: "#842751" }} />
+                <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={shortLabel} />
+                <YAxis yAxisId="count" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <Bar yAxisId="count" dataKey="active" name="Active participants" stackId="people" fill="hsl(var(--chart-2))" />
+                <Bar yAxisId="count" dataKey="left" name="Left programme" stackId="people" fill="hsl(var(--chart-4))" />
+                <Bar yAxisId="count" dataKey="openSeats" name="Open seats" stackId="people" fill="hsl(var(--chart-5))" radius={[8, 8, 0, 0]} />
+                <Line yAxisId="percent" type="monotone" dataKey="completion" name="Completion %" stroke="hsl(var(--chart-1))" strokeWidth={3} dot={{ r: 4, fill: "hsl(var(--chart-1))" }} />
               </ComposedChart>
             </ResponsiveContainer>
           ) : <ChartEmpty label="No active programme data yet." />}
@@ -187,7 +187,7 @@ export default function AdminDashboardPage() {
                 <Pie data={data.sectorBreakdown} dataKey="value" nameKey="name" innerRadius={58} outerRadius={86} paddingAngle={3}>
                   {data.sectorBreakdown.map((item, index) => <Cell key={item.id} fill={chartColors[index % chartColors.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
               </PieChart>
             </ResponsiveContainer>
           ) : <ChartEmpty label="No sector data yet." />}
@@ -199,11 +199,11 @@ export default function AdminDashboardPage() {
           <div className="h-[185px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.fundsTrend.map((item) => ({ ...item, amount: item.amountCents / 100 }))} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(0,0,0,0.08)" vertical={false} />
-                <XAxis dataKey="month" tickFormatter={(value) => formatMonth(String(value))} tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: "#666", fontSize: 12 }} />
-                <Tooltip labelFormatter={(value) => formatMonth(String(value))} formatter={(value) => formatMoney(Number(value) * 100, data.currency)} contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)" }} />
-                <Bar dataKey="amount" name="Funds mobilised" fill="#842751" radius={[8, 8, 0, 0]} />
+                <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="month" tickFormatter={(value) => formatMonth(String(value))} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <Tooltip labelFormatter={(value) => formatMonth(String(value))} formatter={(value) => formatMoney(Number(value) * 100, data.currency)} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <Bar dataKey="amount" name="Funds mobilised" fill="hsl(var(--chart-1))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -212,7 +212,7 @@ export default function AdminDashboardPage() {
             <div className="grid gap-2">
               {data.topFundraisers.map((item, index) => (
                 <button key={item.entrepreneurUserId} type="button" onClick={() => openEntrepreneur(item.entrepreneurUserId)} className="flex items-center justify-between rounded-lg bg-surface-subtle px-3 py-2 text-left transition hover:bg-bid-light">
-                  <span className="flex min-w-0 items-center gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-xs font-semibold text-bid">{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-medium text-ink">{item.businessName}</span><span className="block text-xs text-ink-muted">{item.sectorName}</span></span></span>
+                  <span className="flex min-w-0 items-center gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-card text-xs font-semibold text-bid">{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-medium text-ink">{item.businessName}</span><span className="block text-xs text-ink-muted">{item.sectorName}</span></span></span>
                   <span className="shrink-0 text-sm font-semibold text-ink">{formatMoney(item.amountCents, data.currency, true)}</span>
                 </button>
               ))}
@@ -227,7 +227,7 @@ export default function AdminDashboardPage() {
             {data.stageBreakdown.map((item, index) => (
               <div key={item.id} className="rounded-xl bg-surface-subtle p-4">
                 <div className="mb-2 flex items-center justify-between gap-3"><span className="font-medium">{item.name}</span><span className="text-sm text-ink-muted">{item.value} businesses</span></div>
-                <div className="h-2 overflow-hidden rounded-full bg-white"><div className={index === 0 ? "h-full rounded-full bg-warning" : index === 1 ? "h-full rounded-full bg-bid" : "h-full rounded-full bg-success"} style={{ width: `${item.percent}%` }} /></div>
+                <div className="h-2 overflow-hidden rounded-full bg-surface-panel"><div className={index === 0 ? "h-full rounded-full bg-warning" : index === 1 ? "h-full rounded-full bg-bid" : "h-full rounded-full bg-success"} style={{ width: `${item.percent}%` }} /></div>
               </div>
             ))}
             {!data.stageBreakdown.length && <ChartEmpty label="No business stages have been assigned yet." />}

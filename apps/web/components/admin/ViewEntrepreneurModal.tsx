@@ -74,7 +74,7 @@ export function ViewEntrepreneurModal({
       width="xl"
     >
       <div className="space-y-4">
-        <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-line bg-card p-4 shadow-sm">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
               <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-bid text-base font-semibold text-white shadow-sm">
@@ -121,7 +121,7 @@ export function ViewEntrepreneurModal({
         )}
 
         <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-          <section className="rounded-xl border border-line bg-white p-4">
+          <section className="rounded-xl border border-line bg-card p-4">
             <SectionHeading title="Programme access" description="Free resources plus assigned programmes" />
             <div className="mt-4 grid gap-3">
               <InfoRow label="Base access" value={FREE_RESOURCE_ACCESS_LABEL} />
@@ -179,7 +179,7 @@ export function ViewEntrepreneurModal({
             </div>
           </section>
 
-          <section className="rounded-xl border border-line bg-white p-4">
+          <section className="rounded-xl border border-line bg-card p-4">
             <SectionHeading title="Reporting health" description="What BID should follow up on" />
             <div className="mt-4 grid gap-3">
               <InfoRow
@@ -194,7 +194,7 @@ export function ViewEntrepreneurModal({
           </section>
         </div>
 
-        <section className="rounded-xl border border-line bg-white p-4">
+        <section className="rounded-xl border border-line bg-card p-4">
           <SectionHeading title="Funding history" description="Capital the entrepreneur has reported to BID" />
           {entrepreneur.fundingRounds.length > 0 ? (
             <div className="mt-3 overflow-hidden rounded-lg border border-line">
@@ -323,7 +323,7 @@ function ProfileMeta({
 
 function SummaryTile({ label, value, helper }: { label: string; value: string; helper: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2">
+    <div className="rounded-lg border border-line bg-card px-3 py-2">
       <div className="text-xs text-ink-muted">{label}</div>
       <div className="mt-1 text-lg font-semibold text-ink">{value}</div>
       <div className="mt-0.5 text-xs text-ink-muted">{helper}</div>
@@ -342,7 +342,7 @@ function InfoRow({ label, value, tone }: { label: string; value: ReactNode; tone
 
 function InfoPanel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-3 py-3">
+    <div className="rounded-lg border border-line bg-card px-3 py-3">
       <div className="text-sm font-semibold text-ink">{title}</div>
       <p className="mt-1 text-sm leading-6 text-ink-muted">{text}</p>
     </div>

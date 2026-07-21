@@ -448,7 +448,7 @@ function AdminDetailsModal({
             </DetailCard>
           </div>
 
-          <div className="rounded-xl border border-line bg-white p-4">
+          <div className="rounded-xl border border-line bg-card p-4">
             <div className="text-sm font-semibold text-ink">
               Workspace access
             </div>
@@ -506,7 +506,7 @@ function DetailCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div className="rounded-xl border border-line bg-card p-4">
       <div className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
         {label}
       </div>

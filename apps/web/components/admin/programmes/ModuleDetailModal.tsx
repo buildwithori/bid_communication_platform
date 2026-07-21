@@ -371,7 +371,7 @@ function ModuleDetailModalContent({
           />
         </div>
 
-        <div className="rounded-xl border border-line bg-white p-4">
+        <div className="rounded-xl border border-line bg-card p-4">
           <div className="flex flex-col gap-1">
             <div className="font-semibold text-ink">Content items</div>
             <div className="text-sm text-ink-muted">
@@ -445,7 +445,7 @@ function ModuleDetailModalContent({
           )}
         </div>
 
-        <div className="rounded-xl border border-line bg-white p-4">
+        <div className="rounded-xl border border-line bg-card p-4">
           <div className="flex flex-col gap-1">
             <div className="font-semibold text-ink">Programme usage</div>
             <div className="text-sm text-ink-muted">
@@ -513,7 +513,7 @@ function ModuleMetric({
   progress?: number;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white px-3 py-3">
+    <div className="rounded-xl border border-line bg-card px-3 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
         {label}
       </div>

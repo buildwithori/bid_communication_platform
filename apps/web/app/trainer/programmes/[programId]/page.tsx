@@ -127,7 +127,7 @@ export default function TrainerProgrammeDetailPage() {
                 {detail.description}
               </p>
             </div>
-            <div className="w-full rounded-xl border border-line bg-white px-4 py-3 xl:w-[260px]">
+            <div className="w-full rounded-xl border border-line bg-card px-4 py-3 xl:w-[260px]">
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
@@ -902,7 +902,7 @@ function ProgrammeHealthCard({
   progress?: number;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white px-3 py-3">
+    <div className="rounded-xl border border-line bg-card px-3 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
         {label}
       </div>
@@ -959,7 +959,7 @@ function ReadinessPanelItem({
         ? 'bg-success-light text-success-dark'
         : 'bg-surface-subtle text-bid';
   return (
-    <div className="rounded-xl border border-line bg-white px-4 py-4">
+    <div className="rounded-xl border border-line bg-card px-4 py-4">
       <div className="flex items-start gap-3">
         <div
           className={

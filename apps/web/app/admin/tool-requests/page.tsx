@@ -583,7 +583,7 @@ function ToolRequestReviewModal({
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2">
+    <div className="rounded-lg border border-line bg-card px-3 py-2">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-faint">
         {label}
       </div>
@@ -594,7 +594,7 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
 
 function InfoPanel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white px-4 py-3">
+    <div className="rounded-xl border border-line bg-card px-4 py-3">
       <div className="text-sm font-semibold text-ink">{title}</div>
       <p className="mt-2 text-sm leading-6 text-ink-muted">{text}</p>
     </div>

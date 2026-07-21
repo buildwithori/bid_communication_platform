@@ -539,7 +539,7 @@ function TrainerDetailModal({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur-sm">
+              <div className="rounded-xl border border-border bg-card/85 p-4 shadow-sm backdrop-blur-sm">
                 <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-faint">
                   Session readiness
                 </div>
@@ -630,7 +630,7 @@ function TrainerDetailModal({
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-black/[0.08] bg-surface-panel shadow-[0_12px_32px_rgba(26,26,26,0.04)]">
+            <section className="overflow-hidden rounded-2xl border border-border bg-surface-panel shadow-[0_12px_32px_rgba(26,26,26,0.04)]">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-gradient-to-r from-bid-light/70 via-surface-panel to-info-light/30 px-4 py-4">
                 <div>
                   <h3 className="font-semibold text-ink">Programme coverage</h3>
@@ -655,7 +655,7 @@ function TrainerDetailModal({
                     {visibleProgrammes.map((programme) => (
                       <div
                         key={programme.id}
-                        className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-black/[0.08] bg-surface-panel px-4 py-3.5 shadow-[0_6px_18px_rgba(26,26,26,0.035)] transition hover:border-bid/25 hover:shadow-[0_10px_24px_rgba(123,29,75,0.08)] sm:flex-row sm:items-center sm:justify-between"
+                        className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-border bg-surface-panel px-4 py-3.5 shadow-[0_6px_18px_rgba(26,26,26,0.035)] transition hover:border-bid/25 hover:shadow-[0_10px_24px_rgba(123,29,75,0.08)] sm:flex-row sm:items-center sm:justify-between"
                       >
                         <span
                           className="absolute inset-y-0 left-0 w-1 bg-bid opacity-75"
@@ -740,7 +740,7 @@ function ProfileMetric({
   };
 
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-white p-4 shadow-[0_10px_28px_rgba(26,26,26,0.04)]">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-[0_10px_28px_rgba(26,26,26,0.04)]">
       <div className="flex items-center justify-between gap-3">
         <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone]}`}>
           {icon}

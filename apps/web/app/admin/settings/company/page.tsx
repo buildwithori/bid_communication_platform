@@ -591,7 +591,7 @@ function SettingToggle({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-xl border border-black/[0.08] bg-surface-subtle p-4 transition hover:bg-white",
+        "flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface-subtle p-4 transition hover:bg-card",
         checked && "border-bid/25 bg-bid-light/50",
       )}
     >

@@ -325,7 +325,7 @@ export function ManageEntrepreneurToolsModal({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-white p-4">
+        <div className="rounded-2xl border border-line bg-card p-4">
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="font-semibold text-ink">
@@ -431,7 +431,7 @@ export function ManageEntrepreneurToolsModal({
         </div>
 
         {blockedTools.length > 0 && (
-          <div className="rounded-2xl border border-line bg-white p-4">
+          <div className="rounded-2xl border border-line bg-card p-4">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <div className="font-semibold text-ink">Hidden tools</div>
@@ -549,7 +549,7 @@ function ToolCell({
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white px-3 py-2">
+    <div className="rounded-xl border border-line bg-card px-3 py-2">
       <div className="text-xs text-ink-muted">{label}</div>
       <div className="mt-1 text-xl font-semibold text-ink">{value}</div>
     </div>

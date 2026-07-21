@@ -862,7 +862,7 @@ function ReadinessView({
   );
   return (
     <div className="mt-5 space-y-4">
-      <div className="rounded-xl border border-black/[0.08] bg-surface-subtle px-4 py-4">
+      <div className="rounded-xl border border-border bg-surface-subtle px-4 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -878,7 +878,7 @@ function ReadinessView({
               programme modules.
             </p>
           </div>
-          <div className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 lg:w-[280px]">
+          <div className="w-full rounded-xl border border-border bg-card px-4 py-3 lg:w-[280px]">
             <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
               Readiness score
             </div>
@@ -992,7 +992,7 @@ function ModuleReorderHandle({
         disabled={disabled || rowDisabled}
         {...attributes}
         {...listeners}
-        className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-lg border border-black/[0.08] bg-white text-ink-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
+        className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-lg border border-border bg-card text-ink-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
         aria-label={`Move ${module.title}`}
       >
         <GripVertical className="h-4 w-4" />
@@ -1033,7 +1033,7 @@ function HealthCard({
   progress?: number;
 }) {
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-3">
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">
         {label}
       </div>
@@ -1062,7 +1062,7 @@ function ReadinessItem({
   warning?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-white p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-2">
         <Icon
           className={`h-5 w-5 ${warning ? 'text-warning' : 'text-success'}`}

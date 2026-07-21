@@ -585,7 +585,7 @@ function ProgrammeAccessModal({
           {access.rows.map((item) => (
             <div
               key={item.grantId}
-              className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white p-3"
+              className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card p-3"
             >
               <div>
                 <div className="font-medium text-ink">{item.name}</div>
@@ -795,7 +795,7 @@ function ToolRow({
           ? "Hide"
           : "Grant access";
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div className="rounded-xl border border-line bg-card p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -967,7 +967,7 @@ function ProfileCard({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div className="rounded-xl border border-line bg-card p-4">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
         {icon}
         {label}

@@ -372,7 +372,7 @@ function TrainerLearnerImpactModal({
             <ImpactCard icon={Star} label="Sector" value={detail.data.sector?.name ?? "Not set"} />
           </div>
 
-          <div className="rounded-xl border border-line bg-white p-4">
+          <div className="rounded-xl border border-line bg-card p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold text-ink">Programme progress</div>
@@ -421,7 +421,7 @@ function ImpactCard({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div className="rounded-xl border border-line bg-card p-4">
       <div className="flex items-center gap-2 text-sm text-ink-muted">
         <Icon className="h-4 w-4 text-bid" />
         {label}

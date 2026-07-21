@@ -86,7 +86,7 @@ export function DeliverableFilePreviewModal({
           {signedFile.isLoading ? (
             <div className="h-[360px] animate-pulse rounded-xl border border-line bg-surface-subtle" />
           ) : canRenderPdf ? (
-            <div className="overflow-hidden rounded-xl border border-line bg-white">
+            <div className="overflow-hidden rounded-xl border border-line bg-card">
               <iframe title={review.fileName} src={fileUrl ?? ''} className="h-[68vh] w-full bg-white" />
             </div>
           ) : fileUrl ? (

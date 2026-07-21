@@ -332,7 +332,7 @@ function ContentSequenceItem({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-line bg-white p-3 shadow-sm sm:flex-row sm:items-center",
+        "flex flex-col gap-3 rounded-xl border border-line bg-card p-3 shadow-sm sm:flex-row sm:items-center",
         isDragging && "relative z-10 border-bid/30 shadow-xl",
       )}
     >
