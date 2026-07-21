@@ -231,6 +231,13 @@
   }
 
 
+  /* Consistent feedback for every link or button rendered inside shared tables. */
+  .data-table tbody :is(button, a[href]).text-ink:is(:hover, :focus-visible, :active),
+  .data-table tbody :is(button, a[href]):is(:hover, :focus-visible, :active) :where(.text-ink),
+  .data-table tbody tr[data-interactive="true"]:is(:hover, :focus-within, :active) :is(button, a[href]) :where(.text-ink) {
+    color: hsl(var(--primary));
+  }
+
   .table-toolbar {
     justify-content: space-between;
   }

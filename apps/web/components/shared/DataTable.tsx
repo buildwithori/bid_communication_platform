@@ -81,7 +81,7 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-border bg-card',
+        'data-table overflow-hidden rounded-xl border border-border bg-card',
         className,
       )}
     >
@@ -185,11 +185,12 @@ function DataTableRow<T>({
     <SortableRowContext.Provider value={rowContext}>
       <tr
         ref={setNodeRef}
+        data-interactive={isInteractive ? 'true' : undefined}
         {...restRowProps}
         className={cn(
-          'group transition-colors',
+          'group transition-colors duration-150',
           isInteractive
-            ? 'cursor-pointer hover:bg-bid-light/55 focus-visible:bg-bid-light/55 focus-visible:outline-none'
+            ? 'cursor-pointer hover:bg-bid-light/55 focus-within:bg-bid-light/55 focus-visible:bg-bid-light/55 active:bg-bid-light/80 focus-visible:outline-none'
             : 'hover:bg-surface-subtle/70',
           isDragging && 'relative z-10 bg-card shadow-xl',
           rowClassName?.(row),
