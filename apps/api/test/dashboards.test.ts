@@ -56,7 +56,10 @@ test("entrepreneur dashboard scopes every preview query to the authenticated use
   assert.equal((calls.find((call) => call.resource === "membership")?.args as any).where.userId, "entrepreneur-1");
   assert.equal((calls.find((call) => call.resource === "progress")?.args as any).where.entrepreneurUserId, "entrepreneur-1");
   assert.equal((calls.find((call) => call.resource === "sessions")?.args as any).where.entrepreneurUserId, "entrepreneur-1");
-  assert.equal((calls.find((call) => call.resource === "notifications")?.args as any).where.recipientUserId, "entrepreneur-1");
+  const notificationQuery = calls.find((call) => call.resource === "notifications")?.args as any;
+  assert.equal(notificationQuery.where.recipientUserId, "entrepreneur-1");
+  assert.equal(notificationQuery.take, 3);
+  assert.deepEqual(notificationQuery.orderBy, [{ createdAt: "desc" }, { id: "desc" }]);
 });
 
 test("recent entrepreneur dashboard queue is cursor paginated and never returns the lookahead row", async () => {

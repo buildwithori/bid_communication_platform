@@ -663,7 +663,7 @@ export class DashboardsService {
       this.prisma.notification.findMany({
         where: { recipientUserId: user.id },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 5,
+        take: 3,
         select: {
           id: true,
           title: true,
