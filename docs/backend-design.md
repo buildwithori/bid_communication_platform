@@ -1968,7 +1968,7 @@ The frontend depends on stable DTOs. Add OpenAPI generation and consider generat
 
 These decisions remove the remaining backend ambiguity before implementation:
 
-1. Hosting topology: the first production deploy will run the frontend, API, Postgres, Redis, workers, and supporting services through Docker Compose on one DigitalOcean Droplet.
+1. Hosting topology: the first production deploy will run the frontend, API, Postgres, Redis, workers, and supporting services through Docker Compose on one DigitalOcean Droplet. Compose runs schema migrations and a separate transactionally locked, database-recorded production bootstrap before API and worker startup; the local demo seed must never run in production.
 2. Auth sessions: the web app will use secure httpOnly cookie sessions. Do not use client-managed bearer tokens for normal browser authentication.
 3. Multi-business users: not supported for launch. One entrepreneur user belongs to one business.
 4. Admin permissions: all admins have full access at launch. Keep the model extensible, but do not build permission groups now.

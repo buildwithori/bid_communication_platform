@@ -86,7 +86,7 @@ services:
     stop_grace_period: 30s
     logging: *default-logging
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -107,6 +107,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  bootstrap:
+    image: ${API_IMAGE:-bid-hub-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    command: npm run prisma:bootstrap:production
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   worker:
     image: ${API_IMAGE:-bid-hub-api:latest}
@@ -130,7 +147,7 @@ services:
     stop_grace_period: 30s
     logging: *default-logging
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
       redis:
         condition: service_healthy

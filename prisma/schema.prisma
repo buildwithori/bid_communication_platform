@@ -496,6 +496,14 @@ model CompanySettings {
   @@map("company_settings")
 }
 
+model DeploymentTaskRun {
+  key         String   @id
+  completedAt DateTime @default(now()) @map("completed_at")
+  details     Json?
+
+  @@map("deployment_task_runs")
+}
+
 model Sector {
   id        String   @id @default(cuid())
   name      String

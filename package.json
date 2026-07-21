@@ -29,6 +29,7 @@
     "prisma:status": "dotenv -e .env.local -- sh -c 'DATABASE_URL=\"$DATABASE_HOST_URL\" prisma migrate status'",
     "prisma:migrate": "dotenv -e .env.local -- sh -c 'DATABASE_URL=\"$DATABASE_HOST_URL\" prisma migrate dev'",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:bootstrap:production": "node prisma/seed-production.js",
     "prisma:seed": "dotenv -e .env.local -- sh -c 'DATABASE_URL=\"$DATABASE_HOST_URL\" prisma db seed'",
     "prisma:studio": "dotenv -e .env.local -- sh -c 'DATABASE_URL=\"$DATABASE_HOST_URL\" prisma studio'",
     "docker:dev": "docker compose --env-file .env.local up --build",
