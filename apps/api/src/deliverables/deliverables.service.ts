@@ -148,6 +148,7 @@ export class DeliverablesService {
 
   async listGroups(user: User, query: DeliverableGroupQueryDto) {
     await this.recurring.ensureCurrent();
+    const now = new Date();
     const take = pageSize(query);
     const search = query.search?.trim();
     const groupStatusFilter: Prisma.DeliverableInstanceWhereInput =
@@ -165,6 +166,9 @@ export class DeliverablesService {
           ? { status: DeliverableInstanceStatus.submitted }
           : {};
     const where: Prisma.ProgrammeWhereInput = {
+      archivedAt: null,
+      publishedAt: { not: null },
+      startDate: { lte: now },
       deliverableInstances: {
         some: { entrepreneurUserId: user.id, ...groupStatusFilter },
       },
@@ -761,7 +765,14 @@ export class DeliverablesService {
   private readScopeWhere(user: User): Prisma.DeliverableInstanceWhereInput {
     if (user.role === UserRole.admin) return {};
     if (user.role === UserRole.entrepreneur)
-      return { entrepreneurUserId: user.id };
+      return {
+        entrepreneurUserId: user.id,
+        programme: {
+          archivedAt: null,
+          publishedAt: { not: null },
+          startDate: { lte: new Date() },
+        },
+      };
     if (user.role === UserRole.trainer) {
       return {
         programme: {

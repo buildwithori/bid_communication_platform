@@ -87,6 +87,7 @@ export function ProgrammeGoalRecordModal({
     {
       search: programmeLookup.search || undefined,
       take: 20,
+      selectableOnly: true,
     },
     open,
   );
@@ -167,7 +168,7 @@ export function ProgrammeGoalRecordModal({
             onValueChange={(value) => form.setValue("programmeId", value)}
             options={unique([
               { value: "", label: "Business-level / no programme" },
-              ...(goal?.programme
+              ...(goal?.programme?.selectable
                 ? [{ value: goal.programme.id, label: goal.programme.name }]
                 : []),
               ...programmes.rows.map((item) => ({
@@ -248,6 +249,7 @@ export function FundraisingRoundRecordModal({
     {
       search: programmeLookup.search || undefined,
       take: 20,
+      selectableOnly: true,
     },
     open,
   );
@@ -338,7 +340,7 @@ export function FundraisingRoundRecordModal({
             onValueChange={(value) => form.setValue("programmeId", value)}
             options={unique([
               { value: "", label: "Company-wide / unattributed" },
-              ...(round?.programme
+              ...(round?.programme?.selectable
                 ? [{ value: round.programme.id, label: round.programme.name }]
                 : []),
               ...programmes.rows.map((item) => ({
@@ -423,6 +425,7 @@ export function PeriodicUpdateRecordModal({
     {
       search: programmeLookup.search || undefined,
       take: 20,
+      selectableOnly: true,
     },
     open,
   );
@@ -467,7 +470,7 @@ export function PeriodicUpdateRecordModal({
             onValueChange={(value) => form.setValue("programmeId", value)}
             options={unique([
               { value: "", label: "Company-wide" },
-              ...(update?.programme
+              ...(update?.programme?.selectable
                 ? [{ value: update.programme.id, label: update.programme.name }]
                 : []),
               ...programmes.rows.map((item) => ({
@@ -549,7 +552,7 @@ function ModalActions({
 function goalDefaults(goal?: ProgrammeGoalRecord): GoalForm {
   return {
     goalTypeId: goal?.goalType.id ?? "",
-    programmeId: goal?.programme?.id ?? "",
+    programmeId: goal?.programme?.selectable ? goal.programme.id : "",
     targetAmount:
       goal?.targetAmountCents == null
         ? ""
@@ -564,7 +567,7 @@ function fundingDefaults(round?: FundraisingRoundRecord): FundingForm {
     amount: round ? String(round.amountCents / 100) : "",
     date: round?.date.slice(0, 10) ?? "",
     source: round?.source ?? "",
-    programmeId: round?.programme?.id ?? "",
+    programmeId: round?.programme?.selectable ? round.programme.id : "",
     programmeGoalId: round?.programmeGoal?.linkable
       ? round.programmeGoal.id
       : "",
@@ -572,7 +575,7 @@ function fundingDefaults(round?: FundraisingRoundRecord): FundingForm {
 }
 function updateDefaults(update?: PeriodicUpdateRecord): UpdateForm {
   return {
-    programmeId: update?.programme?.id ?? "",
+    programmeId: update?.programme?.selectable ? update.programme.id : "",
     periodStart: update?.periodStart.slice(0, 10) ?? "",
     periodEnd: update?.periodEnd.slice(0, 10) ?? "",
     jobsWomen: update?.jobsWomen ?? 0,

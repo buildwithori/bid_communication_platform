@@ -141,6 +141,7 @@ export class EntrepreneursService {
   ) {
     await this.assertCanReadEntrepreneur(user, entrepreneurUserId);
     const take = query.take ?? DEFAULT_TAKE;
+    const now = new Date();
     const where: Prisma.ProgrammeAccessGrantWhereInput = {
       entrepreneurUserId,
       revokedAt: null,
@@ -170,6 +171,17 @@ export class EntrepreneursService {
                     contains: query.search.trim(),
                     mode: "insensitive" as const,
                   },
+                },
+              },
+            ]
+          : []),
+        ...(query.selectableOnly
+          ? [
+              {
+                programme: {
+                  archivedAt: null,
+                  publishedAt: { not: null },
+                  startDate: { lte: now },
                 },
               },
             ]
@@ -228,11 +240,20 @@ export class EntrepreneursService {
     const take = query.take ?? DEFAULT_TAKE;
     const filters: Prisma.ProgrammeGoalWhereInput[] = [];
     if (query.linkableOnly) {
+      const now = new Date();
       filters.push({
         milestoneAchieved: false,
         OR: [
           { programmeId: null },
-          { programme: { is: { archivedAt: null } } },
+          {
+            programme: {
+              is: {
+                archivedAt: null,
+                publishedAt: { not: null },
+                startDate: { lte: now },
+              },
+            },
+          },
         ],
       });
     }
@@ -690,7 +711,9 @@ export class EntrepreneursService {
           id: true,
           programmeId: true,
           milestoneAchieved: true,
-          programme: { select: { archivedAt: true } },
+          programme: {
+            select: { archivedAt: true, publishedAt: true, startDate: true },
+          },
         },
       });
       if (!goal) throw new BadRequestException('Select a valid goal owned by this entrepreneur.');
@@ -699,6 +722,12 @@ export class EntrepreneursService {
       }
       if (goal.programme?.archivedAt) {
         throw new BadRequestException('A goal from an archived programme cannot be linked to a fundraising round.');
+      }
+      if (
+        goal.programme &&
+        (!goal.programme.publishedAt || goal.programme.startDate > new Date())
+      ) {
+        throw new BadRequestException('A goal from a scheduled programme cannot be linked to a fundraising round.');
       }
       if (goal.programmeId && dto.programmeId && goal.programmeId !== dto.programmeId) {
         throw new BadRequestException('The linked goal belongs to a different programme.');
@@ -724,6 +753,9 @@ export class EntrepreneursService {
     const programme = await this.prisma.programme.findFirst({
       where: {
         id: programmeId,
+        archivedAt: null,
+        publishedAt: { not: null },
+        startDate: { lte: new Date() },
         OR: [
           { accessType: 'free' },
           { accessGrants: { some: { entrepreneurUserId, revokedAt: null } } },
@@ -733,7 +765,9 @@ export class EntrepreneursService {
     });
 
     if (!programme) {
-      throw new BadRequestException('This entrepreneur does not have access to the selected programme.');
+      throw new BadRequestException(
+        'Select a started programme available to this entrepreneur.',
+      );
     }
   }
 
@@ -754,20 +788,38 @@ export class EntrepreneursService {
 
   private programmeGoalInclude() {
     return {
-      programme: { select: { id: true, name: true } },
+      programme: {
+        select: {
+          id: true,
+          name: true,
+          archivedAt: true,
+          publishedAt: true,
+          startDate: true,
+        },
+      },
       goalType: { select: { id: true, name: true, key: true, requiresTargetAmount: true } },
     } satisfies Prisma.ProgrammeGoalInclude;
   }
 
   private fundraisingRoundInclude() {
     return {
-      programme: { select: { id: true, name: true } },
+      programme: {
+        select: {
+          id: true,
+          name: true,
+          archivedAt: true,
+          publishedAt: true,
+          startDate: true,
+        },
+      },
       programmeGoal: {
         select: {
           id: true,
           description: true,
           milestoneAchieved: true,
-          programme: { select: { archivedAt: true } },
+          programme: {
+            select: { archivedAt: true, publishedAt: true, startDate: true },
+          },
           goalType: { select: { id: true, name: true, key: true } },
         },
       },
@@ -776,7 +828,15 @@ export class EntrepreneursService {
 
   private periodicUpdateInclude() {
     return {
-      programme: { select: { id: true, name: true } },
+      programme: {
+        select: {
+          id: true,
+          name: true,
+          archivedAt: true,
+          publishedAt: true,
+          startDate: true,
+        },
+      },
     } satisfies Prisma.PeriodicUpdateInclude;
   }
 
@@ -855,7 +915,7 @@ export class EntrepreneursService {
     return {
       id: goal.id,
       entrepreneurUserId: goal.entrepreneurUserId,
-      programme: goal.programme,
+      programme: this.mapRecordProgramme(goal.programme),
       goalType: goal.goalType,
       targetAmountCents: goal.targetAmountCents,
       description: goal.description,
@@ -869,7 +929,7 @@ export class EntrepreneursService {
     return {
       id: round.id,
       entrepreneurUserId: round.entrepreneurUserId,
-      programme: round.programme,
+      programme: this.mapRecordProgramme(round.programme),
       programmeGoal: round.programmeGoal
         ? {
             id: round.programmeGoal.id,
@@ -877,7 +937,10 @@ export class EntrepreneursService {
             goalType: round.programmeGoal.goalType,
             linkable:
               !round.programmeGoal.milestoneAchieved &&
-              !round.programmeGoal.programme?.archivedAt,
+              (!round.programmeGoal.programme ||
+                (!round.programmeGoal.programme.archivedAt &&
+                  Boolean(round.programmeGoal.programme.publishedAt) &&
+                  round.programmeGoal.programme.startDate <= new Date())),
           }
         : null,
       name: round.name,
@@ -894,7 +957,7 @@ export class EntrepreneursService {
     return {
       id: update.id,
       entrepreneurUserId: update.entrepreneurUserId,
-      programme: update.programme,
+      programme: this.mapRecordProgramme(update.programme),
       periodStart: update.periodStart.toISOString(),
       periodEnd: update.periodEnd.toISOString(),
       submittedAt: update.submittedAt.toISOString(),
@@ -910,6 +973,26 @@ export class EntrepreneursService {
   private optionalText(value?: string | null) {
     const trimmed = value?.trim();
     return trimmed || null;
+  }
+
+  private mapRecordProgramme(
+    programme: {
+      id: string;
+      name: string;
+      archivedAt: Date | null;
+      publishedAt: Date | null;
+      startDate: Date;
+    } | null,
+  ) {
+    if (!programme) return null;
+    return {
+      id: programme.id,
+      name: programme.name,
+      selectable:
+        !programme.archivedAt &&
+        Boolean(programme.publishedAt) &&
+        programme.startDate <= new Date(),
+    };
   }
 
   private mapProgrammeAccess(

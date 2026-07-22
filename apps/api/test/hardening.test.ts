@@ -449,23 +449,32 @@ test("deliverable calendar windows preserve entrepreneur scope and reject revers
   const dateFrom = "2026-07-01T00:00:00.000Z";
   const dateTo = "2026-08-11T23:59:59.999Z";
 
-  assert.deepEqual(
-    buildInstanceWhere(
-      { id: "entrepreneur-1", role: UserRole.entrepreneur },
-      { dateFrom, dateTo },
-    ),
-    {
-      AND: [
-        { entrepreneurUserId: "entrepreneur-1" },
-        {
-          dueDate: {
-            gte: new Date(dateFrom),
-            lte: new Date(dateTo),
-          },
-        },
-      ],
-    },
+  const entrepreneurWhere = buildInstanceWhere(
+    { id: "entrepreneur-1", role: UserRole.entrepreneur },
+    { dateFrom, dateTo },
+  ) as {
+    AND: Array<{
+      entrepreneurUserId?: string;
+      programme?: {
+        archivedAt: null;
+        publishedAt: { not: null };
+        startDate: { lte: Date };
+      };
+      dueDate?: { gte: Date; lte: Date };
+    }>;
+  };
+  assert.equal(entrepreneurWhere.AND[0]?.entrepreneurUserId, "entrepreneur-1");
+  assert.equal(entrepreneurWhere.AND[0]?.programme?.archivedAt, null);
+  assert.deepEqual(entrepreneurWhere.AND[0]?.programme?.publishedAt, {
+    not: null,
+  });
+  assert.ok(
+    entrepreneurWhere.AND[0]?.programme?.startDate.lte instanceof Date,
   );
+  assert.deepEqual(entrepreneurWhere.AND[1]?.dueDate, {
+    gte: new Date(dateFrom),
+    lte: new Date(dateTo),
+  });
   await assert.rejects(
     service.listInstances(
       { id: "entrepreneur-1", role: UserRole.entrepreneur } as never,

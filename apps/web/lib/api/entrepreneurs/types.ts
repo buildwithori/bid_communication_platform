@@ -114,6 +114,7 @@ export type ProgrammeAccessQuery = {
   search?: string;
   take?: number;
   cursor?: string;
+  selectableOnly?: boolean;
 };
 
 export type EffectiveToolAccess = {
@@ -161,7 +162,7 @@ export type CursorPage<T> = {
 export type ProgrammeGoalRecord = {
   id: string;
   entrepreneurUserId: string;
-  programme: { id: string; name: string } | null;
+  programme: { id: string; name: string; selectable: boolean } | null;
   goalType: {
     id: string;
     name: string;
@@ -178,7 +179,7 @@ export type ProgrammeGoalRecord = {
 export type FundraisingRoundRecord = {
   id: string;
   entrepreneurUserId: string;
-  programme: { id: string; name: string } | null;
+  programme: { id: string; name: string; selectable: boolean } | null;
   programmeGoal: {
     id: string;
     description: string | null;
@@ -197,7 +198,7 @@ export type FundraisingRoundRecord = {
 export type PeriodicUpdateRecord = {
   id: string;
   entrepreneurUserId: string;
-  programme: { id: string; name: string } | null;
+  programme: { id: string; name: string; selectable: boolean } | null;
   periodStart: string;
   periodEnd: string;
   submittedAt: string;
