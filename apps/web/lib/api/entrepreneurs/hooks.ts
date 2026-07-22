@@ -272,9 +272,12 @@ export function useProgrammeAccessQuery(
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(id) && enabled,
   });
+  const rows = result.data?.pages.flatMap((page) => page.items) ?? [];
   return {
     ...result,
-    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+    rows: query.selectableOnly
+      ? rows.filter((programme) => new Date(programme.startDate) <= new Date())
+      : rows,
     totalItems: result.data?.pages[0]?.totalItems ?? 0,
   };
 }

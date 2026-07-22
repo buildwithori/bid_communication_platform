@@ -47,6 +47,8 @@ function queryString(
     params.set("programmeId", query.programmeId);
   if (query && "linkableOnly" in query && query.linkableOnly)
     params.set("linkableOnly", "true");
+  if (query && "selectableOnly" in query && query.selectableOnly)
+    params.set("selectableOnly", "true");
   if (query && "type" in query && query.type) params.set("type", query.type);
   if (query && "toolAreaId" in query && query.toolAreaId)
     params.set("toolAreaId", query.toolAreaId);
