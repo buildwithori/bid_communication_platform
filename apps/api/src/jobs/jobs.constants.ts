@@ -6,6 +6,7 @@ export const QUEUE_NAMES = {
   transactionalEmail: "bid-transactional-email",
   reportExports: "bid-report-exports",
   externalResourceCleanup: "bid-external-resource-cleanup",
+  videoReconciliation: "bid-video-reconciliation",
 } as const;
 
 export const JOB_NAMES = {
@@ -21,6 +22,7 @@ export const JOB_NAMES = {
   entrepreneurInvitationEmail: "entrepreneur-invitation-email",
   generateReportExport: "generate-report-export",
   cleanupExternalResources: "cleanup-external-resources",
+  reconcileVideoAssets: "reconcile-video-assets",
 } as const;
 
 export const QUEUE_PREFIX = "bid-hub";

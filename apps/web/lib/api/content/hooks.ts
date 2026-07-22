@@ -44,6 +44,10 @@ function useCursorPage(query: PageQuery, request: (query: ContentItemQuery) => R
     queryKey: queryKey({ ...query, cursor }),
     queryFn: () => request({ ...query, cursor }),
     enabled,
+    refetchInterval: (current) =>
+      current.state.data?.items.some((item) => item.status === 'processing')
+        ? 5_000
+        : false,
   });
 
   const resetPagination = useCallback(() => {
@@ -127,6 +131,12 @@ export function useModuleContentItemsInfinite(moduleId: string, query: PageQuery
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: enabled && Boolean(moduleId),
+    refetchInterval: (current) =>
+      current.state.data?.pages.some((page) =>
+        page.items.some((item) => item.status === 'processing'),
+      )
+        ? 5_000
+        : false,
   });
   return {
     ...result,

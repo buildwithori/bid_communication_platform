@@ -352,6 +352,7 @@ Before merging backend work, ask:
 - `video` owns Mux direct uploads, cancellation, status polling, webhook transitions, and signed playback. The only public video route is `POST /webhooks/mux`; all upload and playback routes remain authenticated.
 - Mux callbacks require HMAC verification against the exact raw body, enforce a five-minute replay window, and record event IDs transactionally so duplicate deliveries are safe.
 - Ready/errored events update both `video_assets` and attached `content_items`. Signed-policy playback IDs remain backend metadata; authorized clients receive short-lived RS256 playback tokens.
+- A dedicated BullMQ reconciliation scheduler checks only stale pending/processing video rows at a bounded interval. It retrieves direct-upload state until an asset exists, then retrieves asset state to recover missed webhook transitions. Provider errors, upload timeouts, missing assets, and records that cannot be verified within the configured processing timeout become terminal `failed` rows with an administrator-facing retry/delete reason.
 
 ## Entrepreneur Tools Completion (2026-07-16)
 

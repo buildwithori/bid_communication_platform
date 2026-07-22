@@ -173,7 +173,10 @@ function ContentLibrary() {
           <div className="min-w-[180px] text-sm">
             <div className="font-medium text-ink">{sourceLabel(item)}</div>
             <div className="mt-1 text-xs text-ink-muted">
-              {item.durationLabel ?? updatedLabel(item.updatedAt)}
+              {item.type === "video" && item.status === "failed"
+                ? item.video?.failureReason ??
+                  "Processing failed. Delete this item and upload it again."
+                : item.durationLabel ?? updatedLabel(item.updatedAt)}
             </div>
           </div>
         ),
@@ -357,7 +360,9 @@ function StatusBadge({ status }: { status: ContentItemStatus }) {
 
 function sourceLabel(item: ContentItemRecord) {
   if (item.type === "video") {
-    return item.video?.status === "ready" ? "Video ready" : "Video processing";
+    if (item.video?.status === "ready") return "Video ready";
+    if (item.video?.status === "failed") return "Video processing failed";
+    return "Video processing";
   }
   if (item.type === "pdf") {
     return item.file?.originalFilename ?? "PDF asset";

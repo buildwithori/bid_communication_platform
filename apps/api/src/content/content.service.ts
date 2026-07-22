@@ -985,6 +985,7 @@ export class ContentService {
             id: item.videoAsset.id,
             durationSeconds: item.videoAsset.duration,
             status: item.videoAsset.status,
+            failureReason: item.videoAsset.failureReason,
           }
         : null,
       file: file

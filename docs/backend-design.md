@@ -1495,7 +1495,11 @@ Mux sends webhook
 API verifies webhook signature
 API updates video_asset status, asset ID, playback ID, duration
 Content item becomes ready when Mux asset is ready
+BullMQ periodically reconciles only stale pending/processing records against the Mux direct-upload and asset APIs
+Reconciliation restores missed ready/errored transitions and moves unrecoverable or timed-out records to failed
 ```
+
+Webhooks remain the primary status channel. Reconciliation is a bounded, low-frequency recovery path for missed callbacks or API downtime, not continuous provider polling. Failed records retain a safe administrator-facing reason and can be permanently deleted before uploading a replacement.
 
 ### Access Control
 

@@ -30,6 +30,22 @@ const envSchema = z
       .int()
       .min(60_000)
       .default(900_000),
+    VIDEO_RECONCILIATION_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .default(300_000),
+    VIDEO_PROCESSING_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(3_600_000)
+      .default(86_400_000),
+    VIDEO_RECONCILIATION_BATCH_SIZE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(25),
     EMAIL_TRANSPORT: z.enum(["smtp", "resend"]).default("smtp"),
     MAIL_FROM: z.string().min(1).default("BID Hub <no-reply@bid.local>"),
     SMTP_HOST: z.string().min(1).default("localhost"),

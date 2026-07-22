@@ -869,25 +869,28 @@ model ModuleContentItem {
 }
 
 model VideoAsset {
-  id             String      @id @default(cuid())
-  contentItemId  String?     @unique @map("content_item_id")
-  muxAssetId     String?     @unique @map("mux_asset_id")
-  muxUploadId    String?     @unique @map("mux_upload_id")
-  playbackId     String?     @map("playback_id")
-  duration       Int?
-  status         AssetStatus @default(pending)
-  playbackPolicy String?     @map("playback_policy")
-  uploadedById   String?     @map("uploaded_by_id")
-  readyAt        DateTime?   @map("ready_at")
-  failureReason  String?     @map("failure_reason")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id                     String      @id @default(cuid())
+  contentItemId          String?     @unique @map("content_item_id")
+  muxAssetId             String?     @unique @map("mux_asset_id")
+  muxUploadId            String?     @unique @map("mux_upload_id")
+  playbackId             String?     @map("playback_id")
+  duration               Int?
+  status                 AssetStatus @default(pending)
+  playbackPolicy         String?     @map("playback_policy")
+  uploadedById           String?     @map("uploaded_by_id")
+  readyAt                DateTime?   @map("ready_at")
+  failureReason          String?     @map("failure_reason")
+  lastReconciledAt       DateTime?   @map("last_reconciled_at")
+  reconciliationFailures Int         @default(0) @map("reconciliation_failures")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
 
   contentItem   ContentItem?        @relation(fields: [contentItemId], references: [id])
   uploadedBy    User?               @relation("VideoAssetUploadedBy", fields: [uploadedById], references: [id])
   webhookEvents VideoWebhookEvent[]
 
   @@index([status])
+  @@index([status, lastReconciledAt])
   @@index([uploadedById, status])
   @@map("video_assets")
 }

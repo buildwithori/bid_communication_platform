@@ -43,6 +43,7 @@ export type ContentItemRecord = {
     id: string;
     durationSeconds: number | null;
     status: string;
+    failureReason: string | null;
   } | null;
   file: {
     id: string;

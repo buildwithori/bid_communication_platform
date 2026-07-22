@@ -385,6 +385,12 @@ function ContentSequenceItem({
             {item.usage.modules === 1 ? "" : "s"} across {item.usage.programmes}{" "}
             programme{item.usage.programmes === 1 ? "" : "s"}
           </div>
+          {item.type === "video" && item.status === "failed" ? (
+            <div className="mt-2 max-w-2xl text-xs leading-5 text-danger">
+              {item.video?.failureReason ??
+                "Video processing failed. Delete this item and upload it again."}
+            </div>
+          ) : null}
         </div>
       </div>
       {!readOnly ? (

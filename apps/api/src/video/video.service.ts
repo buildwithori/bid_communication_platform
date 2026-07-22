@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -11,6 +12,7 @@ import {
   AssetStatus,
   ContentItemStatus,
   ProgrammeAccessType,
+  Prisma,
   User,
   UserRole,
   VideoAsset,
@@ -43,6 +45,8 @@ type MuxWebhook = {
 
 @Injectable()
 export class VideoService {
+  private readonly logger = new Logger(VideoService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -203,6 +207,9 @@ export class VideoService {
           });
           if (inserted.count === 0) return { received: true, duplicate: true };
           if (!video) return { received: true, matched: false };
+          if (video.status === AssetStatus.archived) {
+            return { received: true, matched: true, ignored: true };
+          }
 
           const update = this.webhookUpdate(event);
           if (update) {
@@ -241,8 +248,30 @@ export class VideoService {
           muxAssetId: data.asset_id ?? null,
           status: AssetStatus.processing,
           failureReason: null,
+          lastReconciledAt: new Date(),
+          reconciliationFailures: 0,
         },
         contentStatus: ContentItemStatus.processing,
+      };
+    }
+    if (
+      event.type === "video.upload.errored" ||
+      event.type === "video.upload.timed_out" ||
+      event.type === "video.upload.cancelled"
+    ) {
+      return {
+        video: {
+          status: AssetStatus.failed,
+          failureReason:
+            event.type === "video.upload.timed_out"
+              ? "The video upload expired before it completed."
+              : event.type === "video.upload.cancelled"
+                ? "The video upload was cancelled before processing."
+                : "The uploaded file could not be processed as a video.",
+          lastReconciledAt: new Date(),
+          reconciliationFailures: 0,
+        },
+        contentStatus: ContentItemStatus.failed,
       };
     }
     if (event.type === "video.asset.created") {
@@ -251,6 +280,8 @@ export class VideoService {
           muxAssetId: data.id,
           status: AssetStatus.processing,
           failureReason: null,
+          lastReconciledAt: new Date(),
+          reconciliationFailures: 0,
         },
         contentStatus: ContentItemStatus.processing,
       };
@@ -269,6 +300,8 @@ export class VideoService {
           status: AssetStatus.ready,
           readyAt: new Date(),
           failureReason: null,
+          lastReconciledAt: new Date(),
+          reconciliationFailures: 0,
         },
         contentStatus: ContentItemStatus.ready,
       };
@@ -279,14 +312,258 @@ export class VideoService {
           muxAssetId: data.id,
           status: AssetStatus.failed,
           failureReason:
-            data.errors?.messages?.[0] ??
-            data.errors?.message ??
-            "Mux could not process this video.",
+            "The uploaded file could not be processed as a video.",
+          lastReconciledAt: new Date(),
+          reconciliationFailures: 0,
         },
         contentStatus: ContentItemStatus.failed,
       };
     }
     return null;
+  }
+
+  async reconcileStaleAssets() {
+    const interval = this.config.get<number>(
+      "VIDEO_RECONCILIATION_INTERVAL_MS",
+      300_000,
+    );
+    const batchSize = this.config.get<number>(
+      "VIDEO_RECONCILIATION_BATCH_SIZE",
+      25,
+    );
+    const dueBefore = new Date(Date.now() - interval);
+    const videos = await this.prisma.videoAsset.findMany({
+      where: {
+        status: { in: [AssetStatus.pending, AssetStatus.processing] },
+        OR: [
+          { lastReconciledAt: null },
+          { lastReconciledAt: { lte: dueBefore } },
+        ],
+      },
+      orderBy: [
+        { lastReconciledAt: { sort: "asc", nulls: "first" } },
+        { createdAt: "asc" },
+      ],
+      take: batchSize,
+    });
+    const result = { checked: 0, ready: 0, failed: 0, processing: 0 };
+
+    for (const video of videos) {
+      result.checked += 1;
+      const status = await this.reconcileAsset(video);
+      result[status] += 1;
+    }
+
+    if (result.checked > 0) {
+      this.logger.log(
+        `Reconciled ${result.checked} video asset(s): ${result.ready} ready, ${result.failed} failed, ${result.processing} still processing`,
+      );
+    }
+    return result;
+  }
+
+  private async reconcileAsset(video: VideoAsset) {
+    const timeout = this.config.get<number>(
+      "VIDEO_PROCESSING_TIMEOUT_MS",
+      86_400_000,
+    );
+    const expired = Date.now() - video.createdAt.getTime() >= timeout;
+
+    try {
+      let muxAssetId = video.muxAssetId;
+      if (!muxAssetId) {
+        if (!video.muxUploadId) {
+          return await this.failReconciliation(
+            video,
+            "The video upload could not be verified. Delete it and upload the file again.",
+          );
+        }
+        const upload = await this.mux.getDirectUpload(video.muxUploadId);
+        if (!upload) {
+          if (!expired) {
+            await this.touchReconciliation(video.id, {
+              status: AssetStatus.pending,
+            });
+            return "processing" as const;
+          }
+          return await this.failReconciliation(
+            video,
+            "The video upload is no longer available. Delete it and upload the file again.",
+          );
+        }
+        if (
+          upload.status === "errored" ||
+          upload.status === "cancelled" ||
+          upload.status === "timed_out"
+        ) {
+          this.logProviderFailure(
+            video.id,
+            upload.error?.message ?? upload.status,
+          );
+          return await this.failReconciliation(
+            video,
+            upload.status === "timed_out"
+              ? "The video upload expired before it completed. Delete it and upload the file again."
+              : "The uploaded file could not be processed as a video. Delete it and upload a supported video file.",
+          );
+        }
+        if (upload.status !== "asset_created" || !upload.asset_id) {
+          if (expired) {
+            return await this.failReconciliation(
+              video,
+              "The video upload did not complete in time. Delete it and upload the file again.",
+            );
+          }
+          await this.touchReconciliation(video.id, {
+            status: AssetStatus.pending,
+          });
+          return "processing" as const;
+        }
+        muxAssetId = upload.asset_id;
+        await this.touchReconciliation(video.id, {
+          muxAssetId,
+          status: AssetStatus.processing,
+        });
+      }
+
+      const asset = await this.mux.getAsset(muxAssetId);
+      if (!asset) {
+        if (!expired) {
+          await this.touchReconciliation(video.id, {
+            muxAssetId,
+            status: AssetStatus.processing,
+          });
+          return "processing" as const;
+        }
+        return await this.failReconciliation(
+          video,
+          "The processed video is no longer available. Delete it and upload the file again.",
+        );
+      }
+      if (asset.status === "errored") {
+        this.logProviderFailure(
+          video.id,
+          asset.errors?.messages?.[0] ?? asset.errors?.message ?? asset.status,
+        );
+        return await this.failReconciliation(
+          video,
+          "The uploaded file could not be processed as a video. Delete it and upload a supported video file.",
+        );
+      }
+      if (asset.status === "ready") {
+        const playbackId = asset.playback_ids?.find(
+          (playback) => playback.policy === "signed",
+        )?.id;
+        if (playbackId) {
+          await this.applyReconciledState(
+            video,
+            {
+              muxAssetId,
+              playbackId,
+              duration: asset.duration ? Math.ceil(asset.duration) : null,
+              playbackPolicy: "signed",
+              status: AssetStatus.ready,
+              readyAt: new Date(),
+              failureReason: null,
+              lastReconciledAt: new Date(),
+              reconciliationFailures: 0,
+            },
+            ContentItemStatus.ready,
+          );
+          return "ready" as const;
+        }
+      }
+      if (expired) {
+        return await this.failReconciliation(
+          video,
+          "Video processing did not finish in time. Delete it and upload the file again.",
+        );
+      }
+      await this.touchReconciliation(video.id, {
+        muxAssetId,
+        status: AssetStatus.processing,
+      });
+      return "processing" as const;
+    } catch (error) {
+      if (expired) {
+        return this.failReconciliation(
+          video,
+          "We could not confirm that video processing completed. Delete it and upload the file again.",
+        );
+      }
+      await this.prisma.videoAsset.updateMany({
+        where: {
+          id: video.id,
+          status: { in: [AssetStatus.pending, AssetStatus.processing] },
+        },
+        data: {
+          lastReconciledAt: new Date(),
+          reconciliationFailures: { increment: 1 },
+        },
+      });
+      this.logger.warn(
+        `Mux reconciliation failed for video ${video.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+      return "processing" as const;
+    }
+  }
+
+  private async touchReconciliation(
+    videoId: string,
+    data: Prisma.VideoAssetUpdateManyMutationInput,
+  ) {
+    await this.prisma.videoAsset.updateMany({
+      where: {
+        id: videoId,
+        status: { in: [AssetStatus.pending, AssetStatus.processing] },
+      },
+      data: {
+        ...data,
+        lastReconciledAt: new Date(),
+        reconciliationFailures: 0,
+      },
+    });
+  }
+
+  private async failReconciliation(video: VideoAsset, reason: string) {
+    await this.applyReconciledState(
+      video,
+      {
+        status: AssetStatus.failed,
+        failureReason: reason,
+        lastReconciledAt: new Date(),
+      },
+      ContentItemStatus.failed,
+    );
+    return "failed" as const;
+  }
+
+  private async applyReconciledState(
+    video: VideoAsset,
+    data: Prisma.VideoAssetUpdateManyMutationInput,
+    contentStatus: ContentItemStatus,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.videoAsset.updateMany({
+        where: {
+          id: video.id,
+          status: { in: [AssetStatus.pending, AssetStatus.processing] },
+        },
+        data,
+      });
+      if (updated.count && video.contentItemId) {
+        await tx.contentItem.update({
+          where: { id: video.contentItemId },
+          data: { status: contentStatus },
+        });
+      }
+    });
+  }
+
+  private logProviderFailure(videoId: string, reason: string) {
+    this.logger.warn(
+      `Mux reported a terminal state for video ${videoId}: ${reason}`,
+    );
   }
 
   private async assertPlaybackAccess(user: User, contentItemId: string) {

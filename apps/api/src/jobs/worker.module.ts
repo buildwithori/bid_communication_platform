@@ -22,6 +22,7 @@ import { NotificationAutomationProcessor } from "./processors/notification-autom
 import { RecurringDeliverablesProcessor } from "./processors/recurring-deliverables.processor";
 import { ReportExportProcessor } from "./processors/report-export.processor";
 import { TransactionalEmailProcessor } from "./processors/transactional-email.processor";
+import { VideoReconciliationProcessor } from "./processors/video-reconciliation.processor";
 import { WorkerHeartbeatService } from "./worker-heartbeat.service";
 
 @Module({
@@ -53,6 +54,7 @@ import { WorkerHeartbeatService } from "./worker-heartbeat.service";
     TransactionalEmailProcessor,
     ReportExportProcessor,
     ExternalResourceCleanupProcessor,
+    VideoReconciliationProcessor,
     WorkerHeartbeatService,
   ],
 })

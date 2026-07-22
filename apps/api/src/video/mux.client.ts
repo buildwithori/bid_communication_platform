@@ -7,12 +7,30 @@ import { ConfigService } from "@nestjs/config";
 import { IntegrationLoggerService } from "../common/observability/integration-logger.service";
 
 type MuxDirectUploadResponse = {
-  data?: {
-    id?: string;
-    url?: string;
-    status?: string;
-  };
+  data?: MuxDirectUpload;
   error?: { messages?: string[] };
+};
+
+export type MuxDirectUpload = {
+  id?: string;
+  url?: string;
+  status?: "waiting" | "asset_created" | "errored" | "cancelled" | "timed_out";
+  timeout?: number;
+  asset_id?: string;
+  error?: { type?: string; message?: string };
+};
+
+type MuxAssetResponse = {
+  data?: MuxAsset;
+  error?: { messages?: string[] };
+};
+
+export type MuxAsset = {
+  id?: string;
+  status?: "preparing" | "ready" | "errored";
+  duration?: number;
+  playback_ids?: Array<{ id?: string; policy?: string }>;
+  errors?: { messages?: string[]; message?: string };
 };
 
 @Injectable()
@@ -38,8 +56,8 @@ export class MuxClient {
         },
       }),
     });
-    const id = response.data?.id;
-    const url = response.data?.url;
+    const id = response?.data?.id;
+    const url = response?.data?.url;
     if (!id || !url) {
       throw new BadGatewayException("Mux did not return a direct upload URL.");
     }
@@ -47,9 +65,27 @@ export class MuxClient {
   }
 
   async cancelDirectUpload(uploadId: string) {
-    await this.request(`/uploads/${encodeURIComponent(uploadId)}`, {
-      method: "DELETE",
+    await this.request(`/uploads/${encodeURIComponent(uploadId)}/cancel`, {
+      method: "PUT",
     });
+  }
+
+  async getDirectUpload(uploadId: string) {
+    const response = await this.request<MuxDirectUploadResponse>(
+      `/uploads/${encodeURIComponent(uploadId)}`,
+      { method: "GET" },
+      true,
+    );
+    return response?.data ?? null;
+  }
+
+  async getAsset(assetId: string) {
+    const response = await this.request<MuxAssetResponse>(
+      `/assets/${encodeURIComponent(assetId)}`,
+      { method: "GET" },
+      true,
+    );
+    return response?.data ?? null;
   }
 
   async deleteAsset(assetId: string) {
@@ -61,7 +97,8 @@ export class MuxClient {
   private async request<T = unknown>(
     path: string,
     init: RequestInit,
-  ): Promise<T> {
+    notFoundAsNull = false,
+  ): Promise<T | null> {
     const tokenId = this.config.get<string>("MUX_TOKEN_ID");
     const tokenSecret = this.config.get<string>("MUX_TOKEN_SECRET");
     if (!tokenId || !tokenSecret) {
@@ -71,12 +108,7 @@ export class MuxClient {
     }
 
     const method = init.method ?? "GET";
-    const operation =
-      method === "POST"
-        ? "direct_upload.create"
-        : path.startsWith("/assets/")
-          ? "asset.delete"
-          : "direct_upload.cancel";
+    const operation = this.operation(path, method);
     return this.integration.trackOutbound(
       { provider: "mux", operation, method },
       async () => {
@@ -98,6 +130,7 @@ export class MuxClient {
         }
 
         if (!response.ok) {
+          if (notFoundAsNull && response.status === 404) return null;
           if (method === "DELETE" && response.status === 404) {
             return undefined as T;
           }
@@ -114,5 +147,21 @@ export class MuxClient {
         return (await response.json()) as T;
       },
     );
+  }
+
+  private operation(path: string, method: string) {
+    if (method === "POST" && path === "/uploads") {
+      return "direct_upload.create";
+    }
+    if (method === "GET" && path.startsWith("/uploads/")) {
+      return "direct_upload.retrieve";
+    }
+    if (method === "PUT" && path.endsWith("/cancel")) {
+      return "direct_upload.cancel";
+    }
+    if (method === "GET" && path.startsWith("/assets/")) {
+      return "asset.retrieve";
+    }
+    return "asset.delete";
   }
 }
