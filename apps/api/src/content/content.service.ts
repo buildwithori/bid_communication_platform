@@ -540,6 +540,7 @@ export class ContentService {
         : {}),
       moduleId: undefined,
       excludeModuleId: undefined,
+      reusableForModuleId: undefined,
     });
     const where: Prisma.ModuleContentItemWhereInput = {
       moduleId,
@@ -566,6 +567,7 @@ export class ContentService {
             type: undefined,
             moduleId: undefined,
             excludeModuleId: undefined,
+            reusableForModuleId: undefined,
           }),
           modules: { some: { moduleId } },
         },
@@ -712,6 +714,25 @@ export class ContentService {
                 },
               },
             ],
+          }
+        : {}),
+      ...(query.reusableForModuleId
+        ? {
+            modules: {
+              none: {
+                module: {
+                  programmes: {
+                    some: {
+                      programme: {
+                        modules: {
+                          some: { moduleId: query.reusableForModuleId },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           }
         : {}),
       ...(search

@@ -700,6 +700,33 @@ test("reusable content lookup excludes other items linked to a module tool", () 
   });
 });
 
+test("reusable content lookup excludes items already used in a connected programme", () => {
+  const service = new ContentService({} as never, {} as never, {} as never);
+  const where = (
+    service as unknown as {
+      contentWhere(query: {
+        reusableForModuleId: string;
+      }): Record<string, unknown>;
+    }
+  ).contentWhere({ reusableForModuleId: "module-target" });
+
+  assert.deepEqual(where, {
+    modules: {
+      none: {
+        module: {
+          programmes: {
+            some: {
+              programme: {
+                modules: { some: { moduleId: "module-target" } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+});
+
 
 test("published tool lookup excludes tools already used in the module", () => {
   const service = new ToolsService(

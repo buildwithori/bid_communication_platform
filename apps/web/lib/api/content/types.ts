@@ -108,6 +108,7 @@ export type ContentItemQuery = {
   trainerId?: string;
   moduleId?: string;
   excludeModuleId?: string;
+  reusableForModuleId?: string;
   take?: number;
   cursor?: string;
 };

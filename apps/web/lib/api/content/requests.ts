@@ -24,6 +24,9 @@ function queryString(query?: ContentItemQuery) {
   if (query?.excludeModuleId) {
     params.set("excludeModuleId", query.excludeModuleId);
   }
+  if (query?.reusableForModuleId) {
+    params.set("reusableForModuleId", query.reusableForModuleId);
+  }
   if (query?.take) params.set("take", String(query.take));
   if (query?.cursor) params.set("cursor", query.cursor);
   const value = params.toString();

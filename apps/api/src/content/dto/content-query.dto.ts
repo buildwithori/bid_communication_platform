@@ -42,6 +42,10 @@ export class ContentItemQueryDto {
   excludeModuleId?: string;
 
   @IsOptional()
+  @IsString()
+  reusableForModuleId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(1)

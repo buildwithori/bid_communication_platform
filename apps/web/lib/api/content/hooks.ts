@@ -172,11 +172,11 @@ export function useLazyPublishedToolsLookup({
 export function useLazyReusableContentItems(moduleId: string, query: PageQuery & { enabled: boolean }) {
   const { enabled, ...filters } = query;
   const result = useInfiniteQuery({
-    queryKey: contentKeys.list({ ...filters, excludeModuleId: moduleId }),
+    queryKey: contentKeys.list({ ...filters, reusableForModuleId: moduleId }),
     queryFn: ({ pageParam }) =>
       listContentItemsRequest({
         ...filters,
-        excludeModuleId: moduleId,
+        reusableForModuleId: moduleId,
         cursor: pageParam,
       }),
     initialPageParam: undefined as string | undefined,

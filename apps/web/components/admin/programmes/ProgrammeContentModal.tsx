@@ -468,11 +468,11 @@ function ReuseModuleContentModal({
             options={reusable.rows.map((item) => ({
               value: item.id,
               label: item.title,
-              description: `${typeMeta[item.type].label} - used in ${item.usage.modules} module${item.usage.modules === 1 ? "" : "s"}`,
+              description: `${typeMeta[item.type].label} · Used elsewhere in ${item.usage.modules} module${item.usage.modules === 1 ? "" : "s"}`,
             }))}
             placeholder="Search content library"
             searchPlaceholder="Search content..."
-            emptyMessage="No reusable content found."
+            emptyMessage="No unused library content is available for this programme."
             onSearchChange={setSearch}
             isLoading={reusable.isLoading || reusable.isFetchingNextPage}
             hasMore={Boolean(reusable.hasNextPage)}
