@@ -137,6 +137,7 @@ export type EntrepreneurDashboard = {
   activeDeliverables: Array<{
     id: string;
     name: string;
+    programmeId: string;
     programmeName: string;
     dueDate: string;
     status: "not_submitted" | "submitted" | "changes_required" | "overdue";

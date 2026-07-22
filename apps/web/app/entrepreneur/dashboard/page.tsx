@@ -124,7 +124,7 @@ export default function EntrepreneurDashboardPage() {
           <CardHeader title="Active deliverables" description="Open submissions and items waiting for your attention" actions={<Link href={routes.entrepreneur.deliverables}><Button variant="outline" size="sm">View all</Button></Link>} />
           <div className="flex flex-col gap-2">
             {data.activeDeliverables.map((deliverable) => (
-              <Link key={deliverable.id} href={`${routes.entrepreneur.deliverables}?deliverable=${encodeURIComponent(deliverable.id)}`} className="flex items-center gap-3 rounded-md border border-line bg-surface-subtle px-3 py-2.5 transition hover:border-bid/20 hover:bg-bid-light">
+              <Link key={deliverable.id} href={routes.entrepreneur.deliverableDetail(deliverable.programmeId, deliverable.id, deliverable.name)} className="flex items-center gap-3 rounded-md border border-line bg-surface-subtle px-3 py-2.5 transition hover:border-bid/20 hover:bg-bid-light">
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card text-bid shadow-sm"><CheckCircle2 className="h-4 w-4" /></div>
                 <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{deliverable.name}</div><div className="mt-0.5 text-xs text-ink-muted">{deliverable.programmeName} · Due {formatShortDate(deliverable.dueDate)}</div></div>
                 <Badge tone={deliverableTone(deliverable.status)}>{deliverableLabel(deliverable.status)}</Badge>

@@ -657,7 +657,7 @@ export class DashboardsService {
           dueDate: true,
           status: true,
           rule: { select: { name: true } },
-          programme: { select: { name: true } },
+          programme: { select: { id: true, name: true } },
         },
       }),
       this.prisma.notification.findMany({
@@ -739,6 +739,7 @@ export class DashboardsService {
       activeDeliverables: activeDeliverables.map((deliverable) => ({
         id: deliverable.id,
         name: deliverable.rule.name,
+        programmeId: deliverable.programme.id,
         programmeName: deliverable.programme.name,
         dueDate: deliverable.dueDate.toISOString(),
         status: deliverable.status,

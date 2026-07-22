@@ -2,6 +2,7 @@
 
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
+import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
@@ -59,9 +60,17 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
   const displayedHistory = historyTarget ?? linkedHistory ?? null;
   function closeHistory() {
     setHistoryTarget(null);
-    if (linkedDeliverableId) router.replace(`/entrepreneur/deliverables/${programmeId}`);
+    if (linkedDeliverableId) {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete('deliverableId');
+      const suffix = next.toString();
+      router.replace(
+        (`/entrepreneur/deliverables/${encodeURIComponent(programmeId)}${suffix ? `?${suffix}` : ''}`) as Route,
+        { scroll: false },
+      );
+    }
   }
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState(searchParams.get('search') ?? '');
   const debouncedQuery = useDebouncedValue(query.trim());
   const [statusFilter, setStatusFilter] = React.useState<typeof ALL | DeliverableStatus>(ALL);
   const [pageSize, setPageSize] = React.useState(10);
@@ -77,6 +86,16 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
   function openUpload(item?: DeliverableInstance) {
     setUploadTarget(item ?? null);
     setUploadOpen(true);
+  }
+
+  function openDetails(item: DeliverableInstance) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set('deliverableId', item.id);
+    if (query.trim()) next.set('search', query.trim());
+    router.replace(
+      (`/entrepreneur/deliverables/${encodeURIComponent(programmeId)}?${next.toString()}`) as Route,
+      { scroll: false },
+    );
   }
 
   const columns: Column<DeliverableInstance>[] = [
@@ -102,7 +121,13 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
           <div className="flex min-w-[270px] items-start gap-3">
             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-bid-light text-bid"><Icon className="h-4 w-4" /></span>
             <div className="min-w-0">
-              <div className="font-semibold text-ink">{item.deliverable}</div>
+              <button
+                type="button"
+                onClick={() => openDetails(item)}
+                className="font-semibold text-ink transition hover:text-bid focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/30"
+              >
+                {item.deliverable}
+              </button>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
                 <span>{meta.helper}</span>
                 {item.periodStart && item.periodEnd && (
@@ -207,7 +232,7 @@ function DeliverableHistoryModal({ deliverable, onClose, onResubmit }: { deliver
   }
 
   return (
-    <Modal open={Boolean(deliverable)} onOpenChange={(open) => { if (!open) void closeAndMarkRead(); }} title={deliverable ? 'History — ' + deliverable.deliverable : 'Deliverable history'} width="wide">
+    <Modal open={Boolean(deliverable)} onOpenChange={(open) => { if (!open) void closeAndMarkRead(); }} title={deliverable ? 'Deliverable details — ' + deliverable.deliverable : 'Deliverable details'} width="wide">
       {deliverable && (
         <div className="space-y-5">
           <div className="grid gap-3 rounded-xl border border-line bg-surface-subtle p-4 sm:grid-cols-[1fr_auto]">

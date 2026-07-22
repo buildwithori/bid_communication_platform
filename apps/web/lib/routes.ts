@@ -19,6 +19,12 @@ export const routes = {
     profile: '/entrepreneur/profile',
     deliverables: '/entrepreneur/deliverables',
     deliverableGroup: (groupId: string): Route => `/entrepreneur/deliverables/${groupId}` as Route,
+    deliverableDetail: (
+      programmeId: string,
+      deliverableId: string,
+      deliverableName: string,
+    ): Route =>
+      `/entrepreneur/deliverables/${encodeURIComponent(programmeId)}?deliverableId=${encodeURIComponent(deliverableId)}&search=${encodeURIComponent(deliverableName)}` as Route,
     schedule: '/entrepreneur/schedule',
     tools: '/entrepreneur/tools',
   },

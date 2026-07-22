@@ -39,7 +39,15 @@ test("entrepreneur dashboard scopes every preview query to the authenticated use
     },
     deliverableInstance: {
       groupBy: capture("deliverable-groups", []),
-      findMany: capture("deliverables", []),
+      findMany: capture("deliverables", [
+        {
+          id: "deliverable-1",
+          dueDate: new Date("2026-07-21T00:00:00.000Z"),
+          status: "overdue",
+          rule: { name: "Business plan" },
+          programme: { id: "programme-1", name: "Growth readiness" },
+        },
+      ]),
     },
     session: { findMany: capture("sessions", []) },
     notification: { findMany: capture("notifications", []) },
@@ -60,6 +68,11 @@ test("entrepreneur dashboard scopes every preview query to the authenticated use
   assert.equal(notificationQuery.where.recipientUserId, "entrepreneur-1");
   assert.equal(notificationQuery.take, 3);
   assert.deepEqual(notificationQuery.orderBy, [{ createdAt: "desc" }, { id: "desc" }]);
+  assert.equal(result.activeDeliverables[0]?.programmeId, "programme-1");
+  const deliverableQuery = calls.find((call) => call.resource === "deliverables")?.args as any;
+  assert.deepEqual(deliverableQuery.select.programme, {
+    select: { id: true, name: true },
+  });
 });
 
 test("recent entrepreneur dashboard queue is cursor paginated and never returns the lookahead row", async () => {
