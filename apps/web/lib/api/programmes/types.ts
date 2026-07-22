@@ -291,6 +291,12 @@ export type UpdateProgrammeDeliverableRuleVariables = {
   payload: UpsertProgrammeDeliverableRulePayload;
 };
 
+export type DeleteProgrammeDeliverableRuleVariables = {
+  programmeId: string;
+  ruleId: string;
+  confirmation: string;
+};
+
 export type ProgrammePlayerProgressStatus =
   "not_started" | "in_progress" | "completed";
 

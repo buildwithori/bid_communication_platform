@@ -146,6 +146,49 @@ export class ResourceDeletionService {
     });
   }
 
+  async deleteProgrammeDeliverableRule(
+    user: User,
+    programmeId: string,
+    ruleId: string,
+    dto: DeleteResourceDto,
+  ): Promise<ResourceDeletionResult> {
+    this.assertAdmin(user);
+    return this.prisma.$transaction(async (tx) => {
+      const rule = await tx.programmeDeliverableRule.findFirst({
+        where: { id: ruleId, programmeId },
+        select: { id: true, name: true },
+      });
+      if (!rule) {
+        throw new NotFoundException("Programme deliverable was not found.");
+      }
+      this.assertConfirmation(rule.name, dto.confirmation);
+
+      const deletion = await this.deleteDeliverableTree(tx, [rule.id]);
+      await tx.programmeDeliverableRule.delete({ where: { id: rule.id } });
+      await this.audit.enqueue(
+        {
+          action: "programme_deliverable_rules.deleted",
+          entityType: "programme_deliverable_rule",
+          entityId: rule.id,
+          summary: `Deleted deliverable rule: ${rule.name}`,
+          payload: {
+            programmeId,
+            name: rule.name,
+            externalCleanupQueued: deletion.externalCleanupQueued,
+          },
+        },
+        tx,
+      );
+
+      return {
+        id: rule.id,
+        name: rule.name,
+        deleted: true,
+        externalCleanupQueued: deletion.externalCleanupQueued,
+      };
+    });
+  }
+
   private async deleteDeliverableTree(tx: Transaction, ruleIds: string[]) {
     if (!ruleIds.length) return { externalCleanupQueued: 0 };
     const instances = await tx.deliverableInstance.findMany({ where: { ruleId: { in: ruleIds } }, select: { id: true } });

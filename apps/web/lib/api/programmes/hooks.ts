@@ -3,11 +3,15 @@
 import { useCallback, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { programmeKeys } from './keys';
+import { dashboardKeys } from '../dashboards/keys';
+import { deliverableKeys } from '../deliverables/keys';
+import { notificationKeys } from '../notifications/keys';
 import {
   archiveProgrammeRequest,
   createProgrammeDeliverableRuleRequest,
   createProgrammeModuleRequest,
   createProgrammeRequest,
+  deleteProgrammeDeliverableRuleRequest,
   deleteProgrammeModuleRequest,
   deleteProgrammeRequest,
   getProgrammeModuleRequest,
@@ -32,6 +36,7 @@ import type {
   CreateProgrammeModuleVariables,
   CreateProgrammePayload,
   DeleteProgrammeModuleVariables,
+  DeleteProgrammeDeliverableRuleVariables,
   DeleteProgrammeVariables,
   MoveProgrammeModuleVariables,
   ProgrammeDeliverableRule,
@@ -462,3 +467,20 @@ export const useCreateProgrammeDeliverableRuleMutation = (handlers?: MutationHan
 
 export const useUpdateProgrammeDeliverableRuleMutation = (handlers?: MutationHandlers<ProgrammeDeliverableRule>) =>
   useDeliverableRuleMutation<UpdateProgrammeDeliverableRuleVariables>(updateProgrammeDeliverableRuleRequest, handlers);
+
+export const useDeleteProgrammeDeliverableRuleMutation = (handlers?: MutationHandlers<ResourceDeletionResult>) => {
+  const queryClient = useQueryClient();
+  return useMutation<ResourceDeletionResult, Error, DeleteProgrammeDeliverableRuleVariables>({
+    mutationFn: deleteProgrammeDeliverableRuleRequest,
+    onSuccess: (data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.deliverableRuleLists(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({ queryKey: deliverableKeys.all });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      handlers?.onSuccess?.(data);
+    },
+    onError: handlers?.onError,
+  });
+};

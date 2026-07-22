@@ -1,6 +1,7 @@
 export {
   useArchiveProgrammeMutation,
   useCreateProgrammeDeliverableRuleMutation,
+  useDeleteProgrammeDeliverableRuleMutation,
   useDeleteProgrammeModuleMutation,
   useDeleteProgrammeMutation,
   useCreateProgrammeModuleMutation,
@@ -31,6 +32,7 @@ export type {
   CreateProgrammeModuleVariables,
   CreateProgrammePayload,
   DeleteProgrammeModuleVariables,
+  DeleteProgrammeDeliverableRuleVariables,
   DeleteProgrammeVariables,
   MoveProgrammeModuleVariables,
   ProgrammeAccessType,

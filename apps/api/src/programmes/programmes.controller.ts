@@ -134,6 +134,22 @@ export class ProgrammesController {
     return this.programmesService.updateDeliverableRule(user, id, ruleId, dto);
   }
 
+  @Delete(':id/deliverable-rules/:ruleId')
+  @Roles(UserRole.admin)
+  deleteDeliverableRule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('ruleId') ruleId: string,
+    @Body() dto: DeleteResourceDto,
+  ) {
+    return this.resourceDeletion.deleteProgrammeDeliverableRule(
+      user,
+      id,
+      ruleId,
+      dto,
+    );
+  }
+
   @Get(':id')
   getProgramme(@CurrentUser() user: User, @Param('id') id: string) {
     return this.programmesService.getProgramme(user, id);

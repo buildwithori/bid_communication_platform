@@ -10,6 +10,7 @@ import { ProgrammesService } from "../src/programmes/programmes.service";
 import { ContentService } from "../src/content/content.service";
 import { FilesService } from "../src/files/files.service";
 import { ToolsService } from "../src/tools/tools.service";
+import { ResourceDeletionService } from "../src/resource-deletion/resource-deletion.service";
 
 const entrepreneur = {
   id: "entrepreneur-1",
@@ -514,6 +515,72 @@ test("reused content keeps an independent rating in each learning context", asyn
   assert.equal(first.programmeId, "programme-1");
   assert.equal(reused.programmeId, "programme-2");
   assert.notEqual(first.id, reused.id);
+});
+
+test("deleting a deliverable rule removes generated work and queues file cleanup", async () => {
+  const deleted: string[] = [];
+  let queuedStorageKey: string | undefined;
+  const transaction = {
+    programmeDeliverableRule: {
+      findFirst: async () => ({ id: "rule-1", name: "First Deliverable" }),
+      delete: async () => deleted.push("rule"),
+    },
+    deliverableInstance: {
+      findMany: async () => [{ id: "instance-1" }],
+      deleteMany: async () => deleted.push("instances"),
+    },
+    deliverableSubmission: {
+      findMany: async () => [
+        {
+          id: "submission-1",
+          fileAsset: { id: "file-1", storageKey: "deliverables/file.pdf" },
+        },
+      ],
+      deleteMany: async () => deleted.push("submissions"),
+    },
+    deliverableReview: {
+      deleteMany: async () => deleted.push("reviews"),
+    },
+    notification: {
+      findMany: async () => [],
+    },
+    fileAsset: {
+      deleteMany: async () => deleted.push("files"),
+    },
+    externalResourceDeletion: {
+      createMany: async (query: any) => {
+        queuedStorageKey = query.data[0]?.externalId;
+      },
+    },
+  };
+  const auditEvents: any[] = [];
+  const service = new ResourceDeletionService(
+    {
+      $transaction: async (operation: (tx: unknown) => unknown) =>
+        operation(transaction),
+    } as never,
+    {
+      enqueue: async (event: unknown) => auditEvents.push(event),
+    } as never,
+  );
+
+  const result = await service.deleteProgrammeDeliverableRule(
+    { id: "admin-1", role: UserRole.admin } as never,
+    "programme-1",
+    "rule-1",
+    { confirmation: "First Deliverable" },
+  );
+
+  assert.deepEqual(deleted, [
+    "reviews",
+    "submissions",
+    "instances",
+    "files",
+    "rule",
+  ]);
+  assert.equal(queuedStorageKey, "deliverables/file.pdf");
+  assert.equal(result.externalCleanupQueued, 1);
+  assert.equal(auditEvents.length, 1);
 });
 
 test("programme access authorizes a linked PDF entrepreneur tool", async () => {

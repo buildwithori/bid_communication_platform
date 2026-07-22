@@ -17,6 +17,7 @@ import {
   type Column,
 } from '@/components/shared/DataTable';
 import { DatePicker } from '@/components/shared/DatePicker';
+import { DestructiveActionModal } from '@/components/shared/DestructiveActionModal';
 import {
   FormAutocomplete,
   FormField,
@@ -27,6 +28,7 @@ import { Modal } from '@/components/shared/Modal';
 import { Notice } from '@/components/shared/PageHeader';
 import {
   useCreateProgrammeDeliverableRuleMutation,
+  useDeleteProgrammeDeliverableRuleMutation,
   useLazyProgrammeModules,
   useProgrammeDeliverableRulesPage,
   useUpdateProgrammeDeliverableRuleMutation,
@@ -137,6 +139,7 @@ export function RequiredDeliverablesSection({
   const [pageSize, setPageSize] = React.useState(5);
   const [addOpen, setAddOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<ProgrammeDeliverableRule | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<ProgrammeDeliverableRule | null>(null);
   const [stageLookup, setStageLookup] = React.useState({ search: '' });
   const [moduleLookup, setModuleLookup] = React.useState({ search: '' });
   const modalOpen = addOpen || Boolean(editTarget);
@@ -176,6 +179,13 @@ export function RequiredDeliverablesSection({
     onSuccess: () => {
       toast.success('Deliverable type updated');
       setEditTarget(null);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteRule = useDeleteProgrammeDeliverableRuleMutation({
+    onSuccess: () => {
+      toast.success('Deliverable deleted');
+      setDeleteTarget(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -228,7 +238,17 @@ export function RequiredDeliverablesSection({
       header: 'Action',
       className: 'w-[84px]',
       cell: (rule) => (
-        <RowActions actions={[{ label: 'Edit deliverable', onSelect: () => openEdit(rule) }]} />
+        <RowActions
+          actions={[
+            { label: 'Edit deliverable', onSelect: () => openEdit(rule) },
+            'separator',
+            {
+              label: 'Delete deliverable',
+              destructive: true,
+              onSelect: () => setDeleteTarget(rule),
+            },
+          ]}
+        />
       ),
     });
   }
@@ -278,7 +298,7 @@ export function RequiredDeliverablesSection({
         />
         {readOnly ? (
           <Notice>
-            Restore this programme before adding or editing deliverable types.
+            Restore this programme before managing deliverable types.
           </Notice>
         ) : null}
         <Notice>
@@ -358,6 +378,32 @@ export function RequiredDeliverablesSection({
               ruleId: editTarget.id,
               payload: toPayload(values),
             })}
+          />
+          <DestructiveActionModal
+            open={Boolean(deleteTarget)}
+            onOpenChange={(open) => {
+              if (!open) setDeleteTarget(null);
+            }}
+            title="Delete deliverable"
+            resourceName={deleteTarget?.name ?? ''}
+            description="This permanently removes the deliverable requirement and all entrepreneur work generated from it."
+            consequences={[
+              `${deleteTarget?.assignedCount ?? 0} assigned requirement${deleteTarget?.assignedCount === 1 ? '' : 's'} will be removed.`,
+              deleteTarget?.submittedCount
+                ? `${deleteTarget.submittedCount} submitted record${deleteTarget.submittedCount === 1 ? '' : 's'}, including uploaded files and reviews, will be permanently deleted.`
+                : 'Any submission history, uploaded files, and reviews for this requirement will be permanently deleted.',
+              'Future recurring requirements and reminders from this deliverable will stop.',
+            ]}
+            confirmLabel="Delete deliverable"
+            isPending={deleteRule.isPending}
+            onConfirm={async () => {
+              if (!deleteTarget) return;
+              await deleteRule.mutateAsync({
+                programmeId,
+                ruleId: deleteTarget.id,
+                confirmation: deleteTarget.name,
+              });
+            }}
           />
         </>
       ) : null}

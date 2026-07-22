@@ -2,6 +2,7 @@ import { apiRequest } from '../client';
 import type {
   ArchiveProgrammeVariables,
   CreateProgrammeDeliverableRuleVariables,
+  DeleteProgrammeDeliverableRuleVariables,
   DeleteProgrammeModuleVariables,
   DeleteProgrammeVariables,
   CreateProgrammeModuleVariables,
@@ -167,4 +168,10 @@ export const updateProgrammeDeliverableRuleRequest = ({ programmeId, ruleId, pay
   apiRequest<ProgrammeDeliverableRule>(`/programmes/${programmeId}/deliverable-rules/${ruleId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+
+export const deleteProgrammeDeliverableRuleRequest = ({ programmeId, ruleId, confirmation }: DeleteProgrammeDeliverableRuleVariables) =>
+  apiRequest<ResourceDeletionResult>(`/programmes/${programmeId}/deliverable-rules/${ruleId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmation }),
   });
