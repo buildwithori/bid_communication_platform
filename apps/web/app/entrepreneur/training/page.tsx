@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BookOpen,
+  FileSpreadsheet,
   FileText,
   Layers3,
   PlayCircle,
@@ -188,6 +189,10 @@ export default function TrainingLibraryPage() {
               <FileText className="h-3.5 w-3.5" />
               {programme.content.pdfs} PDFs
             </Badge>
+            <Badge tone="green">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              {programme.content.excels} Excel
+            </Badge>
             <Badge tone="brand">
               <Wrench className="h-3.5 w-3.5" />
               {programme.content.tools} tools
@@ -335,7 +340,9 @@ export default function TrainingLibraryPage() {
                 icon={FileText}
                 label="Files and tools"
                 value={
-                  heroProgramme.content.pdfs + heroProgramme.content.tools
+                  heroProgramme.content.pdfs +
+                  heroProgramme.content.excels +
+                  heroProgramme.content.tools
                 }
               />
             </div>
