@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
-import { Card, Skeleton, TableSkeleton } from '@/components/shared/Card';
+import { Card } from '@/components/shared/Card';
+import { TrainingLibrarySkeleton } from '@/components/entrepreneur/training/TrainingLibrarySkeletons';
 import {
   DataTable,
   RowActions,
@@ -454,39 +455,6 @@ export default function TrainingLibraryPage() {
           onPageSizeChange={setPageSize}
         />
       </Card>
-    </>
-  );
-}
-
-function TrainingLibrarySkeleton() {
-  return (
-    <>
-      <PageHeader
-        title="Training Library"
-        description="Continue your programme learning and use free BID programmes anytime."
-      />
-      <Card padding="lg" className="mb-4">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-4">
-            <Skeleton className="h-5 w-60" />
-            <Skeleton className="h-8 w-3/5" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-          <div className="space-y-3">
-            {Array.from({ length: 3 }, (_, index) => (
-              <Skeleton key={index} className="h-20 w-full" />
-            ))}
-          </div>
-        </div>
-      </Card>
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
-          <Skeleton key={index} className="h-24 w-full" />
-        ))}
-      </div>
-      <TableSkeleton columns={7} rows={8} />
     </>
   );
 }

@@ -960,7 +960,7 @@ export function ProgrammeCoursePlayerSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
       <div className="grid xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="border-r border-line">
+        <div className="border-b border-line xl:border-b-0 xl:border-r">
           <div className="bg-[#161116] p-4">
             <Skeleton className="h-4 w-52 bg-white/10" />
             <Skeleton className="mt-2 h-3 w-72 bg-white/10" />
@@ -976,11 +976,16 @@ export function ProgrammeCoursePlayerSkeleton() {
             </div>
           </div>
         </div>
-        <div className="space-y-2 p-4">
-          <Skeleton className="mb-5 h-6 w-40" />
-          {[0, 1, 2, 3].map((item) => (
-            <Skeleton key={item} className="h-20 w-full" />
-          ))}
+        <div>
+          <div className="border-b border-line p-4">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="mt-2 h-3 w-24" />
+          </div>
+          <div className="space-y-2 p-4">
+            {[0, 1, 2, 3].map((item) => (
+              <Skeleton key={item} className="h-20 w-full" />
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -15,11 +15,9 @@ import {
 import { Badge } from '@/components/shared/Badge';
 import { Breadcrumb } from '@/components/shared/Breadcrumb';
 import { Button } from '@/components/shared/Button';
-import { Card, Skeleton } from '@/components/shared/Card';
-import {
-  ProgrammeCoursePlayer,
-  ProgrammeCoursePlayerSkeleton,
-} from '@/components/learning/ProgrammeCoursePlayer';
+import { Card } from '@/components/shared/Card';
+import { ProgrammeCoursePlayer } from '@/components/learning/ProgrammeCoursePlayer';
+import { ProgrammePlayerPageSkeleton } from '@/components/entrepreneur/training/TrainingLibrarySkeletons';
 import { Notice, PageHeader } from '@/components/shared/PageHeader';
 import { ProgressBar } from '@/components/shared/ProgressBar';
 import {
@@ -216,36 +214,5 @@ function SummaryMetric({
       <div className="mt-2 text-xl font-semibold text-ink">{value}</div>
       <div className="mt-0.5 text-xs text-ink-muted">{label}</div>
     </div>
-  );
-}
-
-function ProgrammePlayerPageSkeleton() {
-  return (
-    <>
-      <div className="mb-4 flex items-center gap-2">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-4 w-4" />
-        <Skeleton className="h-4 w-44" />
-      </div>
-      <div className="mb-5">
-        <Skeleton className="h-8 w-80 max-w-full" />
-        <Skeleton className="mt-2 h-4 w-[560px] max-w-full" />
-      </div>
-      <Card padding="lg" className="mb-4">
-        <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
-          <div>
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="mt-5 h-3 w-full" />
-            <Skeleton className="mt-3 h-4 w-48" />
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {[0, 1, 2, 3].map((item) => (
-              <Skeleton key={item} className="h-24 w-full" />
-            ))}
-          </div>
-        </div>
-      </Card>
-      <ProgrammeCoursePlayerSkeleton />
-    </>
   );
 }
