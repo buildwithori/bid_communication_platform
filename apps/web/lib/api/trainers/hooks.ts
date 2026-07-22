@@ -106,9 +106,23 @@ export function useLazyTrainersLookup(
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
   });
+  const isRefreshingOptions =
+    enabled && result.isFetching && !result.isFetchingNextPage;
+  const rows = isRefreshingOptions
+    ? []
+    : (result.data?.pages.flatMap((page) => page.items) ?? []).filter(
+        (trainer) =>
+          trainer.directoryStatus === "active" &&
+          (trainer.accessLevel === "full" ||
+            Boolean(
+              trainer.accessExpiresOn &&
+                new Date(trainer.accessExpiresOn) > new Date(),
+            )),
+      );
   return {
     ...result,
-    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+    isLoading: result.isLoading || isRefreshingOptions,
+    rows,
   };
 }
 

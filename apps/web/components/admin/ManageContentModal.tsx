@@ -41,7 +41,7 @@ import { useAdminStore } from "@/lib/stores/admin-store";
 import { toolById, tools } from "@/lib/mock-data";
 import { contentItemSchema, type ContentItemForm } from "@/lib/forms/schemas";
 import { cn } from "@/lib/utils";
-import type { Module, ContentItem } from "@/types";
+import type { Module, ContentItem, Trainer } from "@/types";
 
 const typeMeta = {
   video: {
@@ -64,6 +64,14 @@ const typeMeta = {
     fg: "text-success-dark",
   },
 };
+
+function trainerCanBeAssigned(trainer: Trainer) {
+  if (trainer.metrics.status === "inactive") return false;
+  if (trainer.accessLevel !== "guest") return true;
+  return Boolean(
+    trainer.accessExpiresOn && new Date(trainer.accessExpiresOn) > new Date(),
+  );
+}
 
 export function ManageContentModal({
   open,
@@ -555,6 +563,10 @@ export function AddContentItemModal({
   onAdded?: (module: Module) => void;
 }) {
   const { addContentItem, trainers } = useAdminStore();
+  const selectableTrainers = React.useMemo(
+    () => trainers.filter(trainerCanBeAssigned),
+    [trainers],
+  );
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
   const pdfInputRef = React.useRef<HTMLInputElement | null>(null);
   const embeddedToolOptions = React.useMemo(
@@ -570,7 +582,7 @@ export function AddContentItemModal({
     defaultValues: {
       title: "",
       type: "video",
-      trainerId: trainers[0]?.id ?? "",
+      trainerId: selectableTrainers[0]?.id ?? "",
       videoFileName: "",
       pdfFileName: "",
       fileUrl: "",
@@ -600,7 +612,7 @@ export function AddContentItemModal({
     form.reset({
       title: "",
       type: "video",
-      trainerId: trainers[0]?.id ?? "",
+      trainerId: selectableTrainers[0]?.id ?? "",
       videoFileName: "",
       pdfFileName: "",
       fileUrl: "",
@@ -664,7 +676,7 @@ export function AddContentItemModal({
             onValueChange={(value) =>
               form.setValue("trainerId", value, { shouldValidate: true })
             }
-            options={trainers.map((trainer) => ({
+            options={selectableTrainers.map((trainer) => ({
               value: trainer.id,
               label: trainer.fullName,
               description: trainer.role,

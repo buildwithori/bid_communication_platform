@@ -24,8 +24,30 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
   const router = useRouter();
   const pathname = usePathname();
   const currentUserQuery = useCurrentUserQuery();
+  const refetchCurrentUser = currentUserQuery.refetch;
   const user = currentUserQuery.data?.user;
   const isAllowed = user ? allowedRoles.includes(user.role) : false;
+
+  React.useEffect(() => {
+    if (user?.role !== 'trainer' || !user.trainerAccessExpiresAt) return;
+    const expiresAt = new Date(user.trainerAccessExpiresAt).getTime();
+    let timeout: number | undefined;
+    const checkExpiry = () => {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        void refetchCurrentUser();
+        return;
+      }
+      timeout = window.setTimeout(
+        checkExpiry,
+        Math.min(remaining + 50, 2_147_483_647),
+      );
+    };
+    checkExpiry();
+    return () => {
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [refetchCurrentUser, user?.role, user?.trainerAccessExpiresAt]);
 
   React.useEffect(() => {
     if (currentUserQuery.isLoading) return;

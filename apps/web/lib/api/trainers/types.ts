@@ -4,7 +4,11 @@ export type TrainerRoleLabel =
   | "guest_expert"
   | "investment_analyst";
 export type TrainerAccessLevel = "full" | "guest";
-export type TrainerDirectoryStatus = "active" | "invited" | "inactive";
+export type TrainerDirectoryStatus =
+  | "active"
+  | "invited"
+  | "expired"
+  | "inactive";
 export type TrainerCalendarFilter = "connected" | "not_connected";
 
 export type TrainerRecord = {

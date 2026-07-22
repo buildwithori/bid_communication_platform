@@ -18,6 +18,7 @@ import {
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
 import { FilesService } from "../files/files.service";
+import { activeTrainerUserWhere } from "../trainers/trainer-access";
 import {
   AttachContentItemDto,
   ContentItemQueryDto,
@@ -915,10 +916,12 @@ export class ContentService {
   private async ensureTrainerExists(trainerId?: string) {
     if (!trainerId) return;
     const trainer = await this.prisma.user.findFirst({
-      where: { id: trainerId, role: UserRole.trainer },
+      where: { id: trainerId, AND: [activeTrainerUserWhere()] },
       select: { id: true },
     });
-    if (!trainer) throw new NotFoundException("Trainer was not found.");
+    if (!trainer) {
+      throw new BadRequestException("Choose a valid active trainer.");
+    }
   }
 
   private async ensureVideoAsset(user: User, videoAssetId: string) {

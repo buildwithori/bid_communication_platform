@@ -303,6 +303,6 @@ export class GoogleAuthService {
     },
     onboardingRequired: boolean,
   ) {
-    return { ...user, onboardingRequired };
+    return { ...user, trainerAccessExpiresAt: null, onboardingRequired };
   }
 }

@@ -13,6 +13,10 @@ import { CalendarService } from "../calendar/calendar.service";
 import { PLATFORM_DEFAULT_TIMEZONE } from "../common/constants/platform.constants";
 import { PrismaService } from "../database/prisma.service";
 import {
+  activeBidTeamMemberWhere,
+  activeTrainerUserWhere,
+} from "../trainers/trainer-access";
+import {
   SessionAvailabilityQueryDto,
   SessionTeamMemberQueryDto,
 } from "./dto/session-availability.dto";
@@ -34,8 +38,13 @@ export class SessionAvailabilityService {
     const search = query.search?.trim();
     const rows = await this.prisma.user.findMany({
       where: {
-        role: query.role ?? { in: [UserRole.admin, UserRole.trainer] },
-        status: "active",
+        AND: [
+          query.role === UserRole.admin
+            ? { role: UserRole.admin, status: "active" }
+            : query.role === UserRole.trainer
+              ? activeTrainerUserWhere()
+              : activeBidTeamMemberWhere(),
+        ],
         calendarConnections: {
           some: {
             provider: CalendarProvider.google,
@@ -361,8 +370,7 @@ export class SessionAvailabilityService {
     return this.prisma.user.findMany({
       where: {
         ...(targetUserId ? { id: targetUserId } : {}),
-        role: { in: [UserRole.admin, UserRole.trainer] },
-        status: "active",
+        AND: [activeBidTeamMemberWhere()],
         calendarConnections: {
           some: {
             provider: CalendarProvider.google,

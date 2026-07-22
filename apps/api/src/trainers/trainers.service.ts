@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TrainerQueryDto } from './dto/trainer-query.dto';
+import { activeTrainerUserWhere } from './trainer-access';
 
 const DEFAULT_TAKE = 20;
 
@@ -90,7 +91,7 @@ export class TrainersService {
       this.prisma.user.count({ where }),
       this.prisma.user.count({ where: baseWhere }),
       this.prisma.user.count({
-        where: { AND: [baseWhere, { status: UserStatus.active }] },
+        where: { AND: [baseWhere, this.activeTrainerWhere()] },
       }),
       this.prisma.user.count({
         where: { AND: [baseWhere, { status: UserStatus.pending }] },
@@ -99,6 +100,7 @@ export class TrainersService {
         where: {
           AND: [
             baseWhere,
+            this.activeTrainerWhere(),
             {
               calendarConnections: {
                 some: {
@@ -193,12 +195,11 @@ export class TrainersService {
     }
 
     if (query.status === 'active') {
-      filters.push({
-        status: UserStatus.active,
-        trainerCapability: { status: TrainerCapabilityStatus.active },
-      });
+      filters.push(this.activeTrainerWhere());
     } else if (query.status === 'invited') {
       filters.push({ status: UserStatus.pending });
+    } else if (query.status === 'expired') {
+      filters.push(this.expiredTrainerWhere());
     } else if (query.status === 'inactive') {
       filters.push({
         OR: [
@@ -236,6 +237,23 @@ export class TrainersService {
     if (scopeWhere) filters.push(scopeWhere);
 
     return { AND: filters };
+  }
+
+  private activeTrainerWhere(): Prisma.UserWhereInput {
+    return activeTrainerUserWhere();
+  }
+
+  private expiredTrainerWhere(): Prisma.UserWhereInput {
+    return {
+      status: UserStatus.active,
+      trainerCapability: {
+        is: {
+          status: TrainerCapabilityStatus.active,
+          accessLevel: TrainerAccessLevel.guest,
+          accessExpiresOn: { lte: new Date() },
+        },
+      },
+    };
   }
 
   private scopeWhere(user: User): Prisma.UserWhereInput | null {
@@ -318,6 +336,11 @@ export class TrainersService {
     const contentItems = context.contentByTrainer.get(trainer.id) ?? [];
     const portfolio = this.portfolioSummary(contentItems, viewer);
     const ratings = context.ratingsByTrainer.get(trainer.id) ?? { average: null, count: 0 };
+    const accessExpired = Boolean(
+      trainer.trainerCapability?.accessLevel === TrainerAccessLevel.guest &&
+        trainer.trainerCapability.accessExpiresOn &&
+        trainer.trainerCapability.accessExpiresOn <= new Date(),
+    );
 
     return {
       trainerUserId: trainer.id,
@@ -329,6 +352,8 @@ export class TrainersService {
           ? 'invited'
           : trainer.status === UserStatus.inactive
             ? 'inactive'
+            : accessExpired
+              ? 'expired'
             : 'active',
       name: [trainer.firstName, trainer.lastName].filter(Boolean).join(' ') || trainer.email,
       email: trainer.email,

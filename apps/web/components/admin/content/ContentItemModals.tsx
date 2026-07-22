@@ -26,7 +26,10 @@ import {
   useLazyProgrammeModules,
   useLazyProgrammesLookup,
 } from "@/lib/api/programmes";
-import { useLazyTrainersLookup } from "@/lib/api/trainers";
+import {
+  useLazyTrainersLookup,
+  useTrainerDetailQuery,
+} from "@/lib/api/trainers";
 import { useDirectFileUploadMutation } from "@/lib/api/files";
 import { useDirectVideoUploadMutation } from "@/lib/api/videos";
 
@@ -512,6 +515,7 @@ export function EditContentItemModal({
     status: "active",
     take: 20,
   });
+  const currentTrainer = useTrainerDetailQuery(item?.trainerId ?? null);
   const update = useUpdateContentItemMutation();
 
   if (!item) return null;
@@ -531,7 +535,11 @@ export function EditContentItemModal({
               contentItemId: item.id,
               payload: {
                 title: values.title,
-                trainerId: values.trainerId,
+                trainerId:
+                  values.trainerId === item.trainerId &&
+                  currentTrainer.data?.directoryStatus !== "active"
+                    ? undefined
+                    : values.trainerId,
               },
             });
             toast.success("Content item updated.");
@@ -553,22 +561,24 @@ export function EditContentItemModal({
             value={trainerId}
             onValueChange={(value) => form.setValue("trainerId", value)}
             options={[
-              ...(item.trainer
+              ...(currentTrainer.data?.directoryStatus === "active" &&
+              !trainers.rows.some(
+                (trainer) =>
+                  trainer.trainerUserId === currentTrainer.data?.trainerUserId,
+              )
                 ? [
                     {
-                      value: item.trainer.id,
-                      label: item.trainer.name,
-                      description: item.trainer.email,
+                      value: currentTrainer.data.trainerUserId,
+                      label: currentTrainer.data.name,
+                      description: currentTrainer.data.email,
                     },
                   ]
                 : []),
-              ...trainers.rows
-                .filter((trainer) => trainer.trainerUserId !== item.trainerId)
-                .map((trainer) => ({
-                  value: trainer.trainerUserId,
-                  label: trainer.name,
-                  description: trainer.email,
-                })),
+              ...trainers.rows.map((trainer) => ({
+                value: trainer.trainerUserId,
+                label: trainer.name,
+                description: trainer.email,
+              })),
             ]}
             placeholder="Select trainer"
             searchPlaceholder="Search trainers..."
@@ -578,10 +588,19 @@ export function EditContentItemModal({
             onLoadMore={() => void trainers.fetchNextPage()}
           />
         </FormField>
+        {item.trainerId &&
+        !currentTrainer.isLoading &&
+        currentTrainer.data?.directoryStatus !== "active" ? (
+          <Notice>
+            The previously assigned trainer is no longer available. Existing
+            attribution will remain unless you choose another active trainer.
+          </Notice>
+        ) : null}
         <Notice>The asset type and uploaded file remain unchanged.</Notice>
         <Button
           type="submit"
           className="w-full"
+          disabled={currentTrainer.isLoading}
           isLoading={update.isPending}
           loadingLabel="Saving content..."
         >

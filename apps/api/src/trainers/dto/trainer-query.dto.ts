@@ -13,6 +13,7 @@ import { TrainerAccessLevel } from '@prisma/client';
 export const trainerDirectoryStatuses = [
   'active',
   'invited',
+  'expired',
   'inactive',
 ] as const;
 export type TrainerDirectoryStatus =

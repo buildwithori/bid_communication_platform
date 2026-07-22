@@ -1,5 +1,15 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { BusinessRelationship, BusinessSource, User, UserRole, UserStatus } from '@prisma/client';
+import {
+  BusinessRelationship,
+  BusinessSource,
+  Prisma,
+  TrainerAccessLevel,
+  TrainerCapability,
+  TrainerCapabilityStatus,
+  User,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { AuthEmailService } from './auth-email.service';
 import { PrismaService } from '../database/prisma.service';
 import { DeliverableLifecycleService } from '../deliverables/deliverable-lifecycle.service';
@@ -10,9 +20,16 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
 import { TokenDto } from './dto/token.dto';
 import { addMinutes, createPlainToken, hashPassword, hashToken, verifyPassword } from './auth.tokens';
+import { trainerCapabilityAllowsAccess } from '../trainers/trainer-access';
 
 const SESSION_DURATION_MINUTES = 60 * 24 * 30;
 const VERIFICATION_DURATION_MINUTES = 60 * 24;
+const authUserInclude = Prisma.validator<Prisma.UserInclude>()({
+  trainerCapability: true,
+});
+type AccessCheckedUser = Prisma.UserGetPayload<{
+  include: typeof authUserInclude;
+}>;
 
 @Injectable()
 export class AuthService {
@@ -57,16 +74,20 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const found = await this.prisma.user.findUnique({ where: { email: this.normalizeEmail(dto.email) } });
+    const found = await this.prisma.user.findUnique({
+      where: { email: this.normalizeEmail(dto.email) },
+      include: authUserInclude,
+    });
     if (!found || !(await verifyPassword(dto.password, found.passwordHash))) {
       throw new UnauthorizedException('Invalid email or password.');
     }
     if (found.status === UserStatus.inactive) throw new UnauthorizedException('This account is inactive.');
+    await this.assertTrainerAccess(found);
 
     const user = await this.prisma.user.update({ where: { id: found.id }, data: { lastLoginAt: new Date() } });
     const sessionToken = await this.createSession(user.id);
     return {
-      user: this.serializeUser(user), sessionToken,
+      user: this.serializeUser(user, found.trainerCapability), sessionToken,
       session: { mode: 'cookie', expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES) },
     };
   }
@@ -86,13 +107,22 @@ export class AuthService {
     const activeSession = await this.findActiveSession(sessionToken);
     if (!activeSession) throw new UnauthorizedException('Session is invalid or expired.');
 
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: activeSession.userId },
+      include: authUserInclude,
+    });
+    if (user.status === UserStatus.inactive) {
+      await this.revokeSessionsForAccess(user.id, 'account_inactive');
+      throw new UnauthorizedException('This account is inactive.');
+    }
+    await this.assertTrainerAccess(user);
+
     const nextSessionToken = await this.prisma.$transaction(async (tx) => {
       await tx.refreshToken.update({ where: { id: activeSession.id }, data: { revokedAt: new Date(), revokedReason: 'rotated' } });
       return this.createSession(activeSession.userId, tx);
     });
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: activeSession.userId } });
     return {
-      user: this.serializeUser(user), sessionToken: nextSessionToken,
+      user: this.serializeUser(user, user.trainerCapability), sessionToken: nextSessionToken,
       session: { mode: 'cookie', expiresAt: addMinutes(new Date(), SESSION_DURATION_MINUTES) },
     };
   }
@@ -168,18 +198,29 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async serializeUserWithOnboarding(user: User) {
-    if (user.role !== UserRole.entrepreneur) return { ...this.serializeUser(user), onboardingRequired: false };
+  private async serializeUserWithOnboarding(user: AccessCheckedUser) {
+    if (user.role !== UserRole.entrepreneur) return { ...this.serializeUser(user, user.trainerCapability), onboardingRequired: false };
     const membership = await this.prisma.businessMembership.findFirst({
       where: { userId: user.id, isPrimary: true }, include: { business: true },
     });
-    return { ...this.serializeUser(user), onboardingRequired: !membership?.business.onboardingCompletedAt };
+    return { ...this.serializeUser(user, user.trainerCapability), onboardingRequired: !membership?.business.onboardingCompletedAt };
   }
 
-  private serializeUser(user: User) {
+  private serializeUser(
+    user: User,
+    trainerCapability?: Pick<
+      TrainerCapability,
+      'accessLevel' | 'accessExpiresOn'
+    > | null,
+  ) {
     return {
       id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone,
       role: user.role, status: user.status, emailVerifiedAt: user.emailVerifiedAt,
+      trainerAccessExpiresAt:
+        user.role === UserRole.trainer &&
+        trainerCapability?.accessLevel === TrainerAccessLevel.guest
+          ? trainerCapability.accessExpiresOn?.toISOString() ?? null
+          : null,
     };
   }
 
@@ -193,12 +234,47 @@ export class AuthService {
 
   private async findUserBySession(sessionToken: string) {
     const activeSession = await this.findActiveSession(sessionToken);
-    return activeSession ? this.prisma.user.findUnique({ where: { id: activeSession.userId } }) : null;
+    if (!activeSession) return null;
+    const user = await this.prisma.user.findUnique({
+      where: { id: activeSession.userId },
+      include: authUserInclude,
+    });
+    if (!user) return null;
+    const denial = this.trainerAccessDenial(user);
+    if (!denial) return user;
+    await this.revokeSessionsForAccess(user.id, 'trainer_access_expired');
+    return null;
   }
 
   private async findActiveSession(sessionToken: string) {
     return this.prisma.refreshToken.findFirst({
       where: { tokenHash: await hashToken(sessionToken), revokedAt: null, expiresAt: { gt: new Date() } },
+    });
+  }
+
+  private async assertTrainerAccess(user: AccessCheckedUser) {
+    const denial = this.trainerAccessDenial(user);
+    if (!denial) return;
+    await this.revokeSessionsForAccess(user.id, 'trainer_access_expired');
+    throw new UnauthorizedException(denial);
+  }
+
+  private trainerAccessDenial(user: AccessCheckedUser) {
+    if (user.role !== UserRole.trainer) return null;
+    const capability = user.trainerCapability;
+    if (!capability || capability.status !== TrainerCapabilityStatus.active) {
+      return 'Trainer access is inactive. Contact an administrator for assistance.';
+    }
+    if (!trainerCapabilityAllowsAccess(capability)) {
+      return 'Trainer access has expired. Contact an administrator to restore access.';
+    }
+    return null;
+  }
+
+  private revokeSessionsForAccess(userId: string, reason: string) {
+    return this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: reason },
     });
   }
 

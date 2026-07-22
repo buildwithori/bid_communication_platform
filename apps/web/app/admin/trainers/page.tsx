@@ -79,6 +79,9 @@ function StatusBadge({ trainer }: { trainer: TrainerRecord }) {
   if (trainer.directoryStatus === "inactive") {
     return <Badge tone="neutral">Inactive</Badge>;
   }
+  if (trainer.directoryStatus === "expired") {
+    return <Badge tone="red">Access expired</Badge>;
+  }
   if (
     trainer.accessLevel === "guest" &&
     trainer.accessExpiresOn
@@ -395,6 +398,7 @@ export default function AdminTrainersPage() {
               <option value="all">All statuses</option>
               <option value="active">Active</option>
               <option value="invited">Invited</option>
+              <option value="expired">Expired</option>
               <option value="inactive">Inactive</option>
             </TableFilterSelect>
             <TableFilterSelect value={calendar} onChange={(event) => setCalendar(event.target.value as typeof calendar)}>
@@ -532,7 +536,10 @@ function TrainerDetailModal({
                     </Badge>
                     {trainer.accessLevel === "guest" && trainer.accessExpiresOn ? (
                       <Badge tone="neutral">
-                        Access ends {new Date(trainer.accessExpiresOn).toLocaleDateString()}
+                        {trainer.directoryStatus === "expired"
+                          ? "Access ended "
+                          : "Access ends "}
+                        {new Date(trainer.accessExpiresOn).toLocaleDateString()}
                       </Badge>
                     ) : null}
                   </div>

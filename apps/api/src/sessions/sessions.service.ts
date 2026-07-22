@@ -25,6 +25,10 @@ import { AuditService } from "../audit/audit.service";
 import { CalendarService } from "../calendar/calendar.service";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import {
+  activeBidTeamMemberWhere,
+  activeTrainerUserWhere,
+} from "../trainers/trainer-access";
 import { CreateSessionDto } from "./dto/create-session.dto";
 import {
   CompleteSessionDto,
@@ -929,8 +933,7 @@ export class SessionsService {
     const trainer = await this.prisma.user.findFirst({
       where: {
         id: userId,
-        role: UserRole.trainer,
-        status: "active",
+        AND: [activeTrainerUserWhere()],
       },
       select: { id: true },
     });
@@ -941,7 +944,7 @@ export class SessionsService {
 
   private async ensureOwner(userId: string) {
     const owner = await this.prisma.user.findFirst({
-      where: { id: userId, role: { in: [UserRole.admin, UserRole.trainer] } },
+      where: { id: userId, AND: [activeBidTeamMemberWhere()] },
       select: { id: true },
     });
     if (!owner)
@@ -1009,8 +1012,7 @@ export class SessionsService {
   ) {
     const recipients = await this.prisma.user.findMany({
       where: {
-        role: { in: [UserRole.admin, UserRole.trainer] },
-        status: "active",
+        AND: [activeBidTeamMemberWhere()],
       },
       select: { id: true, role: true },
     });
@@ -1073,8 +1075,7 @@ export class SessionsService {
       ? [{ id: includedRecipient.id, role: includedRecipient.role }]
       : await this.prisma.user.findMany({
           where: {
-            role: { in: [UserRole.admin, UserRole.trainer] },
-            status: "active",
+            AND: [activeBidTeamMemberWhere()],
           },
           select: { id: true, role: true },
         });

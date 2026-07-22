@@ -75,7 +75,14 @@ export function useResendVerificationMutation(handlers?: MutationHandlers<Awaite
 }
 
 export function useCurrentUserQuery() {
-  return useQuery({ queryKey: authKeys.currentUser(), queryFn: currentUserRequest, retry: false, staleTime: 0 });
+  return useQuery({
+    queryKey: authKeys.currentUser(),
+    queryFn: currentUserRequest,
+    retry: false,
+    staleTime: 0,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 export function useGoogleOnboardingQuery() {

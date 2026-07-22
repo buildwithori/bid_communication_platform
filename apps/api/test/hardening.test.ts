@@ -7,8 +7,12 @@ import {
   EntrepreneurToolVisibility,
   ReportExportFormat,
   ReportExportStatus,
+  TrainerAccessLevel,
+  TrainerCapabilityStatus,
   UserRole,
+  UserStatus,
 } from "@prisma/client";
+import { AuthService } from "../src/auth/auth.service";
 import { DeliverablesService } from "../src/deliverables/deliverables.service";
 import { ApiExceptionFilter } from "../src/common/filters/api-exception.filter";
 import type { RequestWithContext } from "../src/common/request-context/request-context.types";
@@ -23,6 +27,81 @@ import { OperationalHealthService } from "../src/health/operational-health.servi
 import { ReportExportService } from "../src/reporting/report-export.service";
 import { ToolsService } from "../src/tools/tools.service";
 import { LearningService } from "../src/learning/learning.service";
+import {
+  activeTrainerUserWhere,
+  trainerCapabilityAllowsAccess,
+} from "../src/trainers/trainer-access";
+
+test("trainer eligibility excludes expired guest access", () => {
+  const now = new Date("2026-07-23T00:00:00.000Z");
+  assert.equal(
+    trainerCapabilityAllowsAccess(
+      {
+        accessLevel: TrainerAccessLevel.guest,
+        accessExpiresOn: new Date("2026-07-22T23:59:59.000Z"),
+        status: TrainerCapabilityStatus.active,
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    trainerCapabilityAllowsAccess(
+      {
+        accessLevel: TrainerAccessLevel.full,
+        accessExpiresOn: null,
+        status: TrainerCapabilityStatus.active,
+      },
+      now,
+    ),
+    true,
+  );
+  assert.deepEqual(activeTrainerUserWhere(now), {
+    role: UserRole.trainer,
+    status: UserStatus.active,
+    trainerCapability: {
+      is: {
+        status: TrainerCapabilityStatus.active,
+        OR: [
+          { accessLevel: TrainerAccessLevel.full },
+          {
+            accessLevel: TrainerAccessLevel.guest,
+            accessExpiresOn: { gt: now },
+          },
+        ],
+      },
+    },
+  });
+});
+
+test("expired trainer sessions are rejected and revoked", async () => {
+  let revokedReason: string | undefined;
+  const prisma = {
+    refreshToken: {
+      findFirst: async () => ({ id: "session-1", userId: "trainer-1" }),
+      updateMany: async (query: { data: { revokedReason: string } }) => {
+        revokedReason = query.data.revokedReason;
+        return { count: 1 };
+      },
+    },
+    user: {
+      findUnique: async () => ({
+        id: "trainer-1",
+        role: UserRole.trainer,
+        status: UserStatus.active,
+        trainerCapability: {
+          accessLevel: TrainerAccessLevel.guest,
+          accessExpiresOn: new Date("2026-07-22T00:00:00.000Z"),
+          status: TrainerCapabilityStatus.active,
+        },
+      }),
+    },
+  };
+  const service = new AuthService(prisma as never, {} as never, {} as never);
+
+  assert.equal(await service.validateSession("expired-session"), null);
+  assert.equal(revokedReason, "trainer_access_expired");
+});
 
 test("learner progress rejects a playback position beyond its duration", async () => {
   const service = new LearningService({

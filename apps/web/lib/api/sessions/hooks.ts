@@ -137,9 +137,14 @@ export function useLazySessionTeamMembers(
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
   });
+  const isRefreshingOptions =
+    enabled && result.isFetching && !result.isFetchingNextPage;
   return {
     ...result,
-    rows: result.data?.pages.flatMap((page) => page.items) ?? [],
+    isLoading: result.isLoading || isRefreshingOptions,
+    rows: isRefreshingOptions
+      ? []
+      : (result.data?.pages.flatMap((page) => page.items) ?? []),
   };
 }
 

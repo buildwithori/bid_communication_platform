@@ -7,6 +7,7 @@ export type AuthUser = {
   role: 'entrepreneur' | 'admin' | 'trainer';
   status: 'pending' | 'active' | 'inactive';
   emailVerifiedAt: string | null;
+  trainerAccessExpiresAt: string | null;
   onboardingRequired?: boolean;
 };
 
