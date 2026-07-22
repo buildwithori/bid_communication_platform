@@ -842,13 +842,77 @@ function MediaStage({
       />
     );
   }
+  return <EmbeddedToolFrame title={item.title} url={item.toolLink.url} />;
+}
+
+function EmbeddedToolFrame({ title, url }: { title: string; url: string }) {
+  const [loaded, setLoaded] = React.useState(false);
+  const [takingLonger, setTakingLonger] = React.useState(false);
+  const [frameKey, setFrameKey] = React.useState(0);
+
+  React.useEffect(() => {
+    if (loaded) return;
+    const timeout = window.setTimeout(() => setTakingLonger(true), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [frameKey, loaded]);
+
+  function retry() {
+    setLoaded(false);
+    setTakingLonger(false);
+    setFrameKey((current) => current + 1);
+  }
+
   return (
-    <iframe
-      title={item.title}
-      src={item.toolLink.url}
-      className="h-[620px] w-full bg-white"
-      sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
-    />
+    <div className="relative h-[620px] w-full overflow-hidden bg-[#0d0a0d]">
+      <iframe
+        key={frameKey}
+        title={title}
+        src={url}
+        onLoad={() => setLoaded(true)}
+        className={cn(
+          "absolute inset-0 h-full w-full bg-white transition-opacity duration-300 motion-reduce:transition-none",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
+        sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+      />
+      {!loaded ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute inset-0 grid place-items-center bg-[#0d0a0d] px-6 text-center text-white"
+        >
+          <div className="max-w-sm">
+            <div className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-bid-pink/25 bg-bid-pink/10 text-bid-pink">
+              <Wrench className="h-6 w-6" />
+              <LoaderCircle className="absolute -inset-1 h-16 w-16 animate-spin text-bid-pink/70" />
+            </div>
+            <p className="mt-5 text-base font-semibold">
+              {takingLonger
+                ? "This tool is taking a little longer"
+                : "Opening interactive tool"}
+            </p>
+            <p className="mt-1 truncate text-sm text-white/60">{title}</p>
+            <p className="mt-2 text-xs leading-5 text-white/45">
+              {takingLonger
+                ? "You can wait a moment longer or try loading it again."
+                : "Preparing the tool inside your lesson…"}
+            </p>
+            {takingLonger ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4 border-white/20 bg-white/5 text-white hover:border-bid-pink/60 hover:bg-bid-pink/10 hover:text-white"
+                onClick={retry}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Try again
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
