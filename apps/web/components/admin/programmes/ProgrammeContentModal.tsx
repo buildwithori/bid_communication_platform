@@ -220,7 +220,7 @@ export function ProgrammeContentModal({
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
                 {search
                   ? "Try a different search."
-                  : "Upload a video or PDF, add an embedded tool, or reuse an existing library item."}
+                  : "Upload a video, PDF, or Excel workbook, add an embedded tool, or reuse an existing library item."}
               </p>
             </div>
           )}

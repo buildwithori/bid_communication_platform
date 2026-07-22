@@ -358,7 +358,7 @@ function ModuleDetailModalContent({
           <ModuleMetric
             label="Attached content"
             value={items.length}
-            helper={`${contentCounts.video} videos, ${contentCounts.pdf} PDFs, ${contentCounts.tool} tools`}
+            helper={`${contentCounts.video} videos, ${contentCounts.pdf} PDFs, ${contentCounts.excel} Excel workbooks, ${contentCounts.tool} tools`}
           />
           <ModuleMetric
             label="Readiness"
@@ -427,7 +427,7 @@ function ModuleDetailModalContent({
                 No content has been attached
               </div>
               <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-ink-muted">
-                Add at least one video, PDF, or online tool before this module
+                Add at least one video, PDF, Excel workbook, or online tool before this module
                 is useful to entrepreneurs.
               </p>
               {!readOnly && (

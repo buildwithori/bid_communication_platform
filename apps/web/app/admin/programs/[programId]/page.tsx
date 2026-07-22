@@ -406,7 +406,7 @@ export default function AdminProgrammeWorkspacePage() {
             <HealthCard
               label="Content assets"
               value={programme.content.total}
-              helper={`${programme.content.videos} videos, ${programme.content.pdfs} PDFs, ${programme.content.tools} tools`}
+              helper={`${programme.content.videos} videos, ${programme.content.pdfs} PDFs, ${programme.content.excels} Excel workbooks, ${programme.content.tools} tools`}
             />
             <HealthCard
               label="Readiness"
@@ -1028,6 +1028,9 @@ function ModuleContentSummary({ module }: { module: ProgrammeModuleRecord }) {
       ) : null}
       {module.content.pdfs ? (
         <Badge tone="neutral">{module.content.pdfs} PDF</Badge>
+      ) : null}
+      {module.content.excels ? (
+        <Badge tone="green">{module.content.excels} Excel</Badge>
       ) : null}
       {module.content.tools ? (
         <Badge tone="brand">{module.content.tools} tool</Badge>

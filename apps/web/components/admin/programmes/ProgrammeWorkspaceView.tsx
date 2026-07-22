@@ -450,7 +450,7 @@ export function ProgrammeWorkspaceView({
             <ProgrammeHealthCard
               label="Content assets"
               value={selectedContentItems.length}
-              helper={`${contentTypeCounts.video} videos,  PDFs,  Excel workbooks,  tools`}
+              helper={`${contentTypeCounts.video} videos, ${contentTypeCounts.pdf} PDFs, ${contentTypeCounts.excel} Excel workbooks, ${contentTypeCounts.tool} tools`}
             />
             <ProgrammeHealthCard
               label="Readiness"
