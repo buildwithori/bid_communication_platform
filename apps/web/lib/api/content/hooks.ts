@@ -37,7 +37,14 @@ type Handlers = {
   onError?: (error: Error) => void;
 };
 
-function useCursorPage(query: PageQuery, request: (query: ContentItemQuery) => ReturnType<typeof listContentItemsRequest>, queryKey: (query: ContentItemQuery) => readonly unknown[], enabled = true) {
+function useCursorPage(
+  query: PageQuery,
+  request: (query: ContentItemQuery) =>
+    ReturnType<typeof listContentItemsRequest>,
+  queryKey: (query: ContentItemQuery) => readonly unknown[],
+  enabled = true,
+  preservePreviousSummary = false,
+) {
   const [page, setCurrentPage] = useState(1);
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const cursor = cursors[page - 1];
@@ -45,6 +52,9 @@ function useCursorPage(query: PageQuery, request: (query: ContentItemQuery) => R
     queryKey: queryKey({ ...query, cursor }),
     queryFn: () => request({ ...query, cursor }),
     enabled,
+    placeholderData: preservePreviousSummary
+      ? (previousData) => previousData
+      : undefined,
     refetchInterval: (current) =>
       current.state.data?.items.some((item) => item.status === 'processing')
         ? 5_000
@@ -124,7 +134,8 @@ export const useSaveContentRatingMutation = (handlers?: { onSuccess?: (data: Con
   });
 };
 
-export const useContentItemsPage = (query: PageQuery) => useCursorPage(query, listContentItemsRequest, contentKeys.list);
+export const useContentItemsPage = (query: PageQuery) =>
+  useCursorPage(query, listContentItemsRequest, contentKeys.list, true, true);
 
 export const useModuleContentItemsPage = (moduleId: string, query: PageQuery, enabled = true) =>
   useCursorPage(

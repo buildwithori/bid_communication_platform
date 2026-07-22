@@ -2,7 +2,8 @@
 
 import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
-import { useSearchParams } from "next/navigation";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { FileSpreadsheet, FileText, PlayCircle, Wrench } from "lucide-react";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@/components/admin/content/ContentItemModals";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
+import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -61,16 +62,29 @@ const typeMeta = {
 
 export default function AdminContentPage() {
   return (
-    <React.Suspense fallback={<ContentLibrarySkeleton />}>
+    <React.Suspense fallback={<ContentLibrarySkeleton activeType="video" />}>
       <ContentLibrary />
     </React.Suspense>
   );
 }
 
 function ContentLibrary() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const moduleId = searchParams.get("moduleId") ?? undefined;
-  const [tab, setTab] = React.useState<ContentItemType>("video");
+  const tab = contentTabFromQuery(searchParams.get("tab"));
+  const setTab = React.useCallback(
+    (nextTab: ContentItemType) => {
+      if (nextTab === tab) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", nextTab);
+      router.push((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    },
+    [pathname, router, searchParams, tab],
+  );
   const [query, setQuery] = React.useState("");
   const debouncedQuery = useDebouncedValue(query);
   const [pageSize, setPageSize] = React.useState(10);
@@ -101,6 +115,9 @@ function ContentLibrary() {
   React.useEffect(() => {
     resetPagination();
   }, [debouncedQuery, moduleId, pageSize, resetPagination, tab]);
+
+  const showInitialSkeleton = content.isPending && !content.data;
+  const showTableSkeleton = content.isPlaceholderData;
 
   const columns = React.useMemo<Column<ContentItemRecord>[]>(
     () => [
@@ -201,6 +218,10 @@ function ContentLibrary() {
     [deleteContent.isPending],
   );
 
+  if (showInitialSkeleton) {
+    return <ContentLibrarySkeleton activeType={tab} />;
+  }
+
   return (
     <>
       <PageHeader
@@ -244,7 +265,13 @@ function ContentLibrary() {
       <Card>
         <CardHeader
           title={`${typeMeta[tab].plural} content`}
-          description={`${content.totalItems} reusable asset${content.totalItems === 1 ? "" : "s"} found`}
+          description={
+            showTableSkeleton ? (
+              <Skeleton className="h-4 w-36" />
+            ) : (
+              `${content.totalItems} reusable asset${content.totalItems === 1 ? "" : "s"} found`
+            )
+          }
         />
         <TableToolbar>
           <div>
@@ -265,10 +292,10 @@ function ContentLibrary() {
           </div>
         </TableToolbar>
 
-        {content.isLoading && !content.data ? (
-          <TableSkeleton columns={5} rows={pageSize} />
-        ) : content.isError ? (
+        {content.isError ? (
           <Notice>Content could not be loaded. {content.error.message}</Notice>
+        ) : showTableSkeleton ? (
+          <ContentTableSkeleton type={tab} rows={pageSize} />
         ) : (
           <DataTable
             columns={columns}
@@ -283,14 +310,18 @@ function ContentLibrary() {
           />
         )}
 
-        <TablePagination
-          page={content.page}
-          pageSize={pageSize}
-          totalItems={content.totalItems}
-          pageSizeOptions={[10, 20, 50]}
-          onPageChange={content.setPage}
-          onPageSizeChange={setPageSize}
-        />
+        {showTableSkeleton ? (
+          <ContentPaginationSkeleton />
+        ) : (
+          <TablePagination
+            page={content.page}
+            pageSize={pageSize}
+            totalItems={content.totalItems}
+            pageSizeOptions={[10, 20, 50]}
+            onPageChange={content.setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Card>
 
       <CreateContentItemModal
@@ -359,6 +390,12 @@ function StatusBadge({ status }: { status: ContentItemStatus }) {
   );
 }
 
+function contentTabFromQuery(value: string | null): ContentItemType {
+  return value === "pdf" || value === "excel" || value === "tool"
+    ? value
+    : "video";
+}
+
 function sourceLabel(item: ContentItemRecord) {
   if (item.type === "video") {
     if (item.video?.status === "ready") return "Video ready";
@@ -382,17 +419,133 @@ function updatedLabel(value: string) {
   })}`;
 }
 
-function ContentLibrarySkeleton() {
+function ContentLibrarySkeleton({
+  activeType,
+}: {
+  activeType: ContentItemType;
+}) {
   return (
     <>
       <PageHeader
         title="Content library"
         description="Upload once, reuse across programme modules, and keep trainer attribution in one place."
+        actions={<Skeleton className="h-9 w-36" />}
       />
-      <div className="mb-4 h-10 w-full max-w-md animate-pulse rounded-xl bg-surface-subtle" />
+      <div
+        aria-label="Loading content categories"
+        aria-busy="true"
+        className="mb-4 flex h-12 w-full max-w-md items-center gap-2 rounded-xl border border-border bg-card p-1"
+      >
+        {[96, 82, 88, 86].map((width, index) => (
+          <Skeleton
+            key={index}
+            className="h-9"
+            style={{ width: `${width}px` }}
+          />
+        ))}
+      </div>
       <Card>
-        <TableSkeleton columns={5} rows={10} />
+        <div className="mb-4 space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-surface-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-52" />
+          </div>
+          <Skeleton className="h-9 w-full sm:w-[340px]" />
+        </div>
+        <ContentTableSkeleton type={activeType} rows={10} />
+        <ContentPaginationSkeleton />
       </Card>
     </>
+  );
+}
+
+function ContentTableSkeleton({
+  type,
+  rows,
+}: {
+  type: ContentItemType;
+  rows: number;
+}) {
+  const assetWidth = {
+    video: "w-28",
+    pdf: "w-44",
+    excel: "w-48",
+    tool: "w-52",
+  }[type];
+
+  return (
+    <div
+      aria-label={`Loading ${typeMeta[type].plural.toLowerCase()} content`}
+      aria-busy="true"
+      className="overflow-x-auto rounded-xl border border-border bg-card"
+    >
+      <div className="min-w-[1040px]">
+        <div className="grid grid-cols-[64px_minmax(280px,1.35fr)_minmax(190px,1fr)_minmax(180px,1fr)_minmax(170px,0.8fr)] gap-4 border-b border-line bg-surface-subtle/80 px-5 py-4">
+          {["Action", "Content", "Trainer owner", "Asset", "Used in"].map(
+            (label) => (
+              <span
+                key={label}
+                className="text-xs font-medium uppercase tracking-wide text-ink-faint"
+              >
+                {label}
+              </span>
+            ),
+          )}
+        </div>
+        {Array.from({ length: rows }, (_, index) => (
+          <div
+            key={index}
+            className="grid min-h-[80px] grid-cols-[64px_minmax(280px,1.35fr)_minmax(190px,1fr)_minmax(180px,1fr)_minmax(170px,0.8fr)] items-center gap-4 border-b border-line/80 px-5 py-3 last:border-0"
+          >
+            <Skeleton className="h-9 w-9 rounded-lg" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+              <div className="min-w-0 space-y-2">
+                <Skeleton className="h-4 w-44" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className={`h-4 ${assetWidth}`} />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContentPaginationSkeleton() {
+  return (
+    <div
+      aria-label="Loading content pagination"
+      aria-busy="true"
+      className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <Skeleton className="h-4 w-28" />
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-8 w-[76px]" />
+        <Skeleton className="h-8 w-8" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-8 w-8" />
+      </div>
+    </div>
   );
 }
