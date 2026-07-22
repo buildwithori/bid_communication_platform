@@ -381,7 +381,18 @@ export function LearningContentPlayer({
             </div>
           </div>
 
-          <ContentRating key={item.id} content={item} />
+          <ContentRating
+            key={
+              currentEntry.programmeId +
+              ":" +
+              currentEntry.moduleId +
+              ":" +
+              item.id
+            }
+            content={item}
+            programmeId={currentEntry.programmeId}
+            moduleId={currentEntry.moduleId}
+          />
         </aside>
       </div>
     </Modal>

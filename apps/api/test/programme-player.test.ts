@@ -430,8 +430,10 @@ test("content without an assigned trainer cannot be rated", async () => {
   let ratingSaved = false;
   const service = new ContentService(
     {
+      programmeModule: {
+        findFirst: async () => ({ id: "programme-module-1" }),
+      },
       contentItem: {
-        findFirst: async () => ({ id: "content-1" }),
         findUnique: async () => ({ id: "content-1", trainerId: null }),
       },
       contentRating: {
@@ -447,12 +449,71 @@ test("content without an assigned trainer cannot be rated", async () => {
 
   await assert.rejects(
     service.upsertRating(entrepreneur as never, {
+      programmeId: "programme-1",
+      moduleId: "module-1",
       contentItemId: "content-1",
       rating: 5,
     }),
     /does not have a trainer to rate/,
   );
   assert.equal(ratingSaved, false);
+});
+
+test("reused content keeps an independent rating in each learning context", async () => {
+  const ratings = new Map<string, any>();
+  const service = new ContentService(
+    {
+      programmeModule: {
+        findFirst: async () => ({ id: "programme-module" }),
+      },
+      contentItem: {
+        findUnique: async () => ({ id: "content-1", trainerId: "trainer-1" }),
+      },
+      contentRating: {
+        upsert: async (query: any) => {
+          const context =
+            query.where
+              .programmeId_moduleId_contentItemId_entrepreneurUserId;
+          const key = [
+            context.programmeId,
+            context.moduleId,
+            context.contentItemId,
+            context.entrepreneurUserId,
+          ].join(":");
+          const now = new Date("2026-07-22T12:00:00.000Z");
+          const rating = {
+            id: "rating-" + ratings.size,
+            ...query.create,
+            comment: query.create.comment ?? null,
+            createdAt: now,
+            updatedAt: now,
+          };
+          ratings.set(key, rating);
+          return rating;
+        },
+      },
+    } as never,
+    {} as never,
+    {} as never,
+  );
+
+  const first = await service.upsertRating(entrepreneur as never, {
+    programmeId: "programme-1",
+    moduleId: "module-1",
+    contentItemId: "content-1",
+    rating: 4,
+  });
+  const reused = await service.upsertRating(entrepreneur as never, {
+    programmeId: "programme-2",
+    moduleId: "module-2",
+    contentItemId: "content-1",
+    rating: 5,
+  });
+
+  assert.equal(ratings.size, 2);
+  assert.equal(first.programmeId, "programme-1");
+  assert.equal(reused.programmeId, "programme-2");
+  assert.notEqual(first.id, reused.id);
 });
 
 test("programme access authorizes a linked PDF entrepreneur tool", async () => {

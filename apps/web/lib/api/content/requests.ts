@@ -7,6 +7,7 @@ import type {
   ContentDeletionResult,
   DeleteContentItemVariables,
   ContentRatingPayload,
+  ContentRatingContext,
   CreateModuleContentVariables,
   MoveModuleContentItemVariables,
   SaveContentRatingInput,
@@ -93,10 +94,15 @@ export const moveModuleContentItemRequest = ({
     },
   );
 
-export const getMyContentRatingRequest = (contentItemId: string) =>
-  apiRequest<ContentRatingPayload | null>(
-    `/content/ratings/${contentItemId}/me`,
+export const getMyContentRatingRequest = (context: ContentRatingContext) => {
+  const params = new URLSearchParams({
+    programmeId: context.programmeId,
+    moduleId: context.moduleId,
+  });
+  return apiRequest<ContentRatingPayload | null>(
+    `/content/ratings/${context.contentItemId}/me?${params.toString()}`,
   );
+};
 
 export const saveContentRatingRequest = (input: SaveContentRatingInput) =>
   apiRequest<ContentRatingPayload>("/content/ratings", {

@@ -1,4 +1,4 @@
-import type { ContentItemQuery } from "./types";
+import type { ContentItemQuery, ContentRatingContext } from "./types";
 
 export const contentKeys = {
   all: ["content"] as const,
@@ -10,6 +10,12 @@ export const contentKeys = {
     [...contentKeys.modules(), moduleId] as const,
   moduleList: (moduleId: string, query: ContentItemQuery) =>
     [...contentKeys.module(moduleId), query] as const,
-  rating: (contentItemId: string) =>
-    [...contentKeys.all, "rating", contentItemId] as const,
+  rating: (context: ContentRatingContext) =>
+    [
+      ...contentKeys.all,
+      "rating",
+      context.programmeId,
+      context.moduleId,
+      context.contentItemId,
+    ] as const,
 };

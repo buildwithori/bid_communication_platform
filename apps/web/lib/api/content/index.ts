@@ -22,6 +22,7 @@ export type {
   ContentItemStatus,
   ContentItemType,
   ContentRatingPayload,
+  ContentRatingContext,
   CreateContentItemInput,
   DeleteContentItemVariables,
   CreateModuleContentVariables,

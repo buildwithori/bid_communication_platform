@@ -9,6 +9,12 @@ import {
 
 export class UpsertContentRatingDto {
   @IsString()
+  programmeId!: string;
+
+  @IsString()
+  moduleId!: string;
+
+  @IsString()
   contentItemId!: string;
 
   @IsInt()

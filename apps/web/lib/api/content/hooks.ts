@@ -24,6 +24,7 @@ import type {
   ContentDeletionResult,
   DeleteContentItemVariables,
   ContentRatingPayload,
+  ContentRatingContext,
   CreateModuleContentVariables,
   MoveModuleContentItemVariables,
   SaveContentRatingInput,
@@ -90,11 +91,17 @@ function useCursorPage(query: PageQuery, request: (query: ContentItemQuery) => R
   };
 }
 
-export const useMyContentRatingQuery = (contentItemId: string | null) =>
+export const useMyContentRatingQuery = (context: ContentRatingContext | null) =>
   useQuery({
-    queryKey: contentKeys.rating(contentItemId ?? 'none'),
-    queryFn: () => getMyContentRatingRequest(contentItemId as string),
-    enabled: Boolean(contentItemId),
+    queryKey: contentKeys.rating(
+      context ?? {
+        programmeId: 'none',
+        moduleId: 'none',
+        contentItemId: 'none',
+      },
+    ),
+    queryFn: () => getMyContentRatingRequest(context as ContentRatingContext),
+    enabled: Boolean(context),
   });
 
 export const useSaveContentRatingMutation = (handlers?: { onSuccess?: (data: ContentRatingPayload) => void; onError?: (error: Error) => void }) => {
@@ -102,7 +109,14 @@ export const useSaveContentRatingMutation = (handlers?: { onSuccess?: (data: Con
   return useMutation<ContentRatingPayload, Error, SaveContentRatingInput>({
     mutationFn: saveContentRatingRequest,
     onSuccess: (data) => {
-      client.setQueryData(contentKeys.rating(data.contentItemId), data);
+      client.setQueryData(
+        contentKeys.rating({
+          programmeId: data.programmeId,
+          moduleId: data.moduleId,
+          contentItemId: data.contentItemId,
+        }),
+        data,
+      );
       handlers?.onSuccess?.(data);
     },
     onError: handlers?.onError,

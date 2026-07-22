@@ -25,6 +25,7 @@ import {
   UpdateContentItemDto,
 } from "./dto/content-query.dto";
 import { CreateContentItemDto } from "./dto/create-content-item.dto";
+import { ContentRatingContextDto } from "./dto/content-rating-context.dto";
 import { UpsertContentRatingDto } from "./dto/upsert-content-rating.dto";
 
 const contentItemInclude = {
@@ -476,13 +477,19 @@ export class ContentService {
     return this.getContentItem(contentItemId, moduleId);
   }
 
-  async getMyRating(user: User, contentItemId: string) {
+  async getMyRating(
+    user: User,
+    contentItemId: string,
+    context: ContentRatingContextDto,
+  ) {
     this.assertEntrepreneur(user);
-    await this.assertContentReadAccess(user, contentItemId);
+    await this.assertRatingContextAccess(user, contentItemId, context);
 
     const rating = await this.prisma.contentRating.findUnique({
       where: {
-        contentItemId_entrepreneurUserId: {
+        programmeId_moduleId_contentItemId_entrepreneurUserId: {
+          programmeId: context.programmeId,
+          moduleId: context.moduleId,
           contentItemId,
           entrepreneurUserId: user.id,
         },
@@ -494,7 +501,7 @@ export class ContentService {
 
   async upsertRating(user: User, input: UpsertContentRatingDto) {
     this.assertEntrepreneur(user);
-    await this.assertContentReadAccess(user, input.contentItemId);
+    await this.assertRatingContextAccess(user, input.contentItemId, input);
 
     const contentItem = await this.prisma.contentItem.findUnique({
       where: { id: input.contentItemId },
@@ -510,12 +517,16 @@ export class ContentService {
     const comment = input.comment?.trim() || null;
     const rating = await this.prisma.contentRating.upsert({
       where: {
-        contentItemId_entrepreneurUserId: {
+        programmeId_moduleId_contentItemId_entrepreneurUserId: {
+          programmeId: input.programmeId,
+          moduleId: input.moduleId,
           contentItemId: input.contentItemId,
           entrepreneurUserId: user.id,
         },
       },
       create: {
+        programmeId: input.programmeId,
+        moduleId: input.moduleId,
         contentItemId: input.contentItemId,
         entrepreneurUserId: user.id,
         trainerId: contentItem.trainerId,
@@ -837,42 +848,44 @@ export class ContentService {
     return result;
   }
 
-  private async assertContentReadAccess(user: User, contentItemId: string) {
-    const content = await this.prisma.contentItem.findFirst({
+  private async assertRatingContextAccess(
+    user: User,
+    contentItemId: string,
+    context: ContentRatingContextDto,
+  ) {
+    const placement = await this.prisma.programmeModule.findFirst({
       where: {
-        id: contentItemId,
-        status: ContentItemStatus.ready,
-        modules: {
-          some: {
-            module: {
-              programmes: {
+        programmeId: context.programmeId,
+        moduleId: context.moduleId,
+        programme: {
+          archivedAt: null,
+          publishedAt: { not: null },
+          OR: [
+            { accessType: ProgrammeAccessType.free },
+            {
+              accessGrants: {
                 some: {
-                  programme: {
-                    archivedAt: null,
-                    publishedAt: { not: null },
-                    OR: [
-                      { accessType: ProgrammeAccessType.free },
-                      {
-                        accessGrants: {
-                          some: {
-                            entrepreneurUserId: user.id,
-                            revokedAt: null,
-                          },
-                        },
-                      },
-                    ],
-                  },
+                  entrepreneurUserId: user.id,
+                  revokedAt: null,
                 },
               },
+            },
+          ],
+        },
+        module: {
+          contentItems: {
+            some: {
+              contentItemId,
+              contentItem: { status: ContentItemStatus.ready },
             },
           },
         },
       },
       select: { id: true },
     });
-    if (!content) {
+    if (!placement) {
       throw new ForbiddenException(
-        "You do not have access to this learning content.",
+        "You do not have access to this learning content in that programme.",
       );
     }
   }
@@ -1059,6 +1072,8 @@ export class ContentService {
 
   private serializeRating(rating: {
     id: string;
+    programmeId: string;
+    moduleId: string;
     contentItemId: string;
     entrepreneurUserId: string;
     trainerId: string | null;
@@ -1069,6 +1084,8 @@ export class ContentService {
   }) {
     return {
       id: rating.id,
+      programmeId: rating.programmeId,
+      moduleId: rating.moduleId,
       contentItemId: rating.contentItemId,
       entrepreneurUserId: rating.entrepreneurUserId,
       trainerId: rating.trainerId,

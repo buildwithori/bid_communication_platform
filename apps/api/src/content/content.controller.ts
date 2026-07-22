@@ -21,6 +21,7 @@ import {
   UpdateContentItemDto,
 } from './dto/content-query.dto';
 import { UpsertContentRatingDto } from './dto/upsert-content-rating.dto';
+import { ContentRatingContextDto } from './dto/content-rating-context.dto';
 import { DeleteResourceDto } from '../resource-deletion/dto/delete-resource.dto';
 import { ResourceDeletionService } from '../resource-deletion/resource-deletion.service';
 
@@ -112,8 +113,9 @@ export class ContentController {
   getMyRating(
     @CurrentUser() user: User,
     @Param('contentItemId') contentItemId: string,
+    @Query() context: ContentRatingContextDto,
   ) {
-    return this.contentService.getMyRating(user, contentItemId);
+    return this.contentService.getMyRating(user, contentItemId, context);
   }
 
   @Post('ratings')

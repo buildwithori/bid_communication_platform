@@ -536,8 +536,16 @@ export function ProgrammeCoursePlayer({
               . A quick rating helps BID improve the learning experience.
             </p>
             <ContentRating
-              key={ratingEntry.item.id}
+              key={
+                data.programme.id +
+                ":" +
+                ratingEntry.module.id +
+                ":" +
+                ratingEntry.item.id
+              }
               content={ratingEntry.item}
+              programmeId={data.programme.id}
+              moduleId={ratingEntry.module.id}
               onSaved={finishRatingPrompt}
             />
             <div className="mt-4 flex justify-end">

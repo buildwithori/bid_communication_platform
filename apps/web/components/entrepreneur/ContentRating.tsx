@@ -20,13 +20,19 @@ type RatingContent = {
 
 export function ContentRating({
   content,
+  programmeId,
+  moduleId,
   onSaved,
 }: {
   content: RatingContent;
+  programmeId: string;
+  moduleId: string;
   onSaved?: () => void;
 }) {
   const savedRating = useMyContentRatingQuery(
-    content.trainer ? content.id : null,
+    content.trainer
+      ? { programmeId, moduleId, contentItemId: content.id }
+      : null,
   );
 
   if (!content.trainer) return null;
@@ -62,6 +68,8 @@ export function ContentRating({
     <RatingForm
       key={content.id + ':' + (savedRating.data?.updatedAt ?? 'new')}
       content={content}
+      programmeId={programmeId}
+      moduleId={moduleId}
       initial={savedRating.data ?? null}
       onSaved={onSaved}
     />
@@ -70,10 +78,14 @@ export function ContentRating({
 
 function RatingForm({
   content,
+  programmeId,
+  moduleId,
   initial,
   onSaved,
 }: {
   content: RatingContent;
+  programmeId: string;
+  moduleId: string;
   initial: ContentRatingPayload | null;
   onSaved?: () => void;
 }) {
@@ -96,6 +108,8 @@ function RatingForm({
     }
     saveRating.mutate(
       {
+        programmeId,
+        moduleId,
         contentItemId: content.id,
         rating,
         comment: comment.trim() || undefined,

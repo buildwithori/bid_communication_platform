@@ -67,6 +67,7 @@ export class ResourceDeletionService {
       const rules = await tx.programmeDeliverableRule.findMany({ where: { programmeId, dueAfterModuleId: moduleId }, select: { id: true } });
       const deletion = await this.deleteDeliverableTree(tx, rules.map((rule) => rule.id));
       if (rules.length) await tx.programmeDeliverableRule.deleteMany({ where: { id: { in: rules.map((rule) => rule.id) } } });
+      await tx.contentRating.deleteMany({ where: { programmeId, moduleId } });
       await tx.learnerContentProgress.deleteMany({ where: { programmeId, moduleId } });
       await tx.learnerModuleProgress.deleteMany({ where: { programmeId, moduleId } });
       await tx.learnerProgrammeProgress.deleteMany({ where: { programmeId } });

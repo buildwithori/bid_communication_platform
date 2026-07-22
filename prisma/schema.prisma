@@ -668,6 +668,7 @@ model Programme {
   deliverableRules     ProgrammeDeliverableRule[]
   deliverableInstances DeliverableInstance[]
   sessions             Session[]
+  contentRatings       ContentRating[]
 
   @@index([accessType])
   @@index([publishedAt, archivedAt])
@@ -806,6 +807,7 @@ model LearningModule {
   contentItems          ModuleContentItem[]
   contentProgress       LearnerContentProgress[]
   progress              LearnerModuleProgress[]
+  contentRatings        ContentRating[]
   deliverableRulesAfter ProgrammeDeliverableRule[] @relation("DeliverableRuleDueAfterModule")
 
   @@map("modules")
@@ -1066,6 +1068,8 @@ model ToolRequest {
 
 model ContentRating {
   id                 String   @id @default(cuid())
+  programmeId        String   @map("programme_id")
+  moduleId           String   @map("module_id")
   contentItemId      String   @map("content_item_id")
   entrepreneurUserId String   @map("entrepreneur_user_id")
   trainerId          String?  @map("trainer_id")
@@ -1074,11 +1078,15 @@ model ContentRating {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  contentItem  ContentItem @relation(fields: [contentItemId], references: [id])
-  entrepreneur User        @relation("ContentRatingEntrepreneur", fields: [entrepreneurUserId], references: [id])
-  trainer      User?       @relation("ContentRatingTrainer", fields: [trainerId], references: [id])
+  programme    Programme      @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  module       LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  contentItem  ContentItem    @relation(fields: [contentItemId], references: [id])
+  entrepreneur User           @relation("ContentRatingEntrepreneur", fields: [entrepreneurUserId], references: [id])
+  trainer      User?          @relation("ContentRatingTrainer", fields: [trainerId], references: [id])
 
-  @@unique([contentItemId, entrepreneurUserId])
+  @@unique([programmeId, moduleId, contentItemId, entrepreneurUserId])
+  @@index([programmeId])
+  @@index([moduleId])
   @@index([entrepreneurUserId])
   @@index([trainerId])
   @@map("content_ratings")

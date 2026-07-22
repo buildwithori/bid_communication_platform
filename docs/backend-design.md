@@ -574,6 +574,8 @@ Rules:
   - external_url nullable
   - source: library, custom
 - `content_ratings`
+  - programme_id
+  - module_id
   - content_item_id
   - entrepreneur_user_id
   - trainer_id copied from content item at rating time
@@ -622,6 +624,7 @@ Rules:
 - A module can be reused across programmes. A content item may appear only once in any programme curriculum; content-reuse programme and module lookups must exclude destinations that already contain it, including duplicates introduced indirectly through a shared module. The attach mutation must recheck this rule transactionally across every programme using the target module.
 - Reordering must update `position` safely inside a transaction.
 - Trainer attribution comes from content item ownership at the time of rating.
+- Ratings are scoped to entrepreneur + programme + module + content item. Reusing the same content asset in another learning context must not reuse the learner's previous rating.
 - Business-level rating reports are derived through the entrepreneur user's business membership, not stored directly on `content_ratings`.
 - Learner progress is tracked only for entrepreneur users. Admins and trainers can read scoped progress summaries, but they do not have learner progress rows.
 - Content progress is tracked in the learning context: entrepreneur + programme + module + content item. This matters because modules and content can be reused across programmes.

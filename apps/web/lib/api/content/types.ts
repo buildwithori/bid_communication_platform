@@ -4,6 +4,8 @@ export type ContentItemStatus =
 
 export type ContentRatingPayload = {
   id: string;
+  programmeId: string;
+  moduleId: string;
   contentItemId: string;
   entrepreneurUserId: string;
   trainerId: string | null;
@@ -13,8 +15,13 @@ export type ContentRatingPayload = {
   updatedAt: string;
 };
 
-export type SaveContentRatingInput = {
+export type ContentRatingContext = {
+  programmeId: string;
+  moduleId: string;
   contentItemId: string;
+};
+
+export type SaveContentRatingInput = ContentRatingContext & {
   rating: number;
   comment?: string;
 };
