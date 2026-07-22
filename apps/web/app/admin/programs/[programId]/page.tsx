@@ -224,7 +224,10 @@ export default function AdminProgrammeWorkspacePage() {
               },
               'separator',
               {
-                label: 'Delete module',
+                label:
+                  module.programmeUses > 1
+                    ? 'Remove from programme'
+                    : 'Delete module',
                 destructive: true,
                 disabled: deleteModule.isPending,
                 onSelect: () => setDeleteModuleTarget(module),
@@ -573,15 +576,23 @@ export default function AdminProgrammeWorkspacePage() {
         }}
         title="Delete module"
         resourceName={deleteModuleTarget?.title ?? ""}
-        description="This removes the module from this programme and permanently clears its programme-specific learner records."
+        description={
+          deleteModuleTarget && deleteModuleTarget.programmeUses > 1
+            ? 'This removes the reusable module from this programme and clears learner records created here.'
+            : 'This permanently deletes the module, its learner records, and content used only by this module.'
+        }
         consequences={[
           "Learner module and content progress in this programme will be deleted.",
           "Deliverable rules tied to completing this module, including submissions and reviews, will be deleted.",
           deleteModuleTarget && deleteModuleTarget.programmeUses > 1
-            ? "The reusable module remains available in its other programmes."
-            : "The module definition will be deleted, but its reusable content stays in the content library.",
+            ? "The reusable module and its content remain available in the other programmes using it."
+            : "Videos and uploaded files used only by this module will be permanently removed. Content reused elsewhere will remain available there.",
         ]}
-        confirmLabel="Delete module"
+        confirmLabel={
+          deleteModuleTarget && deleteModuleTarget.programmeUses > 1
+            ? 'Remove module'
+            : 'Delete module'
+        }
         isPending={deleteModule.isPending}
         onConfirm={async () => {
           if (!deleteModuleTarget) return;

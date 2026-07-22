@@ -78,18 +78,117 @@ export class ResourceDeletionService {
         tx.programmeDeliverableRule.count({ where: { dueAfterModuleId: moduleId } }),
       ]);
       const moduleDeleted = programmeLinks === 0 && dependentRules === 0;
+      let contentItemsDeleted = 0;
+      let sharedContentPreserved = 0;
+      let contentExternalCleanup = 0;
       if (moduleDeleted) {
+        const contentItems = await tx.contentItem.findMany({
+          where: { modules: { some: { moduleId } } },
+          select: {
+            id: true,
+            videoAsset: {
+              select: { id: true, muxAssetId: true, muxUploadId: true },
+            },
+            fileAssets: { select: { id: true, storageKey: true } },
+            _count: { select: { modules: true } },
+          },
+        });
+        const exclusiveContent = contentItems.filter(
+          (item) => item._count.modules === 1,
+        );
+        const exclusiveContentIds = exclusiveContent.map((item) => item.id);
+        sharedContentPreserved = contentItems.length - exclusiveContent.length;
+        contentItemsDeleted = exclusiveContent.length;
+        contentExternalCleanup = await this.queueExternal(tx, [
+          ...exclusiveContent.flatMap((item) => [
+            {
+              provider: ExternalResourceProvider.mux_asset,
+              externalId: item.videoAsset?.muxAssetId,
+            },
+            {
+              provider: ExternalResourceProvider.mux_upload,
+              externalId: item.videoAsset?.muxAssetId
+                ? null
+                : item.videoAsset?.muxUploadId,
+            },
+          ]),
+          ...exclusiveContent.flatMap((item) =>
+            item.fileAssets.map((file) => ({
+              provider: ExternalResourceProvider.object_storage,
+              externalId: file.storageKey,
+            })),
+          ),
+        ]);
+
+        await this.deleteNotifications(
+          tx,
+          NotificationEntityType.content_item,
+          exclusiveContentIds,
+        );
+        if (exclusiveContentIds.length) {
+          const videoAssetIds = exclusiveContent.flatMap((item) =>
+            item.videoAsset ? [item.videoAsset.id] : [],
+          );
+          const fileAssetIds = exclusiveContent.flatMap((item) =>
+            item.fileAssets.map((file) => file.id),
+          );
+          await tx.contentRating.deleteMany({
+            where: { contentItemId: { in: exclusiveContentIds } },
+          });
+          await tx.learnerContentProgress.deleteMany({
+            where: { contentItemId: { in: exclusiveContentIds } },
+          });
+          if (videoAssetIds.length) {
+            await tx.videoWebhookEvent.deleteMany({
+              where: { videoAssetId: { in: videoAssetIds } },
+            });
+            await tx.videoAsset.deleteMany({
+              where: { id: { in: videoAssetIds } },
+            });
+          }
+          await tx.contentToolLink.deleteMany({
+            where: { contentItemId: { in: exclusiveContentIds } },
+          });
+          if (fileAssetIds.length) {
+            await tx.fileAsset.deleteMany({
+              where: { id: { in: fileAssetIds } },
+            });
+          }
+        }
         await tx.learnerContentProgress.deleteMany({ where: { moduleId } });
         await tx.learnerModuleProgress.deleteMany({ where: { moduleId } });
         await tx.moduleContentItem.deleteMany({ where: { moduleId } });
+        if (exclusiveContentIds.length) {
+          await tx.contentItem.deleteMany({
+            where: { id: { in: exclusiveContentIds } },
+          });
+        }
         await tx.learningModule.delete({ where: { id: moduleId } });
       }
+      const externalCleanupQueued =
+        deletion.externalCleanupQueued + contentExternalCleanup;
       await this.audit.enqueue({
         action: "programme_module.deleted", entityType: "programme_module", entityId: moduleId,
-        summary: `Removed module ${link.module.title} from ${link.programme.name}`,
-        payload: { programmeId, moduleDeleted, removedDeliverableRules: rules.length, externalCleanupQueued: deletion.externalCleanupQueued },
+        summary: moduleDeleted
+          ? `Deleted module ${link.module.title}`
+          : `Removed module ${link.module.title} from ${link.programme.name}`,
+        payload: {
+          programmeId,
+          moduleDeleted,
+          removedDeliverableRules: rules.length,
+          contentItemsDeleted,
+          sharedContentPreserved,
+          externalCleanupQueued,
+        },
       }, tx);
-      return { id: moduleId, name: link.module.title, deleted: true, externalCleanupQueued: deletion.externalCleanupQueued, reusableAssetsPreserved: true };
+      return {
+        id: moduleId,
+        name: link.module.title,
+        deleted: true,
+        externalCleanupQueued,
+        reusableAssetsPreserved:
+          !moduleDeleted || sharedContentPreserved > 0,
+      };
     });
   }
 

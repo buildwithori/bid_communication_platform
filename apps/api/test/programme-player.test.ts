@@ -697,6 +697,101 @@ test("deleting a deliverable rule removes generated work and queues file cleanup
   assert.equal(auditEvents.length, 1);
 });
 
+test("deleting a module's final programme use removes exclusive content and queues media cleanup", async () => {
+  const queuedResources: Array<{ provider: string; externalId: string }> = [];
+  let deletedContentIds: string[] = [];
+  let learningModuleDeleted = false;
+  const transaction = {
+    programmeModule: {
+      findUnique: async () => ({
+        id: "programme-module-1",
+        programme: { id: "programme-1", name: "Growth" },
+        module: { id: "module-1", title: "Foundations" },
+      }),
+      delete: async () => undefined,
+      count: async () => 0,
+      updateMany: async () => undefined,
+      findMany: async () => [],
+    },
+    programmeDeliverableRule: {
+      findMany: async () => [],
+      count: async () => 0,
+      deleteMany: async () => undefined,
+    },
+    contentItem: {
+      findMany: async () => [
+        {
+          id: "content-exclusive",
+          videoAsset: {
+            id: "video-1",
+            muxAssetId: "mux-asset-1",
+            muxUploadId: "mux-upload-1",
+          },
+          fileAssets: [
+            { id: "file-1", storageKey: "content/foundations.pdf" },
+          ],
+          _count: { modules: 1 },
+        },
+        {
+          id: "content-shared",
+          videoAsset: null,
+          fileAssets: [],
+          _count: { modules: 2 },
+        },
+      ],
+      deleteMany: async (query: any) => {
+        deletedContentIds = query.where.id.in;
+      },
+    },
+    contentRating: { deleteMany: async () => undefined },
+    learnerContentProgress: { deleteMany: async () => undefined },
+    learnerModuleProgress: { deleteMany: async () => undefined },
+    learnerProgrammeProgress: { deleteMany: async () => undefined },
+    moduleContentItem: { deleteMany: async () => undefined },
+    learningModule: {
+      delete: async () => {
+        learningModuleDeleted = true;
+      },
+    },
+    videoWebhookEvent: { deleteMany: async () => undefined },
+    videoAsset: { deleteMany: async () => undefined },
+    contentToolLink: { deleteMany: async () => undefined },
+    fileAsset: { deleteMany: async () => undefined },
+    notification: { findMany: async () => [] },
+    externalResourceDeletion: {
+      createMany: async (query: any) => {
+        queuedResources.push(...query.data);
+      },
+    },
+  };
+  const service = new ResourceDeletionService(
+    {
+      $transaction: async (operation: (tx: unknown) => unknown) =>
+        operation(transaction),
+    } as never,
+    { enqueue: async () => undefined } as never,
+  );
+
+  const result = await service.deleteProgrammeModule(
+    { id: "admin-1", role: UserRole.admin } as never,
+    "programme-1",
+    "module-1",
+    { confirmation: "Foundations" },
+  );
+
+  assert.equal(learningModuleDeleted, true);
+  assert.deepEqual(deletedContentIds, ["content-exclusive"]);
+  assert.deepEqual(
+    queuedResources.map((resource) => [resource.provider, resource.externalId]),
+    [
+      ["mux_asset", "mux-asset-1"],
+      ["object_storage", "content/foundations.pdf"],
+    ],
+  );
+  assert.equal(result.externalCleanupQueued, 2);
+  assert.equal(result.reusableAssetsPreserved, true);
+});
+
 test("programme access authorizes a linked PDF entrepreneur tool", async () => {
   let programmeQuery: unknown;
   const service = new FilesService(
