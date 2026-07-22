@@ -12,9 +12,11 @@ import {
 import { WorkspaceShellSkeleton } from '@/components/layout/WorkspaceShellSkeleton';
 import { PageSkeleton } from '@/components/shared/Card';
 import { ProfilePageSkeleton } from '@/components/entrepreneur/profile/ProfileLoadingSkeletons';
+import { ContentLibrarySkeleton } from '@/components/admin/content/ContentLibrarySkeleton';
 import { authenticatedDestination, workspaceRouteForRole } from '@/lib/auth-navigation';
 import { routes } from '@/lib/routes';
 import { entrepreneurProfileTabFromQuery } from '@/lib/entrepreneur-profile-tabs';
+import { contentLibraryTabFromQuery } from '@/lib/content-library-tabs';
 
 type WorkspaceRole = AuthUser['role'];
 
@@ -61,6 +63,12 @@ function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathn
           <UrlAwareProfileSkeleton />
         </React.Suspense>
       )
+    : pathname === routes.admin.content
+      ? (
+          <React.Suspense fallback={<ContentLibrarySkeleton activeType="video" />}>
+            <UrlAwareContentLibrarySkeleton />
+          </React.Suspense>
+        )
     : isDashboard
       ? role === 'admin'
       ? <AdminDashboardSkeleton />
@@ -74,6 +82,12 @@ function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathn
       {content}
     </WorkspaceShellSkeleton>
   );
+}
+
+function UrlAwareContentLibrarySkeleton() {
+  const searchParams = useSearchParams();
+  const tab = contentLibraryTabFromQuery(searchParams.get('tab'));
+  return <ContentLibrarySkeleton activeType={tab} />;
 }
 
 function UrlAwareProfileSkeleton() {
