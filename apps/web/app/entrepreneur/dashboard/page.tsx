@@ -66,7 +66,13 @@ export default function EntrepreneurDashboardPage() {
       </MetricGrid>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <ChartCard title="Training progress trend" description="Cumulative content completion over the last six weeks" legend={[{ label: "Training progress", colorClassName: "bg-bid" }]}>
+        <ChartCard
+          title="Training progress trend"
+          description="Cumulative content completion over the last six weeks"
+          legend={[{ label: "Training progress", colorClassName: "bg-bid" }]}
+          className="flex min-h-[360px] flex-col"
+          bodyClassName="h-auto min-h-[250px] flex-1"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.progressTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
               <defs><linearGradient id="entrepreneurTraining" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.24} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient></defs>
