@@ -482,6 +482,7 @@ export default function AdminProgrammeWorkspacePage() {
             <RequiredDeliverablesSection
               programmeId={programmeId}
               programName={programme.name}
+              readOnly={isArchived}
             />
           ) : null}
 

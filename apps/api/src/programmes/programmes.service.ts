@@ -882,7 +882,7 @@ export class ProgrammesService {
       );
     }
 
-    await this.ensureProgrammeExists(programmeId);
+    await this.assertMutableProgramme(programmeId);
     await this.validateDeliverableRuleInput(programmeId, dto);
 
     const rule = await this.audit.capture(
@@ -920,6 +920,8 @@ export class ProgrammesService {
         "Only admins can manage programme deliverable rules.",
       );
     }
+
+    await this.assertMutableProgramme(programmeId);
 
     const existing = await this.prisma.programmeDeliverableRule.findFirst({
       where: { id: ruleId, programmeId },
@@ -1653,7 +1655,7 @@ export class ProgrammesService {
     if (!programme) throw new NotFoundException("Programme was not found.");
     if (programme.archivedAt) {
       throw new BadRequestException(
-        "Restore this programme before changing its curriculum.",
+        "Restore this programme before making changes.",
       );
     }
     return programme;

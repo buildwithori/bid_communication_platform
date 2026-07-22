@@ -126,9 +126,11 @@ function uniqueOptions(
 export function RequiredDeliverablesSection({
   programmeId,
   programName,
+  readOnly = false,
 }: {
   programmeId: string;
   programName: string;
+  readOnly?: boolean;
 }) {
   const [query, setQuery] = React.useState('');
   const debouncedQuery = useDebouncedValue(query);
@@ -206,26 +208,31 @@ export function RequiredDeliverablesSection({
   ]);
 
   const openAdd = () => {
+    if (readOnly) return;
     addForm.reset(defaults());
     setStageLookup({ search: '' });
     setModuleLookup({ search: '' });
     setAddOpen(true);
   };
   const openEdit = (rule: ProgrammeDeliverableRule) => {
+    if (readOnly) return;
     editForm.reset(defaults(rule));
     setStageLookup({ search: '' });
     setModuleLookup({ search: '' });
     setEditTarget(rule);
   };
-  const columns: Column<ProgrammeDeliverableRule>[] = [
-    {
+  const columns: Column<ProgrammeDeliverableRule>[] = [];
+  if (!readOnly) {
+    columns.push({
       key: 'actions',
       header: 'Action',
       className: 'w-[84px]',
       cell: (rule) => (
         <RowActions actions={[{ label: 'Edit deliverable', onSelect: () => openEdit(rule) }]} />
       ),
-    },
+    });
+  }
+  columns.push(
     {
       key: 'name',
       header: 'Deliverable',
@@ -256,15 +263,24 @@ export function RequiredDeliverablesSection({
       header: 'Submitted so far',
       cell: (rule) => `${rule.submittedCount} / ${rule.assignedCount}`,
     },
-  ];
+  );
 
   return (
     <>
       <div className="mt-5">
         <CardHeader
           title={`Required deliverables - ${programName}`}
-          actions={<Button size="sm" onClick={openAdd}>+ Add deliverable type</Button>}
+          actions={
+            readOnly ? undefined : (
+              <Button size="sm" onClick={openAdd}>+ Add deliverable type</Button>
+            )
+          }
         />
+        {readOnly ? (
+          <Notice>
+            Restore this programme before adding or editing deliverable types.
+          </Notice>
+        ) : null}
         <Notice>
           These rules generate entrepreneur-specific requirements and reporting-period submissions.
         </Notice>
@@ -304,43 +320,47 @@ export function RequiredDeliverablesSection({
         />
       </div>
 
-      <RuleModal
-        title="Add deliverable type"
-        open={addOpen}
-        form={addForm}
-        stageOptions={stageOptions}
-        moduleOptions={moduleOptions}
-        stages={stages}
-        modules={modules}
-        setStageLookup={setStageLookup}
-        setModuleLookup={setModuleLookup}
-        isSaving={createRule.isPending}
-        submitLabel="Add deliverable"
-        onClose={() => !createRule.isPending && setAddOpen(false)}
-        onSubmit={(values) => createRule.mutate({
-          programmeId,
-          payload: { ...toPayload(values), name: values.name.trim(), dueType: toApiDueType(values.dueType) },
-        })}
-      />
-      <RuleModal
-        title="Edit deliverable type"
-        open={Boolean(editTarget)}
-        form={editForm}
-        stageOptions={stageOptions}
-        moduleOptions={moduleOptions}
-        stages={stages}
-        modules={modules}
-        setStageLookup={setStageLookup}
-        setModuleLookup={setModuleLookup}
-        isSaving={updateRule.isPending}
-        submitLabel="Save deliverable"
-        onClose={() => !updateRule.isPending && setEditTarget(null)}
-        onSubmit={(values) => editTarget && updateRule.mutate({
-          programmeId,
-          ruleId: editTarget.id,
-          payload: toPayload(values),
-        })}
-      />
+      {!readOnly ? (
+        <>
+          <RuleModal
+            title="Add deliverable type"
+            open={addOpen}
+            form={addForm}
+            stageOptions={stageOptions}
+            moduleOptions={moduleOptions}
+            stages={stages}
+            modules={modules}
+            setStageLookup={setStageLookup}
+            setModuleLookup={setModuleLookup}
+            isSaving={createRule.isPending}
+            submitLabel="Add deliverable"
+            onClose={() => !createRule.isPending && setAddOpen(false)}
+            onSubmit={(values) => createRule.mutate({
+              programmeId,
+              payload: { ...toPayload(values), name: values.name.trim(), dueType: toApiDueType(values.dueType) },
+            })}
+          />
+          <RuleModal
+            title="Edit deliverable type"
+            open={Boolean(editTarget)}
+            form={editForm}
+            stageOptions={stageOptions}
+            moduleOptions={moduleOptions}
+            stages={stages}
+            modules={modules}
+            setStageLookup={setStageLookup}
+            setModuleLookup={setModuleLookup}
+            isSaving={updateRule.isPending}
+            submitLabel="Save deliverable"
+            onClose={() => !updateRule.isPending && setEditTarget(null)}
+            onSubmit={(values) => editTarget && updateRule.mutate({
+              programmeId,
+              ruleId: editTarget.id,
+              payload: toPayload(values),
+            })}
+          />
+        </>
+      ) : null}
     </>
   );
 }

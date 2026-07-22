@@ -553,6 +553,7 @@ export function ProgrammeWorkspaceView({
             <RequiredDeliverablesSection
               programmeId={program.id}
               programName={program.name}
+              readOnly={isArchived}
             />
           )}
 

@@ -247,6 +247,45 @@ test("programme reuse lookup excludes programmes already containing the content"
   });
 });
 
+test("archived programmes reject deliverable rule creation and editing", async () => {
+  let deliverableLookupCalled = false;
+  const prisma = {
+    programme: {
+      findUnique: async () => ({
+        id: "programme-1",
+        archivedAt: new Date("2026-06-01T00:00:00.000Z"),
+      }),
+    },
+    programmeDeliverableRule: {
+      findFirst: async () => {
+        deliverableLookupCalled = true;
+        return { id: "rule-1" };
+      },
+    },
+  };
+  const service = new ProgrammesService(
+    prisma as never,
+    {} as never,
+    {} as never,
+  );
+  const admin = { id: "admin-1", role: UserRole.admin } as never;
+
+  await assert.rejects(
+    service.createDeliverableRule(admin, "programme-1", {} as never),
+    /Restore this programme before making changes/,
+  );
+  await assert.rejects(
+    service.updateDeliverableRule(
+      admin,
+      "programme-1",
+      "rule-1",
+      {} as never,
+    ),
+    /Restore this programme before making changes/,
+  );
+  assert.equal(deliverableLookupCalled, false);
+});
+
 test("module reuse lookup excludes shared modules that would duplicate content", async () => {
   let moduleQuery: any;
   const prisma = {
