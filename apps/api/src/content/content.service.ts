@@ -501,6 +501,11 @@ export class ContentService {
       select: { id: true, trainerId: true },
     });
     if (!contentItem) throw new NotFoundException("Content item not found.");
+    if (!contentItem.trainerId) {
+      throw new BadRequestException(
+        "This learning content does not have a trainer to rate.",
+      );
+    }
 
     const comment = input.comment?.trim() || null;
     const rating = await this.prisma.contentRating.upsert({

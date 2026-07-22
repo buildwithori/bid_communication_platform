@@ -129,7 +129,6 @@ export function ProgrammeCoursePlayer({
   const [locallyCompletedIds, setLocallyCompletedIds] = React.useState(
     () => new Set<string>(),
   );
-  const promptedRatingsRef = React.useRef(new Set<string>());
   const canTrack = data.viewer.canTrackProgress;
   const progress = useLearnerProgressQuery(
     canTrack && active
@@ -275,7 +274,7 @@ export function ProgrammeCoursePlayer({
     completedEntry: PlaylistEntry,
     target: PlaylistEntry | null,
   ) {
-    if (!canTrack || promptedRatingsRef.current.has(completedEntry.item.id)) {
+    if (!canTrack || !completedEntry.item.trainer) {
       if (target) choose(target);
       return;
     }
@@ -295,7 +294,6 @@ export function ProgrammeCoursePlayer({
   }
 
   function finishRatingPrompt() {
-    if (ratingEntry) promptedRatingsRef.current.add(ratingEntry.item.id);
     const target = continueAfterRating;
     setRatingEntry(null);
     setContinueAfterRating(null);

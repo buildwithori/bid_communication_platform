@@ -426,6 +426,35 @@ test("unpublished entrepreneur tools cannot be attached to learning content", as
   );
 });
 
+test("content without an assigned trainer cannot be rated", async () => {
+  let ratingSaved = false;
+  const service = new ContentService(
+    {
+      contentItem: {
+        findFirst: async () => ({ id: "content-1" }),
+        findUnique: async () => ({ id: "content-1", trainerId: null }),
+      },
+      contentRating: {
+        upsert: async () => {
+          ratingSaved = true;
+          return {};
+        },
+      },
+    } as never,
+    {} as never,
+    {} as never,
+  );
+
+  await assert.rejects(
+    service.upsertRating(entrepreneur as never, {
+      contentItemId: "content-1",
+      rating: 5,
+    }),
+    /does not have a trainer to rate/,
+  );
+  assert.equal(ratingSaved, false);
+});
+
 test("programme access authorizes a linked PDF entrepreneur tool", async () => {
   let programmeQuery: unknown;
   const service = new FilesService(

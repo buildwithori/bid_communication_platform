@@ -25,7 +25,11 @@ export function ContentRating({
   content: RatingContent;
   onSaved?: () => void;
 }) {
-  const savedRating = useMyContentRatingQuery(content.id);
+  const savedRating = useMyContentRatingQuery(
+    content.trainer ? content.id : null,
+  );
+
+  if (!content.trainer) return null;
 
   if (savedRating.isLoading && !savedRating.data) {
     return (
