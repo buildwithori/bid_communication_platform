@@ -27,6 +27,7 @@ import { Notice, PageHeader } from "@/components/shared/PageHeader";
 import { Tabs } from "@/components/shared/Tabs";
 import {
   useContentItemsPage,
+  useContentItemsSummaryQuery,
   useDeleteContentItemMutation,
   type ContentItemRecord,
   type ContentItemStatus,
@@ -110,13 +111,19 @@ function ContentLibrary() {
     moduleId,
     take: pageSize,
   });
+  const contentSummary = useContentItemsSummaryQuery({
+    search: debouncedQuery.trim() || undefined,
+    moduleId,
+  });
   const resetPagination = content.resetPagination;
 
   React.useEffect(() => {
     resetPagination();
   }, [debouncedQuery, moduleId, pageSize, resetPagination, tab]);
 
-  const showInitialSkeleton = content.isPending && !content.data;
+  const showInitialSkeleton =
+    (content.isPending && !content.data) ||
+    (contentSummary.isPending && !contentSummary.data);
   const showTableSkeleton = content.isPlaceholderData;
 
   const columns = React.useMemo<Column<ContentItemRecord>[]>(
@@ -245,19 +252,19 @@ function ContentLibrary() {
         tabs={[
           {
             value: "video",
-            label: `Videos (${content.summary.video})`,
+            label: `Videos (${contentSummary.data?.video ?? 0})`,
           },
           {
             value: "pdf",
-            label: `PDFs (${content.summary.pdf})`,
+            label: `PDFs (${contentSummary.data?.pdf ?? 0})`,
           },
           {
             value: "excel",
-            label: `Excel (${content.summary.excel})`,
+            label: `Excel (${contentSummary.data?.excel ?? 0})`,
           },
           {
             value: "tool",
-            label: `Tools (${content.summary.tool})`,
+            label: `Tools (${contentSummary.data?.tool ?? 0})`,
           },
         ]}
       />

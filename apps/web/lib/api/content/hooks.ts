@@ -10,6 +10,7 @@ import {
   createModuleContentItemRequest,
   deleteContentItemRequest,
   getMyContentRatingRequest,
+  getContentItemsSummaryRequest,
   listContentItemsRequest,
   listModuleContentItemsRequest,
   moveModuleContentItemRequest,
@@ -21,6 +22,7 @@ import type {
   ContentItemQuery,
   ContentItemPage,
   ContentItemRecord,
+  ContentItemSummaryQuery,
   ContentDeletionResult,
   DeleteContentItemVariables,
   ContentRatingPayload,
@@ -136,6 +138,13 @@ export const useSaveContentRatingMutation = (handlers?: { onSuccess?: (data: Con
 
 export const useContentItemsPage = (query: PageQuery) =>
   useCursorPage(query, listContentItemsRequest, contentKeys.list, true, true);
+
+export const useContentItemsSummaryQuery = (query: ContentItemSummaryQuery) =>
+  useQuery({
+    queryKey: contentKeys.summary(query),
+    queryFn: () => getContentItemsSummaryRequest(query),
+    placeholderData: (previousData) => previousData,
+  });
 
 export const useModuleContentItemsPage = (moduleId: string, query: PageQuery, enabled = true) =>
   useCursorPage(

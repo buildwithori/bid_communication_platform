@@ -66,6 +66,11 @@ export class ContentService {
     return this.contentPage(query);
   }
 
+  async getContentItemsSummary(user: User, query: ContentItemQueryDto) {
+    this.assertAdmin(user);
+    return this.contentSummary(query);
+  }
+
   async listModuleContentItems(
     user: User,
     moduleId: string,
@@ -647,9 +652,8 @@ export class ContentService {
   private async contentPage(query: ContentItemQueryDto) {
     const take = query.take ?? 20;
     const where = this.contentWhere(query);
-    const summaryWhere = this.contentWhere({ ...query, type: undefined });
 
-    const [rows, totalItems, grouped] = await Promise.all([
+    const [rows, totalItems, summary] = await Promise.all([
       this.prisma.contentItem.findMany({
         where,
         include: contentItemInclude,
@@ -658,11 +662,7 @@ export class ContentService {
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       }),
       this.prisma.contentItem.count({ where }),
-      this.prisma.contentItem.groupBy({
-        by: ["type"],
-        where: summaryWhere,
-        _count: { id: true },
-      }),
+      this.contentSummary(query),
     ]);
 
     const items = rows.slice(0, take);
@@ -670,6 +670,23 @@ export class ContentService {
       items.map((item) => item.id),
       query.moduleId,
     );
+    return {
+      items: items.map((item) =>
+        this.serializeContentItem(item, usage.get(item.id)),
+      ),
+      nextCursor:
+        rows.length > take ? (items[items.length - 1]?.id ?? null) : null,
+      totalItems,
+      summary,
+    };
+  }
+
+  private async contentSummary(query: ContentItemQueryDto) {
+    const grouped = await this.prisma.contentItem.groupBy({
+      by: ["type"],
+      where: this.contentWhere({ ...query, type: undefined }),
+      _count: { id: true },
+    });
     const counts = {
       video: 0,
       pdf: 0,
@@ -679,18 +696,9 @@ export class ContentService {
     for (const row of grouped) {
       counts[row.type] = row._count.id;
     }
-
     return {
-      items: items.map((item) =>
-        this.serializeContentItem(item, usage.get(item.id)),
-      ),
-      nextCursor:
-        rows.length > take ? (items[items.length - 1]?.id ?? null) : null,
-      totalItems,
-      summary: {
-        total: counts.video + counts.pdf + counts.excel + counts.tool,
-        ...counts,
-      },
+      total: counts.video + counts.pdf + counts.excel + counts.tool,
+      ...counts,
     };
   }
 

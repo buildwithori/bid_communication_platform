@@ -1,10 +1,16 @@
-import type { ContentItemQuery, ContentRatingContext } from "./types";
+import type {
+  ContentItemQuery,
+  ContentItemSummaryQuery,
+  ContentRatingContext,
+} from "./types";
 
 export const contentKeys = {
   all: ["content"] as const,
   lists: () => [...contentKeys.all, "list"] as const,
   list: (query: ContentItemQuery) =>
     [...contentKeys.lists(), query] as const,
+  summary: (query: ContentItemSummaryQuery) =>
+    [...contentKeys.all, "summary", query] as const,
   modules: () => [...contentKeys.all, "module"] as const,
   module: (moduleId: string) =>
     [...contentKeys.modules(), moduleId] as const,

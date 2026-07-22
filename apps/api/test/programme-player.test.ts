@@ -1182,6 +1182,40 @@ test("reusable content lookup excludes other items linked to a module tool", () 
   });
 });
 
+test("content library summary is shared across content type tabs", async () => {
+  let summaryWhere: unknown;
+  const service = new ContentService(
+    {
+      contentItem: {
+        groupBy: async (input: { where: unknown }) => {
+          summaryWhere = input.where;
+          return [
+            { type: "video", _count: { id: 1 } },
+            { type: "pdf", _count: { id: 2 } },
+            { type: "tool", _count: { id: 3 } },
+          ];
+        },
+      },
+    } as never,
+    {} as never,
+    {} as never,
+  );
+
+  const summary = await service.getContentItemsSummary(
+    { id: "admin-1", role: UserRole.admin } as never,
+    { type: "video" },
+  );
+
+  assert.deepEqual(summaryWhere, {});
+  assert.deepEqual(summary, {
+    total: 6,
+    video: 1,
+    pdf: 2,
+    excel: 0,
+    tool: 3,
+  });
+});
+
 test("reusable content lookup excludes items already used in a connected programme", () => {
   const service = new ContentService({} as never, {} as never, {} as never);
   const where = (

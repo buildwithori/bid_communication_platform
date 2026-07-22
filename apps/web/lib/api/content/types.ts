@@ -100,13 +100,15 @@ export type ContentItemPage = {
   items: ContentItemRecord[];
   nextCursor: string | null;
   totalItems: number;
-  summary: {
-    total: number;
-    video: number;
-    pdf: number;
-    excel: number;
-    tool: number;
-  };
+  summary: ContentItemSummary;
+};
+
+export type ContentItemSummary = {
+  total: number;
+  video: number;
+  pdf: number;
+  excel: number;
+  tool: number;
 };
 
 export type ContentItemQuery = {
@@ -121,6 +123,11 @@ export type ContentItemQuery = {
   take?: number;
   cursor?: string;
 };
+
+export type ContentItemSummaryQuery = Omit<
+  ContentItemQuery,
+  "type" | "take" | "cursor"
+>;
 
 export type CreateModuleContentVariables = {
   moduleId: string;

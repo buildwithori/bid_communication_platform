@@ -4,6 +4,8 @@ import type {
   ContentItemPage,
   ContentItemQuery,
   ContentItemRecord,
+  ContentItemSummary,
+  ContentItemSummaryQuery,
   ContentDeletionResult,
   DeleteContentItemVariables,
   ContentRatingPayload,
@@ -36,6 +38,9 @@ function queryString(query?: ContentItemQuery) {
 
 export const listContentItemsRequest = (query?: ContentItemQuery) =>
   apiRequest<ContentItemPage>(`/content/items${queryString(query)}`);
+
+export const getContentItemsSummaryRequest = (query?: ContentItemSummaryQuery) =>
+  apiRequest<ContentItemSummary>(`/content/items/summary${queryString(query)}`);
 
 export const listModuleContentItemsRequest = (
   moduleId: string,

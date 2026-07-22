@@ -1,6 +1,7 @@
 export {
   useAttachContentItemMutation,
   useContentItemsPage,
+  useContentItemsSummaryQuery,
   useCreateModuleContentMutation,
   useDeleteContentItemMutation,
   useLazyPublishedToolsLookup,
@@ -18,6 +19,8 @@ export type {
   ContentItemPage,
   ContentItemQuery,
   ContentItemRecord,
+  ContentItemSummary,
+  ContentItemSummaryQuery,
   ContentDeletionResult,
   ContentItemStatus,
   ContentItemType,

@@ -42,6 +42,15 @@ export class ContentController {
     return this.contentService.listContentItems(user, query);
   }
 
+  @Get('items/summary')
+  @Roles(UserRole.admin)
+  getContentItemsSummary(
+    @CurrentUser() user: User,
+    @Query() query: ContentItemQueryDto,
+  ) {
+    return this.contentService.getContentItemsSummary(user, query);
+  }
+
   @Get('modules/:moduleId/items')
   @Roles(UserRole.admin, UserRole.trainer, UserRole.entrepreneur)
   listModuleContentItems(
