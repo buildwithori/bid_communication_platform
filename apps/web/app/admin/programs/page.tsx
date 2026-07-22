@@ -58,7 +58,7 @@ export default function AdminProgramsPage() {
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = React.useState<StatusFilter>('current');
   const [access, setAccess] = React.useState<AccessFilter>('all');
-  const [pageSize, setPageSize] = React.useState(8);
+  const [pageSize, setPageSize] = React.useState(10);
 
   const directory = useProgrammesPage({
     search: debouncedSearch.trim() || undefined,
@@ -408,7 +408,7 @@ export default function AdminProgramsPage() {
           page={directory.page}
           pageSize={pageSize}
           totalItems={directory.totalItems}
-          pageSizeOptions={[8, 16, 32]}
+          pageSizeOptions={[10, 25, 50]}
           onPageChange={directory.setPage}
           onPageSizeChange={setPageSize}
         />
@@ -482,7 +482,7 @@ function ProgrammesPageSkeleton() {
         ))}
       </div>
       <div className="mt-4">
-        <TableSkeleton columns={9} rows={8} />
+        <TableSkeleton columns={9} rows={10} />
       </div>
     </>
   );
