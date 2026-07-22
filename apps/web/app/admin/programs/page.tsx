@@ -449,7 +449,7 @@ export default function AdminProgramsPage() {
         description="This permanently deletes the programme and all entrepreneur activity recorded specifically against it."
         consequences={[
           "Enrolments, progress, goals, updates, deliverables, submissions, reviews, and programme sessions will be deleted.",
-          "Programme submission files, report exports, and connected calendar events will be removed in the background.",
+          "Programme submission files, report exports, and connected calendar events will also be deleted.",
           "Reusable modules and content-library media are preserved so other programmes are not damaged.",
         ]}
         confirmLabel="Delete programme"

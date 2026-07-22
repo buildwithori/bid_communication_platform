@@ -37,7 +37,7 @@ export function uploadVideoToMux(
     });
     request.addEventListener("error", () => {
       signal?.removeEventListener("abort", abort);
-      reject(new Error("Video upload could not reach the video provider."));
+      reject(new Error("Video upload could not be completed. Try again."));
     });
     request.addEventListener("abort", () => {
       signal?.removeEventListener("abort", abort);

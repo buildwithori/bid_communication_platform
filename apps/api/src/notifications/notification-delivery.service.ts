@@ -52,7 +52,7 @@ export class NotificationDeliveryService {
       data: {
         status: NotificationDeliveryStatus.failed,
         failedAt: now,
-        failureReason: "Delivery worker stopped before completion.",
+        failureReason: "Notification delivery could not be completed.",
         nextAttemptAt: now,
       },
     });

@@ -40,7 +40,7 @@ export function uploadToSignedUrl(
     });
     request.addEventListener("error", () => {
       signal?.removeEventListener("abort", abort);
-      reject(new Error("File upload could not reach object storage."));
+      reject(new Error("File upload could not be completed. Try again."));
     });
     request.addEventListener("abort", () => {
       signal?.removeEventListener("abort", abort);

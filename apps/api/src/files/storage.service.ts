@@ -34,7 +34,7 @@ export class StorageService {
 
     if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
       throw new ServiceUnavailableException(
-        "Object storage is not configured.",
+        "File uploads are temporarily unavailable.",
       );
     }
 
@@ -123,7 +123,7 @@ export class StorageService {
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new ServiceUnavailableException(
-        "Object storage could not verify the upload.",
+        "The uploaded file could not be verified. Try uploading it again.",
       );
     }
     const contentLength = Number(response.headers.get("content-length"));
@@ -155,7 +155,7 @@ export class StorageService {
     );
     if (!response.ok) {
       throw new ServiceUnavailableException(
-        "Object storage could not inspect the upload.",
+        "The uploaded file could not be verified. Try uploading it again.",
       );
     }
     return new Uint8Array(await response.arrayBuffer());
@@ -173,7 +173,7 @@ export class StorageService {
     );
     if (!response.ok) {
       throw new ServiceUnavailableException(
-        "Object storage could not read the file.",
+        "The file could not be opened. Try again.",
       );
     }
     const declaredSize = Number(response.headers.get("content-length"));
@@ -213,7 +213,7 @@ export class StorageService {
     );
     if (!response.ok) {
       throw new ServiceUnavailableException(
-        "Object storage could not save the generated file.",
+        "The file could not be prepared. Try again.",
       );
     }
   }
@@ -230,7 +230,7 @@ export class StorageService {
     );
     if (!response.ok && response.status !== 404) {
       throw new ServiceUnavailableException(
-        "Object storage could not delete the file.",
+        "The file could not be deleted. Try again.",
       );
     }
   }
@@ -241,7 +241,7 @@ export class StorageService {
         return await fetch(url, init);
       } catch {
         throw new ServiceUnavailableException(
-          "Object storage is temporarily unavailable.",
+          "Files are temporarily unavailable. Try again shortly.",
         );
       }
     };

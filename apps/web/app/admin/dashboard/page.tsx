@@ -243,7 +243,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <Card className="mt-4">
-        <CardHeader title="Recently joined" description="Server-filtered entrepreneurs that may need team attention" actions={<Button size="sm" variant="outline" onClick={() => router.push(routes.admin.entrepreneurs)}>Open directory</Button>} />
+        <CardHeader title="Recently joined" description="New entrepreneurs who may need team attention" actions={<Button size="sm" variant="outline" onClick={() => router.push(routes.admin.entrepreneurs)}>Open directory</Button>} />
         <TableToolbar>
           <div><div className="text-sm font-medium text-ink">Search new joiners</div><div className="mt-0.5 text-sm text-ink-muted">Search names, email, business, sector, or stage.</div></div>
           <div className="grid w-full gap-2 sm:grid-cols-[minmax(220px,1fr)_180px_190px] lg:w-[740px]">

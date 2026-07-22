@@ -539,7 +539,7 @@ function RuleModal({
           />
         </FormField>
         <Notice>
-          Saving this rule updates backend-managed requirements and creates applicable instances.
+          Saving applies this requirement to eligible entrepreneurs in the programme.
         </Notice>
         <Button
           type="submit"

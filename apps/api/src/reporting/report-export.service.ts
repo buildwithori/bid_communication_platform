@@ -378,7 +378,7 @@ export class ReportExportService {
     const currencyFormat = '#,##0.00 "' + overview.settings.currency + '"';
 
     workbook.creator = "BID Hub";
-    workbook.lastModifiedBy = "BID Hub reporting worker";
+    workbook.lastModifiedBy = "BID Hub";
     workbook.company = "BID Hub";
     workbook.title = "BID Hub impact and performance report";
     workbook.subject = overview.scope.programmeName + " performance report";

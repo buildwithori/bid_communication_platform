@@ -353,3 +353,9 @@ Session workflow rules:
 - Dark mode is supported across auth, admin, trainer, and entrepreneur workspaces, including shared modals, tables, forms, loading states, previews, and dashboard charts. New UI must use the semantic theme tokens (`background`, `card`, `popover`, `surface-*`, `ink-*`, `border`/`line`, and semantic chart colors) instead of hardcoded light surfaces, black borders, or fixed chart text/grid colors.
 - Intentionally fixed rendering canvases are limited to content that requires its native presentation, such as PDF/embedded document frames and dark media stages. Surrounding application chrome must remain theme-aware.
 - Shared data tables own interactive feedback. Clickable content and navigable rows must use the shared hover, keyboard-focus, and pressed states; do not recreate table interaction colors in individual pages.
+
+## User-facing Copy Contract (2026-07-22)
+
+- Product copy must describe the user-visible outcome, current state, consequence, or next action. Do not expose implementation mechanics such as background workers, queues, database transactions, backend calculations, Mux, object-storage providers, webhooks, or internal identifiers in pages, modals, toasts, emails, or API errors that may reach a user.
+- Keep destructive confirmations specific enough for informed consent: name the business records and files that will be deleted or preserved, but describe asynchronous cleanup simply as deletion without explaining how the system performs it.
+- Useful domain states such as processing, preparing, ready, failed, and review queue may remain when they help a user decide what to do. Provider and infrastructure detail belongs in structured logs, health diagnostics, integration callbacks, and technical documentation.

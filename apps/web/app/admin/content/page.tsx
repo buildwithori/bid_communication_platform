@@ -252,8 +252,7 @@ function ContentLibrary() {
               Find content quickly
             </div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search by title or trainer. Filtering and counts run on the
-              backend.
+              Search by content title or trainer.
             </div>
           </div>
           <div className="w-full sm:w-[340px]">

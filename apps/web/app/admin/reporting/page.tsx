@@ -143,7 +143,7 @@ export default function AdminReportingPage() {
     onSuccess: (created) => {
       setExportId(created.id);
       toast.success(
-        "Report export queued. You can keep working while it is generated.",
+        "Report export started. You can keep working while it is prepared.",
       );
     },
     onError: (error) => toast.error(error.message),
@@ -305,7 +305,7 @@ export default function AdminReportingPage() {
                 createExport.mutate({ ...reportQuery, format: exportFormat })
               }
               isLoading={createExport.isPending}
-              loadingLabel="Queueing…"
+              loadingLabel="Starting…"
               disabled={invalidDates}
               className="flex items-center gap-1.5"
             >
@@ -388,7 +388,7 @@ export default function AdminReportingPage() {
                 ? `Your ${currentExport.format.toUpperCase()} export is ready.`
                 : currentExport.status === "failed"
                   ? (currentExport.failureReason ?? "The report export failed.")
-                  : "Your report is being generated in the background."}
+                  : "Your report is being prepared."}
             </span>
             {currentExport.status === "ready" ? (
               <Button

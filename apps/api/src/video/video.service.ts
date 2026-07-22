@@ -229,7 +229,7 @@ export class VideoService {
                 action: `videos.mux.${event.type}`,
                 entityType: "videoAsset",
                 entityId: video.id,
-                summary: `Mux video transition: ${event.type}`,
+                summary: `Video status changed to ${updated.status}.`,
               },
               tx,
             );

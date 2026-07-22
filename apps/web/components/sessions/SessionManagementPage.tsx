@@ -446,7 +446,7 @@ export function SessionManagementPage({
           <div>
             <div className="text-sm font-medium text-ink">Filter sessions</div>
             <div className="mt-0.5 text-sm text-ink-muted">
-              Search and counts are calculated by the backend.
+              Search by topic, participant, programme, or session details.
             </div>
           </div>
           <div className="grid w-full gap-2 lg:w-auto lg:grid-cols-[260px_180px_180px]">

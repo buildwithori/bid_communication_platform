@@ -214,11 +214,19 @@ function ModuleDetailModalContent({
           const sourceLabel =
             item.type === "video"
               ? item.muxPlaybackId
-                ? `Mux ${item.muxPlaybackId}`
-                : "Mux playback ID missing"
+                ? "Video ready"
+                : "Video unavailable"
               : item.type === "pdf"
-                ? (item.fileUrl ?? "PDF file missing")
-                : (item.toolUrl ?? "Tool link missing");
+                ? item.fileUrl
+                  ? "PDF uploaded"
+                  : "PDF unavailable"
+                : item.type === "excel"
+                  ? item.fileUrl
+                    ? "Excel workbook uploaded"
+                    : "Excel workbook unavailable"
+                  : item.toolUrl
+                    ? "Interactive tool linked"
+                    : "Interactive tool unavailable";
 
           return (
             <span className="block max-w-[260px] truncate text-sm text-ink-muted">

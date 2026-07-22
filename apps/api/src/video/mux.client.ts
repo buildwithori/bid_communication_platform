@@ -59,7 +59,9 @@ export class MuxClient {
     const id = response?.data?.id;
     const url = response?.data?.url;
     if (!id || !url) {
-      throw new BadGatewayException("Mux did not return a direct upload URL.");
+      throw new BadGatewayException(
+        "Video upload could not be started. Try again.",
+      );
     }
     return { id, url };
   }
@@ -126,7 +128,9 @@ export class MuxClient {
             signal: AbortSignal.timeout(10_000),
           });
         } catch {
-          throw new BadGatewayException("Could not reach the video provider.");
+          throw new BadGatewayException(
+            "Video service is temporarily unavailable. Try again shortly.",
+          );
         }
 
         if (!response.ok) {
@@ -134,12 +138,8 @@ export class MuxClient {
           if (method === "DELETE" && response.status === 404) {
             return undefined as T;
           }
-          const body = (await response
-            .json()
-            .catch(() => null)) as MuxDirectUploadResponse | null;
-          const message = body?.error?.messages?.[0];
           throw new BadGatewayException(
-            message ?? "The video provider rejected the request.",
+            "The video request could not be completed. Try again.",
           );
         }
 
