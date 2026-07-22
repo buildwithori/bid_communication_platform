@@ -54,6 +54,7 @@ function getCalendarDays(monthDate: Date) {
 
 export interface DatePickerProps {
   value?: string;
+  minDate?: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
   ariaLabel?: string;
@@ -74,6 +75,7 @@ export interface DateRangePickerProps {
 
 export function DatePicker({
   value,
+  minDate,
   onChange,
   onBlur,
   ariaLabel,
@@ -99,6 +101,7 @@ export function DatePicker({
   };
 
   const selectedValue = selectedDate ? toDateValue(selectedDate) : '';
+  const minimumValue = minDate ? toDateValue(parseDate(minDate) ?? new Date(0)) : '';
   const displayValue = formatDisplayDate(value);
 
   return (
@@ -158,11 +161,13 @@ export function DatePicker({
             const dateValue = toDateValue(date);
             const isSelected = dateValue === selectedValue;
             const isOutsideMonth = date.getMonth() !== visibleMonth.getMonth();
+            const isBeforeMinimum = Boolean(minimumValue && dateValue < minimumValue);
 
             return (
               <button
                 key={dateValue}
                 type="button"
+                disabled={isBeforeMinimum}
                 onClick={() => {
                   onChange(dateValue);
                   setOpen(false);
@@ -173,6 +178,8 @@ export function DatePicker({
                     ? 'text-ink-faint hover:bg-surface-subtle'
                     : 'text-ink hover:bg-bid-light',
                   isSelected && 'bg-bid text-white hover:bg-bid',
+                  isBeforeMinimum &&
+                    'cursor-not-allowed bg-transparent text-ink-faint opacity-40 hover:bg-transparent',
                 )}
               >
                 {date.getDate()}

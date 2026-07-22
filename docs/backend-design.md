@@ -682,6 +682,7 @@ Rules:
 - Due dates in review queues come from concrete `deliverable_instances.due_date`, which is calculated from the programme deliverable rule and the entrepreneur/programme context.
 - Business-level display in review queues is derived from the entrepreneur user's business membership, not stored on the deliverable instance.
 - Fixed-date rules copy `due_date` directly into each applicable instance.
+- A fixed deliverable due date may be today or later, but never before the current date in the acting admin's timezone; use `Africa/Kigali` when the user has no valid timezone. The themed date picker disables past dates and the API independently enforces the rule.
 - Module-completion rules create or activate an instance when the learner completes the configured module; the concrete due date should come from company configuration, for example "due N days after module completion".
 - Recurring rules generate instances per reporting cadence and period.
 - New recurring periods are calendar-aligned: monthly, calendar-quarterly, or January-June/July-December. Generation starts no earlier than programme/access eligibility, stops at the programme end date, and uses the period end as the concrete due date.

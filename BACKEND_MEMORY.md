@@ -206,6 +206,7 @@ Initial access rules:
 - Programme create/edit must persist the current UI fields, including `max_entrepreneurs`. UI `publishState` maps to the initial publish action, not to publish/unpublish workflow fields or a loose status column.
 - Archived programmes are hidden from default operational lists and become read-only unless restored.
 - Deliverable due dates come from programme deliverable rules, then become concrete `deliverable_instances.due_date` values per entrepreneur/programme submission context. Review queues must read due dates from instances, not invent them.
+- Fixed-date deliverable rules accept today or a future date only. The API compares date-only values in the acting admin's timezone and falls back to `Africa/Kigali`; frontend calendar disabling is complementary validation, not the security boundary.
 - Recurring deliverables use nullable `deliverable_instances.period_start`/`period_end`. New periods are calendar-aligned, begin no earlier than programme/access eligibility, end no later than the programme end date, and are unique per rule/entrepreneur/programme/period. Generation must remain set-based and idempotent.
 - Deliverable instances link to `entrepreneur_user_id`, not `business_id`. Business context for display/reporting is derived through business membership.
 - Programme goals link to `entrepreneur_user_id`, not `business_id`, and should not include `target_date` unless a real deadline workflow is designed.

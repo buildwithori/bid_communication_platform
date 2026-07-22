@@ -884,7 +884,12 @@ export class ProgrammesService {
     }
 
     await this.assertMutableProgramme(programmeId);
-    await this.validateDeliverableRuleInput(programmeId, dto);
+    await this.validateDeliverableRuleInput(
+      programmeId,
+      dto,
+      undefined,
+      user.timezone ?? "Africa/Kigali",
+    );
 
     const rule = await this.audit.capture(
       {
@@ -931,7 +936,12 @@ export class ProgrammesService {
     if (!existing)
       throw new NotFoundException("Programme deliverable rule was not found.");
 
-    await this.validateDeliverableRuleInput(programmeId, dto, ruleId);
+    await this.validateDeliverableRuleInput(
+      programmeId,
+      dto,
+      ruleId,
+      user.timezone ?? "Africa/Kigali",
+    );
 
     const updated = await this.audit.capture(
       {
@@ -1323,7 +1333,17 @@ export class ProgrammesService {
     programmeId: string,
     dto: CreateProgrammeDeliverableRuleDto | UpsertProgrammeDeliverableRuleDto,
     currentRuleId?: string,
+    timezone = "Africa/Kigali",
   ) {
+    if (
+      dto.dueDate &&
+      dto.dueDate.slice(0, 10) < this.todayInTimezone(timezone)
+    ) {
+      throw new BadRequestException(
+        "Deliverable due date cannot be before today.",
+      );
+    }
+
     if (dto.name?.trim()) {
       const duplicate = await this.prisma.programmeDeliverableRule.findFirst({
         where: {
@@ -1704,6 +1724,32 @@ export class ProgrammesService {
 
   private dateOnly(value: string) {
     return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+  }
+
+  private todayInTimezone(timezone: string) {
+    let formatter: Intl.DateTimeFormat;
+    try {
+      formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    } catch {
+      formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Africa/Kigali",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    }
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(new Date())
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    );
+    return `${parts.year}-${parts.month}-${parts.day}`;
   }
 
   private buildProgrammeWhere(

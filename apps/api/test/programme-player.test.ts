@@ -3,6 +3,7 @@ import test from "node:test";
 import * as ExcelJS from "exceljs";
 import {
   ContentItemStatus,
+  DeliverableDueType,
   ProgrammeAccessType,
   UserRole,
 } from "@prisma/client";
@@ -285,6 +286,32 @@ test("archived programmes reject deliverable rule creation and editing", async (
     /Restore this programme before making changes/,
   );
   assert.equal(deliverableLookupCalled, false);
+});
+
+test("fixed-date deliverables reject dates before today", async () => {
+  const service = new ProgrammesService({} as never, {} as never, {} as never);
+  const internals = service as unknown as {
+    validateDeliverableRuleInput(
+      programmeId: string,
+      dto: unknown,
+      currentRuleId?: string,
+      timezone?: string,
+    ): Promise<void>;
+  };
+
+  await assert.rejects(
+    internals.validateDeliverableRuleInput(
+      "programme-1",
+      {
+        name: "Past deliverable",
+        dueType: DeliverableDueType.fixed_date,
+        dueDate: "2000-01-01",
+      },
+      undefined,
+      "Africa/Kigali",
+    ),
+    /cannot be before today/,
+  );
 });
 
 test("module reuse lookup excludes shared modules that would duplicate content", async () => {

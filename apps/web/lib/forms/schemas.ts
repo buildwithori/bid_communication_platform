@@ -418,6 +418,16 @@ export const requiredDeliverableSchema = z
   )
   .refine(
     (values) =>
+      values.dueType !== "fixed-date" ||
+      !values.dueDate ||
+      values.dueDate >= localTodayDateValue(),
+    {
+      message: "Due date cannot be before today",
+      path: ["dueDate"],
+    },
+  )
+  .refine(
+    (values) =>
       values.dueType !== "module-completion" ||
       Boolean(values.moduleRule?.trim()),
     {
@@ -435,6 +445,14 @@ export const requiredDeliverableSchema = z
     },
   );
 export type RequiredDeliverableForm = z.infer<typeof requiredDeliverableSchema>;
+
+function localTodayDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export const reuseModuleSchema = z.object({
   moduleId: z.string().min(1, "Select a module"),

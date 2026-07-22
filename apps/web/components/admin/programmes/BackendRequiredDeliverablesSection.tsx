@@ -471,7 +471,12 @@ function RuleModal({
               control={form.control}
               name="dueDate"
               render={({ field }) => (
-                <DatePicker value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                <DatePicker
+                  value={field.value}
+                  minDate={todayDateValue()}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
               )}
             />
           </FormField>
@@ -547,4 +552,12 @@ function RuleModal({
       </form>
     </Modal>
   );
+}
+
+function todayDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
