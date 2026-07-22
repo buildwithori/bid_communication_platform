@@ -232,7 +232,7 @@ function ContentLibrary() {
           },
           {
             value: "excel",
-            label: "Excel (" + content.summary.excel + ")",
+            label: `Excel (${content.summary.excel})`,
           },
           {
             value: "tool",

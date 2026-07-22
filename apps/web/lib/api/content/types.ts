@@ -104,6 +104,7 @@ export type ContentItemPage = {
     total: number;
     video: number;
     pdf: number;
+    excel: number;
     tool: number;
   };
 };

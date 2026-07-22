@@ -80,11 +80,12 @@ function useCursorPage(query: PageQuery, request: (query: ContentItemQuery) => R
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary: result.data?.summary ?? {
-      total: 0,
-      video: 0,
-      pdf: 0,
-      tool: 0,
+    summary: {
+      total: result.data?.summary?.total ?? 0,
+      video: result.data?.summary?.video ?? 0,
+      pdf: result.data?.summary?.pdf ?? 0,
+      excel: result.data?.summary?.excel ?? 0,
+      tool: result.data?.summary?.tool ?? 0,
     },
     setPage,
     resetPagination,
