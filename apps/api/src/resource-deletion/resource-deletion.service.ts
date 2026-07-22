@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ExternalResourceProvider, NotificationEntityType, Prisma, User, UserRole } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
@@ -10,7 +10,49 @@ export type ResourceDeletionResult = { id: string; name: string; deleted: true; 
 
 @Injectable()
 export class ResourceDeletionService {
+  private readonly logger = new Logger(ResourceDeletionService.name);
+
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+
+  async cleanupOrphanedCurriculum(limit = 25) {
+    const candidates = await this.prisma.learningModule.findMany({
+      where: {
+        programmes: { none: {} },
+        deliverableRulesAfter: { none: {} },
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: limit,
+    });
+    const totals = {
+      removedModules: 0,
+      removedContentItems: 0,
+      externalCleanupQueued: 0,
+    };
+
+    for (const candidate of candidates) {
+      const result = await this.prisma.$transaction((tx) =>
+        this.cleanupOrphanedModule(tx, candidate.id),
+      );
+      totals.removedModules += result.removedModules;
+      totals.removedContentItems += result.removedContentItems;
+      totals.externalCleanupQueued += result.externalCleanupQueued;
+    }
+
+    if (totals.removedModules) {
+      this.logger.warn(
+        `Reconciled ${totals.removedModules} orphaned curriculum module(s) and ${totals.removedContentItems} exclusive content item(s)`,
+      );
+      await this.audit.enqueue({
+        action: "curriculum.orphans.cleaned",
+        entityType: "learning_module",
+        summary: `Cleaned ${totals.removedModules} orphaned curriculum module(s)`,
+        payload: totals,
+      });
+    }
+
+    return { ...totals, hasMore: candidates.length === limit };
+  }
 
   async deleteContentItem(user: User, contentItemId: string, dto: DeleteResourceDto): Promise<ResourceDeletionResult> {
     this.assertAdmin(user);
@@ -461,6 +503,108 @@ export class ResourceDeletionService {
       await tx.notificationDelivery.deleteMany({ where: { notificationId: { in: notificationIds } } });
       await tx.notification.deleteMany({ where: { id: { in: notificationIds } } });
     }
+  }
+
+  private async cleanupOrphanedModule(tx: Transaction, moduleId: string) {
+    const module = await tx.learningModule.findFirst({
+      where: {
+        id: moduleId,
+        programmes: { none: {} },
+        deliverableRulesAfter: { none: {} },
+      },
+      select: { id: true },
+    });
+    if (!module) {
+      return {
+        removedModules: 0,
+        removedContentItems: 0,
+        externalCleanupQueued: 0,
+      };
+    }
+
+    const contentItems = await tx.contentItem.findMany({
+      where: { modules: { some: { moduleId } } },
+      select: {
+        id: true,
+        videoAsset: {
+          select: { id: true, muxAssetId: true, muxUploadId: true },
+        },
+        fileAssets: { select: { id: true, storageKey: true } },
+        _count: { select: { modules: true } },
+      },
+    });
+    const exclusiveContent = contentItems.filter(
+      (item) => item._count.modules === 1,
+    );
+    const exclusiveContentIds = exclusiveContent.map((item) => item.id);
+    const externalCleanupQueued = await this.queueExternal(tx, [
+      ...exclusiveContent.flatMap((item) => [
+        {
+          provider: ExternalResourceProvider.mux_asset,
+          externalId: item.videoAsset?.muxAssetId,
+        },
+        {
+          provider: ExternalResourceProvider.mux_upload,
+          externalId: item.videoAsset?.muxAssetId
+            ? null
+            : item.videoAsset?.muxUploadId,
+        },
+      ]),
+      ...exclusiveContent.flatMap((item) =>
+        item.fileAssets.map((file) => ({
+          provider: ExternalResourceProvider.object_storage,
+          externalId: file.storageKey,
+        })),
+      ),
+    ]);
+
+    await this.deleteNotifications(
+      tx,
+      NotificationEntityType.content_item,
+      exclusiveContentIds,
+    );
+    await tx.learnerContentProgress.deleteMany({ where: { moduleId } });
+    await tx.learnerModuleProgress.deleteMany({ where: { moduleId } });
+    await tx.contentRating.deleteMany({ where: { moduleId } });
+    if (exclusiveContentIds.length) {
+      const videoAssetIds = exclusiveContent.flatMap((item) =>
+        item.videoAsset ? [item.videoAsset.id] : [],
+      );
+      const fileAssetIds = exclusiveContent.flatMap((item) =>
+        item.fileAssets.map((file) => file.id),
+      );
+      await tx.contentRating.deleteMany({
+        where: { contentItemId: { in: exclusiveContentIds } },
+      });
+      await tx.learnerContentProgress.deleteMany({
+        where: { contentItemId: { in: exclusiveContentIds } },
+      });
+      if (videoAssetIds.length) {
+        await tx.videoWebhookEvent.deleteMany({
+          where: { videoAssetId: { in: videoAssetIds } },
+        });
+        await tx.videoAsset.deleteMany({ where: { id: { in: videoAssetIds } } });
+      }
+      await tx.contentToolLink.deleteMany({
+        where: { contentItemId: { in: exclusiveContentIds } },
+      });
+      if (fileAssetIds.length) {
+        await tx.fileAsset.deleteMany({ where: { id: { in: fileAssetIds } } });
+      }
+    }
+    await tx.moduleContentItem.deleteMany({ where: { moduleId } });
+    if (exclusiveContentIds.length) {
+      await tx.contentItem.deleteMany({
+        where: { id: { in: exclusiveContentIds } },
+      });
+    }
+    await tx.learningModule.delete({ where: { id: moduleId } });
+
+    return {
+      removedModules: 1,
+      removedContentItems: exclusiveContentIds.length,
+      externalCleanupQueued,
+    };
   }
 
   private async queueExternal(tx: Transaction, resources: ExternalDeletion[]) {

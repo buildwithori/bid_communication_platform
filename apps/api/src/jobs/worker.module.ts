@@ -13,6 +13,7 @@ import { NotificationAutomationService } from "../notifications/notification-aut
 import { NotificationDeliveryService } from "../notifications/notification-delivery.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { ReportingModule } from "../reporting/reporting.module";
+import { ResourceDeletionModule } from "../resource-deletion/resource-deletion.module";
 import { ExternalResourceCleanupService } from './external-resource-cleanup.service';
 import { JobsModule } from "./jobs.module";
 import { AuditProcessor } from "./processors/audit.processor";
@@ -41,6 +42,7 @@ import { WorkerHeartbeatService } from "./worker-heartbeat.service";
     AuditModule,
     DeliverableLifecycleModule,
     ReportingModule,
+    ResourceDeletionModule,
     NotificationsModule,
   ],
   providers: [

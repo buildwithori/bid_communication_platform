@@ -1216,6 +1216,88 @@ test("content library summary is shared across content type tabs", async () => {
   });
 });
 
+test("content usage excludes orphaned module placements", async () => {
+  const service = new ContentService(
+    {
+      moduleContentItem: {
+        findMany: async () => [
+          {
+            contentItemId: "content-1",
+            moduleId: "module-orphan",
+            position: 1,
+          },
+          {
+            contentItemId: "content-1",
+            moduleId: "module-active",
+            position: 2,
+          },
+        ],
+      },
+      programmeModule: {
+        findMany: async () => [
+          { moduleId: "module-active", programmeId: "programme-1" },
+        ],
+      },
+    } as never,
+    {} as never,
+    {} as never,
+  );
+
+  const usage = await (
+    service as unknown as {
+      contentUsage(
+        ids: string[],
+        moduleId?: string,
+      ): Promise<Map<string, { modules: number; programmes: number }>>;
+    }
+  ).contentUsage(["content-1"]);
+
+  assert.deepEqual(usage.get("content-1"), {
+    modules: 1,
+    programmes: 1,
+    position: null,
+  });
+});
+
+test("background reconciliation removes orphaned curriculum modules", async () => {
+  let moduleDeleted = false;
+  const transaction = {
+    learningModule: {
+      findFirst: async () => ({ id: "module-orphan" }),
+      delete: async () => {
+        moduleDeleted = true;
+      },
+    },
+    contentItem: { findMany: async () => [] },
+    learnerContentProgress: { deleteMany: async () => undefined },
+    learnerModuleProgress: { deleteMany: async () => undefined },
+    contentRating: { deleteMany: async () => undefined },
+    moduleContentItem: { deleteMany: async () => undefined },
+  };
+  const auditEvents: unknown[] = [];
+  const service = new ResourceDeletionService(
+    {
+      learningModule: {
+        findMany: async () => [{ id: "module-orphan" }],
+      },
+      $transaction: async (operation: (tx: unknown) => Promise<unknown>) =>
+        operation(transaction),
+    } as never,
+    { enqueue: async (event: unknown) => auditEvents.push(event) } as never,
+  );
+
+  const result = await service.cleanupOrphanedCurriculum();
+
+  assert.equal(moduleDeleted, true);
+  assert.deepEqual(result, {
+    removedModules: 1,
+    removedContentItems: 0,
+    externalCleanupQueued: 0,
+    hasMore: false,
+  });
+  assert.equal(auditEvents.length, 1);
+});
+
 test("reusable content lookup excludes items already used in a connected programme", () => {
   const service = new ContentService({} as never, {} as never, {} as never);
   const where = (

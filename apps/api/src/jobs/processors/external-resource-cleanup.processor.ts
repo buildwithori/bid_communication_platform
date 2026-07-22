@@ -3,19 +3,24 @@ import { Logger } from "@nestjs/common";
 import type { Job } from "bullmq";
 import { ExternalResourceCleanupService } from "../external-resource-cleanup.service";
 import { JOB_NAMES, QUEUE_NAMES } from "../jobs.constants";
+import { ResourceDeletionService } from "../../resource-deletion/resource-deletion.service";
 
 @Processor(QUEUE_NAMES.externalResourceCleanup, { concurrency: 2 })
 export class ExternalResourceCleanupProcessor extends WorkerHost {
   private readonly logger = new Logger(ExternalResourceCleanupProcessor.name);
 
-  constructor(private readonly cleanup: ExternalResourceCleanupService) {
+  constructor(
+    private readonly cleanup: ExternalResourceCleanupService,
+    private readonly resourceDeletion: ResourceDeletionService,
+  ) {
     super();
   }
 
-  process(job: Job) {
+  async process(job: Job) {
     if (job.name !== JOB_NAMES.cleanupExternalResources) {
       throw new Error(`Unsupported external cleanup job: ${job.name}`);
     }
+    await this.resourceDeletion.cleanupOrphanedCurriculum();
     return this.cleanup.processPending();
   }
 

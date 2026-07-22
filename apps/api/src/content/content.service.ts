@@ -832,19 +832,25 @@ export class ContentService {
       programmesByModule.set(link.moduleId, programmeIds);
     }
 
+    const programmeModuleIds = new Set(programmeLinks.map((link) => link.moduleId));
+
     for (const contentItemId of contentItemIds) {
       const contentPlacements = placements.filter(
         (placement) => placement.contentItemId === contentItemId,
       );
+      const activePlacements = contentPlacements.filter((placement) =>
+        programmeModuleIds.has(placement.moduleId),
+      );
       const programmeIds = new Set<string>();
-      for (const placement of contentPlacements) {
+      for (const placement of activePlacements) {
         for (const programmeId of programmesByModule.get(placement.moduleId) ??
           []) {
           programmeIds.add(programmeId);
         }
       }
       result.set(contentItemId, {
-        modules: contentPlacements.length,
+        modules: new Set(activePlacements.map((placement) => placement.moduleId))
+          .size,
         programmes: programmeIds.size,
         position:
           contentPlacements.find(
