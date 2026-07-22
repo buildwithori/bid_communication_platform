@@ -130,7 +130,9 @@ export default function EntrepreneurProgrammePlayerPage() {
             area.
           </p>
           <Button asChild variant="outline" className="mt-4 w-full">
-            <Link href={routes.entrepreneur.deliverables}>
+            <Link
+              href={routes.entrepreneur.deliverableGroup(data.programme.id)}
+            >
               <FileText className="h-4 w-4" />
               View deliverables
             </Link>
