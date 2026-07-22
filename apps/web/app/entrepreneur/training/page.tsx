@@ -39,32 +39,44 @@ import { routes } from '@/lib/routes';
 import type { BadgeTone } from '@/types';
 
 type AccessFilter = 'all' | ProgrammeAccessType;
+type AvailabilityFilter = 'current' | 'all';
 type ProgressFilter = 'all' | 'not_started' | 'in_progress' | 'completed';
 
 export default function TrainingLibraryPage() {
   const router = useRouter();
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const [availability, setAvailability] =
+    React.useState<AvailabilityFilter>('current');
   const [access, setAccess] = React.useState<AccessFilter>('all');
   const [progress, setProgress] = React.useState<ProgressFilter>('all');
   const [pageSize, setPageSize] = React.useState(10);
   const directory = useProgrammesPage({
     search: debouncedSearch.trim() || undefined,
+    lifecycle: availability === 'current' ? 'active' : undefined,
     accessType: access === 'all' ? undefined : access,
     progressStatus: progress === 'all' ? undefined : progress,
     take: pageSize,
   });
   const continueLearning = useProgrammesPage({
+    lifecycle: 'active',
     progressStatus: 'in_progress',
     take: 1,
   });
-  const firstAvailable = useProgrammesPage({ take: 1 });
+  const firstAvailable = useProgrammesPage({ lifecycle: 'active', take: 1 });
   const summary = useTrainingCatalogueSummaryQuery();
   const resetPagination = directory.resetPagination;
 
   React.useEffect(() => {
     resetPagination();
-  }, [access, debouncedSearch, pageSize, progress, resetPagination]);
+  }, [
+    access,
+    availability,
+    debouncedSearch,
+    pageSize,
+    progress,
+    resetPagination,
+  ]);
 
   const openProgramme = React.useCallback(
     (programme: ProgrammeListItem) => {
@@ -398,7 +410,7 @@ export default function TrainingLibraryPage() {
               Search your programme access and free programmes from one catalogue.
             </div>
           </div>
-          <div className="grid w-full gap-2 lg:w-[720px] lg:grid-cols-[minmax(220px,1fr)_190px_180px]">
+          <div className="grid w-full gap-2 lg:grid-cols-2 2xl:w-[940px] 2xl:grid-cols-[minmax(220px,1fr)_170px_180px_170px]">
             <TableFilterInput
               icon
               placeholder="Search learning paths..."
@@ -406,12 +418,21 @@ export default function TrainingLibraryPage() {
               onChange={(event) => setSearch(event.target.value)}
             />
             <TableFilterSelect
+              value={availability}
+              onChange={(event) =>
+                setAvailability(event.target.value as AvailabilityFilter)
+              }
+            >
+              <option value="current">Current learning</option>
+              <option value="all">All learning</option>
+            </TableFilterSelect>
+            <TableFilterSelect
               value={access}
               onChange={(event) =>
                 setAccess(event.target.value as AccessFilter)
               }
             >
-              <option value="all">All learning</option>
+              <option value="all">All access</option>
               <option value="assigned">Programme access</option>
               <option value="free">Free programmes</option>
             </TableFilterSelect>
@@ -443,7 +464,7 @@ export default function TrainingLibraryPage() {
         ) : (
           <TableEmptyState
             title="No learning paths found"
-            description="Try changing the search, access, or progress filter."
+            description="Try changing the search, learning, access, or progress filter."
           />
         )}
         <TablePagination

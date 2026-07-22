@@ -96,7 +96,8 @@ function CatalogueSkeleton() {
           <Skeleton className="h-4 w-36" />
           <Skeleton className="mt-2 h-4 w-full max-w-md" />
         </div>
-        <div className="grid w-full gap-2 lg:w-[720px] lg:grid-cols-[minmax(220px,1fr)_190px_180px]">
+        <div className="grid w-full gap-2 lg:grid-cols-2 2xl:w-[940px] 2xl:grid-cols-[minmax(220px,1fr)_170px_180px_170px]">
+          <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
