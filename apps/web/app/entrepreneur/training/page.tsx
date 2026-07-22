@@ -301,16 +301,7 @@ export default function TrainingLibraryPage() {
 
               <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                 <Button
-                  onClick={() =>
-                    heroProgramme.nextLearning
-                      ? router.push(
-                          routes.entrepreneur.trainingModule(
-                            heroProgramme.id,
-                            heroProgramme.nextLearning.moduleId,
-                          ),
-                        )
-                      : openProgramme(heroProgramme)
-                  }
+                  onClick={() => openProgramme(heroProgramme)}
                 >
                   {heroProgramme.learnerProgress.average > 0
                     ? 'Continue learning'

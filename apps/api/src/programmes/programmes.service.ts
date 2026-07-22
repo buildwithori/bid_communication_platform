@@ -1203,23 +1203,19 @@ export class ProgrammesService {
     const playlist = modules.flatMap((module) =>
       module.items.map((item) => ({ moduleId: module.id, item })),
     );
-    const latestInProgress = contentProgress
-      .filter(
-        (progress) =>
-          progress.status !== LearnerProgressStatus.completed &&
-          progress.lastOpenedAt,
-      )
+    const latestOpened = contentProgress
+      .filter((progress) => progress.lastOpenedAt)
       .sort(
         (left, right) =>
           (right.lastOpenedAt?.getTime() ?? 0) -
           (left.lastOpenedAt?.getTime() ?? 0),
       )[0];
     const resume =
-      (latestInProgress
+      (latestOpened
         ? playlist.find(
             (entry) =>
-              entry.moduleId === latestInProgress.moduleId &&
-              entry.item.id === latestInProgress.contentItemId,
+              entry.moduleId === latestOpened.moduleId &&
+              entry.item.id === latestOpened.contentItemId,
           )
         : null) ??
       playlist.find((entry) => entry.item.progress?.status !== "completed") ??
