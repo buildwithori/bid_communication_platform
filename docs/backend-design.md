@@ -638,6 +638,7 @@ Rules:
 - Backend writes should ignore stale progress events when an older client event arrives after a newer one.
 - Content item create UI supports four asset families: video upload, PDF upload, Excel workbook upload, and embedded tool. Video upload creates Mux upload metadata. PDF and Excel uploads create private DigitalOcean Spaces `file_asset` records with usage-specific validation. Embedded tool either links to a published entrepreneur tool or stores a custom external URL.
 - Content preview is powered by the content type: Mux playback for video, signed file URL for PDFs, an authenticated server-parsed and windowed worksheet grid for Excel workbooks, and an embedded/sandboxed URL for online tools.
+- Module readiness is not binary. Return `needs_content` only for an empty module, `processing` when any linked asset is still being prepared, `ready` only when all linked content is ready, and `needs_attention` when linked content is draft, failed, archived, or otherwise unavailable. Module list responses include the processing count so clients can poll only while useful and then refresh programme-level readiness aggregates.
 - If we need chapter labels later, they should be stored as content item metadata or computed from item order. Current UI labels such as "Chapter 1" must not become hardcoded backend truth.
 
 ### Deliverables

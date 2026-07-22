@@ -255,6 +255,7 @@ Session workflow rules:
 - Video consumers pass an internal `videoAssetId`, never a user-entered Mux upload, asset, or playback ID. Mux callbacks use the explicit public `POST /webhooks/mux` exception, raw-body HMAC verification, and durable event IDs for idempotency.
 - Ready videos use separate short-lived RS256 Mux video and thumbnail tokens after programme/content authorization. Signed thumbnails use the same authorised playback ID and expiry with Mux image audience `t`, allowing Mux Player to render its generated poster without making protected media public. Frontend file/video feature hooks own direct-upload progress, cancellation, status polling, failures, and TanStack calls.
 - Mux webhooks are the primary asset-status path and are transactionally idempotent. A bounded BullMQ reconciliation queue checks only stale pending/processing records through the direct-upload and asset APIs, recovers missed ready/errored callbacks, and moves timed-out or repeatedly unverifiable records to `failed` with safe admin recovery copy instead of leaving them processing indefinitely.
+- Module readiness has four truthful states: `needs_content` only when empty, `processing` while an asset is being prepared, `ready` when every linked item is available, and `needs_attention` for linked draft/failed/archived content. Mounted module lists poll only while processing exists and invalidate programme summaries when that lifecycle changes.
 
 ## Programmes And Content Library Completion (2026-07-16)
 

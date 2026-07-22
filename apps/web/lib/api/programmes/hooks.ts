@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { programmeKeys } from './keys';
 import { dashboardKeys } from '../dashboards/keys';
@@ -148,6 +148,7 @@ export const useProgrammeModuleDetailQuery = (programmeId: string | null, module
   });
 
 export function useProgrammeModulesPage(programmeId: string, query: ProgrammeModulePageQuery) {
+  const queryClient = useQueryClient();
   const [page, setCurrentPage] = useState(1);
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const cursor = cursors[page - 1];
@@ -155,8 +156,37 @@ export function useProgrammeModulesPage(programmeId: string, query: ProgrammeMod
     queryKey: programmeKeys.moduleList(programmeId, { ...query, cursor }),
     queryFn: () => listProgrammeModulesRequest(programmeId, { ...query, cursor }),
     enabled: Boolean(programmeId),
+    refetchInterval: (current) =>
+      current.state.data?.items.some(
+        (module) => module.processingContentCount > 0,
+      )
+        ? 5_000
+        : false,
   });
   const rows: ProgrammeModuleRecord[] = result.data?.items ?? [];
+  const lifecycleSignature = rows
+    .map(
+      (module) =>
+        `${module.id}:${module.content.total}:${module.processingContentCount}:${module.readiness}`,
+    )
+    .join('|');
+  const previousLifecycleSignature = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!result.data) return;
+    const previous = previousLifecycleSignature.current;
+    previousLifecycleSignature.current = lifecycleSignature;
+    if (previous === null || previous === lifecycleSignature) return;
+    void queryClient.invalidateQueries({
+      queryKey: programmeKeys.detail(programmeId),
+      exact: true,
+    });
+    void queryClient.invalidateQueries({ queryKey: programmeKeys.lists() });
+    void queryClient.invalidateQueries({ queryKey: programmeKeys.summary() });
+    void queryClient.invalidateQueries({
+      queryKey: programmeKeys.player(programmeId),
+    });
+  }, [lifecycleSignature, programmeId, queryClient, result.data]);
 
   const resetPagination = useCallback(() => {
     setCurrentPage(1);

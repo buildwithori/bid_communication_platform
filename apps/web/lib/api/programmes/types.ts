@@ -101,7 +101,8 @@ export type ProgrammeModuleRecord = {
     excels: number;
     tools: number;
   };
-  readiness: "ready" | "needs_content";
+  processingContentCount: number;
+  readiness: "ready" | "processing" | "needs_content" | "needs_attention";
   learnerProgress: {
     status: "not_started" | "in_progress" | "completed";
     progressPercent: number;

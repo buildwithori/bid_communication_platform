@@ -275,11 +275,7 @@ export default function AdminProgrammeWorkspacePage() {
       {
         key: 'readiness',
         header: 'Readiness',
-        cell: (module) => (
-          <Badge tone={module.readiness === 'ready' ? 'green' : 'amber'}>
-            {module.readiness === 'ready' ? 'Ready' : 'Needs content'}
-          </Badge>
-        ),
+        cell: (module) => <ModuleReadinessBadge module={module} />,
       },
     ],
     [
@@ -401,7 +397,11 @@ export default function AdminProgrammeWorkspacePage() {
             <HealthCard
               label="Modules"
               value={programme.modules.total}
-              helper={`${programme.modules.total - programme.modules.ready} need content`}
+              helper={
+                programme.modules.total === programme.modules.ready
+                  ? 'All modules ready'
+                  : `${programme.modules.total - programme.modules.ready} not ready yet`
+              }
             />
             <HealthCard
               label="Content assets"
@@ -912,7 +912,7 @@ function ReadinessView({
         <ReadinessItem
           icon={needsContent ? AlertTriangle : CheckCircle2}
           title="Content coverage"
-          status={needsContent ? 'Needs content' : 'Complete'}
+          status={needsContent ? 'Not ready yet' : 'Complete'}
           description={
             needsContent
               ? `${needsContent} module${needsContent === 1 ? '' : 's'} still need ready learning content.`
@@ -970,11 +970,7 @@ function ReadinessView({
           {
             key: 'status',
             header: 'Launch status',
-            cell: (module) => (
-              <Badge tone={module.readiness === 'ready' ? 'green' : 'amber'}>
-                {module.readiness === 'ready' ? 'Ready' : 'Needs content'}
-              </Badge>
-            ),
+            cell: (module) => <ModuleReadinessBadge module={module} />,
           },
         ]}
         rows={modules}
@@ -1036,6 +1032,26 @@ function ModuleContentSummary({ module }: { module: ProgrammeModuleRecord }) {
         <Badge tone="brand">{module.content.tools} tool</Badge>
       ) : null}
     </div>
+  );
+}
+
+function ModuleReadinessBadge({ module }: { module: ProgrammeModuleRecord }) {
+  const presentation = {
+    ready: { label: 'Ready', tone: 'green' },
+    processing: { label: 'Processing', tone: 'blue' },
+    needs_content: { label: 'Needs content', tone: 'amber' },
+    needs_attention: { label: 'Needs attention', tone: 'red' },
+  } as const;
+  const state = presentation[module.readiness];
+  const title =
+    module.readiness === 'processing'
+      ? `${module.processingContentCount} content item${module.processingContentCount === 1 ? '' : 's'} still processing`
+      : undefined;
+
+  return (
+    <Badge tone={state.tone} title={title}>
+      {state.label}
+    </Badge>
   );
 }
 

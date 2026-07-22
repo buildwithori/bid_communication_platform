@@ -328,6 +328,93 @@ test("module reuse lookup excludes shared modules that would duplicate content",
   });
 });
 
+test("module summaries expose processing content until readiness can refresh", async () => {
+  const service = new ProgrammesService(
+    {
+      $queryRaw: async () => [
+        {
+          moduleId: "module-1",
+          type: "video",
+          status: "processing",
+          count: 1n,
+        },
+      ],
+    } as never,
+    {} as never,
+    {} as never,
+  );
+  const internals = service as unknown as {
+    moduleContentMetrics(moduleIds: string[]): Promise<Map<string, any>>;
+    mapProgrammeModule(row: unknown, metrics: unknown): {
+      readiness: string;
+      processingContentCount: number;
+    };
+  };
+  const metrics = await internals.moduleContentMetrics(["module-1"]);
+  const summary = internals.mapProgrammeModule(
+    {
+      id: "link-1",
+      moduleId: "module-1",
+      position: 1,
+      module: {
+        id: "module-1",
+        title: "Foundations",
+        description: "",
+        isReusable: true,
+        updatedAt: new Date("2026-07-22T00:00:00.000Z"),
+        _count: { contentItems: 1, programmes: 1 },
+      },
+    },
+    metrics.get("module-1"),
+  );
+
+  assert.equal(summary.processingContentCount, 1);
+  assert.equal(summary.readiness, "processing");
+});
+
+test("module readiness distinguishes empty, ready, and attention states", () => {
+  const service = new ProgrammesService({} as never, {} as never, {} as never);
+  const internals = service as unknown as {
+    mapProgrammeModule(row: unknown, metrics: unknown): {
+      readiness: string;
+    };
+  };
+  const row = {
+    id: "link-1",
+    moduleId: "module-1",
+    position: 1,
+    module: {
+      id: "module-1",
+      title: "Foundations",
+      description: "",
+      isReusable: true,
+      updatedAt: new Date("2026-07-22T00:00:00.000Z"),
+      _count: { contentItems: 1, programmes: 1 },
+    },
+  };
+  const content = { total: 1, videos: 1, pdfs: 0, excels: 0, tools: 0 };
+
+  assert.equal(internals.mapProgrammeModule(row, undefined).readiness, "needs_content");
+  assert.equal(
+    internals.mapProgrammeModule(row, {
+      content,
+      readyItems: 1,
+      processingItems: 0,
+      learnerProgress: null,
+    }).readiness,
+    "ready",
+  );
+  assert.equal(
+    internals.mapProgrammeModule(row, {
+      content,
+      readyItems: 0,
+      processingItems: 0,
+      learnerProgress: null,
+    }).readiness,
+    "needs_attention",
+  );
+});
+
 test("content attachment rejects duplicates anywhere in a connected programme", async () => {
   let created = false;
   let locked = false;

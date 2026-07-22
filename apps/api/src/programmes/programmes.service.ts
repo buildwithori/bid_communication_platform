@@ -120,6 +120,7 @@ type ModuleContentMetrics = {
     tools: number;
   };
   readyItems: number;
+  processingItems: number;
   learnerProgress: {
     status: "not_started" | "in_progress" | "completed";
     progressPercent: number;
@@ -1551,6 +1552,15 @@ export class ProgrammesService {
       tools: 0,
     };
     const readyItems = metrics?.readyItems ?? 0;
+    const processingItems = metrics?.processingItems ?? 0;
+    const readiness =
+      content.total === 0
+        ? "needs_content"
+        : processingItems > 0
+          ? "processing"
+          : readyItems === content.total
+            ? "ready"
+            : "needs_attention";
     return {
       linkId: row.id,
       id: row.module.id,
@@ -1560,10 +1570,8 @@ export class ProgrammesService {
       position: row.position,
       programmeUses: row.module._count.programmes,
       content,
-      readiness:
-        content.total > 0 && readyItems === content.total
-          ? "ready"
-          : "needs_content",
+      processingContentCount: processingItems,
+      readiness,
       learnerProgress: metrics?.learnerProgress ?? null,
       updatedAt: row.module.updatedAt.toISOString(),
     };
@@ -1579,6 +1587,7 @@ export class ProgrammesService {
       metrics.set(moduleId, {
         content: { total: 0, videos: 0, pdfs: 0, excels: 0, tools: 0 },
         readyItems: 0,
+        processingItems: 0,
         learnerProgress: null,
       });
     }
@@ -1609,6 +1618,7 @@ export class ProgrammesService {
       if (row.type === "excel") value.content.excels += count;
       if (row.type === "tool") value.content.tools += count;
       if (row.status === "ready") value.readyItems += count;
+      if (row.status === "processing") value.processingItems += count;
     }
 
     if (user?.role === UserRole.entrepreneur && programmeId) {
