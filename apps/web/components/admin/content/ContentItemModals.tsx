@@ -82,10 +82,12 @@ export function CreateContentItemModal({
   open,
   onOpenChange,
   initialModuleId,
+  initialType = "video",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialModuleId?: string;
+  initialType?: ContentItemType;
 }) {
   const [programmeSearch, setProgrammeSearch] = React.useState("");
   const [moduleSearch, setModuleSearch] = React.useState("");
@@ -97,7 +99,7 @@ export function CreateContentItemModal({
     resolver: zodResolver(createSchema),
     defaultValues: {
       title: "",
-      type: "video",
+      type: initialType,
       trainerId: "",
       programmeId: "",
       moduleId: initialModuleId ?? "",
@@ -136,11 +138,6 @@ export function CreateContentItemModal({
     search: toolSearch.trim() || undefined,
     excludeModuleId: moduleId || undefined,
   });
-  React.useEffect(() => {
-    form.setValue("toolId", "");
-    setToolSearch("");
-  }, [form, moduleId]);
-
   const createContent = useCreateModuleContentMutation();
   const fileUpload = useDirectFileUploadMutation();
   const videoUpload = useDirectVideoUploadMutation();
@@ -156,7 +153,7 @@ export function CreateContentItemModal({
     setToolSearch("");
     form.reset({
       title: "",
-      type: "video",
+      type: initialType,
       trainerId: "",
       programmeId: "",
       moduleId: initialModuleId ?? "",
@@ -258,6 +255,8 @@ export function CreateContentItemModal({
                 onValueChange={(value) => {
                   form.setValue("programmeId", value);
                   form.setValue("moduleId", "");
+                  form.setValue("toolId", "");
+                  setToolSearch("");
                 }}
                 options={programmes.rows.map((programme) => ({
                   value: programme.id,
@@ -280,9 +279,11 @@ export function CreateContentItemModal({
             >
               <FormAutocomplete
                 value={moduleId}
-                onValueChange={(value) =>
-                  form.setValue("moduleId", value, { shouldValidate: true })
-                }
+                onValueChange={(value) => {
+                  form.setValue("moduleId", value, { shouldValidate: true });
+                  form.setValue("toolId", "");
+                  setToolSearch("");
+                }}
                 options={modules.rows.map((module) => ({
                   value: module.id,
                   label: module.title,

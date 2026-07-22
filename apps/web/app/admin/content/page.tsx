@@ -294,9 +294,11 @@ function ContentLibrary() {
       </Card>
 
       <CreateContentItemModal
+        key={`${moduleId ?? "library"}-${tab}`}
         open={createOpen}
         onOpenChange={setCreateOpen}
         initialModuleId={moduleId}
+        initialType={tab}
       />
       <EditContentItemModal
         item={editTarget}
