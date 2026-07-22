@@ -410,12 +410,13 @@ export default function TrainingLibraryPage() {
               Search your programme access and free programmes from one catalogue.
             </div>
           </div>
-          <div className="grid w-full gap-2 lg:grid-cols-2 2xl:w-[940px] 2xl:grid-cols-[minmax(220px,1fr)_170px_180px_170px]">
+          <div className="table-toolbar-search-filters grid w-full gap-2">
             <TableFilterInput
               icon
               placeholder="Search learning paths..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onClear={() => setSearch('')}
             />
             <TableFilterSelect
               value={availability}

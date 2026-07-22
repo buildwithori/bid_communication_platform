@@ -314,6 +314,14 @@
     justify-content: start;
   }
 
+  @media (min-width: 1280px) {
+    .table-toolbar-actions > .table-toolbar-search-filters {
+      grid-template-columns:
+        minmax(20rem, 2fr)
+        repeat(3, minmax(12rem, 1fr)) !important;
+    }
+  }
+
   .table-toolbar-actions > [class~='flex'] {
     flex-wrap: wrap;
     justify-content: flex-end;

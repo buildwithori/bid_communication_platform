@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronLeft, ChevronRight, MoreHorizontal, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -262,23 +262,45 @@ export function TableToolbar({
 
 export const TableFilterInput = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement> & { icon?: boolean }
->(({ className, icon = false, ...props }, ref) => (
-  <div className="relative">
-    {icon && (
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-    )}
-    <input
-      ref={ref}
-      className={cn(
-        'h-9 w-full rounded-lg border border-border bg-card px-3 text-sm font-normal text-ink shadow-sm outline-none transition placeholder:font-normal placeholder:text-ink-faint focus:border-bid focus:ring-2 focus:ring-bid/10',
-        icon && 'pl-9',
-        className,
+  React.InputHTMLAttributes<HTMLInputElement> & {
+    icon?: boolean;
+    onClear?: () => void;
+  }
+>(({ className, icon = false, onClear, value, disabled, ...props }, ref) => {
+  const showClear = Boolean(onClear && String(value ?? '').length > 0);
+  return (
+    <div className="relative">
+      {icon && (
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
       )}
-      {...props}
-    />
-  </div>
-));
+      <input
+        ref={ref}
+        value={value}
+        disabled={disabled}
+        className={cn(
+          'h-9 w-full rounded-lg border border-border bg-card px-3 text-sm font-normal text-ink shadow-sm outline-none transition placeholder:font-normal placeholder:text-ink-faint focus:border-bid focus:ring-2 focus:ring-bid/10',
+          icon && 'pl-9',
+          showClear && 'pr-9',
+          className,
+        )}
+        {...props}
+      />
+      {showClear ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onClear}
+          className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-ink-faint transition hover:bg-bid-light hover:text-bid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/25 disabled:pointer-events-none disabled:opacity-50"
+          aria-label="Clear search"
+          title="Clear search"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+});
 TableFilterInput.displayName = 'TableFilterInput';
 
 type TableFilterSelectProps = Omit<
