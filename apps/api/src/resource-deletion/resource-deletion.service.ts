@@ -198,19 +198,84 @@ export class ResourceDeletionService {
       const programme = await tx.programme.findUnique({ where: { id: programmeId }, select: { id: true, name: true } });
       if (!programme) throw new NotFoundException("Programme not found.");
       this.assertConfirmation(programme.name, dto.confirmation);
-      const [goals, rules, sessions, exports] = await Promise.all([
+      const [goals, rules, sessions, exports, programmeModules] = await Promise.all([
         tx.programmeGoal.findMany({ where: { programmeId }, select: { id: true } }),
         tx.programmeDeliverableRule.findMany({ where: { programmeId }, select: { id: true } }),
         tx.session.findMany({ where: { programmeId }, select: { id: true, calendarEventId: true, ownerUserId: true } }),
         tx.reportExport.findMany({ where: { programmeId }, select: { id: true, fileAsset: { select: { id: true, storageKey: true } } } }),
+        tx.programmeModule.findMany({
+          where: { programmeId },
+          select: { moduleId: true },
+        }),
       ]);
+      const moduleIds = programmeModules.map((entry) => entry.moduleId);
+      const orphanModules = moduleIds.length
+        ? await tx.learningModule.findMany({
+            where: {
+              id: { in: moduleIds },
+              programmes: {
+                none: { programmeId: { not: programmeId } },
+              },
+              deliverableRulesAfter: {
+                none: { programmeId: { not: programmeId } },
+              },
+            },
+            select: { id: true },
+          })
+        : [];
+      const orphanModuleIds = orphanModules.map((entry) => entry.id);
+      const orphanModuleIdSet = new Set(orphanModuleIds);
+      const orphanContentCandidates = orphanModuleIds.length
+        ? await tx.contentItem.findMany({
+            where: {
+              modules: { some: { moduleId: { in: orphanModuleIds } } },
+            },
+            select: {
+              id: true,
+              modules: { select: { moduleId: true } },
+              videoAsset: {
+                select: { id: true, muxAssetId: true, muxUploadId: true },
+              },
+              fileAssets: { select: { id: true, storageKey: true } },
+            },
+          })
+        : [];
+      const orphanContent = orphanContentCandidates.filter((item) =>
+        item.modules.every((link) => orphanModuleIdSet.has(link.moduleId)),
+      );
+      const orphanContentIds = orphanContent.map((item) => item.id);
       const deliverables = await this.deleteDeliverableTree(tx, rules.map((rule) => rule.id));
       const ownExternalCleanup = await this.queueExternal(tx, [
         ...sessions.map((session) => ({ provider: ExternalResourceProvider.google_calendar_event, externalId: session.calendarEventId, ownerUserId: session.ownerUserId })),
         ...exports.map((entry) => ({ provider: ExternalResourceProvider.object_storage, externalId: entry.fileAsset?.storageKey })),
       ]);
+      const contentExternalCleanup = await this.queueExternal(tx, [
+        ...orphanContent.flatMap((item) => [
+          {
+            provider: ExternalResourceProvider.mux_asset,
+            externalId: item.videoAsset?.muxAssetId,
+          },
+          {
+            provider: ExternalResourceProvider.mux_upload,
+            externalId: item.videoAsset?.muxAssetId
+              ? null
+              : item.videoAsset?.muxUploadId,
+          },
+        ]),
+        ...orphanContent.flatMap((item) =>
+          item.fileAssets.map((file) => ({
+            provider: ExternalResourceProvider.object_storage,
+            externalId: file.storageKey,
+          })),
+        ),
+      ]);
       await this.deleteNotifications(tx, NotificationEntityType.session, sessions.map((session) => session.id));
       await this.deleteNotifications(tx, NotificationEntityType.programme, [programmeId]);
+      await this.deleteNotifications(
+        tx,
+        NotificationEntityType.content_item,
+        orphanContentIds,
+      );
       if (sessions.length) {
         const sessionIds = sessions.map((session) => session.id);
         await tx.sessionNote.deleteMany({ where: { sessionId: { in: sessionIds } } });
@@ -231,17 +296,94 @@ export class ResourceDeletionService {
       await tx.learnerContentProgress.deleteMany({ where: { programmeId } });
       await tx.learnerModuleProgress.deleteMany({ where: { programmeId } });
       await tx.learnerProgrammeProgress.deleteMany({ where: { programmeId } });
+      await tx.contentRating.deleteMany({ where: { programmeId } });
       await tx.toolProgrammeAccess.deleteMany({ where: { programmeId } });
       await tx.programmeModule.deleteMany({ where: { programmeId } });
       await tx.programmeDeliverableRule.deleteMany({ where: { programmeId } });
+      if (orphanContentIds.length) {
+        const videoAssetIds = orphanContent.flatMap((item) =>
+          item.videoAsset ? [item.videoAsset.id] : [],
+        );
+        const fileAssetIds = orphanContent.flatMap((item) =>
+          item.fileAssets.map((file) => file.id),
+        );
+        await tx.contentRating.deleteMany({
+          where: { contentItemId: { in: orphanContentIds } },
+        });
+        await tx.learnerContentProgress.deleteMany({
+          where: { contentItemId: { in: orphanContentIds } },
+        });
+        if (videoAssetIds.length) {
+          await tx.videoWebhookEvent.deleteMany({
+            where: { videoAssetId: { in: videoAssetIds } },
+          });
+          await tx.videoAsset.deleteMany({
+            where: { id: { in: videoAssetIds } },
+          });
+        }
+        await tx.contentToolLink.deleteMany({
+          where: { contentItemId: { in: orphanContentIds } },
+        });
+        if (fileAssetIds.length) {
+          await tx.fileAsset.deleteMany({
+            where: { id: { in: fileAssetIds } },
+          });
+        }
+      }
+      if (orphanModuleIds.length) {
+        await tx.learnerContentProgress.deleteMany({
+          where: { moduleId: { in: orphanModuleIds } },
+        });
+        await tx.learnerModuleProgress.deleteMany({
+          where: { moduleId: { in: orphanModuleIds } },
+        });
+        await tx.contentRating.deleteMany({
+          where: { moduleId: { in: orphanModuleIds } },
+        });
+        await tx.moduleContentItem.deleteMany({
+          where: { moduleId: { in: orphanModuleIds } },
+        });
+        if (orphanContentIds.length) {
+          await tx.contentItem.deleteMany({
+            where: { id: { in: orphanContentIds } },
+          });
+        }
+        await tx.learningModule.deleteMany({
+          where: { id: { in: orphanModuleIds } },
+        });
+      }
       await tx.programme.delete({ where: { id: programmeId } });
-      const externalCleanupQueued = deliverables.externalCleanupQueued + ownExternalCleanup;
+      const externalCleanupQueued =
+        deliverables.externalCleanupQueued +
+        ownExternalCleanup +
+        contentExternalCleanup;
+      const sharedModulesPreserved = moduleIds.length - orphanModuleIds.length;
+      const sharedContentPreserved =
+        orphanContentCandidates.length - orphanContent.length;
+      const reusableAssetsPreserved =
+        sharedModulesPreserved > 0 || sharedContentPreserved > 0;
       await this.audit.enqueue({
         action: "programmes.deleted", entityType: "programme", entityId: programmeId,
         summary: `Permanently deleted programme: ${programme.name}`,
-        payload: { name: programme.name, removedSessions: sessions.length, removedDeliverableRules: rules.length, externalCleanupQueued, reusableLibraryContentPreserved: true },
+        payload: {
+          name: programme.name,
+          removedSessions: sessions.length,
+          removedDeliverableRules: rules.length,
+          removedModules: orphanModuleIds.length,
+          removedContentItems: orphanContentIds.length,
+          sharedModulesPreserved,
+          sharedContentPreserved,
+          externalCleanupQueued,
+          reusableLibraryContentPreserved: reusableAssetsPreserved,
+        },
       }, tx);
-      return { id: programmeId, name: programme.name, deleted: true, externalCleanupQueued, reusableAssetsPreserved: true };
+      return {
+        id: programmeId,
+        name: programme.name,
+        deleted: true,
+        externalCleanupQueued,
+        reusableAssetsPreserved,
+      };
     });
   }
 

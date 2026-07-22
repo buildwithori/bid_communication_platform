@@ -450,7 +450,7 @@ export default function AdminProgramsPage() {
         consequences={[
           "Enrolments, progress, goals, updates, deliverables, submissions, reviews, and programme sessions will be deleted.",
           "Programme submission files, report exports, and connected calendar events will also be deleted.",
-          "Reusable modules and content-library media are preserved so other programmes are not damaged.",
+          "Modules and content used by another programme are preserved; items used only here are deleted.",
         ]}
         confirmLabel="Delete programme"
         isPending={deleteProgramme.isPending}

@@ -792,6 +792,122 @@ test("deleting a module's final programme use removes exclusive content and queu
   assert.equal(result.reusableAssetsPreserved, true);
 });
 
+test("deleting a programme removes orphaned curriculum media and preserves shared content", async () => {
+  const queuedResources: Array<{ provider: string; externalId: string }> = [];
+  let deletedContentIds: string[] = [];
+  let deletedModuleIds: string[] = [];
+  let programmeDeleted = false;
+  const transaction = {
+    programme: {
+      findUnique: async () => ({ id: "programme-1", name: "Growth" }),
+      delete: async () => {
+        programmeDeleted = true;
+      },
+    },
+    programmeGoal: {
+      findMany: async () => [],
+      deleteMany: async () => undefined,
+    },
+    programmeDeliverableRule: {
+      findMany: async () => [],
+      deleteMany: async () => undefined,
+    },
+    session: { findMany: async () => [] },
+    reportExport: { findMany: async () => [] },
+    programmeModule: {
+      findMany: async () => [
+        { moduleId: "module-orphan" },
+        { moduleId: "module-shared" },
+      ],
+      deleteMany: async () => undefined,
+    },
+    learningModule: {
+      findMany: async () => [{ id: "module-orphan" }],
+      deleteMany: async (query: any) => {
+        deletedModuleIds = query.where.id.in;
+      },
+    },
+    contentItem: {
+      findMany: async () => [
+        {
+          id: "content-orphan",
+          modules: [{ moduleId: "module-orphan" }],
+          videoAsset: {
+            id: "video-1",
+            muxAssetId: "mux-asset-1",
+            muxUploadId: "mux-upload-1",
+          },
+          fileAssets: [
+            { id: "file-1", storageKey: "content/growth.pdf" },
+          ],
+        },
+        {
+          id: "content-shared",
+          modules: [
+            { moduleId: "module-orphan" },
+            { moduleId: "module-surviving" },
+          ],
+          videoAsset: null,
+          fileAssets: [],
+        },
+      ],
+      deleteMany: async (query: any) => {
+        deletedContentIds = query.where.id.in;
+      },
+    },
+    deliverableInstance: { findMany: async () => [] },
+    externalResourceDeletion: {
+      createMany: async (query: any) => {
+        queuedResources.push(...query.data);
+      },
+    },
+    notification: { findMany: async () => [] },
+    fundraisingRound: { deleteMany: async () => undefined },
+    periodicUpdate: { deleteMany: async () => undefined },
+    programmeAccessGrant: { deleteMany: async () => undefined },
+    learnerContentProgress: { deleteMany: async () => undefined },
+    learnerModuleProgress: { deleteMany: async () => undefined },
+    learnerProgrammeProgress: { deleteMany: async () => undefined },
+    contentRating: { deleteMany: async () => undefined },
+    toolProgrammeAccess: { deleteMany: async () => undefined },
+    videoWebhookEvent: { deleteMany: async () => undefined },
+    videoAsset: { deleteMany: async () => undefined },
+    contentToolLink: { deleteMany: async () => undefined },
+    fileAsset: { deleteMany: async () => undefined },
+    moduleContentItem: { deleteMany: async () => undefined },
+  };
+  const auditEvents: any[] = [];
+  const service = new ResourceDeletionService(
+    {
+      $transaction: async (operation: (tx: unknown) => unknown) =>
+        operation(transaction),
+    } as never,
+    {
+      enqueue: async (event: unknown) => auditEvents.push(event),
+    } as never,
+  );
+
+  const result = await service.deleteProgramme(
+    { id: "admin-1", role: UserRole.admin } as never,
+    "programme-1",
+    { confirmation: "Growth" },
+  );
+
+  assert.equal(programmeDeleted, true);
+  assert.deepEqual(deletedModuleIds, ["module-orphan"]);
+  assert.deepEqual(deletedContentIds, ["content-orphan"]);
+  assert.deepEqual(
+    queuedResources.map((resource) => [resource.provider, resource.externalId]),
+    [
+      ["mux_asset", "mux-asset-1"],
+      ["object_storage", "content/growth.pdf"],
+    ],
+  );
+  assert.equal(result.externalCleanupQueued, 2);
+  assert.equal(result.reusableAssetsPreserved, true);
+  assert.equal(auditEvents.length, 1);
+});
+
 test("programme access authorizes a linked PDF entrepreneur tool", async () => {
   let programmeQuery: unknown;
   const service = new FilesService(
