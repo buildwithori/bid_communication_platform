@@ -162,7 +162,14 @@ function DataTableRow<T>({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: rowId, disabled: !sortable });
+  } = useSortable({
+    id: rowId,
+    disabled: !sortable,
+    transition: {
+      duration: 220,
+      easing: 'cubic-bezier(0.2, 0, 0, 1)',
+    },
+  });
   const extraRowProps = rowProps?.(row) ?? {};
   const { className: extraRowClassName, style: extraRowStyle, ...restRowProps } = extraRowProps;
   const isInteractive = Boolean(

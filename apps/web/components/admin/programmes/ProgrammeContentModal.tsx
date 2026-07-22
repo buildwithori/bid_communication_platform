@@ -101,7 +101,7 @@ export function ProgrammeContentModal({
     onSuccess: () => toast.success("Content position updated."),
     onError: (error) => toast.error(error.message),
   });
-  const canReorder = !readOnly && !debouncedSearch.trim() && !move.isPending;
+  const canReorder = !readOnly && !debouncedSearch.trim();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
@@ -112,7 +112,13 @@ export function ProgrammeContentModal({
   if (!module) return null;
 
   const handleDragEnd = (event: DragEndEvent) => {
-    if (!canReorder || !event.over || event.active.id === event.over.id) return;
+    if (
+      !canReorder ||
+      move.isPending ||
+      !event.over ||
+      event.active.id === event.over.id
+    )
+      return;
     const target = items.rows.find((item) => item.id === event.over?.id);
     if (!target?.usage.position) return;
     move.mutate({
@@ -196,6 +202,7 @@ export function ProgrammeContentModal({
                       key={item.id}
                       item={item}
                       canReorder={canReorder}
+                      dragDisabled={!canReorder || move.isPending}
                       readOnly={readOnly}
                       onEdit={() => setEditItem(item)}
                       onMove={() => setMoveItem(item)}
@@ -303,6 +310,7 @@ export function ProgrammeContentModal({
 function ContentSequenceItem({
   item,
   canReorder,
+  dragDisabled,
   readOnly,
   onEdit,
   onMove,
@@ -310,6 +318,7 @@ function ContentSequenceItem({
 }: {
   item: ContentItemRecord;
   canReorder: boolean;
+  dragDisabled: boolean;
   readOnly: boolean;
   onEdit: () => void;
   onMove: () => void;
@@ -325,7 +334,14 @@ function ContentSequenceItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id, disabled: !canReorder });
+  } = useSortable({
+    id: item.id,
+    disabled: !canReorder,
+    transition: {
+      duration: 220,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+    },
+  });
 
   return (
     <div
@@ -340,10 +356,10 @@ function ContentSequenceItem({
         <button
           ref={setActivatorNodeRef}
           type="button"
-          disabled={!canReorder}
+          disabled={dragDisabled}
           {...attributes}
           {...listeners}
-          className="inline-flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-lg border border-line bg-surface-subtle text-ink-muted disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex h-9 w-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg border border-line bg-surface-subtle text-ink-muted disabled:cursor-not-allowed disabled:opacity-45"
           aria-label={`Reorder ${item.title}`}
         >
           <GripVertical className="h-4 w-4" />

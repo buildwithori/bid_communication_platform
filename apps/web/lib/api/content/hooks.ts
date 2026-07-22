@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { contentKeys } from './keys';
 import { programmeKeys } from '../programmes/keys';
 import { listToolsRequest } from '../tools/requests';
@@ -19,6 +19,7 @@ import {
 import type {
   AttachContentItemVariables,
   ContentItemQuery,
+  ContentItemPage,
   ContentItemRecord,
   ContentDeletionResult,
   DeleteContentItemVariables,
@@ -220,4 +221,88 @@ export const useDeleteContentItemMutation = (handlers?: { onSuccess?: (data: Con
 
 export const useAttachContentItemMutation = (handlers?: Handlers) => useContentMutation<AttachContentItemVariables>(attachContentItemRequest, handlers);
 
-export const useMoveModuleContentItemMutation = (handlers?: Handlers) => useContentMutation<MoveModuleContentItemVariables>(moveModuleContentItemRequest, handlers);
+export const useMoveModuleContentItemMutation = (handlers?: Handlers) => {
+  const client = useQueryClient();
+  return useMutation<
+    ContentItemRecord,
+    Error,
+    MoveModuleContentItemVariables,
+    {
+      snapshots: Array<[
+        readonly unknown[],
+        InfiniteData<ContentItemPage, string | undefined> | undefined,
+      ]>;
+    }
+  >({
+    mutationFn: moveModuleContentItemRequest,
+    onMutate: async (variables) => {
+      const queryKey = contentKeys.module(variables.moduleId);
+      const cancellation = client.cancelQueries({ queryKey });
+      const snapshots = client.getQueriesData<
+        InfiniteData<ContentItemPage, string | undefined>
+      >({ queryKey });
+
+      client.setQueriesData<InfiniteData<ContentItemPage, string | undefined>>(
+        { queryKey },
+        (
+          data:
+            | InfiniteData<ContentItemPage, string | undefined>
+            | undefined,
+        ) => reorderModuleContentPages(data, variables),
+      );
+      await cancellation;
+      return { snapshots };
+    },
+    onError: (error, _variables, context) => {
+      context?.snapshots.forEach(([queryKey, data]) => {
+        client.setQueryData(queryKey, data);
+      });
+      handlers?.onError?.(error);
+    },
+    onSuccess: (data) => handlers?.onSuccess?.(data),
+    onSettled: (_data, _error, variables) => {
+      void client.invalidateQueries({
+        queryKey: contentKeys.module(variables.moduleId),
+      });
+      void client.invalidateQueries({ queryKey: programmeKeys.all });
+    },
+  });
+};
+
+function reorderModuleContentPages(
+  data: InfiniteData<ContentItemPage, string | undefined> | undefined,
+  variables: MoveModuleContentItemVariables,
+) {
+  if (!data) return data;
+  const items = data.pages.flatMap((page) => page.items);
+  const sourceIndex = items.findIndex(
+    (item) => item.id === variables.contentItemId,
+  );
+  const targetIndex = items.findIndex(
+    (item) => item.usage.position === variables.position,
+  );
+  if (sourceIndex < 0 || targetIndex < 0) return data;
+
+  const positions = items.map((item) => item.usage.position);
+  const reordered = [...items];
+  const [moved] = reordered.splice(sourceIndex, 1);
+  if (!moved) return data;
+  reordered.splice(targetIndex, 0, moved);
+  const positioned = reordered.map((item, index) => ({
+    ...item,
+    usage: {
+      ...item.usage,
+      position: positions[index] ?? item.usage.position,
+    },
+  }));
+
+  let offset = 0;
+  return {
+    ...data,
+    pages: data.pages.map((page) => {
+      const pageItems = positioned.slice(offset, offset + page.items.length);
+      offset += page.items.length;
+      return { ...page, items: pageItems };
+    }),
+  };
+}

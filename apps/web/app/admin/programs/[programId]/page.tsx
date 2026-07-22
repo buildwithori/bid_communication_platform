@@ -151,8 +151,7 @@ export default function AdminProgrammeWorkspacePage() {
   const isArchived = detail.data?.lifecycle === 'archived';
   const canReorder =
     !isArchived &&
-    debouncedModuleSearch.trim().length === 0 &&
-    !moveProgramme.isPending;
+    debouncedModuleSearch.trim().length === 0;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
@@ -163,7 +162,13 @@ export default function AdminProgrammeWorkspacePage() {
   const handleDragEnd = React.useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
-      if (!over || active.id === over.id || !canReorder) return;
+      if (
+        !over ||
+        active.id === over.id ||
+        !canReorder ||
+        moveProgramme.isPending
+      )
+        return;
       const target = modules.rows.find((module) => module.id === over.id);
       if (!target) return;
       moveProgramme.mutate({
@@ -181,7 +186,10 @@ export default function AdminProgrammeWorkspacePage() {
         key: 'reorder',
         header: 'Reorder',
         cell: (module) => (
-          <ModuleReorderHandle module={module} disabled={!canReorder} />
+          <ModuleReorderHandle
+            module={module}
+            disabled={!canReorder || moveProgramme.isPending}
+          />
         ),
         className: 'min-w-[132px]',
       },
@@ -274,7 +282,13 @@ export default function AdminProgrammeWorkspacePage() {
         ),
       },
     ],
-    [canReorder, deleteModule.isPending, isArchived, setContentModule],
+    [
+      canReorder,
+      deleteModule.isPending,
+      isArchived,
+      moveProgramme.isPending,
+      setContentModule,
+    ],
   );
 
   if (detail.isLoading && !detail.data) {
@@ -993,7 +1007,7 @@ function ModuleReorderHandle({
         disabled={disabled || rowDisabled}
         {...attributes}
         {...listeners}
-        className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-lg border border-border bg-card text-ink-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
+        className="inline-flex h-8 w-8 touch-none cursor-grab items-center justify-center rounded-lg border border-border bg-card text-ink-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-45"
         aria-label={`Move ${module.title}`}
       >
         <GripVertical className="h-4 w-4" />

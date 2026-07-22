@@ -38,6 +38,7 @@ import type {
   ProgrammeDeliverableRuleQuery,
   ProgrammeDetail,
   ProgrammeModuleQuery,
+  ProgrammeModulePage,
   ProgrammeModuleRecord,
   ProgrammeQuery,
   ResourceDeletionResult,
@@ -350,7 +351,84 @@ export const useUpdateProgrammeModuleMutation = (handlers?: MutationHandlers<Pro
 
 export const useReuseProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) => useProgrammeModuleMutation<ReuseProgrammeModuleVariables>(reuseProgrammeModuleRequest, handlers);
 
-export const useMoveProgrammeModuleMutation = (handlers?: MutationHandlers<ProgrammeModuleRecord>) => useProgrammeModuleMutation<MoveProgrammeModuleVariables>(moveProgrammeModuleRequest, handlers);
+export const useMoveProgrammeModuleMutation = (
+  handlers?: MutationHandlers<ProgrammeModuleRecord>,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    ProgrammeModuleRecord,
+    Error,
+    MoveProgrammeModuleVariables,
+    { snapshots: Array<[readonly unknown[], ProgrammeModulePage | undefined]> }
+  >({
+    mutationFn: moveProgrammeModuleRequest,
+    onMutate: async (variables) => {
+      const queryKey = programmeKeys.modules(variables.programmeId);
+      const cancellation = queryClient.cancelQueries({ queryKey });
+      const snapshots = queryClient.getQueriesData<ProgrammeModulePage>({
+        queryKey,
+      });
+
+      queryClient.setQueriesData<ProgrammeModulePage>(
+        { queryKey },
+        (page: ProgrammeModulePage | undefined) =>
+          reorderProgrammeModulePage(page, variables),
+      );
+      await cancellation;
+      return { snapshots };
+    },
+    onError: (error, _variables, context) => {
+      context?.snapshots.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
+      handlers?.onError?.(error);
+    },
+    onSuccess: (data) => handlers?.onSuccess?.(data),
+    onSettled: (_data, _error, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.modules(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.reusableModuleLists(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: programmeKeys.detail(variables.programmeId),
+      });
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: programmeKeys.summary() });
+    },
+  });
+};
+
+function reorderProgrammeModulePage(
+  page: ProgrammeModulePage | undefined,
+  variables: MoveProgrammeModuleVariables,
+) {
+  if (!page) return page;
+  const ordered = [...page.items].sort(
+    (left, right) => left.position - right.position,
+  );
+  const sourceIndex = ordered.findIndex(
+    (item) => item.id === variables.moduleId,
+  );
+  const targetIndex = ordered.findIndex(
+    (item) => item.position === variables.position,
+  );
+  if (sourceIndex < 0 || targetIndex < 0) return page;
+
+  const positions = ordered.map((item) => item.position);
+  const [moved] = ordered.splice(sourceIndex, 1);
+  if (!moved) return page;
+  ordered.splice(targetIndex, 0, moved);
+
+  return {
+    ...page,
+    items: ordered.map((item, index) => ({
+      ...item,
+      position: positions[index] ?? item.position,
+    })),
+  };
+}
 
 export const useDeleteProgrammeModuleMutation = (handlers?: MutationHandlers<ResourceDeletionResult>) => {
   const queryClient = useQueryClient();
