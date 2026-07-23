@@ -15,14 +15,12 @@ import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { FormAutocomplete } from '@/components/shared/FormField';
 import { getGoogleAuthUrl, useSignupMutation } from '@/lib/api/auth';
+import { countryOptions } from '@/lib/countries';
 import { signupSchema, type SignupForm as SignupFormValues } from '@/lib/forms/schemas';
-import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
 import { detectTimezone } from '@/lib/timezones';
 import { offerBrowserCredentialSave } from '@/lib/browser-credentials';
 import { cn } from '@/lib/utils';
-
-const countryOptions = countries.map((country) => ({ value: country, label: country }));
 
 export default function AuthSignupPage() {
   return (

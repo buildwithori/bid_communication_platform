@@ -57,8 +57,6 @@ export const stageById: Record<StageId, Stage> = stages.reduce(
   {} as Record<StageId, Stage>,
 );
 
-export const countries = ['Ghana', 'Nigeria', 'Kenya', 'Rwanda'] as const;
-
 export interface ProgrammeGoalType {
   id: string;
   label: string;

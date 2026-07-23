@@ -14,8 +14,9 @@ import {
   entrepreneurSchema,
   type EntrepreneurForm,
 } from '@/lib/forms/schemas';
+import { countryOptions } from '@/lib/countries';
 import { useAdminStore } from '@/lib/stores/admin-store';
-import { countries, programmeGoalTypes, sectors, stages } from '@/lib/mock-data/definitions';
+import { programmeGoalTypes, sectors, stages } from '@/lib/mock-data/definitions';
 import { getAssignedProgrammes } from '@/lib/programme-access';
 import type { Entrepreneur } from '@/types';
 
@@ -108,7 +109,7 @@ export function EntrepreneurModal({
             <FormAutocomplete
               value={country}
               onValueChange={(v) => form.setValue('country', v as EntrepreneurForm['country'])}
-              options={countries.map((country) => ({ value: country, label: country }))}
+              options={countryOptions}
               placeholder="Select country"
               searchPlaceholder="Search countries..."
               emptyMessage="No country found."

@@ -5,6 +5,7 @@
  * can be swapped for a real backend (e.g. Supabase tables) without
  * touching the components that consume these types.
  */
+import type { Country as CountryName } from "@/lib/countries";
 
 export type Role = "entrepreneur" | "admin" | "trainer";
 
@@ -19,7 +20,7 @@ export type SectorId =
 
 export type StageId = string;
 
-export type Country = "Ghana" | "Nigeria" | "Kenya" | "Rwanda";
+export type Country = CountryName;
 
 export type EntrepreneurSource = "invited" | "self-registered";
 

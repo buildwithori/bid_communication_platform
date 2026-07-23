@@ -60,7 +60,7 @@ import {
   useLazyBusinessStagesQuery,
   useLazySectorsQuery,
 } from "@/lib/api/settings";
-import { countries } from "@/lib/mock-data/definitions";
+import { countries, countryOptions } from "@/lib/countries";
 import { getTimezoneOptions, PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import {
   entrepreneurProfileTabFromQuery,
@@ -656,10 +656,7 @@ function BusinessTab({
                 onValueChange={(value) =>
                   form.setValue("country", value as ProfileForm["country"])
                 }
-                options={countries.map((item) => ({
-                  value: item,
-                  label: item,
-                }))}
+                options={countryOptions}
                 placeholder="Select country"
                 searchPlaceholder="Search countries..."
                 emptyMessage="No country found."

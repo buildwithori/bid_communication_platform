@@ -12,13 +12,11 @@ import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { FormAutocomplete } from '@/components/shared/FormField';
 import { useCompleteGoogleOnboardingMutation, useGoogleOnboardingQuery } from '@/lib/api/auth';
+import { countryOptions } from '@/lib/countries';
 import { entrepreneurOnboardingSchema, type EntrepreneurOnboardingForm } from '@/lib/forms/schemas';
-import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
 import { detectTimezone } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
-
-const countryOptions = countries.map((country) => ({ value: country, label: country }));
 
 export default function EntrepreneurOnboardingPage() {
   return <AuthShell title="Complete signup details" description="Confirm the entrepreneur account details BID needs before opening the workspace." cardClassName="p-5 sm:p-7"><OnboardingForm /></AuthShell>;

@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { countries } from "@/lib/countries";
 import { isFutureLocalDateValue } from "@/lib/date-values";
-import { countries } from "@/lib/mock-data/definitions";
 
 /**
  * Form validation schemas. Each one mirrors a form in the mockups and

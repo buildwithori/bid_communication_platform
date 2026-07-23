@@ -24,7 +24,7 @@ import {
   entrepreneurProfileSchema,
   type EntrepreneurProfileForm,
 } from "@/lib/forms/schemas";
-import { countries } from "@/lib/mock-data/definitions";
+import { countryOptions } from "@/lib/countries";
 
 export function EntrepreneurFormModal({
   open,
@@ -169,10 +169,7 @@ export function EntrepreneurFormModal({
                 { shouldDirty: true },
               )
             }
-            options={countries.map((country) => ({
-              value: country,
-              label: country,
-            }))}
+            options={countryOptions}
             placeholder="Select country"
             searchPlaceholder="Search countries..."
             emptyMessage="No country found."
