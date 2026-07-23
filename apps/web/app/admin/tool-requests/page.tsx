@@ -446,7 +446,7 @@ function ToolRequestReviewModal({
       onOpenChange={(open) => !open && onClose()}
       title={
         request
-          ? `Review tool request  ${request.toolName}`
+          ? `Review tool request: ${request.toolName}`
           : "Review tool request"
       }
       width="wide"
@@ -461,7 +461,7 @@ function ToolRequestReviewModal({
                   {request.businessName}
                 </div>
                 <div className="mt-1 text-sm text-ink-muted">
-                  {request.requesterName} � {request.programme}
+                  {request.requesterName} · {request.programme}
                 </div>
               </div>
               <Badge tone={toolRequestStatusMeta[request.status].tone}>
