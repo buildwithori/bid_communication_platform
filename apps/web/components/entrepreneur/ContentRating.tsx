@@ -23,11 +23,13 @@ export function ContentRating({
   programmeId,
   moduleId,
   onSaved,
+  onContinue,
 }: {
   content: RatingContent;
   programmeId: string;
   moduleId: string;
   onSaved?: () => void;
+  onContinue?: () => void;
 }) {
   const savedRating = useMyContentRatingQuery(
     content.trainer
@@ -65,14 +67,23 @@ export function ContentRating({
   }
 
   return (
-    <RatingForm
-      key={content.id + ':' + (savedRating.data?.updatedAt ?? 'new')}
-      content={content}
-      programmeId={programmeId}
-      moduleId={moduleId}
-      initial={savedRating.data ?? null}
-      onSaved={onSaved}
-    />
+    <>
+      <RatingForm
+        key={content.id + ':' + (savedRating.data?.updatedAt ?? 'new')}
+        content={content}
+        programmeId={programmeId}
+        moduleId={moduleId}
+        initial={savedRating.data ?? null}
+        onSaved={onSaved}
+      />
+      {onContinue ? (
+        <div className="mt-4 flex justify-end">
+          <Button type="button" variant="ghost" onClick={onContinue}>
+            {savedRating.data ? 'Keep current rating' : 'Maybe later'}
+          </Button>
+        </div>
+      ) : null}
+    </>
   );
 }
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { ContentRating } from '@/components/entrepreneur/ContentRating';
-import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
 
 type RatingModalContent = {
@@ -43,12 +42,8 @@ export function ContentRatingModal({
             programmeId={programmeId}
             moduleId={moduleId}
             onSaved={onContinue}
+            onContinue={onContinue}
           />
-          <div className="mt-4 flex justify-end">
-            <Button type="button" variant="ghost" onClick={onContinue}>
-              Maybe later
-            </Button>
-          </div>
         </div>
       ) : null}
     </Modal>
