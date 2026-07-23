@@ -31,6 +31,7 @@ const titles: Record<string, string> = {
   [routes.admin.settingsGoalTypes]: 'Goal Types',
   [routes.admin.settingsCompany]: 'Company Settings',
   [routes.admin.reporting]: 'Reporting & Analytics',
+  [routes.admin.health]: 'System Health',
 };
 
 function useTitle() {

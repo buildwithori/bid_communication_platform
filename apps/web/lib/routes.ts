@@ -58,6 +58,7 @@ export const routes = {
     settingsToolAreas: '/admin/settings/tool-areas',
     settingsCompany: '/admin/settings/company',
     reporting: '/admin/reporting',
+    health: '/admin/health',
   },
 } as const;
 

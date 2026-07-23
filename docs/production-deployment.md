@@ -176,7 +176,7 @@ curl --fail https://hub.example.org/api/health
 
 Caddy requests and renews the HTTPS certificate automatically after DNS resolves and ports 80 and 443 are reachable. If HTTPS is not ready, inspect `docker compose --env-file .env -f docker-compose.prod.yml logs caddy` before changing DNS or proxy settings.
 
-The API health response must report PostgreSQL, Redis/background jobs, object storage, email configuration, and the worker heartbeat as healthy. Verify login, one private file upload, one calendar connection, and one queued test email before opening the deployment to users.
+The public API health response is intentionally minimal and returns only overall readiness. After signing in as an admin, open `/admin/health` directly to inspect PostgreSQL, Redis/background jobs, object storage, email delivery, worker heartbeat, queue counts, and integration configuration. This route is intentionally not listed in workspace navigation, and its detailed `/api/health/details` endpoint is admin-only. Verify login, one private file upload, one calendar connection, and one queued test email before opening the deployment to users.
 
 All application email is asynchronous. Auth and invitation services enqueue the `transactional-email` queue; notification creation persists delivery records consumed by the notification worker. The send-capable `EmailService` is registered only in `WorkerModule`, so an API request never waits for Resend or SMTP. BullMQ retries transactional email up to five times with exponential backoff, and Redis uses AOF persistence with a `noeviction` policy.
 
