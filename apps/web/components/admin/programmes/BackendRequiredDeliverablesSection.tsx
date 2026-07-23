@@ -257,10 +257,24 @@ export function RequiredDeliverablesSection({
       key: 'name',
       header: 'Deliverable',
       cell: (rule) => (
-        <div className="min-w-[180px]">
-          <div className="font-medium text-ink">{rule.name}</div>
-          {!rule.active && <Badge tone="neutral">Inactive</Badge>}
-        </div>
+        readOnly ? (
+          <div className="min-w-[180px]">
+            <div className="font-medium text-ink">{rule.name}</div>
+            {!rule.active && <Badge tone="neutral">Inactive</Badge>}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => openEdit(rule)}
+            className="group block min-w-[180px] rounded-md text-left outline-none transition-colors hover:text-bid focus-visible:ring-2 focus-visible:ring-bid/20"
+            aria-label={`Edit ${rule.name}`}
+          >
+            <span className="block font-medium text-ink transition-colors group-hover:text-bid group-focus-visible:text-bid">
+              {rule.name}
+            </span>
+            {!rule.active && <Badge tone="neutral">Inactive</Badge>}
+          </button>
+        )
       ),
     },
     {
