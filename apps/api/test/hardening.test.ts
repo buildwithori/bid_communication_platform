@@ -564,7 +564,7 @@ test("deliverable calendar windows preserve entrepreneur scope and reject revers
   assert.equal(freshnessChecks, 1);
 });
 
-test("draft tools do not require a publish-ready audience", async () => {
+test("draft tools require a resource but not a publish-ready audience", async () => {
   const service = new ToolsService(
     {} as never,
     {} as never,
@@ -580,12 +580,39 @@ test("draft tools do not require a publish-ready audience", async () => {
     }
   ).validateToolPayload.bind(service);
 
+  await assert.rejects(
+    validate(
+      {
+        type: EntrepreneurToolType.embedded_tool,
+        status: EntrepreneurToolStatus.draft,
+        visibility: EntrepreneurToolVisibility.programmes,
+        embeddedUrl: null,
+        programmeIds: [],
+      },
+      { status: EntrepreneurToolStatus.draft },
+    ),
+    /require a resource link/i,
+  );
+
+  await assert.rejects(
+    validate(
+      {
+        type: EntrepreneurToolType.pdf,
+        status: EntrepreneurToolStatus.draft,
+        visibility: EntrepreneurToolVisibility.all_entrepreneurs,
+        fileAssetId: null,
+      },
+      { status: EntrepreneurToolStatus.draft },
+    ),
+    /require an uploaded file/i,
+  );
+
   await validate(
     {
       type: EntrepreneurToolType.embedded_tool,
       status: EntrepreneurToolStatus.draft,
       visibility: EntrepreneurToolVisibility.programmes,
-      embeddedUrl: null,
+      embeddedUrl: "https://example.com/tool",
       programmeIds: [],
     },
     { status: EntrepreneurToolStatus.draft },

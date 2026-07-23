@@ -659,24 +659,20 @@ export class ToolsService {
 
     if (
       effective.type === EntrepreneurToolType.embedded_tool &&
-      effective.status === EntrepreneurToolStatus.published &&
-      !effective.embeddedUrl
+      !effective.embeddedUrl?.trim()
     ) {
-      throw new BadRequestException(
-        "Online tools need a link before publishing.",
-      );
+      throw new BadRequestException("Online tools require a resource link.");
     }
 
     if (
       (effective.type === EntrepreneurToolType.pdf ||
         effective.type === EntrepreneurToolType.excel) &&
-      effective.status === EntrepreneurToolStatus.published &&
       !effective.fileAssetId
     ) {
       throw new BadRequestException(
         effective.type === EntrepreneurToolType.excel
-          ? "Excel tools need an uploaded workbook before publishing."
-          : "PDF tools need an uploaded file before publishing.",
+          ? "Excel tools require an uploaded workbook."
+          : "PDF tools require an uploaded file.",
       );
     }
 

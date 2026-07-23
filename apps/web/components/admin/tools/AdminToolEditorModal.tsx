@@ -138,6 +138,17 @@ export function AdminToolEditorModal({
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
   };
+  const setToolType = (type: ApiToolType) => {
+    setDraft((current) => ({ ...current, type }));
+    setFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+    setErrors((current) => ({
+      ...current,
+      type: "",
+      file: "",
+      embeddedUrl: "",
+    }));
+  };
   const validate = () => {
     const next: Record<string, string> = {};
     if (draft.name.trim().length < 2) next.name = "Enter a tool name.";
@@ -146,20 +157,18 @@ export function AdminToolEditorModal({
     if (!draft.toolAreaId) next.toolAreaId = "Select a tool area.";
     if (
       draft.type === "embedded_tool" &&
-      draft.status === "published" &&
       !draft.embeddedUrl.trim()
     )
-      next.embeddedUrl = "Add the online tool link.";
+      next.embeddedUrl = "Add the online tool link to continue.";
     if (
       (draft.type === "pdf" || draft.type === "excel") &&
-      draft.status === "published" &&
       !file &&
       !(tool?.type === draft.type && tool.fileAsset)
     )
       next.file =
         draft.type === "excel"
-          ? "Upload an Excel workbook before publishing."
-          : "Upload a PDF before publishing.";
+          ? "Attach an Excel workbook to continue."
+          : "Attach a PDF resource to continue.";
     if (
       draft.status === "published" &&
       draft.visibility === "programmes" &&
@@ -263,7 +272,7 @@ export function AdminToolEditorModal({
           <FormField label="Tool type">
             <FormSelect
               value={draft.type}
-              onValueChange={(value) => setField("type", value as ApiToolType)}
+              onValueChange={(value) => setToolType(value as ApiToolType)}
               options={typeOptions}
             />
           </FormField>
@@ -316,12 +325,17 @@ export function AdminToolEditorModal({
                   : "application/pdf,.pdf"
               }
               className="hidden"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                setErrors((current) => ({ ...current, file: "" }));
+              }}
             />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex min-h-[92px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-card px-4 py-5 text-center transition hover:border-bid/40 hover:bg-bid-light/20"
+              className={`flex min-h-[92px] w-full flex-col items-center justify-center rounded-xl border border-dashed bg-card px-4 py-5 text-center transition hover:border-bid/40 hover:bg-bid-light/20 ${
+                errors.file ? "border-danger" : "border-line-strong"
+              }`}
             >
               <Upload className="mb-2 h-5 w-5 text-bid" />
               <span className="text-sm font-semibold text-ink">
@@ -347,6 +361,8 @@ export function AdminToolEditorModal({
               value={draft.embeddedUrl}
               onChange={(event) => setField("embeddedUrl", event.target.value)}
               placeholder="https://example.com/tool"
+              required
+              aria-invalid={Boolean(errors.embeddedUrl)}
             />
           </FormField>
         )}
