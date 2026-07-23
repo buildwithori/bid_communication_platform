@@ -21,13 +21,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ContentRating } from "@/components/entrepreneur/ContentRating";
+import { ContentRatingModal } from "@/components/entrepreneur/ContentRatingModal";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Skeleton } from "@/components/shared/Card";
 import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
 import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
-import { Modal } from "@/components/shared/Modal";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 import { useSignedFileUrlQuery } from "@/lib/api/files";
 import {
@@ -122,11 +121,11 @@ export function ProgrammeCoursePlayer({
   const [restartFromBeginningKey, setRestartFromBeginningKey] = React.useState<
     string | null
   >(null);
-  const [ratingEntry, setRatingEntry] = React.useState<PlaylistEntry | null>(
-    null,
-  );
-  const [continueAfterRating, setContinueAfterRating] =
-    React.useState<PlaylistEntry | null>(null);
+  const [ratingPrompt, setRatingPrompt] = React.useState<{
+    entry: PlaylistEntry;
+    target: PlaylistEntry | null;
+  } | null>(null);
+  const ratingPromptedForVisitRef = React.useRef<string | null>(null);
   const [locallyCompletedIds, setLocallyCompletedIds] = React.useState(
     () => new Set<string>(),
   );
@@ -192,6 +191,7 @@ export function ProgrammeCoursePlayer({
       const nextKey = entryKey(entry);
       if (nextKey === activeKey) return;
       void flushPlayback();
+      ratingPromptedForVisitRef.current = null;
       setTransitioningToKey(entry.item.type === "video" ? nextKey : null);
       setRestartFromBeginningKey(null);
       setActiveKey(nextKey);
@@ -207,8 +207,12 @@ export function ProgrammeCoursePlayer({
       (entry) => entry.item.id === initialContentId,
     );
     if (!requested || entryKey(requested) === activeKey) return;
-    setActiveKey(entryKey(requested));
-    setExpanded((current) => new Set(current).add(requested.module.id));
+    const frame = window.requestAnimationFrame(() => {
+      ratingPromptedForVisitRef.current = null;
+      setActiveKey(entryKey(requested));
+      setExpanded((current) => new Set(current).add(requested.module.id));
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [activeKey, initialContentId, playlist]);
 
   const saveProgress = React.useCallback(
@@ -279,8 +283,13 @@ export function ProgrammeCoursePlayer({
       if (target) choose(target);
       return;
     }
-    setRatingEntry(completedEntry);
-    setContinueAfterRating(target);
+    const completedKey = entryKey(completedEntry);
+    if (ratingPromptedForVisitRef.current === completedKey) {
+      if (target) choose(target);
+      return;
+    }
+    ratingPromptedForVisitRef.current = completedKey;
+    setRatingPrompt({ entry: completedEntry, target });
   }
 
   function handleCompletionSaved(
@@ -295,9 +304,8 @@ export function ProgrammeCoursePlayer({
   }
 
   function finishRatingPrompt() {
-    const target = continueAfterRating;
-    setRatingEntry(null);
-    setContinueAfterRating(null);
+    const target = ratingPrompt?.target ?? null;
+    setRatingPrompt(null);
     if (target) choose(target);
   }
 
@@ -421,7 +429,7 @@ export function ProgrammeCoursePlayer({
                         undefined,
                         true,
                         "mark",
-                        () => handleCompletionSaved(active, null),
+                        () => handleCompletionSaved(active, next),
                       )
                     }
                   >
@@ -448,6 +456,7 @@ export function ProgrammeCoursePlayer({
                 type="button"
                 disabled={
                   completionAction !== null ||
+                  (!next && completed) ||
                   (!next &&
                     (!canTrack || (active.item.type === "video" && !completed)))
                 }
@@ -473,7 +482,7 @@ export function ProgrammeCoursePlayer({
                   if (next) choose(next);
                 }}
               >
-                {next ? "Next" : "Finish lesson"}
+                {next ? "Next" : completed ? "Course complete" : "Finish lesson"}
                 {next ? <ChevronRight className="h-4 w-4" /> : null}
               </Button>
             </div>
@@ -521,46 +530,12 @@ export function ProgrammeCoursePlayer({
         </div>
       ) : null}
 
-      <Modal
-        open={Boolean(ratingEntry)}
-        onOpenChange={(open) => !open && finishRatingPrompt()}
-        title="How was this lesson?"
-        width="md"
-      >
-        {ratingEntry ? (
-          <div>
-            <p className="mb-4 text-sm leading-6 text-ink-muted">
-              You completed{" "}
-              <span className="font-medium text-ink">
-                {ratingEntry.item.title}
-              </span>
-              . A quick rating helps BID improve the learning experience.
-            </p>
-            <ContentRating
-              key={
-                data.programme.id +
-                ":" +
-                ratingEntry.module.id +
-                ":" +
-                ratingEntry.item.id
-              }
-              content={ratingEntry.item}
-              programmeId={data.programme.id}
-              moduleId={ratingEntry.module.id}
-              onSaved={finishRatingPrompt}
-            />
-            <div className="mt-4 flex justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={finishRatingPrompt}
-              >
-                {continueAfterRating ? "Skip and continue" : "Maybe later"}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+      <ContentRatingModal
+        content={ratingPrompt?.entry.item ?? null}
+        programmeId={data.programme.id}
+        moduleId={ratingPrompt?.entry.module.id ?? null}
+        onContinue={finishRatingPrompt}
+      />
     </section>
   );
 }
