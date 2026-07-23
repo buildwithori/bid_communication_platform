@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -19,11 +20,78 @@ export function Tabs<T extends string>({
   tabs,
   className,
 }: TabsProps<T>) {
+  const tabListRef = React.useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = React.useState({
+    left: false,
+    right: false,
+  });
+
+  const updateOverflow = React.useCallback(() => {
+    const element = tabListRef.current;
+    if (!element) return;
+    const maximumScroll = element.scrollWidth - element.clientWidth;
+    setOverflow({
+      left: element.scrollLeft > 2,
+      right: maximumScroll - element.scrollLeft > 2,
+    });
+  }, []);
+
+  React.useEffect(() => {
+    const element = tabListRef.current;
+    if (!element) return;
+
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(element);
+    Array.from(element.children).forEach((child) => observer.observe(child));
+
+    return () => observer.disconnect();
+  }, [tabs.length, updateOverflow]);
+
+  React.useEffect(() => {
+    const element = tabListRef.current;
+    const activeTab = element?.querySelector<HTMLElement>(
+      '[role="tab"][aria-selected="true"]',
+    );
+    if (element && activeTab) {
+      const tabStart = activeTab.offsetLeft;
+      const tabEnd = tabStart + activeTab.offsetWidth;
+      const visibleStart = element.scrollLeft;
+      const visibleEnd = visibleStart + element.clientWidth;
+
+      if (tabStart < visibleStart) {
+        element.scrollTo({ left: tabStart - 16, behavior: 'smooth' });
+      } else if (tabEnd > visibleEnd) {
+        element.scrollTo({
+          left: tabEnd - element.clientWidth + 16,
+          behavior: 'smooth',
+        });
+      }
+    }
+    const frame = window.requestAnimationFrame(updateOverflow);
+    return () => window.cancelAnimationFrame(frame);
+  }, [updateOverflow, value]);
+
+  const maskImage =
+    overflow.left && overflow.right
+      ? 'linear-gradient(to right, transparent, black 18px, black calc(100% - 18px), transparent)'
+      : overflow.left
+        ? 'linear-gradient(to right, transparent, black 18px, black)'
+        : overflow.right
+          ? 'linear-gradient(to right, black, black calc(100% - 18px), transparent)'
+          : undefined;
+
   return (
     <div
+      ref={tabListRef}
       role="tablist"
+      onScroll={updateOverflow}
+      style={{
+        maskImage,
+        WebkitMaskImage: maskImage,
+      }}
       className={cn(
-        'mb-4 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm',
+        'mb-4 flex w-fit max-w-full gap-1 overflow-x-auto overscroll-x-contain scroll-smooth scroll-px-4 rounded-xl border border-border bg-card p-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className,
       )}
     >
