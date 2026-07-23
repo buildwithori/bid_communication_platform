@@ -249,6 +249,39 @@ test("programme reuse lookup excludes programmes already containing the content"
   });
 });
 
+test("trainer programme scope excludes archived programmes even when requested", () => {
+  const service = new ProgrammesService({} as never, {} as never, {} as never);
+  const builder = service as unknown as {
+    buildProgrammeWhere: (
+      user: unknown,
+      query: { includeArchived: boolean },
+    ) => { AND: Array<Record<string, unknown>> };
+  };
+  const where = builder.buildProgrammeWhere(
+    { id: "trainer-1", role: UserRole.trainer },
+    { includeArchived: true },
+  );
+
+  assert.deepEqual(where.AND, [
+    {
+      archivedAt: null,
+      modules: {
+        some: {
+          module: {
+            contentItems: {
+              some: {
+                contentItem: {
+                  trainerId: "trainer-1",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  ]);
+});
+
 test("archived programmes reject deliverable rule creation and editing", async () => {
   let deliverableLookupCalled = false;
   const prisma = {

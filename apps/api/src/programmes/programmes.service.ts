@@ -318,9 +318,11 @@ export class ProgrammesService {
               AND EXISTS (
                 SELECT 1
                 FROM programme_modules pm
+                JOIN programmes p ON p.id = pm.programme_id
                 JOIN module_content_items mci ON mci.module_id = pm.module_id
                 JOIN content_items ci ON ci.id = mci.content_item_id
                 WHERE pm.programme_id = pag.programme_id
+                  AND p.archived_at IS NULL
                   AND ci.trainer_id = ${user.id}
               )
             `
@@ -1886,6 +1888,7 @@ export class ProgrammesService {
     }
 
     return {
+      archivedAt: null,
       modules: {
         some: {
           module: {

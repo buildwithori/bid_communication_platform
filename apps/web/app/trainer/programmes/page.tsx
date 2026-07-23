@@ -28,7 +28,10 @@ import {
 } from '@/lib/api/programmes';
 import { routes } from '@/lib/routes';
 
-type StatusFilter = 'current' | 'all' | ProgrammeLifecycle;
+type StatusFilter =
+  | 'current'
+  | 'all'
+  | Exclude<ProgrammeLifecycle, 'archived'>;
 
 export default function TrainerProgrammesPage() {
   const router = useRouter();
@@ -39,7 +42,6 @@ export default function TrainerProgrammesPage() {
   const directory = useProgrammesPage({
     search: debouncedSearch.trim() || undefined,
     lifecycle: status === 'current' || status === 'all' ? undefined : status,
-    includeArchived: status === 'all' ? true : undefined,
     take: pageSize,
   });
   const summary = useProgrammeSummaryQuery();
@@ -264,7 +266,6 @@ export default function TrainerProgrammesPage() {
               <option value="scheduled">Scheduled</option>
               <option value="draft">Draft</option>
               <option value="completed">Completed</option>
-              <option value="archived">Archived</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>
