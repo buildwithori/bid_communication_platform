@@ -123,12 +123,12 @@ export const programSchema = z
     if (
       values.startDate &&
       values.endDate &&
-      new Date(values.endDate) < new Date(values.startDate)
+      new Date(values.endDate) <= new Date(values.startDate)
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["endDate"],
-        message: "End date must be on or after the start date",
+        message: "End date must be after the start date",
       });
     }
   });

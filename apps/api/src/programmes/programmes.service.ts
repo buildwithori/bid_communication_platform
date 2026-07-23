@@ -1705,10 +1705,10 @@ export class ProgrammesService {
     if (
       Number.isNaN(startDate.getTime()) ||
       Number.isNaN(endDate.getTime()) ||
-      endDate < startDate
+      endDate <= startDate
     ) {
       throw new BadRequestException(
-        "Programme end date must be on or after its start date.",
+        "Programme end date must be after its start date.",
       );
     }
     return { startDate, endDate };

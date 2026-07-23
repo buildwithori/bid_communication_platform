@@ -8,6 +8,7 @@ import { Modal } from '@/components/shared/Modal';
 import { FormField, FormInput, FormSelect, FormTextarea, FormRow2 } from '@/components/shared/FormField';
 import { Button } from '@/components/shared/Button';
 import { DatePicker } from '@/components/shared/DatePicker';
+import { nextDateValue } from '@/lib/date-values';
 import { programSchema, type ProgramForm } from '@/lib/forms/schemas';
 import {
   useCreateProgrammeMutation,
@@ -54,6 +55,7 @@ export function ProgramModal({
   });
   const accessType = useWatch({ control: form.control, name: 'accessType' });
   const publishState = useWatch({ control: form.control, name: 'publishState' });
+  const startDate = useWatch({ control: form.control, name: 'startDate' });
 
   React.useEffect(() => {
     if (open) form.reset(programmeDefaults(program));
@@ -138,7 +140,16 @@ export function ProgramModal({
               render={({ field }) => (
                 <DatePicker
                   value={field.value}
-                  onChange={field.onChange}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    const endDate = form.getValues('endDate');
+                    if (endDate && endDate <= value) {
+                      form.setValue('endDate', '', {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                  }}
                   onBlur={field.onBlur}
                 />
               )}
@@ -153,6 +164,7 @@ export function ProgramModal({
                   value={field.value}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
+                  minDate={startDate ? nextDateValue(startDate) : undefined}
                 />
               )}
             />
