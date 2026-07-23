@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { UserRole } from "@prisma/client";
 import { Public } from "../auth/decorators/public.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { DeepHealthService } from "./deep-health.service";
 import { OperationalHealthService } from "./operational-health.service";
 
 @Controller()
@@ -10,6 +11,7 @@ export class HealthController {
   constructor(
     private readonly config: ConfigService,
     private readonly operational: OperationalHealthService,
+    private readonly deepHealth: DeepHealthService,
   ) {}
 
   @Get("health")
@@ -31,10 +33,26 @@ export class HealthController {
   @Get("health/details")
   @Roles(UserRole.admin)
   async getHealthDetails() {
-    const health = await this.operational.status();
+    const [health, diagnostics] = await Promise.all([
+      this.operational.status(),
+      this.deepHealth.status().catch(() => null),
+    ]);
+    const criticalDiagnostic = diagnostics?.issues.some(
+      (issue) => issue.severity === "critical",
+    );
+    const warningDiagnostic = diagnostics?.issues.some(
+      (issue) => issue.severity === "warning",
+    );
+    const status =
+      health.status === "unhealthy" || criticalDiagnostic
+        ? ("unhealthy" as const)
+        : !diagnostics || warningDiagnostic
+          ? ("degraded" as const)
+          : ("operational" as const);
     return {
       app: "BID Hub",
-      status: health.status,
+      status,
+      readinessStatus: health.status,
       failed: health.failed,
       environment: this.config.get<string>("NODE_ENV") ?? "unknown",
       runtime: {
@@ -43,6 +61,7 @@ export class HealthController {
       },
       dependencies: health.dependencies,
       integrations: health.integrations,
+      diagnostics,
       timestamp: new Date().toISOString(),
     };
   }

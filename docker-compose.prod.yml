@@ -126,6 +126,24 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  backup:
+    image: postgres:16-alpine
+    profiles: ["operations"]
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      PGHOST: postgres
+      BACKUP_DIRECTORY_IN_CONTAINER: /backups
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-production"]
+    volumes:
+      - ./docker/postgres/backup.sh:/usr/local/bin/backup-production:ro
+      - ${BACKUP_DIRECTORY:-./backups}:/backups
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   worker:
     image: ${API_IMAGE:-bid-hub-api:latest}
     build:

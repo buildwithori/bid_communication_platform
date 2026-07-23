@@ -68,6 +68,62 @@ export class JobsHealthService {
     };
   }
 
+  async diagnostics() {
+    await this.waitUntilReady();
+    const queues = [
+      this.auditQueue,
+      this.notificationQueue,
+      this.notificationAutomationQueue,
+      this.recurringQueue,
+      this.transactionalEmailQueue,
+      this.reportExportQueue,
+      this.externalCleanupQueue,
+      this.videoReconciliationQueue,
+    ];
+
+    return Promise.all(
+      queues.map(async (queue) => {
+        const [counts, oldestWaiting, latestCompleted, schedulers] =
+          await Promise.all([
+            queue.getJobCounts(
+              "wait",
+              "active",
+              "delayed",
+              "failed",
+              "completed",
+            ),
+            queue.getJobs(["wait"], 0, 0, true),
+            queue.getJobs(["completed"], 0, 0, false),
+            queue.getJobSchedulers(0, -1, true),
+          ]);
+        const oldestWaitingJob = oldestWaiting[0];
+        const latestCompletedJob = latestCompleted[0];
+        const now = Date.now();
+
+        return {
+          name: queue.name,
+          counts,
+          oldestWaitingAt: oldestWaitingJob
+            ? new Date(oldestWaitingJob.timestamp).toISOString()
+            : null,
+          oldestWaitingAgeSeconds: oldestWaitingJob
+            ? Math.max(0, Math.floor((now - oldestWaitingJob.timestamp) / 1_000))
+            : null,
+          lastCompletedAt: latestCompletedJob?.finishedOn
+            ? new Date(latestCompletedJob.finishedOn).toISOString()
+            : null,
+          schedulers: schedulers.map((scheduler) => ({
+            id: scheduler.id,
+            name: scheduler.name,
+            nextRunAt: scheduler.next
+              ? new Date(scheduler.next).toISOString()
+              : null,
+          })),
+        };
+      }),
+    );
+  }
+
   private async waitUntilReady() {
     let timer: NodeJS.Timeout | undefined;
     try {

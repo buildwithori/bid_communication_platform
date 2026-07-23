@@ -36,6 +36,38 @@ export function HealthPageSkeleton() {
         ))}
       </div>
 
+      <div className="grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Card key={index} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-10 w-10 rounded-xl" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-8 w-28" />
+            <Skeleton className="h-2 w-full rounded-full" />
+            <Skeleton className="h-4 w-44 max-w-full" />
+          </Card>
+        ))}
+      </div>
+
+      <Card className="space-y-4">
+        <Skeleton className="h-6 w-44" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className="h-36 w-full rounded-xl" />
+          ))}
+        </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <Skeleton className="h-6 w-56" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-12 w-full" />
+        ))}
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
         <Card className="space-y-4">
           <Skeleton className="h-6 w-44" />

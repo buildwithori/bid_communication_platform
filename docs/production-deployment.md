@@ -176,7 +176,7 @@ curl --fail https://hub.example.org/api/health
 
 Caddy requests and renews the HTTPS certificate automatically after DNS resolves and ports 80 and 443 are reachable. If HTTPS is not ready, inspect `docker compose --env-file .env -f docker-compose.prod.yml logs caddy` before changing DNS or proxy settings.
 
-The public API health response is intentionally minimal and returns only overall readiness. After signing in as an admin, open `/admin/health` directly to inspect PostgreSQL, Redis/background jobs, object storage, email delivery, worker heartbeat, queue counts, and integration configuration. This route is intentionally not listed in workspace navigation, and its detailed `/api/health/details` endpoint is admin-only. Verify login, one private file upload, one calendar connection, and one queued test email before opening the deployment to users.
+The public API health response is intentionally minimal and returns only overall readiness. After signing in as an admin, open `/admin/health` directly to inspect PostgreSQL, Redis/background jobs, object storage, email delivery, worker heartbeat, queue timing and schedules, host resources, processing backlogs, backup freshness, and integration configuration. This route is intentionally not listed in workspace navigation, and its detailed `/api/health/details` endpoint is admin-only. Verify login, one private file upload, one calendar connection, and one queued test email before opening the deployment to users.
 
 All application email is asynchronous. Auth and invitation services enqueue the `transactional-email` queue; notification creation persists delivery records consumed by the notification worker. The send-capable `EmailService` is registered only in `WorkerModule`, so an API request never waits for Resend or SMTP. BullMQ retries transactional email up to five times with exponential backoff, and Redis uses AOF persistence with a `noeviction` policy.
 
@@ -206,7 +206,22 @@ docker compose --env-file .env -f docker-compose.prod.yml logs -f --tail=200 api
 
 The Compose file retains five 10 MB JSON log files per service. Add external uptime monitoring for `/health` and `/api/health`, and alert when either fails.
 
-Take scheduled encrypted PostgreSQL backups and periodically test a restore into a separate database. DigitalOcean volume snapshots are useful as a second layer, not a substitute for database-aware backups. Retain the previous application image tag until post-deploy verification is complete.
+Run a database-aware backup with:
+
+```bash
+mkdir -p /opt/bid-hub/backups
+chmod 700 /opt/bid-hub/backups
+
+docker compose \
+  --env-file .env \
+  -f docker-compose.prod.yml \
+  --profile operations \
+  run --rm backup
+```
+
+Set `BACKUP_DIRECTORY=/opt/bid-hub/backups` in `.env`. The backup service writes a PostgreSQL custom-format dump with owner-only permissions and records success in the database only after `pg_dump` completes. `/admin/health` reports the last successful run and warns when it becomes older than 26 hours.
+
+Schedule the command daily with the host scheduler and copy backups to encrypted off-host storage. Periodically test a restore into a separate database. DigitalOcean volume snapshots are useful as a second layer, not a substitute for database-aware backups. Retain the previous application image tag until post-deploy verification is complete.
 
 ## Rollback
 

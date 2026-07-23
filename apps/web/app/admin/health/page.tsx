@@ -14,6 +14,7 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
+import { DeepHealthPanels } from "@/components/health/DeepHealthPanels";
 import { HealthPageSkeleton } from "@/components/health/HealthPageSkeleton";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
@@ -80,7 +81,8 @@ export default function AdminHealthPage() {
   }
 
   const snapshot: HealthDetails = health.data;
-  const healthy = snapshot.status === "ok";
+  const operational = snapshot.status === "operational";
+  const degraded = snapshot.status === "degraded";
   const jobs = snapshot.dependencies.backgroundJobs.details;
   const queues: HealthQueue[] = jobs?.queues ?? [];
   const queueTotals = sumQueueCounts(queues);
@@ -113,47 +115,72 @@ export default function AdminHealthPage() {
       <Card
         className={cn(
           "relative mb-5 overflow-hidden p-0",
-          healthy
+          operational
             ? "border-success/25"
-            : "border-danger/30",
+            : degraded
+              ? "border-warning/30"
+              : "border-danger/30",
         )}
       >
         <div
           className={cn(
             "pointer-events-none absolute inset-0 opacity-80",
-            healthy
+            operational
               ? "bg-gradient-to-br from-success-light via-card to-info-light/50"
-              : "bg-gradient-to-br from-danger-light via-card to-warning-light/50",
+              : degraded
+                ? "bg-gradient-to-br from-warning-light via-card to-info-light/35"
+                : "bg-gradient-to-br from-danger-light via-card to-warning-light/50",
           )}
           aria-hidden="true"
         />
         <div
           className={cn(
             "pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full blur-3xl",
-            healthy ? "bg-success/15" : "bg-danger/15",
+            operational
+              ? "bg-success/15"
+              : degraded
+                ? "bg-warning/15"
+                : "bg-danger/15",
           )}
           aria-hidden="true"
         />
         <div className="relative flex min-h-48 flex-col justify-between gap-8 p-6 sm:flex-row sm:items-center lg:p-8">
           <div>
-            <Badge tone={healthy ? "green" : "red"} className="gap-1.5">
+            <Badge
+              tone={operational ? "green" : degraded ? "amber" : "red"}
+              className="gap-1.5"
+            >
               <span
                 className={cn(
                   "h-1.5 w-1.5 rounded-full",
-                  healthy ? "bg-success" : "bg-danger",
+                  operational
+                    ? "bg-success"
+                    : degraded
+                      ? "bg-warning"
+                      : "bg-danger",
                 )}
               />
-              {healthy ? "Operational" : "Attention required"}
+              {operational
+                ? "Operational"
+                : degraded
+                  ? "Degraded"
+                  : "Unhealthy"}
             </Badge>
             <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-ink">
-              {healthy
+              {operational
                 ? "All required services are healthy"
-                : `${snapshot.failed.length} service${snapshot.failed.length === 1 ? "" : "s"} need attention`}
+                : degraded
+                  ? `${snapshot.diagnostics?.issues.length ?? 1} operational signal${(snapshot.diagnostics?.issues.length ?? 1) === 1 ? "" : "s"} need attention`
+                  : `${snapshot.failed.length || snapshot.diagnostics?.issues.length || 1} critical signal${(snapshot.failed.length || snapshot.diagnostics?.issues.length || 1) === 1 ? "" : "s"} need attention`}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-muted">
-              {healthy
+              {operational
                 ? `${connectedCount} of 4 required dependencies responded successfully. BID Hub is ready to serve requests.`
-                : `Unavailable: ${snapshot.failed.map((name) => dependencyLabels[name] ?? name).join(", ")}. Healthy services remain visible below.`}
+                : degraded
+                  ? "Core services remain available, but one or more operational checks are outside their healthy range."
+                  : snapshot.failed.length
+                    ? `Unavailable: ${snapshot.failed.map((name) => dependencyLabels[name] ?? name).join(", ")}. Healthy services remain visible below.`
+                    : "A critical host or processing condition needs attention. Core dependency status remains visible below."}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-faint">
               <span className="inline-flex items-center gap-1.5">
@@ -166,12 +193,14 @@ export default function AdminHealthPage() {
           <div
             className={cn(
               "flex h-28 w-28 shrink-0 items-center justify-center rounded-full border-[10px] shadow-[0_18px_45px_rgba(0,0,0,0.08)]",
-              healthy
+              operational
                 ? "border-success-light bg-success text-white"
-                : "border-danger-light bg-danger text-white",
+                : degraded
+                  ? "border-warning-light bg-warning text-white"
+                  : "border-danger-light bg-danger text-white",
             )}
           >
-            {healthy ? (
+            {operational ? (
               <CheckCircle2 className="h-12 w-12" aria-hidden="true" />
             ) : (
               <CircleAlert className="h-12 w-12" aria-hidden="true" />
@@ -180,8 +209,15 @@ export default function AdminHealthPage() {
         </div>
       </Card>
 
-      {!healthy ? (
-        <Notice className="border border-danger/20 bg-danger-light/45 text-danger-dark">
+      {!operational ? (
+        <Notice
+          className={cn(
+            "border",
+            degraded
+              ? "border-warning/20 bg-warning-light/45 text-warning-dark"
+              : "border-danger/20 bg-danger-light/45 text-danger-dark",
+          )}
+        >
           The dashboard remains available during a partial outage so you can
           identify the affected dependency and confirm recovery.
         </Notice>
@@ -229,6 +265,8 @@ export default function AdminHealthPage() {
           }
         />
       </div>
+
+      <DeepHealthPanels diagnostics={snapshot.diagnostics} />
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]">
         <Card>
