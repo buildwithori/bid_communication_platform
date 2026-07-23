@@ -16,6 +16,7 @@ import { Badge } from "@/components/shared/Badge";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { trainerSchema, type TrainerForm } from "@/lib/forms/schemas";
 import { useLazySectorsQuery } from "@/lib/api/settings";
+import { nextLocalDateValue } from "@/lib/date-values";
 import type { TrainerRecord } from "@/lib/api/trainers";
 
 const roleOptions = [
@@ -170,6 +171,7 @@ export function TrainerModal({
                   value={field.value}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
+                  minDate={nextLocalDateValue()}
                 />
               )}
             />

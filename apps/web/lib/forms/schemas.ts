@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isFutureLocalDateValue } from "@/lib/date-values";
 import { countries } from "@/lib/mock-data/definitions";
 
 /**
@@ -60,6 +61,16 @@ export const trainerSchema = z
         code: z.ZodIssueCode.custom,
         path: ["accessExpiresOn"],
         message: "Choose when guest access expires",
+      });
+    } else if (
+      value.accessLevel === "guest" &&
+      value.accessExpiresOn &&
+      !isFutureLocalDateValue(value.accessExpiresOn)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["accessExpiresOn"],
+        message: "Choose a date after today",
       });
     }
   });
