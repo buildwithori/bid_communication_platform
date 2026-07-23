@@ -23,6 +23,7 @@ import {
   CreateToolRequestDto,
   UpdateToolRequestDto,
 } from "./dto/upsert-tool-request.dto";
+import { PLATFORM_DEFAULT_TIMEZONE } from "../common/constants/platform.constants";
 
 const DEFAULT_TAKE = 20;
 
@@ -142,6 +143,15 @@ export class ToolRequestsService {
   async createRequest(user: User, dto: CreateToolRequestDto) {
     if (user.role !== UserRole.entrepreneur) {
       throw new BadRequestException("Only entrepreneurs can request tools.");
+    }
+    if (
+      dto.neededBy &&
+      dto.neededBy <=
+        this.todayInTimezone(user.timezone ?? PLATFORM_DEFAULT_TIMEZONE)
+    ) {
+      throw new BadRequestException(
+        "Needed-by date must be after today.",
+      );
     }
 
     await this.ensureToolArea(dto.toolAreaId);
@@ -269,6 +279,32 @@ export class ToolRequestsService {
 
     if (isDecision) await this.notifyEntrepreneurOfDecision(user, updated);
     return this.mapRequest(updated);
+  }
+
+  private todayInTimezone(timezone: string) {
+    let formatter: Intl.DateTimeFormat;
+    try {
+      formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    } catch {
+      formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: PLATFORM_DEFAULT_TIMEZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    }
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(new Date())
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    );
+    return `${parts.year}-${parts.month}-${parts.day}`;
   }
 
   private async notifyAdminsOfRequest(

@@ -219,7 +219,13 @@ export type PeriodicUpdateForm = z.infer<typeof periodicUpdateSchema>;
 export const toolRequestSchema = z.object({
   name: z.string().min(1, "Tool name or idea is required"),
   category: z.string().min(1, "Select a tool area"),
-  neededBy: z.string().optional(),
+  neededBy: z
+    .string()
+    .optional()
+    .refine(
+      (value) => !value || isFutureLocalDateValue(value),
+      "Choose a date after today",
+    ),
   reason: z
     .string()
     .trim()

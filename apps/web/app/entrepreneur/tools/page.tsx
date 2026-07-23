@@ -57,6 +57,7 @@ import {
 import { useLazyToolAreasQuery } from "@/lib/api/settings";
 import { useToolsPage } from "@/lib/api/tools";
 import { toolRequestSchema, type ToolRequestForm } from "@/lib/forms/schemas";
+import { nextLocalDateValue } from "@/lib/date-values";
 import {
   mapToolRequestRecordToUi,
   toolRequestStatusMeta,
@@ -198,12 +199,17 @@ function RequestToolModal({
             onLoadMore={() => void areas.fetchNextPage()}
           />
         </FormField>
-        <FormField label="Needed by" optional>
+        <FormField
+          label="Needed by"
+          optional
+          error={form.formState.errors.neededBy?.message}
+        >
           <DatePicker
             value={neededBy}
             onChange={(value) =>
               form.setValue("neededBy", value, { shouldValidate: true })
             }
+            minDate={nextLocalDateValue()}
             placeholder="Select a date if time-sensitive"
           />
         </FormField>

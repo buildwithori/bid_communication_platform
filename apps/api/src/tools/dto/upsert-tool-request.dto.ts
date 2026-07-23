@@ -1,4 +1,12 @@
-import { IsDateString, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { ToolRequestStatus } from '@prisma/client';
 
 export class CreateToolRequestDto {
@@ -17,6 +25,9 @@ export class CreateToolRequestDto {
 
   @IsOptional()
   @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'neededBy must use YYYY-MM-DD',
+  })
   neededBy?: string;
 }
 
