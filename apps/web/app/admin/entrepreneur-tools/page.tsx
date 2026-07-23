@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { AdminToolEditorModal } from "@/components/admin/tools/AdminToolEditorModal";
 import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
+import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
@@ -548,30 +549,24 @@ function ToolDetailsModal({
         </div>
         {tool.type === "excel" ? (
           <SpreadsheetViewer fileId={tool.fileAsset?.id} title={tool.name} />
+        ) : previewUrl ? (
+          <ToolFramePreview
+            key={`${tool.id}:${previewUrl}`}
+            title={tool.name}
+            url={
+              tool.type === "embedded_tool"
+                ? previewUrl
+                : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
+            }
+            type={tool.type === "embedded_tool" ? "online" : "pdf"}
+            className="[&>iframe]:h-[64vh]"
+          />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-line bg-card">
-            {previewUrl ? (
-              <iframe
-                title={`${tool.name} preview`}
-                src={
-                  tool.type === "embedded_tool"
-                    ? previewUrl
-                    : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
-                }
-                loading="eager"
-                sandbox={
-                  tool.type === "embedded_tool"
-                    ? "allow-forms allow-popups allow-same-origin allow-scripts"
-                    : undefined
-                }
-                className="h-[64vh] min-h-[480px] w-full bg-white"
-              />
-            ) : (
-              <div className="grid min-h-[320px] place-items-center bg-surface-subtle p-8 text-center text-sm text-ink-muted">
-                Add a {tool.type === "pdf" ? "PDF resource" : "tool link"}{" "}
-                before this can be previewed.
-              </div>
-            )}
+            <div className="grid min-h-[320px] place-items-center bg-surface-subtle p-8 text-center text-sm text-ink-muted">
+              Add a {tool.type === "pdf" ? "PDF resource" : "tool link"} before
+              this can be previewed.
+            </div>
           </div>
         )}
       </div>

@@ -37,6 +37,7 @@ import {
   FormSelect,
 } from "@/components/shared/FormField";
 import { Button } from "@/components/shared/Button";
+import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
 import { useAdminStore } from "@/lib/stores/admin-store";
 import { toolById, tools } from "@/lib/mock-data";
 import { contentItemSchema, type ContentItemForm } from "@/lib/forms/schemas";
@@ -403,17 +404,6 @@ function ContentPreviewModal({
                 Next
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              {getOpenUrl(item) ? (
-                <Button
-                  asChild
-                  variant="outline"
-                  className="border-bid/35 bg-bid-light/35 text-bid-dark hover:border-bid/50 hover:bg-bid-light hover:text-bid-dark"
-                >
-                  <a href={getOpenUrl(item)} target="_blank" rel="noreferrer">
-                    Open in new tab
-                  </a>
-                </Button>
-              ) : null}
             </div>
           </div>
         </div>
@@ -483,10 +473,12 @@ function ContentPreviewFrame({ item }: { item: ContentItem }) {
     }
 
     return (
-      <iframe
-        title={`${item.title} PDF preview`}
-        src={item.fileUrl}
-        className="h-[56vh] min-h-[420px] w-full bg-white"
+      <ToolFramePreview
+        key={`${item.id}:${item.fileUrl}`}
+        title={item.title}
+        url={item.fileUrl}
+        type="pdf"
+        className="min-h-[420px] rounded-none border-0 shadow-none [&>iframe]:h-[56vh] [&>iframe]:min-h-[420px]"
       />
     );
   }
@@ -501,11 +493,12 @@ function ContentPreviewFrame({ item }: { item: ContentItem }) {
   }
 
   return (
-    <iframe
-      title={`${item.title} embedded tool preview`}
-      src={item.toolUrl}
-      sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
-      className="h-[56vh] min-h-[420px] w-full bg-white"
+    <ToolFramePreview
+      key={`${item.id}:${item.toolUrl}`}
+      title={item.title}
+      url={item.toolUrl}
+      type="online"
+      className="min-h-[420px] rounded-none border-0 shadow-none [&>iframe]:h-[56vh] [&>iframe]:min-h-[420px]"
     />
   );
 }
@@ -527,12 +520,6 @@ function MissingPreviewState({
       </div>
     </div>
   );
-}
-
-function getOpenUrl(item: ContentItem) {
-  if (item.type === "pdf") return item.fileUrl;
-  if (item.type === "tool") return item.toolUrl;
-  return undefined;
 }
 
 function getContentSourceLabel(item: ContentItem) {

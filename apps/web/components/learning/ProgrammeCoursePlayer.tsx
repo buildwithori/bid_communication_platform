@@ -26,6 +26,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Skeleton } from "@/components/shared/Card";
 import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
+import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
 import { Modal } from "@/components/shared/Modal";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 import { useSignedFileUrlQuery } from "@/lib/api/files";
@@ -834,10 +835,12 @@ function MediaStage({
       );
     }
     return (
-      <iframe
+      <ToolFramePreview
+        key={`${item.id}:${signedFile.data.download.url}`}
         title={item.title}
-        src={signedFile.data.download.url}
-        className="h-[620px] w-full bg-white"
+        url={signedFile.data.download.url}
+        type="pdf"
+        className="min-h-[620px] rounded-none border-0 shadow-none [&>iframe]:h-[620px]"
       />
     );
   }

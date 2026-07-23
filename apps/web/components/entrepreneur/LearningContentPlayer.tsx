@@ -21,6 +21,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Skeleton } from "@/components/shared/Card";
 import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
+import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
 import { Modal } from "@/components/shared/Modal";
 import {
   type ContentItemRecord,
@@ -481,13 +482,13 @@ function ContentFrame({
       );
     }
     return (
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <iframe
-          title={item.title}
-          src={signedFile.data.download.url}
-          className="h-[560px] w-full"
-        />
-      </div>
+      <ToolFramePreview
+        key={`${item.id}:${signedFile.data.download.url}`}
+        title={item.title}
+        url={signedFile.data.download.url}
+        type="pdf"
+        className="min-h-[560px] rounded-xl [&>iframe]:h-[560px]"
+      />
     );
   }
 
@@ -502,14 +503,13 @@ function ContentFrame({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-card">
-      <iframe
-        title={item.title}
-        src={item.toolLink.url}
-        className="h-[560px] w-full"
-        sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
-      />
-    </div>
+    <ToolFramePreview
+      key={`${item.id}:${item.toolLink.url}`}
+      title={item.title}
+      url={item.toolLink.url}
+      type="online"
+      className="min-h-[560px] rounded-xl [&>iframe]:h-[560px]"
+    />
   );
 }
 

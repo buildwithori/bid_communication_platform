@@ -27,6 +27,7 @@ import {
   TableSkeleton,
 } from "@/components/shared/Card";
 import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
+import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
 import { DatePicker } from "@/components/shared/DatePicker";
 import {
   DataTable,
@@ -317,37 +318,30 @@ function ToolPreviewModal({
         </div>
         {tool.type === "excel" ? (
           <SpreadsheetViewer fileId={tool.fileId} title={tool.name} />
+        ) : previewUrl ? (
+          <ToolFramePreview
+            key={`${tool.id}:${previewUrl}`}
+            title={tool.name}
+            url={
+              isOnline
+                ? previewUrl
+                : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
+            }
+            type={isOnline ? "online" : "pdf"}
+          />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            {previewUrl ? (
-              <iframe
-                title={`${tool.name} preview`}
-                src={
-                  isOnline
-                    ? previewUrl
-                    : previewUrl + "#view=FitH&toolbar=1&navpanes=1"
-                }
-                loading="eager"
-                sandbox={
-                  isOnline
-                    ? "allow-forms allow-popups allow-same-origin allow-scripts"
-                    : undefined
-                }
-                className="h-[68vh] min-h-[480px] w-full bg-white"
-              />
-            ) : (
-              <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">
-                <div>
-                  <div className="text-base font-semibold text-ink">
-                    Preview is not available
-                  </div>
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-                    This tool needs a {isOnline ? "tool link" : "PDF file"}{" "}
-                    before it can be previewed.
-                  </p>
+            <div className="grid min-h-[430px] place-items-center bg-surface-subtle p-8 text-center">
+              <div>
+                <div className="text-base font-semibold text-ink">
+                  Preview is not available
                 </div>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
+                  This tool needs a {isOnline ? "tool link" : "PDF file"} before
+                  it can be previewed.
+                </p>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
