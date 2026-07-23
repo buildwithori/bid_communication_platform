@@ -2,7 +2,8 @@
 
 import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CalendarDays,
@@ -24,8 +25,14 @@ import {
   Card,
   CardHeader,
   Skeleton,
-  TableSkeleton,
 } from "@/components/shared/Card";
+import {
+  ToolGridSkeleton,
+  ToolRequestTableSkeleton,
+  ToolRequestsPanelSkeleton,
+  ToolsCataloguePanelSkeleton,
+  ToolsPaginationSkeleton,
+} from "@/components/entrepreneur/tools/EntrepreneurToolsSkeletons";
 import { SpreadsheetViewer } from "@/components/shared/SpreadsheetViewer";
 import { ToolFramePreview } from "@/components/shared/ToolFramePreview";
 import { DatePicker } from "@/components/shared/DatePicker";
@@ -59,6 +66,10 @@ import { useToolsPage } from "@/lib/api/tools";
 import { toolRequestSchema, type ToolRequestForm } from "@/lib/forms/schemas";
 import { nextLocalDateValue } from "@/lib/date-values";
 import {
+  entrepreneurToolsTabFromQuery,
+  type EntrepreneurToolsTab,
+} from "@/lib/entrepreneur-tools-tabs";
+import {
   mapToolRequestRecordToUi,
   toolRequestStatusMeta,
   uiToApiToolRequestStatus,
@@ -67,8 +78,6 @@ import {
 import { mapToolRecordToUi } from "@/lib/tools/tool-records";
 import { cn } from "@/lib/utils";
 import type { Tool } from "@/types";
-
-type ToolTab = "all" | "pdf" | "excel" | "embed" | "requests";
 
 const iconMap: Record<Tool["iconKey"], LucideIcon> = {
   canvas: LayoutGrid,
@@ -449,10 +458,13 @@ function RequestInfoPanel({ title, text }: { title: string; text: string }) {
 
 export default function ToolsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const linkedRequestId = searchParams.get("requestId");
   const linkedRequest = useToolRequestDetailQuery(linkedRequestId);
-  const [tab, setTab] = React.useState<ToolTab>("all");
+  const tab = linkedRequestId
+    ? "requests"
+    : entrepreneurToolsTabFromQuery(searchParams.get("tab"));
   const [query, setQuery] = React.useState("");
   const debouncedQuery = useDebouncedValue(query);
   const [pageSize, setPageSize] = React.useState(9);
@@ -468,27 +480,47 @@ export default function ToolsPage() {
     null,
   );
   const [activeTool, setActiveTool] = React.useState<Tool | null>(null);
+  const setTab = React.useCallback(
+    (nextTab: EntrepreneurToolsTab) => {
+      if (nextTab === tab && !linkedRequestId) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", nextTab);
+      params.delete("requestId");
+      setActiveRequest(null);
+      setActiveTool(null);
+      router.push((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    },
+    [linkedRequestId, pathname, router, searchParams, tab],
+  );
   const linkedRecord = linkedRequest.data as ToolRequestRecord | undefined;
   const linkedRequestView = linkedRecord
     ? mapToolRequestRecordToUi(linkedRecord)
     : null;
   const displayedRequest = activeRequest ?? linkedRequestView;
-  const displayedTab: ToolTab = linkedRequestId ? "requests" : tab;
 
   function closeRequest() {
     setActiveRequest(null);
-    if (linkedRequestId) router.replace("/entrepreneur/tools");
+    if (linkedRequestId) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "requests");
+      params.delete("requestId");
+      router.replace((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    }
   }
   const [areaSearch, setAreaSearch] = React.useState("");
 
   const toolPage = useToolsPage({
     search: debouncedQuery || undefined,
     type:
-      displayedTab === "pdf"
+      tab === "pdf"
         ? "pdf"
-        : displayedTab === "excel"
+        : tab === "excel"
           ? "excel"
-          : displayedTab === "embed"
+          : tab === "online"
             ? "embedded_tool"
             : undefined,
     take: pageSize,
@@ -525,6 +557,11 @@ export default function ToolsPage() {
     () => requestPage.rows.map(mapToolRequestRecordToUi),
     [requestPage.rows],
   );
+  const showInitialToolSkeleton = toolPage.isPending && !toolPage.data;
+  const showInitialRequestSkeleton =
+    requestPage.isPending && !requestPage.data;
+  const showToolResultsSkeleton = toolPage.isPlaceholderData;
+  const showRequestResultsSkeleton = requestPage.isPlaceholderData;
   const areaOptions = [
     { value: "all", label: "All tool areas" },
     ...(areas.data?.pages.flatMap((page) => page.items) ?? []).map((area) => ({
@@ -604,24 +641,32 @@ export default function ToolsPage() {
         }
       />
       <Tabs
-        value={displayedTab}
+        value={tab}
         onChange={setTab}
         tabs={[
           { value: "all", label: "All tools" },
           { value: "pdf", label: "PDF resources" },
           { value: "excel", label: "Excel workbooks" },
-          { value: "embed", label: "Online tools" },
+          { value: "online", label: "Online tools" },
           { value: "requests", label: "My requests" },
         ]}
       />
 
-      {displayedTab === "requests" ? (
+      {tab === "requests" && showInitialRequestSkeleton ? (
+        <ToolRequestsPanelSkeleton rows={requestPageSize} />
+      ) : tab === "requests" ? (
         <Card>
           <CardHeader
             title="Your tool requests"
             description="Track requests you have sent to BID and the admin decision state."
             actions={
-              <Badge tone="neutral">{requestPage.totalItems} requests</Badge>
+              showRequestResultsSkeleton ? (
+                <Skeleton className="h-6 w-24 rounded-full" />
+              ) : (
+                <Badge tone="neutral">
+                  {requestPage.totalItems} requests
+                </Badge>
+              )
             }
           />
           <TableToolbar>
@@ -674,12 +719,12 @@ export default function ToolsPage() {
               />
             </div>
           </TableToolbar>
-          {requestPage.isLoading ? (
-            <TableSkeleton rows={5} columns={5} />
-          ) : requestPage.isError ? (
+          {requestPage.isError ? (
             <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">
               {requestPage.error.message}
             </div>
+          ) : showRequestResultsSkeleton ? (
+            <ToolRequestTableSkeleton rows={requestPageSize} />
           ) : (
             <DataTable
               columns={requestColumns}
@@ -689,24 +734,34 @@ export default function ToolsPage() {
               tableClassName="min-w-[920px]"
             />
           )}
-          <TablePagination
-            page={requestPage.page}
-            pageSize={requestPageSize}
-            totalItems={requestPage.totalItems}
-            onPageChange={requestPage.setPage}
-            onPageSizeChange={(next) => {
-              setRequestPageSize(next);
-              requestPage.resetPagination();
-            }}
-          />
+          {showRequestResultsSkeleton ? (
+            <ToolsPaginationSkeleton />
+          ) : (
+            <TablePagination
+              page={requestPage.page}
+              pageSize={requestPageSize}
+              totalItems={requestPage.totalItems}
+              onPageChange={requestPage.setPage}
+              onPageSizeChange={(next) => {
+                setRequestPageSize(next);
+                requestPage.resetPagination();
+              }}
+            />
+          )}
         </Card>
+      ) : showInitialToolSkeleton ? (
+        <ToolsCataloguePanelSkeleton cards={pageSize} />
       ) : (
         <Card>
           <TableToolbar>
             <div>
               <div className="text-sm font-medium text-ink">Browse tools</div>
               <div className="mt-0.5 text-sm text-ink-muted">
-                {toolPage.totalItems} tools available in this view.
+                {showToolResultsSkeleton ? (
+                  <Skeleton className="h-4 w-48" />
+                ) : (
+                  `${toolPage.totalItems} tools available in this view.`
+                )}
               </div>
             </div>
             <div className="w-full sm:w-[320px]">
@@ -721,16 +776,12 @@ export default function ToolsPage() {
               />
             </div>
           </TableToolbar>
-          {toolPage.isLoading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }, (_, index) => (
-                <Skeleton key={index} className="h-[170px] rounded-xl" />
-              ))}
-            </div>
-          ) : toolPage.isError ? (
+          {toolPage.isError ? (
             <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">
               {toolPage.error.message}
             </div>
+          ) : showToolResultsSkeleton ? (
+            <ToolGridSkeleton cards={pageSize} />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {tools.map((tool) => (
@@ -747,17 +798,21 @@ export default function ToolsPage() {
               ) : null}
             </div>
           )}
-          <TablePagination
-            page={toolPage.page}
-            pageSize={pageSize}
-            totalItems={toolPage.totalItems}
-            pageSizeOptions={[9, 18, 27]}
-            onPageChange={toolPage.setPage}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              toolPage.resetPagination();
-            }}
-          />
+          {showToolResultsSkeleton ? (
+            <ToolsPaginationSkeleton />
+          ) : (
+            <TablePagination
+              page={toolPage.page}
+              pageSize={pageSize}
+              totalItems={toolPage.totalItems}
+              pageSizeOptions={[9, 18, 27]}
+              onPageChange={toolPage.setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                toolPage.resetPagination();
+              }}
+            />
+          )}
         </Card>
       )}
 

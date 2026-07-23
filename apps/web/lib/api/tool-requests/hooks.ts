@@ -31,6 +31,7 @@ export function useToolRequestsPage(query: PageQuery) {
   const result = useQuery({
     queryKey: toolRequestKeys.list({ ...query, cursor }),
     queryFn: () => listToolRequestsRequest({ ...query, cursor }),
+    placeholderData: (previousData) => previousData,
   });
 
   const resetPagination = useCallback(() => {
