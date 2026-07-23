@@ -246,6 +246,19 @@ export const toolAreaSchema = z.object({
 });
 export type ToolAreaForm = z.infer<typeof toolAreaSchema>;
 
+export const sessionTypeSchema = z.object({
+  name: z
+    .string()
+    .min(2, "Session type name must be at least 2 characters")
+    .max(100, "Session type name must be 100 characters or fewer"),
+  durationMinutes: z.coerce
+    .number()
+    .int("Choose a whole number of minutes")
+    .min(15, "Duration must be at least 15 minutes")
+    .max(480, "Duration cannot exceed 8 hours"),
+});
+export type SessionTypeForm = z.infer<typeof sessionTypeSchema>;
+
 export const businessStageSchema = z.object({
   label: z.string().min(1, "Stage name is required"),
   definition: z.string().min(1, "Definition is required"),

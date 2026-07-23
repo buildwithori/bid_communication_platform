@@ -6,7 +6,6 @@ import {
   FormAutocomplete,
   FormField,
   FormRow2,
-  FormSelect,
   FormTextarea,
 } from "@/components/shared/FormField";
 import { Button } from "@/components/shared/Button";
@@ -22,12 +21,7 @@ import {
   type SessionRecord,
   type SessionType,
 } from "@/lib/api/sessions";
-
-const sessionTypes = [
-  { value: "mentor_checkin", label: "Mentor check-in" },
-  { value: "office_hours", label: "Office hours" },
-  { value: "investor_prep", label: "Investor prep" },
-];
+import { useLazySessionTypesQuery } from "@/lib/api/settings";
 
 export type SessionEditorValues = {
   entrepreneurUserId: string;
@@ -96,7 +90,7 @@ function SessionEditorModalForm({
     initialSession?.ownerUserId ?? "",
   );
   const [sessionType, setSessionType] = React.useState<SessionType>(
-    initialSession?.type ?? "mentor_checkin",
+    initialSession?.type ?? "",
   );
   const [topic, setTopic] = React.useState(initialSession?.topic ?? "");
   const [date, setDate] = React.useState(
@@ -118,6 +112,35 @@ function SessionEditorModalForm({
     search: ownerSearch || undefined,
     take: 20,
   });
+  const sessionTypes = useLazySessionTypesQuery({
+    enabled: open && mode === "create",
+    active: true,
+    take: 20,
+  });
+  const sessionTypeOptions = React.useMemo(
+    () => [
+      ...(initialSession
+        ? [
+            {
+              value: initialSession.type,
+              label: initialSession.typeName,
+              description: `${initialSession.durationMinutes} minutes`,
+            },
+          ]
+        : []),
+      ...(sessionTypes.data?.pages ?? [])
+        .flatMap((page) => page.items)
+        .filter((entry) => entry.key !== initialSession?.type)
+        .map((entry) => ({
+          value: entry.key,
+          label: entry.name,
+          description: `${entry.durationMinutes} minutes`,
+        })),
+    ],
+    [initialSession, sessionTypes.data?.pages],
+  );
+  const effectiveSessionType =
+    sessionType || sessionTypeOptions[0]?.value || "";
   const effectiveOwnerId =
     mode === "reschedule"
       ? (initialSession?.ownerUserId ?? "")
@@ -130,8 +153,12 @@ function SessionEditorModalForm({
       dateTo: date,
       timezone,
       targetUserId: effectiveOwnerId,
+      sessionType: effectiveSessionType,
     },
-    open && Boolean(date) && Boolean(effectiveOwnerId),
+    open &&
+      Boolean(date) &&
+      Boolean(effectiveOwnerId) &&
+      Boolean(effectiveSessionType),
   );
 
   const entrepreneurOptions = [
@@ -210,7 +237,7 @@ function SessionEditorModalForm({
     onSubmit({
       entrepreneurUserId: entrepreneurId,
       ownerUserId: effectiveOwnerId,
-      type: sessionType,
+      type: effectiveSessionType,
       topic: topic.trim(),
       startAt: slot.startAt,
       endAt: slot.endAt,
@@ -246,11 +273,22 @@ function SessionEditorModalForm({
 
         <FormRow2>
           <FormField label="Session type">
-            <FormSelect
-              value={sessionType}
-              onValueChange={(value) => setSessionType(value as SessionType)}
-              options={sessionTypes}
+            <FormAutocomplete
+              value={effectiveSessionType}
+              onValueChange={(value) => {
+                setSessionType(value);
+                setSlotStartAt("");
+              }}
+              options={sessionTypeOptions}
               disabled={mode === "reschedule"}
+              placeholder="Select a session type"
+              searchPlaceholder="Search session types..."
+              emptyMessage="No active session types are available."
+              isLoading={
+                sessionTypes.isLoading || sessionTypes.isFetchingNextPage
+              }
+              hasMore={Boolean(sessionTypes.hasNextPage)}
+              onLoadMore={() => void sessionTypes.fetchNextPage()}
             />
           </FormField>
           <FormField label="Calendar owner">
@@ -319,7 +357,7 @@ function SessionEditorModalForm({
 
         {availability.data ? (
           <p className="text-sm text-ink-muted">
-            Google Meet is created automatically. Default duration:{" "}
+            Google Meet is created automatically. Duration:{" "}
             {availability.data.durationMinutes} minutes.
           </p>
         ) : null}

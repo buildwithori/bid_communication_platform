@@ -93,7 +93,8 @@ export type TrainerDashboard = {
   }>;
   upcomingSessions: Array<{
     id: string;
-    type: "mentor_checkin" | "office_hours" | "investor_prep";
+    type: string;
+    typeName: string;
     topic: string;
     status: "requested" | "confirmed";
     startsAt: string;
@@ -127,7 +128,8 @@ export type EntrepreneurDashboard = {
   }>;
   upcomingSessions: Array<{
     id: string;
-    type: "mentor_checkin" | "office_hours" | "investor_prep";
+    type: string;
+    typeName: string;
     topic: string;
     status: "requested" | "confirmed";
     startsAt: string;

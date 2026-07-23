@@ -1,4 +1,4 @@
-export type SessionType = "mentor_checkin" | "office_hours" | "investor_prep";
+export type SessionType = string;
 export type SessionStatus =
   "requested" | "confirmed" | "declined" | "cancelled" | "completed";
 export type SessionSource = "entrepreneur_request" | "team_created";
@@ -33,6 +33,8 @@ export type SessionRecord = {
   target: SessionUser | null;
   createdBy: SessionUser;
   type: SessionType;
+  typeName: string;
+  durationMinutes: number;
   topic: string;
   notes: string | null;
   source: SessionSource;
@@ -117,12 +119,17 @@ export type SessionAvailabilityQuery = {
   dateTo: string;
   timezone: string;
   targetUserId?: string;
-  durationMinutes?: number;
+  sessionType: SessionType;
 };
 export type SessionAvailability = {
   dateFrom: string;
   dateTo: string;
   timezone: string;
+  sessionType: {
+    key: string;
+    name: string;
+    durationMinutes: number;
+  };
   durationMinutes: number;
   slots: Array<{
     startAt: string;

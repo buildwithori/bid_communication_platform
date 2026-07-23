@@ -15,7 +15,6 @@ export interface CompanyConfig {
     workdayStartMinutes: number;
     workdayEndMinutes: number;
     slotIntervalMinutes: number;
-    defaultDurationMinutes: number;
   };
   notifications: {
     inAppNotifications: boolean;
@@ -43,7 +42,6 @@ export type CompanySettingsResponse = {
   sessionWorkdayStartMinutes: number;
   sessionWorkdayEndMinutes: number;
   sessionSlotIntervalMinutes: number;
-  defaultSessionDurationMinutes: number;
   inAppNotificationsEnabledByDefault: boolean;
   emailNotificationsEnabledByDefault: boolean;
   reminderNotificationsEnabledByDefault: boolean;
@@ -66,6 +64,10 @@ export type BusinessStageRecord = LookupRecord & {
 export type ProgrammeGoalTypeRecord = LookupRecord & {
   description: string | null;
   requiresTargetAmount: boolean;
+};
+
+export type SessionTypeRecord = LookupRecord & {
+  durationMinutes: number;
 };
 
 export type LookupPage<TRecord> = {
@@ -96,9 +98,14 @@ export type ProgrammeGoalTypePayload = LookupPayload & {
   requiresTargetAmount?: boolean;
 };
 
+export type SessionTypePayload = LookupPayload & {
+  durationMinutes: number;
+};
+
 export type LookupUpdatePayload = Partial<LookupPayload>;
 export type BusinessStageUpdatePayload = Partial<BusinessStagePayload>;
 export type ProgrammeGoalTypeUpdatePayload = Partial<ProgrammeGoalTypePayload>;
+export type SessionTypeUpdatePayload = Partial<SessionTypePayload>;
 
 export type UpdateLookupVariables<TPayload> = {
   id: string;

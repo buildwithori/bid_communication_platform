@@ -21,6 +21,7 @@ import { FormField, FormTextarea } from "@/components/shared/FormField";
 import {
   DataTable,
   RowActions,
+  TableFilterAutocomplete,
   TableFilterInput,
   TableFilterSelect,
   TablePagination,
@@ -42,6 +43,7 @@ import {
   type SessionStatus,
   type SessionType,
 } from "@/lib/api/sessions";
+import { useLazySessionTypesQuery } from "@/lib/api/settings";
 
 const ALL = "all";
 
@@ -63,12 +65,6 @@ function statusMeta(status: SessionStatus) {
   return { label: "Awaiting team", tone: "amber" as const };
 }
 
-function typeLabel(type: SessionType) {
-  if (type === "mentor_checkin") return "Mentor check-in";
-  if (type === "office_hours") return "Office hours";
-  return "Investor prep";
-}
-
 export function SessionManagementPage({
   actor,
 }: {
@@ -79,6 +75,18 @@ export function SessionManagementPage({
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = React.useState<typeof ALL | SessionStatus>(ALL);
   const [type, setType] = React.useState<typeof ALL | SessionType>(ALL);
+  const [typeSearch, setTypeSearch] = React.useState("");
+  const sessionTypes = useLazySessionTypesQuery({
+    enabled: true,
+    search: typeSearch || undefined,
+    take: 20,
+  });
+  const sessionTypeOptions = [
+    { value: ALL, label: "All types" },
+    ...(sessionTypes.data?.pages ?? [])
+      .flatMap((page) => page.items)
+      .map((entry) => ({ value: entry.key, label: entry.name })),
+  ];
   const [pageSize, setPageSize] = React.useState(10);
   const sessions = useSessionsPage({
     search: debouncedSearch || undefined,
@@ -274,7 +282,7 @@ export function SessionManagementPage({
           <div className="min-w-[250px]">
             <div className="font-medium text-ink">{session.topic}</div>
             <div className="mt-1 text-sm text-ink-muted">
-              {typeLabel(session.type)} ·{" "}
+              {session.typeName} ·{" "}
               {session.source === "entrepreneur_request"
                 ? "Requested by entrepreneur"
                 : "Created by BID team"}
@@ -475,15 +483,19 @@ export function SessionManagementPage({
               <option value="declined">Declined</option>
               <option value="cancelled">Cancelled</option>
             </TableFilterSelect>
-            <TableFilterSelect
+            <TableFilterAutocomplete
               value={type}
-              onChange={(event) => setType(event.target.value as typeof type)}
-            >
-              <option value="all">All types</option>
-              <option value="mentor_checkin">Mentor check-in</option>
-              <option value="office_hours">Office hours</option>
-              <option value="investor_prep">Investor prep</option>
-            </TableFilterSelect>
+              onValueChange={(value) => setType(value)}
+              options={sessionTypeOptions}
+              placeholder="All types"
+              searchPlaceholder="Search session types..."
+              onSearchChange={setTypeSearch}
+              isLoading={
+                sessionTypes.isLoading || sessionTypes.isFetchingNextPage
+              }
+              hasMore={Boolean(sessionTypes.hasNextPage)}
+              onLoadMore={() => void sessionTypes.fetchNextPage()}
+            />
           </div>
         </TableToolbar>
         {sessions.isError ? (

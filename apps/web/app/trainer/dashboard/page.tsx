@@ -127,7 +127,7 @@ export default function TrainerDashboardPage() {
         <div className="grid gap-3 lg:grid-cols-3">
           {data.upcomingSessions.map((session) => (
             <Link key={session.id} href={`${routes.trainer.sessions}?session=${encodeURIComponent(session.id)}`} className="flex min-h-[164px] flex-col rounded-xl border border-line bg-surface-subtle p-4 text-left transition hover:border-bid/30 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20">
-              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">{sessionTypeLabel(session.type)}</div><div className="mt-2 text-base font-semibold text-ink">{session.topic}</div><div className="mt-1 text-sm text-ink-muted">{session.entrepreneurName}</div></div><Badge tone={session.status === "confirmed" ? "green" : "amber"}>{session.status === "confirmed" ? "Confirmed" : "Awaiting response"}</Badge></div>
+              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">{session.typeName}</div><div className="mt-2 text-base font-semibold text-ink">{session.topic}</div><div className="mt-1 text-sm text-ink-muted">{session.entrepreneurName}</div></div><Badge tone={session.status === "confirmed" ? "green" : "amber"}>{session.status === "confirmed" ? "Confirmed" : "Awaiting response"}</Badge></div>
               <div className="mt-auto flex flex-wrap gap-3 pt-5 text-sm text-ink-muted"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{formatDate(session.startsAt)}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{formatTime(session.startsAt, session.timezone)}</span></div>
             </Link>
           ))}
@@ -143,4 +143,3 @@ function shortLabel(value: string) { return value.length > 18 ? `${value.slice(0
 function formatWeek(value: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" }); }
 function formatDate(value: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" }); }
 function formatTime(value: string, timezone: string) { return new Date(value).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit", timeZone: timezone }); }
-function sessionTypeLabel(value: string) { return value.split("_").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" "); }

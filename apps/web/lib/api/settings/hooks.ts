@@ -13,16 +13,19 @@ import {
   createBusinessStageRequest,
   createProgrammeGoalTypeRequest,
   createSectorRequest,
+  createSessionTypeRequest,
   createToolAreaRequest,
   getCompanySettingsRequest,
   listBusinessStagesRequest,
   listProgrammeGoalTypesRequest,
   listSectorsRequest,
+  listSessionTypesRequest,
   listToolAreasRequest,
   updateBusinessStageRequest,
   updateCompanySettingsRequest,
   updateProgrammeGoalTypeRequest,
   updateSectorRequest,
+  updateSessionTypeRequest,
   updateToolAreaRequest,
 } from "./requests";
 import type {
@@ -38,6 +41,9 @@ import type {
   ProgrammeGoalTypePayload,
   ProgrammeGoalTypeRecord,
   ProgrammeGoalTypeUpdatePayload,
+  SessionTypePayload,
+  SessionTypeRecord,
+  SessionTypeUpdatePayload,
   UpdateLookupVariables,
 } from "./types";
 
@@ -151,6 +157,14 @@ export function useToolAreasPage(query: LookupPageQuery) {
   return useLookupPage(query, settingsKeys.toolAreaList, listToolAreasRequest);
 }
 
+export function useSessionTypesPage(query: LookupPageQuery) {
+  return useLookupPage(
+    query,
+    settingsKeys.sessionTypeList,
+    listSessionTypesRequest,
+  );
+}
+
 export function useSectorsQuery(query?: LookupQuery) {
   return useQuery({
     queryKey: settingsKeys.sectorList(query),
@@ -176,6 +190,13 @@ export function useToolAreasQuery(query?: LookupQuery) {
   return useQuery({
     queryKey: settingsKeys.toolAreaList(query),
     queryFn: () => listToolAreasRequest(query),
+  });
+}
+
+export function useSessionTypesQuery(query?: LookupQuery) {
+  return useQuery({
+    queryKey: settingsKeys.sessionTypeList(query),
+    queryFn: () => listSessionTypesRequest(query),
   });
 }
 
@@ -226,6 +247,20 @@ export function useLazyToolAreasQuery({
     queryKey: settingsKeys.toolAreaList(query),
     queryFn: ({ pageParam }) =>
       listToolAreasRequest({ ...query, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+}
+
+export function useLazySessionTypesQuery({
+  enabled,
+  ...query
+}: LazyLookupOptions) {
+  return useInfiniteQuery({
+    queryKey: settingsKeys.sessionTypeList(query),
+    queryFn: ({ pageParam }) =>
+      listSessionTypesRequest({ ...query, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
@@ -326,4 +361,23 @@ export function useUpdateToolAreaMutation(
     LookupRecord,
     UpdateLookupVariables<LookupUpdatePayload>
   >(updateToolAreaRequest, settingsKeys.toolAreas(), handlers);
+}
+
+export function useCreateSessionTypeMutation(
+  handlers?: MutationHandlers<SessionTypeRecord>,
+) {
+  return useLookupMutation<SessionTypeRecord, SessionTypePayload>(
+    createSessionTypeRequest,
+    settingsKeys.sessionTypes(),
+    handlers,
+  );
+}
+
+export function useUpdateSessionTypeMutation(
+  handlers?: MutationHandlers<SessionTypeRecord>,
+) {
+  return useLookupMutation<
+    SessionTypeRecord,
+    UpdateLookupVariables<SessionTypeUpdatePayload>
+  >(updateSessionTypeRequest, settingsKeys.sessionTypes(), handlers);
 }

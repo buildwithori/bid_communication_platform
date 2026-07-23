@@ -17,7 +17,6 @@ export const companyConfig = {
     workdayStartMinutes: 540,
     workdayEndMinutes: 1020,
     slotIntervalMinutes: 30,
-    defaultDurationMinutes: 60,
   },
   notifications: {
     inAppNotifications: true,

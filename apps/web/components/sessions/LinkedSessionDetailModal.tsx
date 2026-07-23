@@ -8,7 +8,7 @@ import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { Modal } from '@/components/shared/Modal';
 import { Notice } from '@/components/shared/PageHeader';
-import { useSessionDetailQuery, type SessionRecord, type SessionStatus, type SessionType } from '@/lib/api/sessions';
+import { useSessionDetailQuery, type SessionRecord, type SessionStatus } from '@/lib/api/sessions';
 
 const statusMeta: Record<SessionStatus, { label: string; tone: 'amber' | 'green' | 'red' | 'neutral' }> = {
   requested: { label: 'Awaiting team', tone: 'amber' },
@@ -16,12 +16,6 @@ const statusMeta: Record<SessionStatus, { label: string; tone: 'amber' | 'green'
   declined: { label: 'Declined', tone: 'red' },
   cancelled: { label: 'Cancelled', tone: 'red' },
   completed: { label: 'Completed', tone: 'neutral' },
-};
-
-const typeLabels: Record<SessionType, string> = {
-  mentor_checkin: 'Mentor check-in',
-  office_hours: 'Office hours',
-  investor_prep: 'Investor prep',
 };
 
 export function LinkedSessionDetailModal() {
@@ -53,7 +47,7 @@ export function LinkedSessionDetailModal() {
           <div className="rounded-2xl border border-bid/15 bg-bid-light/45 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-bid-dark">{typeLabels[detail.type]}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-bid-dark">{detail.typeName}</p>
                 <h3 className="mt-1 text-lg font-semibold text-ink">{detail.topic}</h3>
                 <p className="mt-1 text-sm text-ink-muted">{detail.entrepreneur.businessName}</p>
               </div>

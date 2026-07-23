@@ -49,14 +49,6 @@ const slotIntervalOptions = [
   { value: "60", label: "60 minutes" },
 ];
 
-const sessionDurationOptions = [
-  { value: "30", label: "30 minutes" },
-  { value: "45", label: "45 minutes" },
-  { value: "60", label: "60 minutes" },
-  { value: "90", label: "90 minutes" },
-  { value: "120", label: "120 minutes" },
-];
-
 function minutesToTime(minutes: number) {
   const hours = Math.floor(minutes / 60)
     .toString()
@@ -162,16 +154,10 @@ function CompanySettingsForm({
     sessionPolicy.workdayStartMinutes >= sessionPolicy.workdayEndMinutes
       ? "End time must be after the start time."
       : undefined;
-  const sessionDurationError =
-    sessionPolicy.defaultDurationMinutes >
-    sessionPolicy.workdayEndMinutes - sessionPolicy.workdayStartMinutes
-      ? "Duration must fit inside the working day."
-      : undefined;
   const hasError = Boolean(
     overdueError ||
     moduleDueError ||
     sessionHoursError ||
-    sessionDurationError ||
     sessionPolicy.workingDays.length === 0,
   );
 
@@ -435,21 +421,6 @@ function CompanySettingsForm({
                   options={slotIntervalOptions}
                 />
               </FormField>
-              <FormField
-                label="Default session duration"
-                error={sessionDurationError}
-              >
-                <FormSelect
-                  value={String(sessionPolicy.defaultDurationMinutes)}
-                  onValueChange={(value) =>
-                    setSessionPolicy((current) => ({
-                      ...current,
-                      defaultDurationMinutes: Number(value),
-                    }))
-                  }
-                  options={sessionDurationOptions}
-                />
-              </FormField>
             </div>
           </div>
         </Card>
@@ -531,7 +502,6 @@ function CompanySettingsForm({
                 workdayStartMinutes: 540,
                 workdayEndMinutes: 1020,
                 slotIntervalMinutes: 30,
-                defaultDurationMinutes: 60,
               });
               setNotifications({
                 inAppNotifications: true,

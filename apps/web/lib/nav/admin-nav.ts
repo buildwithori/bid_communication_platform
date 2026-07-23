@@ -13,6 +13,7 @@ import {
   Tags,
   Target,
   Settings,
+  CalendarClock,
 } from 'lucide-react';
 import type { NavSection } from '@/components/layout/NavSidebar';
 import { routes } from '@/lib/routes';
@@ -67,6 +68,7 @@ export const adminNav: NavSection[] = [
       { href: routes.admin.settingsSectors, label: 'Sectors', icon: Tags },
       { href: routes.admin.settingsGoalTypes, label: 'Goal Types', icon: Target },
       { href: routes.admin.settingsToolAreas, label: 'Tool Areas', icon: Wrench },
+      { href: routes.admin.settingsSessionTypes, label: 'Session Types', icon: CalendarClock },
       { href: routes.admin.settingsCompany, label: 'Company Settings', icon: Settings },
     ],
   },

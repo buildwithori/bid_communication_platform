@@ -23,20 +23,8 @@ import {
   useLazySessionTeamMembers,
   useSessionAvailabilityQuery,
   type SessionAvailability,
-  type SessionType,
 } from "@/lib/api/sessions";
-
-const sessionTypes = [
-  { value: "mentor-checkin", label: "1:1 mentor check-in" },
-  { value: "office-hours", label: "Office hours" },
-  { value: "investor-prep", label: "Investor prep session" },
-];
-
-const sessionTypeMap: Record<string, SessionType> = {
-  "mentor-checkin": "mentor_checkin",
-  "office-hours": "office_hours",
-  "investor-prep": "investor_prep",
-};
+import { useLazySessionTypesQuery } from "@/lib/api/settings";
 
 function dateValue(date: Date) {
   const year = date.getFullYear();
@@ -64,7 +52,7 @@ export function BookingModal({
   const form = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
-      sessionType: "mentor-checkin",
+      sessionType: "",
       recipient: "general",
       trainerId: "",
       topic: "",
@@ -86,10 +74,27 @@ export function BookingModal({
     take: 20,
     role: "trainer",
   });
+  const sessionTypes = useLazySessionTypesQuery({
+    enabled: open,
+    active: true,
+    take: 20,
+  });
+  const sessionTypeOptions = React.useMemo(
+    () =>
+      (sessionTypes.data?.pages ?? [])
+        .flatMap((page) => page.items)
+        .map((entry) => ({
+          value: entry.key,
+          label: entry.name,
+          description: `${entry.durationMinutes} minutes`,
+        })),
+    [sessionTypes.data?.pages],
+  );
   const availabilityQuery = {
     dateFrom: selectedDate,
     dateTo: selectedDate,
     timezone,
+    sessionType,
     ...(recipient === "specific" && trainerId
       ? { targetUserId: trainerId }
       : {}),
@@ -98,6 +103,7 @@ export function BookingModal({
     availabilityQuery,
     open &&
       Boolean(selectedDate) &&
+      Boolean(sessionType) &&
       (recipient === "general" || Boolean(trainerId)),
   );
   const createSession = useCreateSessionMutation({
@@ -105,7 +111,7 @@ export function BookingModal({
       toast.success("Session request sent");
       onOpenChange(false);
       form.reset({
-        sessionType: "mentor-checkin",
+        sessionType: "",
         recipient: "general",
         trainerId: "",
         topic: "",
@@ -118,11 +124,19 @@ export function BookingModal({
   });
 
   React.useEffect(() => {
+    if (!sessionType && sessionTypeOptions[0]) {
+      form.setValue("sessionType", sessionTypeOptions[0].value, {
+        shouldValidate: false,
+      });
+    }
+  }, [form, sessionType, sessionTypeOptions]);
+
+  React.useEffect(() => {
     form.setValue("time", "", { shouldValidate: false });
     if (recipient === "general") {
       form.setValue("trainerId", "", { shouldValidate: false });
     }
-  }, [form, recipient, trainerId, selectedDate]);
+  }, [form, recipient, trainerId, selectedDate, sessionType]);
 
   const slotOptions = (availability.data?.slots ?? []).map(
     (slot: SessionAvailability["slots"][number]) => ({
@@ -158,7 +172,7 @@ export function BookingModal({
       return;
     }
     createSession.mutate({
-      type: sessionTypeMap[values.sessionType],
+      type: values.sessionType,
       topic: values.topic,
       notes: values.notes || undefined,
       startAt: slot.startAt,
@@ -181,12 +195,20 @@ export function BookingModal({
     >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
         <FormField label="Session type">
-          <FormSelect
+          <FormAutocomplete
             value={sessionType}
             onValueChange={(value) =>
               form.setValue("sessionType", value, { shouldValidate: true })
             }
-            options={sessionTypes}
+            options={sessionTypeOptions}
+            placeholder="Select a session type"
+            searchPlaceholder="Search session types..."
+            emptyMessage="No active session types are available."
+            isLoading={
+              sessionTypes.isLoading || sessionTypes.isFetchingNextPage
+            }
+            hasMore={Boolean(sessionTypes.hasNextPage)}
+            onLoadMore={() => void sessionTypes.fetchNextPage()}
           />
         </FormField>
 

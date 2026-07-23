@@ -15,6 +15,9 @@ import type {
   ProgrammeGoalTypePayload,
   ProgrammeGoalTypeRecord,
   ProgrammeGoalTypeUpdatePayload,
+  SessionTypePayload,
+  SessionTypeRecord,
+  SessionTypeUpdatePayload,
 } from "./types";
 
 function toClientSessionProvider(provider: string) {
@@ -47,7 +50,6 @@ function mapCompanySettings(settings: CompanySettingsResponse): CompanyConfig {
       workdayStartMinutes: settings.sessionWorkdayStartMinutes,
       workdayEndMinutes: settings.sessionWorkdayEndMinutes,
       slotIntervalMinutes: settings.sessionSlotIntervalMinutes,
-      defaultDurationMinutes: settings.defaultSessionDurationMinutes,
     },
     notifications: {
       inAppNotifications: settings.inAppNotificationsEnabledByDefault,
@@ -75,7 +77,6 @@ function toCompanySettingsPatch(
     sessionWorkdayStartMinutes: patch.sessions?.workdayStartMinutes,
     sessionWorkdayEndMinutes: patch.sessions?.workdayEndMinutes,
     sessionSlotIntervalMinutes: patch.sessions?.slotIntervalMinutes,
-    defaultSessionDurationMinutes: patch.sessions?.defaultDurationMinutes,
     inAppNotificationsEnabledByDefault: patch.notifications?.inAppNotifications,
     emailNotificationsEnabledByDefault: patch.notifications?.emailNotifications,
     reminderNotificationsEnabledByDefault:
@@ -216,6 +217,32 @@ export function updateToolAreaRequest({
   payload: LookupUpdatePayload;
 }) {
   return apiRequest<LookupRecord>(`/settings/tool-areas/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listSessionTypesRequest(query?: LookupQuery) {
+  return apiRequest<LookupPage<SessionTypeRecord>>(
+    `/lookups/session-types${toQueryString(query)}`,
+  );
+}
+
+export function createSessionTypeRequest(payload: SessionTypePayload) {
+  return apiRequest<SessionTypeRecord>("/settings/session-types", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateSessionTypeRequest({
+  id,
+  payload,
+}: {
+  id: string;
+  payload: SessionTypeUpdatePayload;
+}) {
+  return apiRequest<SessionTypeRecord>(`/settings/session-types/${id}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

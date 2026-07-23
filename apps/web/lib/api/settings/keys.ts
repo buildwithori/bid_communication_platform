@@ -16,4 +16,7 @@ export const settingsKeys = {
   toolAreas: () => [...settingsKeys.all, "tool-areas"] as const,
   toolAreaList: (query?: LookupQuery) =>
     [...settingsKeys.toolAreas(), "list", query ?? {}] as const,
+  sessionTypes: () => [...settingsKeys.all, "session-types"] as const,
+  sessionTypeList: (query?: LookupQuery) =>
+    [...settingsKeys.sessionTypes(), "list", query ?? {}] as const,
 };

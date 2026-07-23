@@ -56,6 +56,7 @@ export const routes = {
     settingsSectors: '/admin/settings/sectors',
     settingsGoalTypes: '/admin/settings/goal-types',
     settingsToolAreas: '/admin/settings/tool-areas',
+    settingsSessionTypes: '/admin/settings/session-types',
     settingsCompany: '/admin/settings/company',
     reporting: '/admin/reporting',
     health: '/admin/health',
