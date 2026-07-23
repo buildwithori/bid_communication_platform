@@ -159,15 +159,6 @@ export default function AdminToolRequestsPage() {
           decideRequest(request, "in-development", { close: false }),
       });
     }
-    if (
-      request.availableTransitions.includes("built") ||
-      request.availableTransitions.includes("declined")
-    ) {
-      actions.push({
-        label: "Review decision",
-        onSelect: () => openRequest(request),
-      });
-    }
     if (request.availableTransitions.includes("under-review")) {
       actions.push("separator", {
         label: "Reopen review",
