@@ -21,6 +21,7 @@ import {
 import {
   FormAutocomplete,
   FormField,
+  FormSelect,
   FormTextarea,
 } from "@/components/shared/FormField";
 import { MetricGrid } from "@/components/shared/MetricGrid";
@@ -371,6 +372,11 @@ export default function AdminToolRequestsPage() {
         {linkedRequest.isError ? <Notice>This tool request is unavailable or outside your access scope.</Notice> : null}
       </Modal>
       <ToolRequestReviewModal
+        key={
+          displayedRequest
+            ? `${displayedRequest.id}:${displayedRequest.status}`
+            : "no-request"
+        }
         request={displayedRequest}
         decisionNote={activeRequest ? decisionNote : displayedRequest?.adminNote ?? ""}
         linkedToolId={activeRequest ? linkedToolId : displayedRequest?.linkedToolId ?? ""}
@@ -408,13 +414,24 @@ function ToolRequestReviewModal({
   onDecide: (status: ToolRequestStatus) => void;
   onViewLibrary: () => void;
 }) {
+  const [selectedStatus, setSelectedStatus] = useState<ToolRequestStatus>(
+    request?.status ?? "under-review",
+  );
   const [toolSearch, setToolSearch] = useState("");
   const tools = useLazyToolsQuery({
-    enabled: Boolean(request),
+    enabled: Boolean(request && selectedStatus === "built"),
     search: toolSearch || undefined,
     status: "published",
     take: 20,
   });
+  const statusOptions = request
+    ? Array.from(new Set([request.status, ...request.availableTransitions])).map(
+        (status) => ({
+          value: status,
+          label: toolRequestStatusMeta[status].label,
+        }),
+      )
+    : [];
   const toolOptions = tools.rows.map((tool) => ({
     value: tool.id,
     label: tool.name,
@@ -430,6 +447,32 @@ function ToolRequestReviewModal({
       description: "Currently linked",
     });
   }
+  const noteRequired = selectedStatus === "declined";
+  const showingLibraryTool = selectedStatus === "built";
+  const decisionNoteChanged =
+    decisionNote.trim() !== (request?.adminNote ?? "").trim();
+  const linkedToolChanged =
+    linkedToolId !== (request?.linkedToolId ?? "");
+  const hasChanges = Boolean(
+    request &&
+      (selectedStatus !== request.status ||
+        (!showingLibraryTool && decisionNoteChanged) ||
+        (showingLibraryTool && linkedToolChanged)),
+  );
+  const canSubmit =
+    hasChanges &&
+    (!noteRequired || Boolean(decisionNote.trim())) &&
+    (!showingLibraryTool || Boolean(linkedToolId));
+  const submitLabel =
+    selectedStatus === request?.status
+      ? "Save changes"
+      : selectedStatus === "built"
+        ? "Mark as built"
+        : selectedStatus === "declined"
+          ? "Decline request"
+          : selectedStatus === "in-development"
+            ? "Move to development"
+            : "Reopen review";
 
   return (
     <Modal
@@ -473,10 +516,6 @@ function ToolRequestReviewModal({
                 value={formatDate(request.neededBy)}
               />
             ) : null}
-            <InfoBlock
-              label="Status"
-              value={toolRequestStatusMeta[request.status].label}
-            />
           </div>
 
           <div className="mt-4">
@@ -486,16 +525,17 @@ function ToolRequestReviewModal({
             />
           </div>
 
-          <FormField label="Admin decision note" optional className="mt-4">
-            <FormTextarea
-              rows={4}
-              placeholder="Capture why BID is approving, building, or declining this request..."
-              value={decisionNote}
-              onChange={(event) => onDecisionNoteChange(event.target.value)}
+          <FormField label="Status" className="mt-4">
+            <FormSelect
+              value={selectedStatus}
+              onValueChange={(value) =>
+                setSelectedStatus(value as ToolRequestStatus)
+              }
+              options={statusOptions}
             />
           </FormField>
 
-          {request.availableTransitions.includes("built") ? (
+          {showingLibraryTool ? (
             <FormField label="Finished library tool" className="mt-4">
               <FormAutocomplete
                 value={linkedToolId}
@@ -510,7 +550,24 @@ function ToolRequestReviewModal({
                 onLoadMore={() => void tools.fetchNextPage()}
               />
             </FormField>
-          ) : null}
+          ) : (
+            <FormField
+              label="Admin decision note"
+              optional={!noteRequired}
+              className="mt-4"
+            >
+              <FormTextarea
+                rows={4}
+                placeholder={
+                  noteRequired
+                    ? "Explain why this request is being declined..."
+                    : "Add context for the entrepreneur about this status..."
+                }
+                value={decisionNote}
+                onChange={(event) => onDecisionNoteChange(event.target.value)}
+              />
+            </FormField>
+          )}
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
@@ -521,50 +578,20 @@ function ToolRequestReviewModal({
             >
               Close
             </Button>
-            {request.availableTransitions.includes("declined") ? (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => onDecide("declined")}
-                isLoading={busy}
-                disabled={!decisionNote.trim()}
-              >
-                Decline
-              </Button>
-            ) : null}
-            {request.availableTransitions.includes("in-development") ? (
-              <Button
-                type="button"
-                onClick={() => onDecide("in-development")}
-                isLoading={busy}
-              >
-                Approve for development
-              </Button>
-            ) : null}
-            {request.availableTransitions.includes("built") ? (
-              <Button
-                type="button"
-                onClick={() => onDecide("built")}
-                isLoading={busy}
-                disabled={!linkedToolId}
-              >
-                Mark as built
-              </Button>
-            ) : null}
-            {request.availableTransitions.includes("under-review") ? (
-              <Button
-                type="button"
-                onClick={() => onDecide("under-review")}
-                isLoading={busy}
-              >
-                Reopen review
-              </Button>
-            ) : null}
-            {request.status === "built" ? (
+            {request.status === "built" && selectedStatus === "built" ? (
               <Button type="button" onClick={onViewLibrary}>
                 View linked tool
               </Button>
             ) : null}
+            <Button
+              type="button"
+              variant={selectedStatus === "declined" ? "destructive" : "primary"}
+              onClick={() => onDecide(selectedStatus)}
+              isLoading={busy}
+              disabled={!canSubmit}
+            >
+              {submitLabel}
+            </Button>
           </div>
         </div>
       ) : null}
