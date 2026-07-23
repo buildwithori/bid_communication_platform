@@ -1,6 +1,9 @@
 export type EntrepreneurStatus = "active" | "inactive";
 export type EntrepreneurDirectoryStatus = EntrepreneurStatus | "invited";
 export type EntrepreneurSource = "self_registered" | "admin_invited";
+export type EntrepreneurProgrammeAccessFilter =
+  | "with_programme"
+  | "without_programme";
 
 export type EntrepreneurProgrammeAccess = {
   grantId: string;
@@ -74,6 +77,7 @@ export type EntrepreneurQuery = {
   programmeId?: string;
   status?: EntrepreneurDirectoryStatus;
   source?: EntrepreneurSource;
+  programmeAccess?: EntrepreneurProgrammeAccessFilter;
   take?: number;
   cursor?: string;
 };

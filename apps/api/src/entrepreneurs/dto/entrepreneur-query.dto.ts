@@ -9,6 +9,13 @@ export const entrepreneurDirectoryStatuses = [
 export type EntrepreneurDirectoryStatus =
   (typeof entrepreneurDirectoryStatuses)[number];
 
+export const entrepreneurProgrammeAccessFilters = [
+  'with_programme',
+  'without_programme',
+] as const;
+export type EntrepreneurProgrammeAccessFilter =
+  (typeof entrepreneurProgrammeAccessFilters)[number];
+
 export class EntrepreneurQueryDto {
   @IsOptional()
   @IsString()
@@ -34,6 +41,10 @@ export class EntrepreneurQueryDto {
   @IsOptional()
   @IsIn(Object.values(BusinessSource))
   source?: BusinessSource;
+
+  @IsOptional()
+  @IsIn(entrepreneurProgrammeAccessFilters)
+  programmeAccess?: EntrepreneurProgrammeAccessFilter;
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))

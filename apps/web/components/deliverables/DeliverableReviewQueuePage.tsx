@@ -38,6 +38,13 @@ import { mapDeliverableReviewRow, reviewLabel, reviewTone, type DeliverableRevie
 
 const ALL = 'all';
 type ReviewStatusFilter = typeof ALL | DeliverableReviewStatus | 'overdue';
+const reviewStatusFilters: ReviewStatusFilter[] = [
+  ALL,
+  'pending-review',
+  'changes-requested',
+  'approved',
+  'overdue',
+];
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -83,7 +90,12 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
   const [dueDateTarget, setDueDateTarget] = React.useState<DeliverableReviewRow | null>(null);
   const [query, setQuery] = React.useState('');
   const debouncedQuery = useDebouncedValue(query.trim());
-  const [statusFilter, setStatusFilter] = React.useState<ReviewStatusFilter>(ALL);
+  const requestedStatus = searchParams.get('status') as ReviewStatusFilter | null;
+  const [statusFilter, setStatusFilter] = React.useState<ReviewStatusFilter>(
+    requestedStatus && reviewStatusFilters.includes(requestedStatus)
+      ? requestedStatus
+      : ALL,
+  );
   const [programmeFilter, setProgrammeFilter] = React.useState(ALL);
   const [pageSize, setPageSize] = React.useState(10);
   const [programmeSearch, setProgrammeSearch] = React.useState('');

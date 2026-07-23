@@ -61,8 +61,14 @@ export default function AdminToolRequestsPage() {
   const linkedRequest = useToolRequestDetailQuery(linkedRequestId);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query);
+  const requestedStatus = searchParams.get("status");
+  const initialStatus =
+    requestedStatus &&
+    Object.prototype.hasOwnProperty.call(toolRequestStatusMeta, requestedStatus)
+      ? (requestedStatus as ToolRequestStatus)
+      : "all";
   const [statusFilter, setStatusFilter] = useState<"all" | ToolRequestStatus>(
-    "all",
+    initialStatus,
   );
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [pageSize, setPageSize] = useState(10);

@@ -2,6 +2,7 @@
 
 import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { EntrepreneurFormModal } from "@/components/admin/entrepreneurs/EntrepreneurFormModal";
@@ -42,6 +43,7 @@ import {
   useUpdateEntrepreneurStatusMutation,
   type EffectiveToolAccess,
   type EntrepreneurDirectoryStatus,
+  type EntrepreneurProgrammeAccessFilter,
   type EntrepreneurRecord,
   type EntrepreneurSource,
 } from "@/lib/api/entrepreneurs";
@@ -71,6 +73,7 @@ function StatusBadge({ record }: { record: EntrepreneurRecord }) {
 }
 
 export default function AdminEntrepreneursPage() {
+  const searchParams = useSearchParams();
   const [addOpen, setAddOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<EntrepreneurRecord>();
   const [detailId, setDetailId] = React.useState<string | null>(null);
@@ -86,9 +89,30 @@ export default function AdminEntrepreneursPage() {
     return () => window.clearTimeout(timeout);
   }, []);
   const [search, setSearch] = React.useState("");
+  const requestedStatus = searchParams.get("status");
+  const requestedSource = searchParams.get("source");
+  const requestedProgrammeAccess = searchParams.get("programmeAccess");
   const [status, setStatus] =
-    React.useState<AllOr<EntrepreneurDirectoryStatus>>("all");
-  const [source, setSource] = React.useState<AllOr<EntrepreneurSource>>("all");
+    React.useState<AllOr<EntrepreneurDirectoryStatus>>(
+      requestedStatus === "active" ||
+        requestedStatus === "inactive" ||
+        requestedStatus === "invited"
+        ? requestedStatus
+        : "all",
+    );
+  const [source, setSource] = React.useState<AllOr<EntrepreneurSource>>(
+    requestedSource === "self_registered" ||
+      requestedSource === "admin_invited"
+      ? requestedSource
+      : "all",
+  );
+  const [programmeAccess, setProgrammeAccess] =
+    React.useState<AllOr<EntrepreneurProgrammeAccessFilter>>(
+      requestedProgrammeAccess === "with_programme" ||
+        requestedProgrammeAccess === "without_programme"
+        ? requestedProgrammeAccess
+        : "all",
+    );
   const [sectorId, setSectorId] = React.useState("all");
   const [stageId, setStageId] = React.useState("all");
   const [sectorLookup, setSectorLookup] = React.useState({
@@ -103,6 +127,8 @@ export default function AdminEntrepreneursPage() {
     search: debouncedSearch.trim() || undefined,
     status: status === "all" ? undefined : status,
     source: source === "all" ? undefined : source,
+    programmeAccess:
+      programmeAccess === "all" ? undefined : programmeAccess,
     sectorId: sectorId === "all" ? undefined : sectorId,
     stageId: stageId === "all" ? undefined : stageId,
     take: pageSize,
@@ -133,6 +159,7 @@ export default function AdminEntrepreneursPage() {
       source,
       stageId,
       status,
+      programmeAccess,
     ],
   );
 
@@ -459,6 +486,18 @@ export default function AdminEntrepreneursPage() {
               <option value="invited">Invited</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
+            </TableFilterSelect>
+            <TableFilterSelect
+              value={programmeAccess}
+              onChange={(event) =>
+                setProgrammeAccess(
+                  event.target.value as typeof programmeAccess,
+                )
+              }
+            >
+              <option value="all">All programme access</option>
+              <option value="with_programme">With programme</option>
+              <option value="without_programme">Without programme</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>

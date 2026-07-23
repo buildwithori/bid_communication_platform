@@ -583,6 +583,19 @@ export class EntrepreneursService {
       });
     }
     if (query.source) filters.push({ business: { source: query.source } });
+    if (query.programmeAccess === 'without_programme') {
+      filters.push({
+        user: {
+          entrepreneurProgrammeGrants: { none: { revokedAt: null } },
+        },
+      });
+    } else if (query.programmeAccess === 'with_programme') {
+      filters.push({
+        user: {
+          entrepreneurProgrammeGrants: { some: { revokedAt: null } },
+        },
+      });
+    }
     if (query.programmeId && programmeAccessType === 'assigned') {
       filters.push({
         user: {

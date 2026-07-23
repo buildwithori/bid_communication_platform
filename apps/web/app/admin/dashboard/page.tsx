@@ -2,6 +2,7 @@
 
 import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import {
   Bar,
@@ -139,9 +140,9 @@ export default function AdminDashboardPage() {
     },
   ];
   const pendingActions = [
-    { label: "Deliverables awaiting review", count: data.pendingActions.deliverablesAwaitingReview, tone: "amber" as const, href: routes.admin.deliverableReviews },
-    { label: "Self-registered without programme", count: data.pendingActions.selfRegisteredWithoutProgramme, tone: "red" as const, href: routes.admin.entrepreneurs },
-    { label: "Tool requests under review", count: data.pendingActions.toolRequestsUnderReview, tone: "blue" as const, href: routes.admin.toolRequests },
+    { label: "Deliverables awaiting review", count: data.pendingActions.deliverablesAwaitingReview, tone: "amber" as const, href: `${routes.admin.deliverableReviews}?status=pending-review` },
+    { label: "Self-registered without programme", count: data.pendingActions.selfRegisteredWithoutProgramme, tone: "red" as const, href: `${routes.admin.entrepreneurs}?source=self_registered&status=active&programmeAccess=without_programme` },
+    { label: "Tool requests under review", count: data.pendingActions.toolRequestsUnderReview, tone: "blue" as const, href: `${routes.admin.toolRequests}?status=under-review` },
   ];
 
   return (
@@ -236,7 +237,7 @@ export default function AdminDashboardPage() {
           <CardHeader title="Pending actions" className="mb-2" />
           <div className="grid gap-2">
             {pendingActions.map((item) => (
-              <button key={item.label} type="button" onClick={() => router.push(item.href)} className="flex items-center justify-between rounded-lg bg-surface-subtle px-3 py-2 text-left text-sm transition hover:bg-bid-light hover:text-bid"><span>{item.label}</span><Badge tone={item.tone}>{item.count}</Badge></button>
+              <button key={item.label} type="button" onClick={() => router.push(item.href as Route)} className="flex items-center justify-between rounded-lg bg-surface-subtle px-3 py-2 text-left text-sm transition hover:bg-bid-light hover:text-bid"><span>{item.label}</span><Badge tone={item.tone}>{item.count}</Badge></button>
             ))}
           </div>
         </Card>

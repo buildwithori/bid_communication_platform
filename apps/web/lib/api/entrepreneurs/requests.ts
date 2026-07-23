@@ -44,6 +44,8 @@ function queryString(
     params.set("status", query.status);
   if (query && "source" in query && query.source)
     params.set("source", query.source);
+  if (query && "programmeAccess" in query && query.programmeAccess)
+    params.set("programmeAccess", query.programmeAccess);
   if (query && "programmeId" in query && query.programmeId)
     params.set("programmeId", query.programmeId);
   if (query && "linkableOnly" in query && query.linkableOnly)
