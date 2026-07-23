@@ -12,18 +12,44 @@ export const AuthTextField = React.forwardRef<
   }
 >(({ label, icon, type = "text", placeholder, error, className, readOnly, disabled, onAnimationStart, onChange, ...props }, ref) => {
   const isLocked = readOnly || disabled;
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
+  const setInputRef = React.useCallback(
+    (input: HTMLInputElement | null) => {
+      inputRef.current = input;
+      if (typeof ref === "function") ref(input);
+      else if (ref) ref.current = input;
+    },
+    [ref],
+  );
+  const syncBrowserValue = React.useCallback(() => {
+    const input = inputRef.current;
+    const handleChange = onChangeRef.current;
+    if (!input || !handleChange || input.readOnly || input.disabled) return;
+
+    handleChange({
+      target: input,
+      currentTarget: input,
+      type: "change",
+    } as React.ChangeEvent<HTMLInputElement>);
+  }, []);
+
+  React.useEffect(() => {
+    if (!onChangeRef.current || inputRef.current?.readOnly || inputRef.current?.disabled) return;
+
+    const delays = [0, 100, 500, 1_000];
+    const timers = delays.map((delay) =>
+      window.setTimeout(syncBrowserValue, delay),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [syncBrowserValue]);
+
   const handleAnimationStart = (event: React.AnimationEvent<HTMLInputElement>) => {
     onAnimationStart?.(event);
     if (event.animationName !== "bid-auth-autofill-start") return;
 
-    const input = event.currentTarget;
-    window.requestAnimationFrame(() => {
-      onChange?.({
-        target: input,
-        currentTarget: input,
-        type: "change",
-      } as React.ChangeEvent<HTMLInputElement>);
-    });
+    window.requestAnimationFrame(syncBrowserValue);
   };
 
   return (
@@ -40,7 +66,7 @@ export const AuthTextField = React.forwardRef<
       >
         {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
         <input
-          ref={ref}
+          ref={setInputRef}
           type={type}
           placeholder={placeholder}
           readOnly={readOnly}

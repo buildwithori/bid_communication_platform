@@ -47,12 +47,23 @@ function OnboardingForm() {
     onSuccess: () => { toast.success('Signup details completed.'); router.replace(routes.entrepreneur.dashboard); },
     onError: (error: Error) => toast.error(error.message),
   });
+  const submitOnboarding = form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: account.data!.user.email, country: values.country, phone: values.phone, timezone: detectTimezone() }));
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const nativeValues = new FormData(event.currentTarget);
+    (['businessName', 'representative', 'phone'] as const).forEach((field) => {
+      const value = nativeValues.get(field);
+      if (typeof value === 'string') {
+        form.setValue(field, value, { shouldDirty: true });
+      }
+    });
+    void submitOnboarding(event);
+  };
 
   if (account.isLoading) return <div aria-label="Loading onboarding" aria-busy="true" className="space-y-4">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-11 w-full" />)}</div>;
   if (account.isError) return <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Your Google signup session could not be loaded. Return to sign in and try again.</div>;
 
   return (
-    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: account.data!.user.email, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
+    <form className="space-y-4" autoComplete="on" onSubmit={handleSubmit}>
       <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-6 text-muted-foreground">Google supplied your verified name and email. Add the missing business and contact details to open your workspace.</div>
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" autoComplete="organization" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
       <div className="grid gap-3 sm:grid-cols-2">
