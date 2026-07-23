@@ -144,21 +144,6 @@ export default function AdminToolRequestsPage() {
 
   const columns: Column<ToolRequest>[] = [
     {
-      key: "actions",
-      header: "Action",
-      cell: (request) => (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => openRequest(request)}
-        >
-          View request
-        </Button>
-      ),
-      className: "w-[132px]",
-    },
-    {
       key: "request",
       header: "Request",
       cell: (request) => (
