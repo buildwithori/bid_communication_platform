@@ -365,6 +365,7 @@ test("Google onboarding queues one welcome email when the workspace becomes read
   const result = await service.completeOnboarding(user.id, details);
   await service.completeOnboarding(user.id, details);
 
+  assert.equal(result.user.email, user.email);
   assert.equal(result.user.onboardingRequired, false);
   assert.deepEqual(sent, [{ to: user.email, name: "David" }]);
 });

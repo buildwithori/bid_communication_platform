@@ -10,8 +10,21 @@ export const AuthTextField = React.forwardRef<
     icon?: React.ReactNode;
     error?: string;
   }
->(({ label, icon, type = "text", placeholder, error, className, readOnly, disabled, ...props }, ref) => {
+>(({ label, icon, type = "text", placeholder, error, className, readOnly, disabled, onAnimationStart, onChange, ...props }, ref) => {
   const isLocked = readOnly || disabled;
+  const handleAnimationStart = (event: React.AnimationEvent<HTMLInputElement>) => {
+    onAnimationStart?.(event);
+    if (event.animationName !== "bid-auth-autofill-start") return;
+
+    const input = event.currentTarget;
+    window.requestAnimationFrame(() => {
+      onChange?.({
+        target: input,
+        currentTarget: input,
+        type: "change",
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+  };
 
   return (
     <label className="block min-w-0">
@@ -32,6 +45,8 @@ export const AuthTextField = React.forwardRef<
           placeholder={placeholder}
           readOnly={readOnly}
           disabled={disabled}
+          onAnimationStart={handleAnimationStart}
+          onChange={onChange}
           className={cn(
             "h-full w-full min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground",
             isLocked && "cursor-not-allowed text-muted-foreground",

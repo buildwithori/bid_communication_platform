@@ -29,7 +29,7 @@ function OnboardingForm() {
   const account = useGoogleOnboardingQuery();
   const form = useForm<EntrepreneurOnboardingForm>({
     resolver: zodResolver(entrepreneurOnboardingSchema),
-    defaultValues: { businessName: '', representative: '', email: '', country: 'Ghana', phone: '' },
+    defaultValues: { businessName: '', representative: '', country: 'Ghana', phone: '' },
   });
   const country = useWatch({ control: form.control, name: 'country' });
 
@@ -40,7 +40,6 @@ function OnboardingForm() {
     form.reset({
       businessName: '',
       representative: [user.firstName, user.lastName].filter(Boolean).join(' '),
-      email: user.email,
       country: 'Ghana',
       phone: user.phone ?? '',
     });
@@ -55,12 +54,12 @@ function OnboardingForm() {
   if (account.isError) return <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Your Google signup session could not be loaded. Return to sign in and try again.</div>;
 
   return (
-    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
+    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: account.data!.user.email, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
       <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-6 text-muted-foreground">Google supplied your verified name and email. Add the missing business and contact details to open your workspace.</div>
       <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" autoComplete="organization" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
       <div className="grid gap-3 sm:grid-cols-2">
         <AuthTextField icon={<UserPlus className="h-4 w-4" />} label="Representative name" autoComplete="name" placeholder="Jane Doe" error={form.formState.errors.representative?.message} {...form.register('representative')} />
-        <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} readOnly error={form.formState.errors.email?.message} {...form.register('email')} />
+        <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} readOnly name="email" value={account.data?.user.email ?? ''} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block"><span className="mb-1.5 block text-sm font-medium text-foreground">Country</span><FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value as EntrepreneurOnboardingForm['country'], { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11', form.formState.errors.country && 'border-destructive')} />{form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-destructive">{form.formState.errors.country.message}</span> : null}</label>

@@ -183,6 +183,8 @@
   textarea:-webkit-autofill:hover,
   textarea:-webkit-autofill:focus,
   textarea:-webkit-autofill:active {
+    animation-name: bid-auth-autofill-start;
+    animation-duration: 0.01s;
     caret-color: hsl(var(--foreground));
     -webkit-text-fill-color: hsl(var(--foreground));
     -webkit-box-shadow: 0 0 0 1000px
@@ -190,6 +192,15 @@
     box-shadow: 0 0 0 1000px
       hsl(var(--autofill-background, var(--card))) inset;
     transition: background-color 9999s ease-out 0s;
+  }
+
+  @keyframes bid-auth-autofill-start {
+    from {
+      opacity: 0.99;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   input:autofill,
