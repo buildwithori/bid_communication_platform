@@ -25,6 +25,7 @@ export function AdminInviteModal({
       firstName: "",
       lastName: "",
       email: "",
+      phone: "",
     },
   });
 
@@ -60,17 +61,33 @@ export function AdminInviteModal({
           </FormField>
         </FormRow2>
 
-        <FormField
-          label="Email"
-          error={form.formState.errors.email?.message}
-          className="mb-0"
-        >
-          <FormInput
-            type="email"
-            placeholder="admin@example.com"
-            {...form.register("email")}
-          />
-        </FormField>
+        <FormRow2>
+          <FormField
+            label="Email"
+            error={form.formState.errors.email?.message}
+            className="mb-0"
+          >
+            <FormInput
+              type="email"
+              autoComplete="email"
+              placeholder="admin@example.com"
+              {...form.register("email")}
+            />
+          </FormField>
+          <FormField
+            label="Phone"
+            optional
+            error={form.formState.errors.phone?.message}
+            className="mb-0"
+          >
+            <FormInput
+              type="tel"
+              autoComplete="tel"
+              placeholder="+250 700 000 000"
+              {...form.register("phone")}
+            />
+          </FormField>
+        </FormRow2>
 
         <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
           <Button

@@ -158,6 +158,7 @@ export class AdminsService {
             email,
             firstName: dto.firstName.trim(),
             lastName: dto.lastName.trim(),
+            phone: dto.phone?.trim() || null,
             role: UserRole.admin,
             status: UserStatus.pending,
             invitedById: actor.id,

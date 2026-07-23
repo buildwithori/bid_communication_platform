@@ -72,6 +72,7 @@ export class TrainerManagementService {
             email,
             firstName: dto.firstName.trim(),
             lastName: dto.lastName.trim(),
+            phone: dto.phone?.trim() || null,
             role: UserRole.trainer,
             status: UserStatus.pending,
             invitedById: actor.id,

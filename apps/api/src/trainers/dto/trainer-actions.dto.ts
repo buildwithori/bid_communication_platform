@@ -55,6 +55,11 @@ export class InviteTrainerDto extends TrainerCapabilityDto {
   @IsEmail()
   @MaxLength(254)
   email!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 }
 
 export class UpdateTrainerDto extends TrainerCapabilityDto {

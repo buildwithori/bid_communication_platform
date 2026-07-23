@@ -57,6 +57,7 @@ export type InviteAdminPayload = {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
 };
 
 export type UpdateAdminStatusVariables = {

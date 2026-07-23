@@ -168,3 +168,85 @@ test("accepting an admin invitation queues the admin welcome", async () => {
 
   assert.deepEqual(sent, [{ to: admin.email, name: "BID Member" }]);
 });
+
+test("admin invitations persist the supplied phone number", async () => {
+  let createdUserData: Record<string, unknown> | undefined;
+  const created = {
+    ...pendingUser(UserRole.admin),
+    email: "new-admin@bid.test",
+    firstName: "New",
+    lastName: "Admin",
+    phone: "+250 700 000 001",
+  };
+  const service = new AdminsService(
+    {
+      user: {
+        findUnique: async () => null,
+      },
+    } as never,
+    auditWith({
+      user: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          createdUserData = data;
+          return created;
+        },
+      },
+      invitation: { create: async () => ({}) },
+    }) as never,
+    { sendInvitation: async () => undefined } as never,
+  );
+  (service as unknown as { get: (id: string) => Promise<unknown> }).get =
+    async () => created;
+
+  await service.invite(pendingUser(UserRole.admin) as never, {
+    firstName: "New",
+    lastName: "Admin",
+    email: created.email,
+    phone: "  +250 700 000 001  ",
+  });
+
+  assert.equal(createdUserData?.phone, "+250 700 000 001");
+});
+
+test("trainer invitations persist the supplied phone number", async () => {
+  let createdUserData: Record<string, unknown> | undefined;
+  const created = {
+    ...pendingUser(UserRole.trainer),
+    email: "new-trainer@bid.test",
+    firstName: "New",
+    lastName: "Trainer",
+    phone: "+250 700 000 002",
+  };
+  const service = new TrainerManagementService(
+    {
+      user: {
+        findUnique: async () => null,
+      },
+    } as never,
+    auditWith({
+      user: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          createdUserData = data;
+          return created;
+        },
+      },
+      trainerCapability: { create: async () => ({}) },
+      trainerSpecialism: { createMany: async () => ({ count: 0 }) },
+      invitation: { create: async () => ({}) },
+    }) as never,
+    { sendInvitation: async () => undefined } as never,
+    { getTrainer: async () => created } as never,
+  );
+
+  await service.invite(pendingUser(UserRole.admin) as never, {
+    firstName: "New",
+    lastName: "Trainer",
+    email: created.email,
+    phone: "  +250 700 000 002  ",
+    roleLabel: "trainer",
+    accessLevel: "full",
+    sectorIds: [],
+  });
+
+  assert.equal(createdUserData?.phone, "+250 700 000 002");
+});

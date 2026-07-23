@@ -113,17 +113,33 @@ export function TrainerModal({
           </FormField>
         </FormRow2>
 
-        <FormField
-          label="Email"
-          error={form.formState.errors.email?.message}
-          className="mb-0"
-        >
-          <FormInput
-            type="email"
-            disabled={isEdit}
-            {...form.register("email")}
-          />
-        </FormField>
+        <FormRow2>
+          <FormField
+            label="Email"
+            error={form.formState.errors.email?.message}
+            className="mb-0"
+          >
+            <FormInput
+              type="email"
+              autoComplete="email"
+              disabled={isEdit}
+              {...form.register("email")}
+            />
+          </FormField>
+          <FormField
+            label="Phone"
+            optional
+            error={form.formState.errors.phone?.message}
+            className="mb-0"
+          >
+            <FormInput
+              type="tel"
+              autoComplete="tel"
+              placeholder="+250 700 000 000"
+              {...form.register("phone")}
+            />
+          </FormField>
+        </FormRow2>
 
         <FormRow2>
           <FormField label="Role label" className="mb-0">
@@ -246,6 +262,7 @@ function defaults(trainer?: TrainerRecord): TrainerForm {
     firstName: trainer?.firstName ?? "",
     lastName: trainer?.lastName ?? "",
     email: trainer?.email ?? "",
+    phone: trainer?.phone ?? "",
     roleLabel: trainer?.roleLabel ?? "trainer",
     accessLevel: trainer?.accessLevel ?? "full",
     accessExpiresOn: trainer?.accessExpiresOn?.slice(0, 10) ?? "",

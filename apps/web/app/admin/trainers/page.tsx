@@ -207,6 +207,7 @@ export default function AdminTrainersPage() {
       firstName: values.firstName,
       lastName: values.lastName,
       email: values.email,
+      phone: values.phone?.trim() || undefined,
       roleLabel: values.roleLabel,
       accessLevel: values.accessLevel,
       accessExpiresOn:
@@ -222,7 +223,7 @@ export default function AdminTrainersPage() {
       payload: {
         firstName: values.firstName,
         lastName: values.lastName,
-        phone: editTarget.phone ?? undefined,
+        phone: values.phone?.trim() || undefined,
         roleLabel: values.roleLabel,
         accessLevel: values.accessLevel,
         accessExpiresOn:
@@ -289,6 +290,22 @@ export default function AdminTrainersPage() {
           </div>
         </div>
       ),
+    },
+    {
+      key: "phone",
+      header: "Phone",
+      className: "min-w-[170px]",
+      cell: (trainer) =>
+        trainer.phone ? (
+          <a
+            href={`tel:${trainer.phone}`}
+            className="text-ink-muted transition hover:text-bid"
+          >
+            {trainer.phone}
+          </a>
+        ) : (
+          <span className="text-ink-faint">Not provided</span>
+        ),
     },
     { key: "role", header: "Role", cell: (trainer) => roleLabels[trainer.roleLabel] },
     {
@@ -442,7 +459,7 @@ export default function AdminTrainersPage() {
               rows={trainers.rows}
               rowKey={(trainer) => trainer.trainerUserId}
               emptyMessage="No trainers match these filters."
-              tableClassName={activeTab === "directory" ? "min-w-[1120px]" : "min-w-[980px]"}
+              tableClassName={activeTab === "directory" ? "min-w-[1290px]" : "min-w-[980px]"}
             />
             <TablePagination
               page={trainers.page}
@@ -559,7 +576,12 @@ function TrainerDetailModal({
                         <Phone className="h-4 w-4" aria-hidden="true" />
                         {trainer.phone}
                       </a>
-                    ) : null}
+                    ) : (
+                      <span className="inline-flex items-center gap-2 text-ink-faint">
+                        <Phone className="h-4 w-4" aria-hidden="true" />
+                        Phone not provided
+                      </span>
+                    )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge tone="brand">{roleLabels[trainer.roleLabel]}</Badge>

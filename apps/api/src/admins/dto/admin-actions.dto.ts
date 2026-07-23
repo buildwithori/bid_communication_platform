@@ -21,6 +21,11 @@ export class InviteAdminDto {
   @IsEmail()
   @MaxLength(254)
   email!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 }
 
 export class AcceptAdminInvitationDto {

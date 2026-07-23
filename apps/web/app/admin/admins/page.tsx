@@ -173,6 +173,22 @@ export default function AdminsPage() {
       ),
     },
     {
+      key: "phone",
+      header: "Phone",
+      className: "min-w-[170px]",
+      cell: (admin) =>
+        admin.phone ? (
+          <a
+            href={`tel:${admin.phone}`}
+            className="text-ink-muted transition hover:text-bid"
+          >
+            {admin.phone}
+          </a>
+        ) : (
+          <span className="text-ink-faint">Not provided</span>
+        ),
+    },
+    {
       key: "calendar",
       header: "Calendar support",
       cell: (admin) => calendarBadge(admin.calendar.connected),
@@ -309,6 +325,7 @@ export default function AdminsPage() {
           rows={admins.rows}
           rowKey={(admin) => admin.id}
           emptyMessage="No admins match these filters."
+          tableClassName="min-w-[980px]"
         />
         <TablePagination
           page={admins.page}
@@ -332,6 +349,7 @@ export default function AdminsPage() {
             firstName: values.firstName.trim(),
             lastName: values.lastName.trim(),
             email: values.email.trim(),
+            phone: values.phone?.trim() || undefined,
           })
         }
       />
@@ -373,7 +391,7 @@ function AdminsPageSkeleton() {
           </Card>
         ))}
       </MetricGrid>
-      <TableSkeleton columns={5} rows={8} />
+      <TableSkeleton columns={6} rows={8} />
     </>
   );
 }
@@ -428,14 +446,23 @@ function AdminDetailsModal({
                 <p className="mt-1 truncate text-sm text-ink-muted">
                   {admin.email}
                 </p>
-                {admin.phone ? (
-                  <p className="mt-1 text-sm text-ink-muted">{admin.phone}</p>
-                ) : null}
               </div>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
+            <DetailCard label="Phone">
+              {admin.phone ? (
+                <a
+                  href={`tel:${admin.phone}`}
+                  className="transition hover:text-bid"
+                >
+                  {admin.phone}
+                </a>
+              ) : (
+                "Not provided"
+              )}
+            </DetailCard>
             <DetailCard label="Calendar support">
               {calendarBadge(admin.calendar.connected)}
             </DetailCard>
