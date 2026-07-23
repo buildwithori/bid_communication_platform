@@ -187,6 +187,40 @@ test("transactional email processor renders env-rooted module templates", async 
     sent[0].template.props.logoUrl,
     "https://hub.bid.org/bid-logo.png",
   );
+
+  await processor.process({
+    name: JOB_NAMES.adminWelcomeEmail,
+    data: { to: "admin@bid.test", name: "Admin User" },
+  } as never);
+  await processor.process({
+    name: JOB_NAMES.trainerWelcomeEmail,
+    data: { to: "trainer@bid.test", name: "Trainer User" },
+  } as never);
+  await processor.process({
+    name: JOB_NAMES.entrepreneurWelcomeEmail,
+    data: { to: "founder@bid.test", name: "Founder User" },
+  } as never);
+
+  assert.deepEqual(
+    sent.slice(1).map((message) => ({
+      subject: message.subject,
+      dashboardUrl: message.template.props.dashboardUrl,
+    })),
+    [
+      {
+        subject: "Welcome to the BID Hub admin team",
+        dashboardUrl: "https://hub.bid.org/admin/dashboard",
+      },
+      {
+        subject: "Your BID Hub trainer workspace is ready",
+        dashboardUrl: "https://hub.bid.org/trainer/dashboard",
+      },
+      {
+        subject: "Your BID Hub entrepreneur workspace is ready",
+        dashboardUrl: "https://hub.bid.org/entrepreneur/dashboard",
+      },
+    ],
+  );
 });
 
 test("audit processing recovers stale locks and schedules failed event retries", async () => {

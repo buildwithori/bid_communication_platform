@@ -3,8 +3,11 @@ import test from "node:test";
 import { render } from "@react-email/render";
 import { NotificationType, UserRole } from "@prisma/client";
 import { VerificationEmail } from "../src/auth/emails/verification-email";
+import { AdminWelcomeEmail } from "../src/admins/emails/admin-welcome-email";
 import { DeliverableNotificationEmail } from "../src/deliverables/emails/deliverable-notification-email";
+import { EntrepreneurWelcomeEmail } from "../src/entrepreneurs/emails/entrepreneur-welcome-email";
 import { SessionNotificationEmail } from "../src/sessions/emails/session-notification-email";
+import { TrainerWelcomeEmail } from "../src/trainers/emails/trainer-welcome-email";
 
 const logoUrl = "https://hub.example.test/bid-logo.png";
 const actionUrl = "https://hub.example.test/entrepreneur/schedule?sessionId=1";
@@ -55,4 +58,35 @@ test("deliverable review email gives a reviewer a clear action", async () => {
   assert.match(html, /Akwaaba Foods/);
   assert.match(html, /Review submission/);
   assert.match(html, /record a clear decision/);
+});
+
+test("welcome emails give each role its own workspace guidance", async () => {
+  const adminHtml = await render(
+    AdminWelcomeEmail({
+      name: "Amina",
+      dashboardUrl: "https://hub.example.test/admin/dashboard",
+      logoUrl,
+    }),
+  );
+  const trainerHtml = await render(
+    TrainerWelcomeEmail({
+      name: "Kofi",
+      dashboardUrl: "https://hub.example.test/trainer/dashboard",
+      logoUrl,
+    }),
+  );
+  const entrepreneurHtml = await render(
+    EntrepreneurWelcomeEmail({
+      name: "Amara",
+      dashboardUrl: "https://hub.example.test/entrepreneur/dashboard",
+      logoUrl,
+    }),
+  );
+
+  assert.match(adminHtml, /Admin workspace/);
+  assert.match(adminHtml, /manage programmes/);
+  assert.match(trainerHtml, /Trainer workspace/);
+  assert.match(trainerHtml, /connect your calendar/);
+  assert.match(entrepreneurHtml, /Entrepreneur workspace/);
+  assert.match(entrepreneurHtml, /current learning/);
 });

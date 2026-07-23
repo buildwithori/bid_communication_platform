@@ -23,6 +23,9 @@ export class AuthEmailService {
   }
 
   sendWelcome(to: string, name: string) {
-    return this.emailQueue.enqueue(JOB_NAMES.authWelcomeEmail, { to, name });
+    return this.emailQueue.enqueue(JOB_NAMES.entrepreneurWelcomeEmail, {
+      to,
+      name,
+    });
   }
 }

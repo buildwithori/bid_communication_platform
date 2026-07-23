@@ -312,6 +312,10 @@ export class AdminsService {
       },
     );
 
+    await this.email.sendWelcome(
+      activated.email,
+      activated.name ?? this.displayName(activated),
+    );
     return this.mapAdmin(activated);
   }
 

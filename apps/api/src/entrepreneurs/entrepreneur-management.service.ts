@@ -246,6 +246,10 @@ export class EntrepreneurManagementService {
         return user;
       },
     );
+    await this.email.sendWelcome(
+      activated.email,
+      this.displayName(activated),
+    );
     return this.entrepreneurs.getEntrepreneur(activated, activated.id);
   }
 

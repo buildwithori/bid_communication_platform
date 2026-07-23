@@ -237,6 +237,7 @@ export class TrainerManagementService {
         return user;
       },
     );
+    await this.email.sendWelcome(activated.email, this.displayName(activated));
     return this.trainers.getTrainer(activated, activated.id);
   }
 

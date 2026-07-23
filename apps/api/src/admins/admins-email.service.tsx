@@ -14,4 +14,8 @@ export class AdminsEmailService {
       token,
     });
   }
+
+  sendWelcome(to: string, name: string) {
+    return this.emailQueue.enqueue(JOB_NAMES.adminWelcomeEmail, { to, name });
+  }
 }

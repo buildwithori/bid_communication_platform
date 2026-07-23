@@ -2,12 +2,14 @@ import { OnWorkerEvent, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import type { Job } from "bullmq";
 import { AdminInvitationEmail } from "../../admins/emails/admin-invitation-email";
+import { AdminWelcomeEmail } from "../../admins/emails/admin-welcome-email";
 import { PasswordResetEmail } from "../../auth/emails/password-reset-email";
 import { VerificationEmail } from "../../auth/emails/verification-email";
-import { WelcomeEmail } from "../../auth/emails/welcome-email";
 import { EmailService } from "../../email/email.service";
 import { EntrepreneurInvitationEmail } from "../../entrepreneurs/emails/entrepreneur-invitation-email";
+import { EntrepreneurWelcomeEmail } from "../../entrepreneurs/emails/entrepreneur-welcome-email";
 import { TrainerInvitationEmail } from "../../trainers/emails/trainer-invitation-email";
+import { TrainerWelcomeEmail } from "../../trainers/emails/trainer-welcome-email";
 import { JOB_NAMES, QUEUE_NAMES } from "../jobs.constants";
 import type {
   TransactionalEmailJobDataMap,
@@ -33,8 +35,20 @@ export class TransactionalEmailProcessor extends WorkerHost {
           job.data as TransactionalEmailJobDataMap[typeof JOB_NAMES.authPasswordResetEmail],
         );
       case JOB_NAMES.authWelcomeEmail:
-        return this.sendWelcome(
+        return this.sendEntrepreneurWelcome(
           job.data as TransactionalEmailJobDataMap[typeof JOB_NAMES.authWelcomeEmail],
+        );
+      case JOB_NAMES.adminWelcomeEmail:
+        return this.sendAdminWelcome(
+          job.data as TransactionalEmailJobDataMap[typeof JOB_NAMES.adminWelcomeEmail],
+        );
+      case JOB_NAMES.trainerWelcomeEmail:
+        return this.sendTrainerWelcome(
+          job.data as TransactionalEmailJobDataMap[typeof JOB_NAMES.trainerWelcomeEmail],
+        );
+      case JOB_NAMES.entrepreneurWelcomeEmail:
+        return this.sendEntrepreneurWelcome(
+          job.data as TransactionalEmailJobDataMap[typeof JOB_NAMES.entrepreneurWelcomeEmail],
         );
       case JOB_NAMES.adminInvitationEmail:
         return this.sendAdminInvitation(
@@ -109,14 +123,48 @@ export class TransactionalEmailProcessor extends WorkerHost {
     });
   }
 
-  private sendWelcome(
-    data: TransactionalEmailJobDataMap[typeof JOB_NAMES.authWelcomeEmail],
+  private sendAdminWelcome(
+    data: TransactionalEmailJobDataMap[typeof JOB_NAMES.adminWelcomeEmail],
   ) {
     return this.email.send({
       to: data.to,
-      subject: "Welcome to BID Hub",
+      subject: "Welcome to the BID Hub admin team",
       template: (
-        <WelcomeEmail
+        <AdminWelcomeEmail
+          name={data.name}
+          dashboardUrl={this.email.appUrl("/admin/dashboard")}
+          logoUrl={this.email.logoUrl()}
+        />
+      ),
+    });
+  }
+
+  private sendTrainerWelcome(
+    data: TransactionalEmailJobDataMap[typeof JOB_NAMES.trainerWelcomeEmail],
+  ) {
+    return this.email.send({
+      to: data.to,
+      subject: "Your BID Hub trainer workspace is ready",
+      template: (
+        <TrainerWelcomeEmail
+          name={data.name}
+          dashboardUrl={this.email.appUrl("/trainer/dashboard")}
+          logoUrl={this.email.logoUrl()}
+        />
+      ),
+    });
+  }
+
+  private sendEntrepreneurWelcome(
+    data:
+      | TransactionalEmailJobDataMap[typeof JOB_NAMES.authWelcomeEmail]
+      | TransactionalEmailJobDataMap[typeof JOB_NAMES.entrepreneurWelcomeEmail],
+  ) {
+    return this.email.send({
+      to: data.to,
+      subject: "Your BID Hub entrepreneur workspace is ready",
+      template: (
+        <EntrepreneurWelcomeEmail
           name={data.name}
           dashboardUrl={this.email.appUrl("/entrepreneur/dashboard")}
           logoUrl={this.email.logoUrl()}

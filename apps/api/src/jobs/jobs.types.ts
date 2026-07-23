@@ -15,6 +15,18 @@ export type TransactionalEmailJobDataMap = {
     to: string;
     name: string;
   };
+  [JOB_NAMES.adminWelcomeEmail]: {
+    to: string;
+    name: string;
+  };
+  [JOB_NAMES.trainerWelcomeEmail]: {
+    to: string;
+    name: string;
+  };
+  [JOB_NAMES.entrepreneurWelcomeEmail]: {
+    to: string;
+    name: string;
+  };
   [JOB_NAMES.adminInvitationEmail]: {
     to: string;
     name: string;

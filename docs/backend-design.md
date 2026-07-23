@@ -1651,7 +1651,9 @@ Initial React Email templates:
 
 - email verification
 - password reset
-- entrepreneur signup welcome
+- entrepreneur welcome after verified signup, Google onboarding, or invitation acceptance
+- trainer welcome after invitation acceptance
+- admin welcome after invitation acceptance
 - admin invitation
 - trainer invitation
 - session requested

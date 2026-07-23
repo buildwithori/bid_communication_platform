@@ -34,6 +34,7 @@ export type BidActionEmailProps = {
   details?: ReadonlyArray<BidEmailDetail>;
   expiryNote?: string;
   preferenceNote?: string;
+  platformLabel?: string;
 };
 
 export function BidActionEmail({
@@ -58,7 +59,9 @@ export function BidActionEmail({
                 />
               </Column>
               <Column align="right">
-                <Text style={styles.platformLabel}>Entrepreneur platform</Text>
+                <Text style={styles.platformLabel}>
+                  {props.platformLabel ?? "BID Hub platform"}
+                </Text>
               </Column>
             </Row>
           </Section>

@@ -14,4 +14,8 @@ export class TrainersEmailService {
       token,
     });
   }
+
+  sendWelcome(to: string, name: string) {
+    return this.emailQueue.enqueue(JOB_NAMES.trainerWelcomeEmail, { to, name });
+  }
 }

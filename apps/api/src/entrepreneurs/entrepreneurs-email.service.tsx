@@ -21,4 +21,11 @@ export class EntrepreneursEmailService {
       token,
     });
   }
+
+  sendWelcome(to: string, name: string) {
+    return this.emailQueue.enqueue(JOB_NAMES.entrepreneurWelcomeEmail, {
+      to,
+      name,
+    });
+  }
 }
