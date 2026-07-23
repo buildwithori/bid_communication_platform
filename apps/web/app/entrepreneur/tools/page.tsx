@@ -455,7 +455,7 @@ export default function ToolsPage() {
   const [tab, setTab] = React.useState<ToolTab>("all");
   const [query, setQuery] = React.useState("");
   const debouncedQuery = useDebouncedValue(query);
-  const [pageSize, setPageSize] = React.useState(6);
+  const [pageSize, setPageSize] = React.useState(9);
   const [requestQuery, setRequestQuery] = React.useState("");
   const debouncedRequestQuery = useDebouncedValue(requestQuery);
   const [requestStatus, setRequestStatus] = React.useState<
@@ -751,7 +751,7 @@ export default function ToolsPage() {
             page={toolPage.page}
             pageSize={pageSize}
             totalItems={toolPage.totalItems}
-            pageSizeOptions={[6, 12, 24]}
+            pageSizeOptions={[9, 18, 27]}
             onPageChange={toolPage.setPage}
             onPageSizeChange={(next) => {
               setPageSize(next);
