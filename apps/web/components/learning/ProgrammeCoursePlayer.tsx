@@ -568,107 +568,134 @@ function CurriculumPanel({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {data.modules.map((module) => (
-          <div key={module.id} className="border-b border-line last:border-b-0">
-            <button
-              type="button"
-              onClick={() => onToggle(module.id)}
-              className={cn(
-                "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-bid-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30",
-                module.id === active.module.id && "bg-bid-light/25",
-              )}
+        {data.modules.map((module) => {
+          const isExpanded = expanded.has(module.id);
+          const panelId = `course-module-${module.id}`;
+
+          return (
+            <div
+              key={module.id}
+              className="border-b border-line last:border-b-0"
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line bg-card text-xs font-semibold text-ink-muted">
-                {module.position}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink">
-                  {module.title}
-                </span>
-                <span className="mt-1 block text-xs text-ink-muted">
-                  {module.items.length} lesson
-                  {module.items.length === 1 ? "" : "s"}
-                  {module.progress
-                    ? " · " + module.progress.progressPercent + "% complete"
-                    : ""}
-                </span>
-              </span>
-              <ChevronDown
+              <button
+                type="button"
+                onClick={() => onToggle(module.id)}
+                aria-expanded={isExpanded}
+                aria-controls={panelId}
                 className={cn(
-                  "mt-1 h-4 w-4 shrink-0 text-ink-muted transition-transform",
-                  expanded.has(module.id) && "rotate-180",
+                  "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors duration-200 hover:bg-bid-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30",
+                  module.id === active.module.id && "bg-bid-light/25",
                 )}
-              />
-            </button>
-            {expanded.has(module.id) ? (
-              <div className="border-t border-line bg-card py-1">
-                {module.items.length ? (
-                  module.items.map((item) => {
-                    const itemActive =
-                      module.id === active.module.id &&
-                      item.id === active.item.id;
-                    const ItemIcon = typeMeta[item.type].icon;
-                    const done = item.progress?.status === "completed";
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => onSelect({ module, item })}
-                        className={cn(
-                          "group flex w-full items-start gap-3 border-l-2 border-transparent px-4 py-3 text-left transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30",
-                          itemActive && "border-l-bid bg-bid-light/35",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border",
-                            done
-                              ? "border-success/30 bg-success-light text-success-dark"
-                              : itemActive
-                                ? "border-bid/30 bg-bid text-white"
-                                : "border-line bg-card text-ink-muted",
-                          )}
-                        >
-                          {done ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : itemActive ? (
-                            <Play className="h-3 w-3 fill-current" />
-                          ) : (
-                            <ItemIcon className="h-3.5 w-3.5" />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line bg-card text-xs font-semibold text-ink-muted">
+                  {module.position}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-ink">
+                    {module.title}
+                  </span>
+                  <span className="mt-1 block text-xs text-ink-muted">
+                    {module.items.length} lesson
+                    {module.items.length === 1 ? "" : "s"}
+                    {module.progress
+                      ? " · " + module.progress.progressPercent + "% complete"
+                      : ""}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "mt-1 h-4 w-4 shrink-0 text-ink-muted transition-transform duration-300 ease-out motion-reduce:transition-none",
+                    isExpanded && "rotate-180 text-bid",
+                  )}
+                />
+              </button>
+              <div
+                id={panelId}
+                aria-hidden={!isExpanded}
+                inert={!isExpanded}
+                className={cn(
+                  "grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none",
+                  isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div
+                    className={cn(
+                      "border-t border-line bg-card py-1 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none",
+                      isExpanded
+                        ? "translate-y-0 opacity-100 delay-75"
+                        : "-translate-y-1 opacity-0",
+                    )}
+                  >
+                    {module.items.length ? (
+                      module.items.map((item) => {
+                        const itemActive =
+                          module.id === active.module.id &&
+                          item.id === active.item.id;
+                        const ItemIcon = typeMeta[item.type].icon;
+                        const done = item.progress?.status === "completed";
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => onSelect({ module, item })}
                             className={cn(
-                              "line-clamp-2 text-sm font-medium text-ink group-hover:text-bid",
-                              itemActive && "text-bid",
+                              "group flex w-full items-start gap-3 border-l-2 border-transparent px-4 py-3 text-left transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bid/30",
+                              itemActive && "border-l-bid bg-bid-light/35",
                             )}
                           >
-                            {item.position}. {item.title}
-                          </span>
-                          <span className="mt-1 block text-xs text-ink-muted">
-                            {typeMeta[item.type].label}
-                            {item.durationLabel
-                              ? " · " + item.durationLabel
-                              : ""}
-                            {!data.viewer.canTrackProgress &&
-                            item.status !== "ready"
-                              ? " · " + item.status
-                              : ""}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <p className="px-5 py-4 text-xs leading-5 text-ink-muted">
-                    No content has been added to this module yet.
-                  </p>
-                )}
+                            <span
+                              className={cn(
+                                "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border",
+                                done
+                                  ? "border-success/30 bg-success-light text-success-dark"
+                                  : itemActive
+                                    ? "border-bid/30 bg-bid text-white"
+                                    : "border-line bg-card text-ink-muted",
+                              )}
+                            >
+                              {done ? (
+                                <Check className="h-3.5 w-3.5" />
+                              ) : itemActive ? (
+                                <Play className="h-3 w-3 fill-current" />
+                              ) : (
+                                <ItemIcon className="h-3.5 w-3.5" />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span
+                                className={cn(
+                                  "line-clamp-2 text-sm font-medium text-ink group-hover:text-bid",
+                                  itemActive && "text-bid",
+                                )}
+                              >
+                                {item.position}. {item.title}
+                              </span>
+                              <span className="mt-1 block text-xs text-ink-muted">
+                                {typeMeta[item.type].label}
+                                {item.durationLabel
+                                  ? " · " + item.durationLabel
+                                  : ""}
+                                {!data.viewer.canTrackProgress &&
+                                item.status !== "ready"
+                                  ? " · " + item.status
+                                  : ""}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p className="px-5 py-4 text-xs leading-5 text-ink-muted">
+                        No content has been added to this module yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-            ) : null}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </aside>
   );
