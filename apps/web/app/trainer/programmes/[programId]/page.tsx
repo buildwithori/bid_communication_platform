@@ -9,6 +9,7 @@ import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
+  FileSpreadsheet,
   FileText,
   PlayCircle,
   Users,
@@ -332,9 +333,13 @@ function OverviewTab({ programme }: { programme: ProgrammeDetail }) {
             value={programme.content.videos}
           />
           <ContextMetric
-            icon={FileText}
-            label="Files and tools"
-            value={programme.content.pdfs + programme.content.tools}
+            icon={FileSpreadsheet}
+            label="PDFs, Excel and tools"
+            value={
+              programme.content.pdfs +
+              programme.content.excels +
+              programme.content.tools
+            }
           />
         </div>
       </Card>
@@ -863,7 +868,10 @@ function ContentSummary({ module }: { module: ProgrammeModuleRecord }) {
         <Badge tone="blue">{module.content.videos} videos</Badge>
       ) : null}
       {module.content.pdfs > 0 ? (
-        <Badge tone="neutral">{module.content.pdfs} files</Badge>
+        <Badge tone="neutral">{module.content.pdfs} PDFs</Badge>
+      ) : null}
+      {module.content.excels > 0 ? (
+        <Badge tone="green">{module.content.excels} Excel</Badge>
       ) : null}
       {module.content.tools > 0 ? (
         <Badge tone="brand">{module.content.tools} tools</Badge>
@@ -1070,6 +1078,8 @@ function contentBreakdown(programme: ProgrammeDetail) {
     ' videos, ' +
     programme.content.pdfs +
     ' PDFs, ' +
+    programme.content.excels +
+    ' Excel, ' +
     programme.content.tools +
     ' tools'
   );

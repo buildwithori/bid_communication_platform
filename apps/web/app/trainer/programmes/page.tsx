@@ -3,7 +3,13 @@
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, FileText, PlayCircle, Wrench } from 'lucide-react';
+import {
+  BookOpen,
+  FileSpreadsheet,
+  FileText,
+  PlayCircle,
+  Wrench,
+} from 'lucide-react';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Card, Skeleton, TableSkeleton } from '@/components/shared/Card';
@@ -137,6 +143,10 @@ export default function TrainerProgrammesPage() {
               <Badge tone="neutral">
                 <FileText className="h-3.5 w-3.5" />
                 {programme.content.pdfs} PDFs
+              </Badge>
+              <Badge tone="green">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                {programme.content.excels} Excel
               </Badge>
               <Badge tone="brand">
                 <Wrench className="h-3.5 w-3.5" />
