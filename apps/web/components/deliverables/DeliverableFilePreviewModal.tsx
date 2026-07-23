@@ -1,10 +1,12 @@
 'use client';
 
-import { Download, ExternalLink, FileText } from 'lucide-react';
+import * as React from 'react';
+import { Download, ExternalLink, FileText, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
 import { useSignedFileUrlQuery } from '@/lib/api/files';
 import type { DeliverableReviewRow } from '@/lib/deliverables/review-queue';
+import { cn } from '@/lib/utils';
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -24,6 +26,53 @@ function formatFileSize(value?: string | null) {
 
 function isPdf(review: DeliverableReviewRow) {
   return review.fileMimeType === 'application/pdf' || review.fileName.toLowerCase().endsWith('.pdf');
+}
+
+function PdfPreviewLoading({ fileName }: { fileName: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="absolute inset-0 z-10 overflow-hidden bg-surface-subtle"
+    >
+      <div className="flex h-11 items-center gap-3 border-b border-line bg-card px-4">
+        <div className="h-3 w-7 animate-pulse rounded bg-surface-strong" />
+        <div className="h-3 w-28 animate-pulse rounded bg-surface-strong" />
+        <div className="ml-auto h-3 w-20 animate-pulse rounded bg-surface-strong" />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 top-11 grid place-items-center overflow-hidden p-6">
+        <div className="absolute inset-x-[12%] top-7 h-[calc(100%-3.5rem)] animate-pulse rounded-lg border border-line bg-card shadow-sm" />
+        <div className="relative z-10 rounded-2xl border border-bid/20 bg-card/95 px-6 py-5 text-center shadow-lg backdrop-blur">
+          <div className="relative mx-auto grid h-12 w-12 place-items-center rounded-xl bg-bid-light text-bid">
+            <FileText className="h-5 w-5" />
+            <LoaderCircle className="absolute -inset-1 h-14 w-14 animate-spin text-bid/70" />
+          </div>
+          <p className="mt-4 text-sm font-semibold text-ink">Preparing document preview</p>
+          <p className="mt-1 max-w-xs truncate text-xs text-ink-muted">{fileName}</p>
+        </div>
+      </div>
+      <span className="sr-only">Loading {fileName}</span>
+    </div>
+  );
+}
+
+function PdfPreviewFrame({ fileName, fileUrl }: { fileName: string; fileUrl: string }) {
+  const [loaded, setLoaded] = React.useState(false);
+
+  return (
+    <div className="relative h-[68vh] min-h-[360px] overflow-hidden rounded-xl border border-line bg-card">
+      <iframe
+        title={fileName}
+        src={fileUrl}
+        onLoad={() => setLoaded(true)}
+        className={cn(
+          'absolute inset-0 h-full w-full bg-white transition-opacity duration-300 motion-reduce:transition-none',
+          loaded ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+      {!loaded ? <PdfPreviewLoading fileName={fileName} /> : null}
+    </div>
+  );
 }
 
 export function DeliverableFilePreviewModal({
@@ -84,11 +133,15 @@ export function DeliverableFilePreviewModal({
           </div>
 
           {signedFile.isLoading ? (
-            <div className="h-[360px] animate-pulse rounded-xl border border-line bg-surface-subtle" />
-          ) : canRenderPdf ? (
-            <div className="overflow-hidden rounded-xl border border-line bg-card">
-              <iframe title={review.fileName} src={fileUrl ?? ''} className="h-[68vh] w-full bg-white" />
+            <div className="relative h-[68vh] min-h-[360px] overflow-hidden rounded-xl border border-line">
+              <PdfPreviewLoading fileName={review.fileName} />
             </div>
+          ) : canRenderPdf ? (
+            <PdfPreviewFrame
+              key={`${review.fileId}:${fileUrl}`}
+              fileName={review.fileName}
+              fileUrl={fileUrl ?? ''}
+            />
           ) : fileUrl ? (
             <div className="grid min-h-[360px] place-items-center rounded-xl border border-dashed border-line bg-surface-subtle p-8 text-center">
               <div>

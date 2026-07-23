@@ -642,6 +642,16 @@ export class DeliverablesService {
       select: { id: true, dueDate: true, status: true },
     });
     if (!existing) throw new NotFoundException("Deliverable was not found.");
+    const requestedDate = dto.dueDate.slice(0, 10);
+    const today = this.localDateValue(
+      new Date(),
+      user.timezone ?? "Africa/Kigali",
+    );
+    if (requestedDate < today) {
+      throw new BadRequestException(
+        "The deliverable due date cannot be before today.",
+      );
+    }
     const dueDate = new Date(dto.dueDate);
 
     const updated = await this.audit.capture(
@@ -950,6 +960,15 @@ export class DeliverablesService {
       timeStyle: "short",
       timeZone: instance.entrepreneur.timezone ?? "Africa/Kigali",
     }).format(instance.dueDate);
+  }
+
+  private localDateValue(date: Date, timezone: string) {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
   }
 
   private emailExcerpt(value: string, maxLength = 280) {

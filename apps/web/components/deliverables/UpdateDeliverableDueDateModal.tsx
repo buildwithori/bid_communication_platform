@@ -5,6 +5,7 @@ import { Button } from '@/components/shared/Button';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { FormField, FormTextarea } from '@/components/shared/FormField';
 import { Modal } from '@/components/shared/Modal';
+import { localDateValue } from '@/lib/date-values';
 import type { DeliverableReviewRow } from '@/lib/deliverables/review-queue';
 
 function formatDate(value?: string) {
@@ -44,7 +45,13 @@ export function UpdateDeliverableDueDateModal({
             <div className="mt-1 text-sm text-ink-muted">Programme rule: <span className="font-medium text-ink">{review.dueRule}</span></div>
           </div>
 
-          <FormField label="Override due date"><DatePicker value={dueAt} onChange={setDueAt} /></FormField>
+          <FormField label="Override due date">
+            <DatePicker
+              value={dueAt}
+              minDate={localDateValue()}
+              onChange={setDueAt}
+            />
+          </FormField>
           <FormField label="Reason" optional>
             <FormTextarea rows={3} value={reason} maxLength={300} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this entrepreneur-specific due date is changing..." />
           </FormField>
