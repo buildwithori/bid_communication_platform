@@ -9,14 +9,12 @@ import { Button } from "@/components/shared/Button";
 import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
 import {
   DataTable,
-  RowActions,
   TableFilterAutocomplete,
   TableFilterInput,
   TableFilterSelect,
   TablePagination,
   TableToolbar,
   type Column,
-  type RowAction,
 } from "@/components/shared/DataTable";
 import {
   FormAutocomplete,
@@ -131,7 +129,6 @@ export default function AdminToolRequestsPage() {
   const decideRequest = (
     request: ToolRequest,
     status: ToolRequestStatus,
-    options?: { close?: boolean },
   ) => {
     update.mutate(
       {
@@ -142,47 +139,24 @@ export default function AdminToolRequestsPage() {
           ...(status === "built" ? { linkedToolId: linkedToolId || request.linkedToolId } : {}),
         },
       },
-      { onSuccess: () => options?.close !== false && setActiveRequest(null) },
     );
-  };
-
-  const getRowActions = (
-    request: ToolRequest,
-  ): Array<RowAction | "separator"> => {
-    const actions: Array<RowAction | "separator"> = [
-      { label: "View request", onSelect: () => openRequest(request) },
-    ];
-    if (request.availableTransitions.includes("in-development")) {
-      actions.push("separator", {
-        label: "Approve for development",
-        disabled: update.isPending,
-        onSelect: () =>
-          decideRequest(request, "in-development", { close: false }),
-      });
-    }
-    if (request.availableTransitions.includes("under-review")) {
-      actions.push("separator", {
-        label: "Reopen review",
-        disabled: update.isPending,
-        onSelect: () =>
-          decideRequest(request, "under-review", { close: false }),
-      });
-    }
-    if (request.status === "built") {
-      actions.push("separator", {
-        label: "View linked tool",
-        onSelect: () => router.push(routes.admin.entrepreneurTools),
-      });
-    }
-    return actions;
   };
 
   const columns: Column<ToolRequest>[] = [
     {
       key: "actions",
       header: "Action",
-      cell: (request) => <RowActions actions={getRowActions(request)} />,
-      className: "w-[84px]",
+      cell: (request) => (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => openRequest(request)}
+        >
+          View request
+        </Button>
+      ),
+      className: "w-[132px]",
     },
     {
       key: "request",
