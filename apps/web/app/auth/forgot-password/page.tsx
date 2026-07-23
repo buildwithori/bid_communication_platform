@@ -22,8 +22,8 @@ function ForgotPasswordForm() {
     onError: (error: Error) => toast.error(error.message),
   });
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-      <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" placeholder="you@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
+    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
       <Button type="submit" size="lg" className="h-11 w-full" isLoading={mutation.isPending} loadingLabel="Sending instructions...">Send reset instructions</Button>
     </form>
   );

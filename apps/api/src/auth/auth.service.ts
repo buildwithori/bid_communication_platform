@@ -153,7 +153,10 @@ export class AuthService {
   }
 
   async resetPassword(dto: ResetPasswordDto) {
-    const resetToken = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash: await hashToken(dto.token) } });
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: await hashToken(dto.token) },
+      include: { user: { select: { email: true } } },
+    });
     if (!resetToken || resetToken.consumedAt || resetToken.expiresAt < new Date()) {
       throw new BadRequestException('This reset link is invalid or has expired.');
     }
@@ -162,7 +165,7 @@ export class AuthService {
       this.prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { consumedAt: new Date() } }),
       this.prisma.refreshToken.updateMany({ where: { userId: resetToken.userId, revokedAt: null }, data: { revokedAt: new Date(), revokedReason: 'password_reset' } }),
     ]);
-    return { ok: true };
+    return { ok: true, email: resetToken.user.email };
   }
 
   async verifyEmail(dto: TokenDto) {

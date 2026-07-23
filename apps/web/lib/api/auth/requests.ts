@@ -7,6 +7,7 @@ import type {
   LoginPayload,
   LoginResult,
   OkResult,
+  PasswordResetResult,
   ResendVerificationPayload,
   ResetPasswordPayload,
   SessionRefreshResult,
@@ -28,7 +29,7 @@ export function forgotPasswordRequest(payload: ForgotPasswordPayload) {
 }
 
 export function resetPasswordRequest(payload: ResetPasswordPayload) {
-  return apiRequest<OkResult>('/auth/reset-password', { method: 'POST', body: JSON.stringify(payload) });
+  return apiRequest<PasswordResetResult>('/auth/reset-password', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export function verifyEmailRequest(payload: VerifyEmailPayload) {

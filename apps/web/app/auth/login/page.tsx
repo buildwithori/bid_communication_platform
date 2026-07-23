@@ -17,6 +17,7 @@ import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { getGoogleAuthUrl, useLoginMutation, type AuthUser } from '@/lib/api/auth';
 import { workspaceRouteForRole } from '@/lib/auth-navigation';
+import { offerBrowserCredentialSave } from '@/lib/browser-credentials';
 import { loginSchema, type LoginForm as LoginFormValues } from '@/lib/forms/schemas';
 import { routes } from '@/lib/routes';
 
@@ -45,7 +46,8 @@ function LoginForm() {
   const oauthError = searchParams.get('oauthError');
   const form = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
   const mutation = useLoginMutation({
-    onSuccess: ({ user }) => {
+    onSuccess: async ({ user }) => {
+      await offerBrowserCredentialSave(user.email, form.getValues('password'));
       if (!user.emailVerifiedAt || user.status === 'pending') {
         router.replace(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);
         return;
@@ -56,12 +58,12 @@ function LoginForm() {
   });
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
       {oauthError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{oauthErrors[oauthError] ?? oauthErrors.failed}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('login'))}>Continue with Google</AuthGoogleButton>
       <AuthDivider label="or sign in with email" />
-      <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" placeholder="you@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
-      <AuthTextField icon={<Lock className="h-4 w-4" />} label="Password" type="password" placeholder="Enter password" error={form.formState.errors.password?.message} {...form.register('password')} />
+      <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
+      <AuthTextField icon={<Lock className="h-4 w-4" />} label="Password" type="password" autoComplete="current-password" placeholder="Enter password" error={form.formState.errors.password?.message} {...form.register('password')} />
       <div className="text-right"><Link href={routes.auth.forgotPassword} className="text-sm font-medium text-primary hover:text-primary/80">Forgot password?</Link></div>
       <Button type="submit" size="lg" className="h-11 w-full" isLoading={mutation.isPending} loadingLabel="Signing in...">Sign in</Button>
       <p className="text-center text-xs leading-5 text-muted-foreground">By continuing, you agree to use BID Hub for authorised programme activity.</p>

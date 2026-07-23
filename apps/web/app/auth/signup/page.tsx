@@ -19,6 +19,7 @@ import { signupSchema, type SignupForm as SignupFormValues } from '@/lib/forms/s
 import { countries } from '@/lib/mock-data/definitions';
 import { routes } from '@/lib/routes';
 import { detectTimezone } from '@/lib/timezones';
+import { offerBrowserCredentialSave } from '@/lib/browser-credentials';
 import { cn } from '@/lib/utils';
 
 const countryOptions = countries.map((country) => ({ value: country, label: country }));
@@ -43,7 +44,8 @@ function SignupForm() {
   });
   const country = useWatch({ control: form.control, name: 'country' });
   const mutation = useSignupMutation({
-    onSuccess: ({ user }) => {
+    onSuccess: async ({ user }) => {
+      await offerBrowserCredentialSave(user.email, form.getValues('password'));
       toast.success('Account created. Check your email to verify your account.');
       router.push(`${routes.auth.verifyEmail}?email=${encodeURIComponent(user.email)}`);
     },
@@ -51,16 +53,16 @@ function SignupForm() {
   });
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, password: values.password, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
+    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate({ businessName: values.businessName, representativeName: values.representative, email: values.email, password: values.password, country: values.country, phone: values.phone, timezone: detectTimezone() }))}>
       {oauthError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{signupOauthError(oauthError)}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('signup'))}>Sign up with Google</AuthGoogleButton>
       <AuthDivider label="or create account with email" />
-      <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
-      <AuthTextField icon={<UserPlus className="h-4 w-4" />} label="Representative name" placeholder="Jane Doe" error={form.formState.errors.representative?.message} {...form.register('representative')} />
-      <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" placeholder="jane@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
+      <AuthTextField icon={<Briefcase className="h-4 w-4" />} label="Business name" autoComplete="organization" placeholder="Acme Fintech Ltd" error={form.formState.errors.businessName?.message} {...form.register('businessName')} />
+      <AuthTextField icon={<UserPlus className="h-4 w-4" />} label="Representative name" autoComplete="name" placeholder="Jane Doe" error={form.formState.errors.representative?.message} {...form.register('representative')} />
+      <AuthTextField icon={<Mail className="h-4 w-4" />} label="Email address" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="jane@example.com" error={form.formState.errors.email?.message} {...form.register('email')} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AuthTextField icon={<Lock className="h-4 w-4" />} label="Password" type="password" placeholder="At least 8 characters" error={form.formState.errors.password?.message} {...form.register('password')} />
-        <AuthTextField icon={<Lock className="h-4 w-4" />} label="Confirm password" type="password" placeholder="Repeat password" error={form.formState.errors.confirmPassword?.message} {...form.register('confirmPassword')} />
+        <AuthTextField icon={<Lock className="h-4 w-4" />} label="Password" type="password" autoComplete="new-password" placeholder="At least 8 characters" error={form.formState.errors.password?.message} {...form.register('password')} />
+        <AuthTextField icon={<Lock className="h-4 w-4" />} label="Confirm password" type="password" autoComplete="new-password" placeholder="Repeat password" error={form.formState.errors.confirmPassword?.message} {...form.register('confirmPassword')} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
@@ -68,7 +70,7 @@ function SignupForm() {
           <FormAutocomplete value={country} onValueChange={(value) => form.setValue('country', value, { shouldValidate: true })} options={countryOptions} placeholder="Select country" searchPlaceholder="Search countries..." emptyMessage="No country found." className={cn('h-11', form.formState.errors.country && 'border-destructive focus:border-destructive focus:ring-destructive/10')} />
           {form.formState.errors.country?.message ? <span className="mt-1.5 block text-xs text-destructive">{form.formState.errors.country.message}</span> : null}
         </label>
-        <AuthTextField label="Phone" type="tel" placeholder="+233 20 000 0000" error={form.formState.errors.phone?.message} {...form.register('phone')} />
+        <AuthTextField label="Phone" type="tel" autoComplete="tel" placeholder="+233 20 000 0000" error={form.formState.errors.phone?.message} {...form.register('phone')} />
       </div>
       <Button type="submit" size="lg" className="h-11 w-full" isLoading={mutation.isPending} loadingLabel="Creating account...">Create account</Button>
     </form>

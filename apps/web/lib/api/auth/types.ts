@@ -47,3 +47,4 @@ export type CurrentUserResult = { user: AuthUser | null };
 export type SessionRefreshResult = { user: AuthUser; session: { mode: string; expiresAt: string } };
 export type GoogleOnboardingResult = { user: AuthUser };
 export type OkResult = { ok: boolean };
+export type PasswordResetResult = OkResult & { email: string };

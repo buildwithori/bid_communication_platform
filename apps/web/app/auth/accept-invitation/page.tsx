@@ -19,6 +19,7 @@ import {
   type AcceptTrainerInvitationForm,
 } from "@/lib/forms/schemas";
 import { routes } from "@/lib/routes";
+import { offerBrowserCredentialSave } from "@/lib/browser-credentials";
 
 type InvitationRole = "admin" | "trainer" | "entrepreneur";
 
@@ -52,20 +53,21 @@ function AcceptInvitationFormView({ invitationRole }: { invitationRole: Invitati
     resolver: zodResolver(acceptTrainerInvitationSchema),
     defaultValues: { password: "", confirmPassword: "" },
   });
-  const onAccepted = () => {
+  const onAccepted = async (email: string) => {
+    await offerBrowserCredentialSave(email, form.getValues("password"));
     toast.success("Account activated. Sign in to continue.");
     router.replace(routes.auth.login);
   };
   const adminMutation = useAcceptAdminInvitationMutation({
-    onSuccess: onAccepted,
+    onSuccess: (record) => void onAccepted(record.email),
     onError: (error) => toast.error(error.message),
   });
   const trainerMutation = useAcceptTrainerInvitationMutation({
-    onSuccess: onAccepted,
+    onSuccess: (record) => void onAccepted(record.email),
     onError: (error) => toast.error(error.message),
   });
   const entrepreneurMutation = useAcceptEntrepreneurInvitationMutation({
-    onSuccess: onAccepted,
+    onSuccess: (record) => void onAccepted(record.email),
     onError: (error) => toast.error(error.message),
   });
   const isPending =
@@ -77,6 +79,7 @@ function AcceptInvitationFormView({ invitationRole }: { invitationRole: Invitati
   return (
     <form
       className="space-y-4"
+      autoComplete="on"
       onSubmit={form.handleSubmit(({ password }) => {
         if (!token || !invitationRole || isPending) return;
         if (invitationRole === "trainer") {
@@ -103,6 +106,7 @@ function AcceptInvitationFormView({ invitationRole }: { invitationRole: Invitati
         icon={<Lock className="h-4 w-4" />}
         label="Password"
         type="password"
+        autoComplete="new-password"
         placeholder="Create a secure password"
         error={form.formState.errors.password?.message}
         {...form.register("password")}
@@ -111,6 +115,7 @@ function AcceptInvitationFormView({ invitationRole }: { invitationRole: Invitati
         icon={<Lock className="h-4 w-4" />}
         label="Confirm password"
         type="password"
+        autoComplete="new-password"
         placeholder="Confirm your password"
         error={form.formState.errors.confirmPassword?.message}
         {...form.register("confirmPassword")}
