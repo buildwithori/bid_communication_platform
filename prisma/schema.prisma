@@ -44,7 +44,6 @@ enum CalendarConnectionStatus {
 enum BusinessStatus {
   active
   inactive
-  archived
 }
 
 enum BusinessSource {

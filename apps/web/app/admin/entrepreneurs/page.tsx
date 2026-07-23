@@ -66,8 +66,6 @@ function StatusBadge({ record }: { record: EntrepreneurRecord }) {
   if (record.userStatus === "pending")
     return <Badge tone="amber">Invitation pending</Badge>;
   if (record.status === "active") return <Badge tone="green">Active</Badge>;
-  if (record.status === "archived")
-    return <Badge tone="neutral">Archived</Badge>;
   return <Badge tone="amber">Inactive</Badge>;
 }
 
@@ -454,7 +452,6 @@ export default function AdminEntrepreneursPage() {
               <option value="invited">Invited</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-              <option value="archived">Archived</option>
             </TableFilterSelect>
           </div>
         </TableToolbar>

@@ -1,4 +1,4 @@
-export type EntrepreneurStatus = "active" | "inactive" | "archived";
+export type EntrepreneurStatus = "active" | "inactive";
 export type EntrepreneurDirectoryStatus = EntrepreneurStatus | "invited";
 export type EntrepreneurSource = "self_registered" | "admin_invited";
 

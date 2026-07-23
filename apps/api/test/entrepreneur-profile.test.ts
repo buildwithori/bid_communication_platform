@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import { EntrepreneurManagementService } from '../src/entrepreneurs/entrepreneur-management.service';
 import { EntrepreneursService } from '../src/entrepreneurs/entrepreneurs.service';
+import { entrepreneurDirectoryStatuses } from '../src/entrepreneurs/dto/entrepreneur-query.dto';
 
 test('self-profile updates persist entrepreneur and business identity fields', async () => {
   const userUpdates: unknown[] = [];
@@ -92,6 +93,11 @@ const entrepreneurUser = {
 };
 
 test('entrepreneur directory separates invited and active records', () => {
+  assert.deepEqual(entrepreneurDirectoryStatuses, [
+    'active',
+    'inactive',
+    'invited',
+  ]);
   const service = new EntrepreneursService({} as never, {} as never);
   const buildMembershipWhere = (
     service as unknown as {
