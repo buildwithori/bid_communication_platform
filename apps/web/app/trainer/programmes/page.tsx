@@ -29,7 +29,6 @@ import {
 import { routes } from '@/lib/routes';
 
 type StatusFilter =
-  | 'current'
   | 'all'
   | Exclude<ProgrammeLifecycle, 'archived'>;
 
@@ -37,11 +36,11 @@ export default function TrainerProgrammesPage() {
   const router = useRouter();
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search);
-  const [status, setStatus] = React.useState<StatusFilter>('current');
+  const [status, setStatus] = React.useState<StatusFilter>('all');
   const [pageSize, setPageSize] = React.useState(10);
   const directory = useProgrammesPage({
     search: debouncedSearch.trim() || undefined,
-    lifecycle: status === 'current' || status === 'all' ? undefined : status,
+    lifecycle: status === 'all' ? undefined : status,
     take: pageSize,
   });
   const summary = useProgrammeSummaryQuery();
@@ -260,7 +259,6 @@ export default function TrainerProgrammesPage() {
                 setStatus(event.target.value as StatusFilter)
               }
             >
-              <option value="current">Current programmes</option>
               <option value="all">All programmes</option>
               <option value="active">Active</option>
               <option value="scheduled">Scheduled</option>
