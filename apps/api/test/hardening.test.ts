@@ -189,6 +189,110 @@ test("position-only playback checkpoints skip aggregate recomputation", async ()
   assert.equal(result.syncedItems, 1);
 });
 
+test("curriculum growth reopens completed learner progress", async () => {
+  const completedAt = new Date("2026-07-20T12:00:00.000Z");
+  const moduleState = {
+    entrepreneurUserId: "entrepreneur-1",
+    programmeId: "programme-1",
+    moduleId: "module-1",
+    status: "completed",
+    progressPercent: 100,
+    completedContentCount: 1,
+    totalContentCount: 1,
+    startedAt: completedAt,
+    completedAt,
+  };
+  let programmeUpdate: Record<string, unknown> | undefined;
+  const tx = {
+    programmeModule: {
+      findMany: async () => [
+        { programmeId: "programme-1", moduleId: "module-1" },
+      ],
+    },
+    programme: {
+      findUnique: async () => ({
+        modules: [
+          {
+            moduleId: "module-1",
+            module: {
+              contentItems: [
+                { contentItem: { id: "content-1" } },
+                { contentItem: { id: "content-2" } },
+              ],
+            },
+          },
+        ],
+      }),
+    },
+    learnerContentProgress: {
+      findMany: async (query: { select?: { entrepreneurUserId?: boolean } }) =>
+        query.select?.entrepreneurUserId
+          ? [
+              {
+                programmeId: "programme-1",
+                entrepreneurUserId: "entrepreneur-1",
+              },
+            ]
+          : [
+              {
+                moduleId: "module-1",
+                contentItemId: "content-1",
+                status: "completed",
+                progressPercent: 100,
+              },
+            ],
+    },
+    learnerModuleProgress: {
+      findMany: async (query: {
+        select?: { entrepreneurUserId?: boolean };
+        where: { moduleId?: unknown };
+      }) => {
+        if (query.select?.entrepreneurUserId) {
+          return [
+            {
+              programmeId: "programme-1",
+              entrepreneurUserId: "entrepreneur-1",
+            },
+          ];
+        }
+        return [moduleState];
+      },
+      upsert: async (query: { update: typeof moduleState }) => {
+        Object.assign(moduleState, query.update);
+        return moduleState;
+      },
+    },
+    learnerProgrammeProgress: {
+      findMany: async () => [
+        {
+          programmeId: "programme-1",
+          entrepreneurUserId: "entrepreneur-1",
+        },
+      ],
+      findUnique: async () => ({
+        status: "completed",
+        startedAt: completedAt,
+        completedAt,
+      }),
+      upsert: async (query: { update: Record<string, unknown> }) => {
+        programmeUpdate = query.update;
+        return query.update;
+      },
+    },
+  };
+  const service = new LearningService({} as never);
+
+  await service.reconcileProgrammes(tx as never, ["programme-1"]);
+
+  assert.equal(moduleState.status, "in_progress");
+  assert.equal(moduleState.progressPercent, 50);
+  assert.equal(moduleState.completedContentCount, 1);
+  assert.equal(moduleState.totalContentCount, 2);
+  assert.equal(programmeUpdate?.status, "in_progress");
+  assert.equal(programmeUpdate?.progressPercent, 50);
+  assert.equal(programmeUpdate?.completedAt, null);
+});
+
 test("trace IDs accept bounded safe values and reject injection-shaped input", () => {
   assert.equal(normalizeTraceId(" request-123:child "), "request-123:child");
   assert.equal(normalizeTraceId("bad\nforged-log"), null);

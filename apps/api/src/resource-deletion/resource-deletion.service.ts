@@ -2,6 +2,10 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { ExternalResourceProvider, NotificationEntityType, Prisma, User, UserRole } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
+import {
+  DETACHED_LEARNING_SERVICE,
+  LearningService,
+} from "../learning/learning.service";
 import { DeleteResourceDto } from "./dto/delete-resource.dto";
 
 type Transaction = Prisma.TransactionClient;
@@ -12,7 +16,11 @@ export type ResourceDeletionResult = { id: string; name: string; deleted: true; 
 export class ResourceDeletionService {
   private readonly logger = new Logger(ResourceDeletionService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly learning: LearningService = DETACHED_LEARNING_SERVICE,
+  ) {}
 
   async cleanupOrphanedCurriculum(limit = 25) {
     const candidates = await this.prisma.learningModule.findMany({
@@ -88,6 +96,7 @@ export class ResourceDeletionService {
       if (item.fileAssets.length) await tx.fileAsset.deleteMany({ where: { id: { in: item.fileAssets.map((file) => file.id) } } });
       await tx.contentItem.delete({ where: { id: item.id } });
       for (const moduleId of moduleIds) await this.reindexModuleContent(tx, moduleId);
+      await this.learning.reconcileProgrammes(tx, programmeIds);
       await this.audit.enqueue({
         action: "content.deleted", entityType: "content_item", entityId: item.id,
         summary: `Deleted content: ${item.title}`,
@@ -207,6 +216,7 @@ export class ResourceDeletionService {
         }
         await tx.learningModule.delete({ where: { id: moduleId } });
       }
+      await this.learning.reconcileProgrammes(tx, [programmeId]);
       const externalCleanupQueued =
         deletion.externalCleanupQueued + contentExternalCleanup;
       await this.audit.enqueue({

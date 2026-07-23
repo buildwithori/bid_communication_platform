@@ -126,6 +126,147 @@ export class LearningService {
     });
   }
 
+  async reconcileProgrammes(
+    tx: Prisma.TransactionClient,
+    programmeIds: Iterable<string>,
+    syncedAt = new Date(),
+  ) {
+    const ids = [...new Set(programmeIds)];
+    if (!ids.length) return;
+
+    const [programmeModules, programmeRows, moduleRows, contentRows] =
+      await Promise.all([
+        tx.programmeModule.findMany({
+          where: { programmeId: { in: ids } },
+          select: { programmeId: true, moduleId: true },
+        }),
+        tx.learnerProgrammeProgress.findMany({
+          where: { programmeId: { in: ids } },
+          select: { programmeId: true, entrepreneurUserId: true },
+        }),
+        tx.learnerModuleProgress.findMany({
+          where: { programmeId: { in: ids } },
+          select: { programmeId: true, entrepreneurUserId: true },
+        }),
+        tx.learnerContentProgress.findMany({
+          where: { programmeId: { in: ids } },
+          select: { programmeId: true, entrepreneurUserId: true },
+        }),
+      ]);
+    const moduleIdsByProgramme = new Map<string, Set<string>>();
+    for (const row of programmeModules) {
+      const moduleIds =
+        moduleIdsByProgramme.get(row.programmeId) ?? new Set<string>();
+      moduleIds.add(row.moduleId);
+      moduleIdsByProgramme.set(row.programmeId, moduleIds);
+    }
+    const trackedLearners = new Map<
+      string,
+      { programmeId: string; entrepreneurUserId: string }
+    >();
+    for (const row of [...programmeRows, ...moduleRows, ...contentRows]) {
+      if (!row.programmeId) continue;
+      trackedLearners.set(
+        `${row.programmeId}:${row.entrepreneurUserId}`,
+        {
+          programmeId: row.programmeId,
+          entrepreneurUserId: row.entrepreneurUserId,
+        },
+      );
+    }
+
+    for (const learner of trackedLearners.values()) {
+      await this.recomputeProgrammeProgress(
+        tx,
+        learner.entrepreneurUserId,
+        learner.programmeId,
+        moduleIdsByProgramme.get(learner.programmeId) ?? new Set<string>(),
+        syncedAt,
+      );
+    }
+  }
+
+  async reconcileLearnerProgrammeIfStale(
+    entrepreneurUserId: string,
+    programmeId: string,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const [programmeProgress, moduleProgressCount, contentProgressCount] =
+        await Promise.all([
+          tx.learnerProgrammeProgress.findUnique({
+            where: {
+              entrepreneurUserId_programmeId: {
+                entrepreneurUserId,
+                programmeId,
+              },
+            },
+            select: { lastSyncedAt: true },
+          }),
+          tx.learnerModuleProgress.count({
+            where: { entrepreneurUserId, programmeId },
+          }),
+          tx.learnerContentProgress.count({
+            where: { entrepreneurUserId, programmeId },
+          }),
+        ]);
+      if (
+        !programmeProgress &&
+        moduleProgressCount === 0 &&
+        contentProgressCount === 0
+      ) {
+        return;
+      }
+
+      const programmeModules = await tx.programmeModule.findMany({
+        where: { programmeId },
+        select: {
+          moduleId: true,
+          updatedAt: true,
+          module: {
+            select: {
+              updatedAt: true,
+              contentItems: {
+                select: {
+                  updatedAt: true,
+                  contentItem: { select: { updatedAt: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      const curriculumUpdatedAt = programmeModules.reduce((latest, link) => {
+        const timestamps = [
+          link.updatedAt,
+          link.module.updatedAt,
+          ...link.module.contentItems.flatMap((item) => [
+            item.updatedAt,
+            item.contentItem.updatedAt,
+          ]),
+        ];
+        return timestamps.reduce(
+          (current, timestamp) =>
+            timestamp > current ? timestamp : current,
+          latest,
+        );
+      }, new Date(0));
+      if (
+        programmeProgress &&
+        programmeProgress.lastSyncedAt >= curriculumUpdatedAt
+      ) {
+        return;
+      }
+
+      await this.recomputeProgrammeProgress(
+        tx,
+        entrepreneurUserId,
+        programmeId,
+        new Set(programmeModules.map((module) => module.moduleId)),
+        new Date(),
+      );
+    });
+  }
+
   private async withSerializableRetry<T>(
     operation: (tx: Prisma.TransactionClient) => Promise<T>,
   ) {
@@ -363,7 +504,7 @@ export class LearningService {
     return { applied: true, aggregateChanged };
   }
 
-  private async recomputeProgrammeProgress(
+  async recomputeProgrammeProgress(
     tx: Prisma.TransactionClient,
     entrepreneurUserId: string,
     programmeId: string,
@@ -778,3 +919,8 @@ export class LearningService {
   }
 
 }
+
+export const DETACHED_LEARNING_SERVICE = {
+  reconcileProgrammes: async () => undefined,
+  reconcileLearnerProgrammeIfStale: async () => undefined,
+} as unknown as LearningService;

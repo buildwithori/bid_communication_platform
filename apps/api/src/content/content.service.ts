@@ -18,6 +18,10 @@ import {
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
 import { FilesService } from "../files/files.service";
+import {
+  DETACHED_LEARNING_SERVICE,
+  LearningService,
+} from "../learning/learning.service";
 import { activeTrainerUserWhere } from "../trainers/trainer-access";
 import {
   AttachContentItemDto,
@@ -60,6 +64,7 @@ export class ContentService {
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
     private readonly audit: AuditService,
+    private readonly learning: LearningService = DETACHED_LEARNING_SERVICE,
   ) {}
 
   async listContentItems(user: User, query: ContentItemQueryDto) {
@@ -256,6 +261,14 @@ export class ContentService {
             position: (maxPosition._max.position ?? 0) + 1,
           },
         });
+        const programmes = await tx.programmeModule.findMany({
+          where: { moduleId },
+          select: { programmeId: true },
+        });
+        await this.learning.reconcileProgrammes(
+          tx,
+          programmes.map((programme) => programme.programmeId),
+        );
 
         return { ...contentItem, name: contentItem.title };
       },
@@ -414,6 +427,7 @@ export class ContentService {
             position: (maxPosition._max.position ?? 0) + 1,
           },
         });
+        await this.learning.reconcileProgrammes(tx, programmeIds);
         return { id: contentItem.id, name: contentItem.title };
       },
     );

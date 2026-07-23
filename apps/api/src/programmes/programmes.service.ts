@@ -20,6 +20,10 @@ import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RecurringDeliverableService } from "../deliverables/recurring-deliverable.service";
 import {
+  DETACHED_LEARNING_SERVICE,
+  LearningService,
+} from "../learning/learning.service";
+import {
   cursorArgs,
   pageSize,
   toCursorPage,
@@ -135,6 +139,7 @@ export class ProgrammesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly recurringDeliverables: RecurringDeliverableService,
+    private readonly learning: LearningService = DETACHED_LEARNING_SERVICE,
   ) {}
   async createProgramme(user: User, dto: CreateProgrammeDto) {
     this.assertAdmin(user);
@@ -675,6 +680,7 @@ export class ProgrammesService {
             position: (maxPosition._max.position ?? 0) + 1,
           },
         });
+        await this.learning.reconcileProgrammes(tx, [programmeId]);
         return { ...module, name: module.title };
       },
     );
@@ -719,6 +725,7 @@ export class ProgrammesService {
             position: (maxPosition._max.position ?? 0) + 1,
           },
         });
+        await this.learning.reconcileProgrammes(tx, [programmeId]);
         return { ...module, name: module.title };
       },
     );
@@ -1002,6 +1009,12 @@ export class ProgrammesService {
     if (!programme) throw new NotFoundException("Programme was not found.");
     if (!(await this.canReadProgramme(user, programmeId))) {
       throw new ForbiddenException("You do not have access to this programme.");
+    }
+    if (user.role === UserRole.entrepreneur) {
+      await this.learning.reconcileLearnerProgrammeIfStale(
+        user.id,
+        programmeId,
+      );
     }
 
     const moduleLinks = await this.prisma.programmeModule.findMany({

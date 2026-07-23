@@ -21,6 +21,10 @@ import { createSign } from "crypto";
 import { AuditService } from "../audit/audit.service";
 import { IntegrationLoggerService } from "../common/observability/integration-logger.service";
 import { PrismaService } from "../database/prisma.service";
+import {
+  DETACHED_LEARNING_SERVICE,
+  LearningService,
+} from "../learning/learning.service";
 import { MuxClient } from "./mux.client";
 import { verifyMuxWebhookSignature } from "./mux-signature";
 
@@ -53,6 +57,7 @@ export class VideoService {
     private readonly mux: MuxClient,
     private readonly audit: AuditService,
     private readonly integration: IntegrationLoggerService,
+    private readonly learning: LearningService = DETACHED_LEARNING_SERVICE,
   ) {}
 
   async createDirectUpload(user: User) {
@@ -222,6 +227,10 @@ export class VideoService {
                 where: { id: updated.contentItemId },
                 data: { status: update.contentStatus },
               });
+              await this.reconcileContentProgrammes(
+                tx,
+                updated.contentItemId,
+              );
             }
             await this.audit.enqueue(
               {
@@ -556,8 +565,31 @@ export class VideoService {
           where: { id: video.contentItemId },
           data: { status: contentStatus },
         });
+        await this.reconcileContentProgrammes(tx, video.contentItemId);
       }
     });
+  }
+
+  private async reconcileContentProgrammes(
+    tx: Prisma.TransactionClient,
+    contentItemId: string,
+  ) {
+    const placements = await tx.moduleContentItem.findMany({
+      where: { contentItemId },
+      select: {
+        module: {
+          select: {
+            programmes: { select: { programmeId: true } },
+          },
+        },
+      },
+    });
+    await this.learning.reconcileProgrammes(
+      tx,
+      placements.flatMap((placement) =>
+        placement.module.programmes.map((programme) => programme.programmeId),
+      ),
+    );
   }
 
   private logProviderFailure(videoId: string, reason: string) {

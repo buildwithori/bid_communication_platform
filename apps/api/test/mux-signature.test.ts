@@ -125,6 +125,9 @@ function reconciliationPrisma(video = reconciliationVideo()) {
         return { id: "content-1" };
       },
     },
+    moduleContentItem: {
+      findMany: async () => [],
+    },
   };
   return {
     prisma: {
