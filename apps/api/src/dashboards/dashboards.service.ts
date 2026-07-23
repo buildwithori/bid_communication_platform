@@ -459,6 +459,7 @@ export class DashboardsService {
           select: {
             id: true,
             type: true,
+            typeDefinition: { select: { name: true } },
             topic: true,
             status: true,
             startAt: true,
@@ -578,6 +579,7 @@ export class DashboardsService {
       upcomingSessions: sessions.map((session) => ({
         id: session.id,
         type: session.type,
+        typeName: session.typeDefinition.name,
         topic: session.topic,
         status: session.status,
         startsAt: session.startAt.toISOString(),
@@ -631,6 +633,7 @@ export class DashboardsService {
         select: {
           id: true,
           type: true,
+          typeDefinition: { select: { name: true } },
           topic: true,
           status: true,
           startAt: true,
@@ -730,6 +733,7 @@ export class DashboardsService {
       upcomingSessions: upcomingSessions.map((session) => ({
         id: session.id,
         type: session.type,
+        typeName: session.typeDefinition.name,
         topic: session.topic,
         status: session.status,
         startsAt: session.startAt.toISOString(),

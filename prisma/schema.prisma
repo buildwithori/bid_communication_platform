@@ -152,12 +152,6 @@ enum ToolRequestStatus {
   declined
 }
 
-enum SessionType {
-  mentor_checkin
-  office_hours
-  investor_prep
-}
-
 enum SessionStatus {
   requested
   confirmed
@@ -484,7 +478,6 @@ model CompanySettings {
   sessionWorkdayStartMinutes            Int      @default(540) @map("session_workday_start_minutes")
   sessionWorkdayEndMinutes              Int      @default(1020) @map("session_workday_end_minutes")
   sessionSlotIntervalMinutes            Int      @default(30) @map("session_slot_interval_minutes")
-  defaultSessionDurationMinutes         Int      @default(60) @map("default_session_duration_minutes")
   inAppNotificationsEnabledByDefault    Boolean  @default(true) @map("in_app_notifications_enabled_by_default")
   emailNotificationsEnabledByDefault    Boolean  @default(true) @map("email_notifications_enabled_by_default")
   reminderNotificationsEnabledByDefault Boolean  @default(true) @map("reminder_notifications_enabled_by_default")
@@ -562,6 +555,21 @@ model ToolArea {
 
   @@index([active])
   @@map("tool_areas")
+}
+
+model SessionTypeDefinition {
+  id              String   @id @default(cuid())
+  name            String
+  key             String   @unique
+  durationMinutes Int      @map("duration_minutes")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  sessions Session[]
+
+  @@index([active, name])
+  @@map("session_type_definitions")
 }
 
 model Business {
@@ -1279,7 +1287,8 @@ model Session {
   targetType         SessionTargetType @default(open_team) @map("target_type")
   targetUserId       String?           @map("target_user_id")
   createdById        String            @map("created_by_id")
-  type               SessionType
+  type               String
+  durationMinutes    Int               @map("duration_minutes")
   topic              String
   notes              String?
   source             SessionSource     @default(entrepreneur_request)
@@ -1301,6 +1310,7 @@ model Session {
   owner           User?                   @relation("SessionOwner", fields: [ownerUserId], references: [id])
   target          User?                   @relation("SessionTarget", fields: [targetUserId], references: [id])
   createdBy       User                    @relation("SessionCreatedBy", fields: [createdById], references: [id])
+  typeDefinition  SessionTypeDefinition   @relation(fields: [type], references: [key], onUpdate: Cascade)
   notesHistory    SessionNote[]
   reschedules     SessionReschedule[]
   requestDeclines SessionRequestDecline[]

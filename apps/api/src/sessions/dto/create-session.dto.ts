@@ -7,7 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
-import { SessionTargetType, SessionType } from "@prisma/client";
+import { SessionTargetType } from "@prisma/client";
 
 export class CreateSessionDto {
   @IsOptional()
@@ -30,8 +30,10 @@ export class CreateSessionDto {
   @IsString()
   targetUserId?: string;
 
-  @IsEnum(SessionType)
-  type!: SessionType;
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  type!: string;
 
   @IsString()
   @MinLength(3)

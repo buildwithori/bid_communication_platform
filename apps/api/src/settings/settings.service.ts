@@ -17,10 +17,12 @@ import {
   CreateBusinessStageDto,
   CreateProgrammeGoalTypeDto,
   CreateSectorDto,
+  CreateSessionTypeDto,
   CreateToolAreaDto,
   UpdateBusinessStageDto,
   UpdateProgrammeGoalTypeDto,
   UpdateSectorDto,
+  UpdateSessionTypeDto,
   UpdateToolAreaDto,
 } from "./dto/lookup-entry.dto";
 
@@ -52,15 +54,6 @@ export class SettingsService {
         "Session working hours must end after they start.",
       );
     }
-    const duration =
-      dto.defaultSessionDurationMinutes ??
-      current.defaultSessionDurationMinutes;
-    if (duration > end - start) {
-      throw new BadRequestException(
-        "Default session duration must fit inside the working day.",
-      );
-    }
-
     return this.audit.capture(
       {
         action: "settings.company.updated",
@@ -278,6 +271,72 @@ export class SettingsService {
     );
   }
 
+  async createSessionType(dto: CreateSessionTypeDto) {
+    const key = this.normalizeKey(dto.key ?? dto.name);
+    await this.ensureUniqueKey("sessionTypeDefinition", key);
+    await this.assertSessionDurationFitsWorkingDay(dto.durationMinutes);
+
+    return this.audit.capture(
+      {
+        action: "settings.session-type.created",
+        entityType: "sessionTypeDefinition",
+        entityId: (sessionType) => sessionType.id,
+        summary: (sessionType) => `Session type ${sessionType.name} created`,
+        payload: { ...dto, key },
+      },
+      (tx) =>
+        tx.sessionTypeDefinition.create({
+          data: {
+            name: dto.name.trim(),
+            key,
+            durationMinutes: dto.durationMinutes,
+            active: dto.active ?? true,
+          },
+        }),
+    );
+  }
+
+  async updateSessionType(id: string, dto: UpdateSessionTypeDto) {
+    const current = await this.prisma.sessionTypeDefinition.findUnique({
+      where: { id },
+    });
+    if (!current) throw new NotFoundException("Session type was not found.");
+    if (dto.durationMinutes !== undefined) {
+      await this.assertSessionDurationFitsWorkingDay(dto.durationMinutes);
+    }
+    if (current.active && dto.active === false) {
+      const otherActiveTypes = await this.prisma.sessionTypeDefinition.count({
+        where: { active: true, id: { not: id } },
+      });
+      if (otherActiveTypes === 0) {
+        throw new BadRequestException(
+          "At least one session type must remain active.",
+        );
+      }
+    }
+
+    return this.audit.capture(
+      {
+        action: "settings.session-type.updated",
+        entityType: "sessionTypeDefinition",
+        entityId: (sessionType) => sessionType.id,
+        summary: (sessionType) => `Session type ${sessionType.name} updated`,
+        payload: { ...dto },
+      },
+      (tx) =>
+        tx.sessionTypeDefinition.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(dto.durationMinutes !== undefined
+              ? { durationMinutes: dto.durationMinutes }
+              : {}),
+            ...(dto.active !== undefined ? { active: dto.active } : {}),
+          },
+        }),
+    );
+  }
+
   async listSectors(query: LookupQueryDto) {
     const take = pageSize(query);
     const where = this.buildLookupWhere<Prisma.SectorWhereInput>(query);
@@ -361,6 +420,22 @@ export class SettingsService {
     return { ...toCursorPage(rows, take, (row) => row.id), totalItems };
   }
 
+  async listSessionTypes(query: LookupQueryDto) {
+    const take = pageSize(query);
+    const where =
+      this.buildLookupWhere<Prisma.SessionTypeDefinitionWhereInput>(query);
+    const [rows, totalItems] = await this.prisma.$transaction([
+      this.prisma.sessionTypeDefinition.findMany({
+        where,
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+        take: take + 1,
+        ...cursorArgs(query.cursor),
+      }),
+      this.prisma.sessionTypeDefinition.count({ where }),
+    ]);
+    return { ...toCursorPage(rows, take, (row) => row.id), totalItems };
+  }
+
   private normalizeKey(value: string) {
     const key = value
       .trim()
@@ -376,7 +451,12 @@ export class SettingsService {
   }
 
   private async ensureUniqueKey(
-    model: "sector" | "businessStage" | "programmeGoalType" | "toolArea",
+    model:
+      | "sector"
+      | "businessStage"
+      | "programmeGoalType"
+      | "toolArea"
+      | "sessionTypeDefinition",
     key: string,
     currentId?: string,
   ) {
@@ -387,7 +467,12 @@ export class SettingsService {
   }
 
   private findByKey(
-    model: "sector" | "businessStage" | "programmeGoalType" | "toolArea",
+    model:
+      | "sector"
+      | "businessStage"
+      | "programmeGoalType"
+      | "toolArea"
+      | "sessionTypeDefinition",
     key: string,
   ) {
     if (model === "sector")
@@ -396,7 +481,21 @@ export class SettingsService {
       return this.prisma.businessStage.findUnique({ where: { key } });
     if (model === "programmeGoalType")
       return this.prisma.programmeGoalType.findUnique({ where: { key } });
+    if (model === "sessionTypeDefinition")
+      return this.prisma.sessionTypeDefinition.findUnique({ where: { key } });
     return this.prisma.toolArea.findUnique({ where: { key } });
+  }
+
+  private async assertSessionDurationFitsWorkingDay(durationMinutes: number) {
+    const settings = await this.getCompanySettings();
+    if (
+      durationMinutes >
+      settings.sessionWorkdayEndMinutes - settings.sessionWorkdayStartMinutes
+    ) {
+      throw new BadRequestException(
+        "Session duration must fit inside the configured working day.",
+      );
+    }
   }
 
   private async ensureSectorExists(id: string) {

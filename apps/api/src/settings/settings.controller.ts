@@ -7,10 +7,12 @@ import {
   CreateBusinessStageDto,
   CreateProgrammeGoalTypeDto,
   CreateSectorDto,
+  CreateSessionTypeDto,
   CreateToolAreaDto,
   UpdateBusinessStageDto,
   UpdateProgrammeGoalTypeDto,
   UpdateSectorDto,
+  UpdateSessionTypeDto,
   UpdateToolAreaDto,
 } from './dto/lookup-entry.dto';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
@@ -81,6 +83,21 @@ export class SettingsController {
     return this.settingsService.updateToolArea(id, dto);
   }
 
+  @Post('settings/session-types')
+  @Roles(UserRole.admin)
+  createSessionType(@Body() dto: CreateSessionTypeDto) {
+    return this.settingsService.createSessionType(dto);
+  }
+
+  @Patch('settings/session-types/:id')
+  @Roles(UserRole.admin)
+  updateSessionType(
+    @Param('id') id: string,
+    @Body() dto: UpdateSessionTypeDto,
+  ) {
+    return this.settingsService.updateSessionType(id, dto);
+  }
+
   @Get('lookups/sectors')
   listSectors(@Query() query: LookupQueryDto) {
     return this.settingsService.listSectors(query);
@@ -99,5 +116,10 @@ export class SettingsController {
   @Get('lookups/tool-areas')
   listToolAreas(@Query() query: LookupQueryDto) {
     return this.settingsService.listToolAreas(query);
+  }
+
+  @Get('lookups/session-types')
+  listSessionTypes(@Query() query: LookupQueryDto) {
+    return this.settingsService.listSessionTypes(query);
   }
 }

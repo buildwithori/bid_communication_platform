@@ -8,7 +8,7 @@ import {
   Max,
   Min,
 } from "class-validator";
-import { SessionSource, SessionStatus, SessionType } from "@prisma/client";
+import { SessionSource, SessionStatus } from "@prisma/client";
 
 export class SessionQueryDto {
   @IsOptional()
@@ -20,8 +20,8 @@ export class SessionQueryDto {
   status?: SessionStatus;
 
   @IsOptional()
-  @IsEnum(SessionType)
-  type?: SessionType;
+  @IsString()
+  type?: string;
 
   @IsOptional()
   @IsEnum(SessionSource)

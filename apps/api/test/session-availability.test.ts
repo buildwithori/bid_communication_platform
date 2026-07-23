@@ -8,7 +8,6 @@ const policy = {
   sessionWorkdayStartMinutes: 540,
   sessionWorkdayEndMinutes: 1020,
   sessionSlotIntervalMinutes: 30,
-  defaultSessionDurationMinutes: 60,
 };
 
 function service(options?: {
@@ -27,6 +26,13 @@ function service(options?: {
       upsert: async () => ({
         ...policy,
         defaultTimezone: options?.defaultTimezone ?? "UTC",
+      }),
+    },
+    sessionTypeDefinition: {
+      findUnique: async () => ({
+        key: "mentor_checkin",
+        name: "1:1 mentor check-in",
+        durationMinutes: 60,
       }),
     },
     user: {
@@ -62,7 +68,7 @@ test("open-team slots remain available when at least one connected member is fre
     dateFrom: "2030-01-07",
     dateTo: "2030-01-07",
     timezone: "UTC",
-    durationMinutes: 60,
+    sessionType: "mentor_checkin",
   });
 
   assert.equal(result.slots.length, 15);
@@ -85,7 +91,7 @@ test("specific-trainer slots are scoped to only that trainer calendar", async ()
     dateTo: "2030-01-07",
     timezone: "UTC",
     targetUserId: "trainer-1",
-    durationMinutes: 60,
+    sessionType: "mentor_checkin",
   });
 
   assert.equal(
@@ -102,7 +108,7 @@ test("availability applies company hours in the company timezone and presents th
     dateFrom: "2030-01-07",
     dateTo: "2030-01-07",
     timezone: "America/New_York",
-    durationMinutes: 60,
+    sessionType: "mentor_checkin",
   });
 
   assert.equal(result.slots[0]?.startAt, "2030-01-07T08:00:00.000Z");

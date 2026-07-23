@@ -109,12 +109,17 @@ export class SessionAvailabilityService {
         sessionWorkdayStartMinutes: true,
         sessionWorkdayEndMinutes: true,
         sessionSlotIntervalMinutes: true,
-        defaultSessionDurationMinutes: true,
         defaultTimezone: true,
       },
     });
-    const durationMinutes =
-      query.durationMinutes ?? policy.defaultSessionDurationMinutes;
+    const sessionType = await this.prisma.sessionTypeDefinition.findUnique({
+      where: { key: query.sessionType },
+      select: { key: true, name: true, durationMinutes: true },
+    });
+    if (!sessionType) {
+      throw new BadRequestException("Choose a valid session type.");
+    }
+    const durationMinutes = sessionType.durationMinutes;
     const candidates = await this.findCandidates(query.targetUserId);
     if (query.targetUserId && candidates.length === 0) {
       throw new BadRequestException(
@@ -126,6 +131,7 @@ export class SessionAvailabilityService {
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
         timezone: query.timezone,
+        sessionType,
         durationMinutes,
         slots: [],
       };
@@ -250,6 +256,7 @@ export class SessionAvailabilityService {
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
       timezone: query.timezone,
+      sessionType,
       durationMinutes,
       slots,
     };

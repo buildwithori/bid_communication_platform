@@ -77,12 +77,6 @@ export class UpdateCompanySettingsDto {
   sessionSlotIntervalMinutes?: number;
 
   @IsOptional()
-  @IsInt()
-  @Min(15)
-  @Max(480)
-  defaultSessionDurationMinutes?: number;
-
-  @IsOptional()
   @IsBoolean()
   inAppNotificationsEnabledByDefault?: boolean;
 

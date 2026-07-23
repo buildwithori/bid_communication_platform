@@ -705,7 +705,8 @@ Feature 12 uses one durable `sessions` lifecycle aggregate for both requests and
   - owner_user_id nullable until accepted
   - target_type: specific_user, open_team
   - target_user_id nullable; a specific target must be an active trainer
-  - type: mentor_checkin, office_hours, investor_prep
+  - type: stable key referencing an admin-managed session type
+  - duration_minutes: booked-duration snapshot
   - topic and optional notes
   - source: entrepreneur_request, team_created
   - status: requested, confirmed, declined, cancelled, completed
@@ -747,11 +748,19 @@ Feature 12 uses one durable `sessions` lifecycle aggregate for both requests and
   - session_workday_start_minutes
   - session_workday_end_minutes
   - session_slot_interval_minutes
-  - default_session_duration_minutes
+- `session_type_definitions`
+  - name
+  - stable unique key
+  - duration_minutes
+  - active
 
 Rules:
 
 - Session records are linked to the entrepreneur user, not the business record.
+- Session type choices and their durations are admin-managed. Only active types can
+  be used for new bookings; inactive types remain readable on historical sessions.
+- Every session snapshots its booked duration so later changes to a type affect
+  future availability without rewriting existing bookings.
 - Business names shown in session calendars and queues are derived through the entrepreneur user's primary business membership.
 - Specific-trainer availability is computed only from that active trainer's connected calendar.
 - Open-team slots are returned only when at least one eligible connected admin/trainer is free.
@@ -1571,7 +1580,7 @@ Store:
 Availability endpoint input:
 
 - date or date range
-- session type/duration
+- session type key; the backend resolves its configured duration
 - target user or open team
 - timezone
 

@@ -6,7 +6,9 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
+  MinLength,
 } from "class-validator";
 
 export class SessionAvailabilityQueryDto {
@@ -23,12 +25,10 @@ export class SessionAvailabilityQueryDto {
   @IsString()
   targetUserId?: string;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(30)
-  @Max(180)
-  durationMinutes?: number;
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  sessionType!: string;
 }
 
 export class SessionTeamMemberQueryDto {

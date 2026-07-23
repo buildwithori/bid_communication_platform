@@ -1,4 +1,13 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateSectorDto {
   @IsString()
@@ -163,6 +172,46 @@ export class UpdateToolAreaDto {
   @MinLength(2)
   @MaxLength(80)
   key?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class CreateSessionTypeDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  key?: string;
+
+  @IsInt()
+  @Min(15)
+  @Max(480)
+  durationMinutes!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class UpdateSessionTypeDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  name?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(15)
+  @Max(480)
+  durationMinutes?: number;
 
   @IsOptional()
   @IsBoolean()

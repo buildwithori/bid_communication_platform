@@ -69,6 +69,12 @@ const toolAreas = [
   ["Market research", "market-research"],
 ];
 
+const sessionTypes = [
+  ["1:1 mentor check-in", "mentor_checkin", 60],
+  ["Office hours", "office_hours", 30],
+  ["Investor prep session", "investor_prep", 60],
+];
+
 async function seedCore(client, { updateExisting = true } = {}) {
   const update = (value) => (updateExisting ? value : {});
 
@@ -113,6 +119,15 @@ async function seedCore(client, { updateExisting = true } = {}) {
       create: { key, ...value },
     });
   }
+
+  for (const [name, key, durationMinutes] of sessionTypes) {
+    const value = { name, durationMinutes, active: true };
+    await client.sessionTypeDefinition.upsert({
+      where: { key },
+      update: update(value),
+      create: { key, ...value },
+    });
+  }
 }
 
-module.exports = { sectors, seedCore };
+module.exports = { sectors, seedCore, sessionTypes };

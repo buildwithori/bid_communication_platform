@@ -6,7 +6,6 @@ import {
   SessionSource,
   SessionStatus,
   SessionTargetType,
-  SessionType,
   UserRole,
 } from "@prisma/client";
 import { SessionsService } from "../src/sessions/sessions.service";
@@ -30,7 +29,14 @@ function fixture(overrides: Record<string, unknown> = {}) {
     targetType: SessionTargetType.open_team,
     targetUserId: null,
     createdById: "entrepreneur-1",
-    type: SessionType.mentor_checkin,
+    type: "mentor_checkin",
+    durationMinutes: 60,
+    typeDefinition: {
+      key: "mentor_checkin",
+      name: "1:1 mentor check-in",
+      durationMinutes: 60,
+      active: true,
+    },
     topic: "Pricing review",
     notes: "Prepare pricing questions",
     source: SessionSource.entrepreneur_request,
@@ -315,6 +321,6 @@ test("session confirmation copy uses a possessive label without an extra article
 
   const body = (service as any).sessionConfirmedBody(trainer, session);
 
-  assert.match(body, /confirmed your mentor check-in/);
+  assert.match(body, /confirmed your 1:1 mentor check-in/);
   assert.doesNotMatch(body, /your a mentor/);
 });

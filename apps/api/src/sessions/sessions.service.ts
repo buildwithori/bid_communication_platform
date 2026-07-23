@@ -91,6 +91,14 @@ const sessionInclude = {
       role: true,
     },
   },
+  typeDefinition: {
+    select: {
+      key: true,
+      name: true,
+      durationMinutes: true,
+      active: true,
+    },
+  },
   reschedules: {
     orderBy: { createdAt: "desc" as const },
     take: 20,
@@ -205,6 +213,15 @@ export class SessionsService {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
     this.assertValidTimeRange(startAt, endAt);
+    const sessionType = await this.ensureActiveSessionType(dto.type);
+    if (
+      endAt.getTime() - startAt.getTime() !==
+      sessionType.durationMinutes * 60_000
+    ) {
+      throw new BadRequestException(
+        `This session type must be ${sessionType.durationMinutes} minutes.`,
+      );
+    }
     const timezone = await this.availability.resolveTimezone(
       user.role === UserRole.entrepreneur ? user.timezone : dto.timezone,
     );
@@ -298,6 +315,7 @@ export class SessionsService {
               targetUserId,
               createdById: user.id,
               type: dto.type,
+              durationMinutes: sessionType.durationMinutes,
               topic: dto.topic.trim(),
               notes: dto.notes?.trim() || null,
               source,
@@ -572,6 +590,14 @@ export class SessionsService {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
     this.assertValidTimeRange(startAt, endAt);
+    if (
+      endAt.getTime() - startAt.getTime() !==
+      session.typeDefinition.durationMinutes * 60_000
+    ) {
+      throw new BadRequestException(
+        `This session type must be ${session.typeDefinition.durationMinutes} minutes.`,
+      );
+    }
     await this.availability.assertBookableTime(
       startAt,
       endAt,
@@ -645,6 +671,7 @@ export class SessionsService {
             data: {
               startAt,
               endAt,
+              durationMinutes: session.typeDefinition.durationMinutes,
               ...(replacementEvent
                 ? {
                     calendarEventId: replacementEvent.eventId,
@@ -880,7 +907,12 @@ export class SessionsService {
   private async getSessionEntity(user: User, id: string) {
     const session = await this.prisma.session.findFirst({
       where: { id, ...this.scopeWhere(user) },
-      include: { entrepreneur: { select: { email: true } } },
+      include: {
+        entrepreneur: { select: { email: true } },
+        typeDefinition: {
+          select: { durationMinutes: true },
+        },
+      },
     });
     if (!session) throw new NotFoundException("Session was not found.");
     return session;
@@ -952,6 +984,17 @@ export class SessionsService {
     });
     if (!owner)
       throw new BadRequestException("Choose a valid BID team member.");
+  }
+
+  private async ensureActiveSessionType(key: string) {
+    const sessionType = await this.prisma.sessionTypeDefinition.findFirst({
+      where: { key, active: true },
+      select: { key: true, durationMinutes: true },
+    });
+    if (!sessionType) {
+      throw new BadRequestException("Choose a valid active session type.");
+    }
+    return sessionType;
   }
 
   private async ensureProgrammeReadable(
@@ -1113,7 +1156,7 @@ export class SessionsService {
     return (
       this.sessionEntrepreneurName(session) +
       " requested " +
-      this.sessionTypeWithArticle(session.type) +
+      this.sessionTypeWithArticle(session) +
       " for “" +
       session.topic +
       "” on " +
@@ -1127,7 +1170,7 @@ export class SessionsService {
     return (
       this.sessionEntrepreneurName(session) +
       " booked " +
-      this.sessionTypeWithArticle(session.type) +
+      this.sessionTypeWithArticle(session) +
       " for “" +
       session.topic +
       "”. It is scheduled for " +
@@ -1143,7 +1186,7 @@ export class SessionsService {
     return (
       this.userName(actor) +
       " confirmed your " +
-      this.sessionTypeLabel(session.type) +
+      this.sessionTypeLabel(session) +
       " for “" +
       session.topic +
       "”. It is scheduled for " +
@@ -1231,19 +1274,12 @@ export class SessionsService {
     return start + "–" + end + " (" + session.timezone + ")";
   }
 
-  private sessionTypeLabel(type: SessionWithInclude["type"]) {
-    const labels: Record<SessionWithInclude["type"], string> = {
-      mentor_checkin: "mentor check-in",
-      office_hours: "office hours session",
-      investor_prep: "investor prep session",
-    };
-    return labels[type];
+  private sessionTypeLabel(session: SessionWithInclude) {
+    return session.typeDefinition.name;
   }
 
-  private sessionTypeWithArticle(type: SessionWithInclude["type"]) {
-    return (
-      (type === "mentor_checkin" ? "a " : "an ") + this.sessionTypeLabel(type)
-    );
+  private sessionTypeWithArticle(session: SessionWithInclude) {
+    return "the " + this.sessionTypeLabel(session);
   }
 
   private mapSession(
@@ -1272,6 +1308,8 @@ export class SessionsService {
       target: session.target ? this.mapUser(session.target) : null,
       createdBy: this.mapUser(session.createdBy),
       type: session.type,
+      typeName: session.typeDefinition.name,
+      durationMinutes: session.durationMinutes,
       topic: session.topic,
       notes: session.notes,
       source: session.source,
