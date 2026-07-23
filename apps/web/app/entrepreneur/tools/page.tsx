@@ -404,7 +404,7 @@ function ViewToolRequestModal({
           </div>
           <div className="mt-4 grid gap-3">
             <RequestInfoPanel title="Business need" text={request.reason} />
-            {request.adminNote ? (
+            {request.status !== "built" && request.adminNote ? (
               <RequestInfoPanel
                 title="BID decision note"
                 text={request.adminNote}

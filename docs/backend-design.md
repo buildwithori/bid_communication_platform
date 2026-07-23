@@ -1153,6 +1153,7 @@ Backend mapping:
 - Google Meet links and Calendar event IDs are created only after ownership confirmation.
 - Tool visibility uses global, programme, and entrepreneur-level access/hidden-override tables. Do not store a giant selected-audience array on `tools`.
 - Tool request admin decisions are persisted and visible to the entrepreneur.
+- A tool request decision note represents the current non-Built state. Marking a request Built clears the active note, records the previous note through audit history, requires a published linked tool, and sends a resource-available completion update.
 
 ### Tool Runtime Contract
 

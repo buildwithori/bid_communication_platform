@@ -135,7 +135,10 @@ export default function AdminToolRequestsPage() {
         id: request.id,
         payload: {
           status: uiToApiToolRequestStatus[status],
-          adminDecisionNote: decisionNote.trim() || request.adminNote || null,
+          adminDecisionNote:
+            status === "built"
+              ? null
+              : decisionNote.trim() || request.adminNote || null,
           ...(status === "built" ? { linkedToolId: linkedToolId || request.linkedToolId } : {}),
         },
       },

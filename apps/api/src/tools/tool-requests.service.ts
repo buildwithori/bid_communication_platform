@@ -202,9 +202,11 @@ export class ToolRequestsService {
         ? dto.linkedToolId || null
         : existing.linkedToolId;
     const nextDecisionNote =
-      dto.adminDecisionNote !== undefined
-        ? dto.adminDecisionNote?.trim() || null
-        : existing.adminDecisionNote;
+      nextStatus === ToolRequestStatus.built
+        ? null
+        : dto.adminDecisionNote !== undefined
+          ? dto.adminDecisionNote?.trim() || null
+          : existing.adminDecisionNote;
     const isDecision =
       dto.status !== undefined && dto.status !== existing.status;
     const reopening = nextStatus === ToolRequestStatus.under_review;
@@ -253,6 +255,8 @@ export class ToolRequestsService {
           previousStatus: existing.status,
           nextStatus,
           linkedToolId: nextLinkedToolId,
+          previousDecisionNote: existing.adminDecisionNote,
+          nextDecisionNote,
         },
       },
       (tx) =>
@@ -261,9 +265,11 @@ export class ToolRequestsService {
             where: { id },
             data: {
               ...(dto.status !== undefined ? { status: dto.status } : {}),
-              ...(dto.adminDecisionNote !== undefined
-                ? { adminDecisionNote: nextDecisionNote }
-                : {}),
+              ...(nextStatus === ToolRequestStatus.built
+                ? { adminDecisionNote: null }
+                : dto.adminDecisionNote !== undefined
+                  ? { adminDecisionNote: nextDecisionNote }
+                  : {}),
               ...(dto.linkedToolId !== undefined
                 ? { linkedToolId: nextLinkedToolId }
                 : {}),
@@ -391,15 +397,19 @@ export class ToolRequestsService {
     request: ToolRequestWithInclude,
     statusLabel: string,
   ) {
+    const decisionNote =
+      request.status === ToolRequestStatus.built
+        ? null
+        : request.adminDecisionNote;
     return (
       "Your request “" +
       request.title +
       "” was " +
       statusLabel +
-      (request.adminDecisionNote
-        ? ". BID team note: " + this.emailExcerpt(request.adminDecisionNote)
+      (decisionNote
+        ? ". BID team note: " + this.emailExcerpt(decisionNote)
         : "") +
-      (request.linkedTool
+      (request.status === ToolRequestStatus.built && request.linkedTool
         ? ". Available resource: " + request.linkedTool.name
         : "") +
       ". Open the request to review the full update."
@@ -496,7 +506,10 @@ export class ToolRequestsService {
       neededBy: request.neededBy?.toISOString() ?? null,
       status: request.status,
       availableTransitions: this.availableTransitions(request.status),
-      adminDecisionNote: request.adminDecisionNote,
+      adminDecisionNote:
+        request.status === ToolRequestStatus.built
+          ? null
+          : request.adminDecisionNote,
       decidedAt: request.decidedAt?.toISOString() ?? null,
       decidedBy: request.decidedBy ? this.mapUser(request.decidedBy) : null,
       linkedTool: request.linkedTool,

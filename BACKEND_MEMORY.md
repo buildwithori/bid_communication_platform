@@ -361,7 +361,7 @@ Before merging backend work, ask:
 - Feature 11 is complete. Tools use scalable authenticated catalogue APIs, backend filters/counts, private PDF assets or embedded URLs, normalized global/programme/entrepreneur audiences, and per-entrepreneur hidden overrides.
 - Admin tool management uses feature-sliced frontend hooks, lazy paginated tool-area/programme/entrepreneur selectors, protected direct uploads, backend aggregate cards, tailored skeletons, guarded async actions, and automatic lifecycle audit events.
 - Entrepreneur tool reads are effective-access scoped and redact admin creator metadata and other audience identities. Trainers are explicitly forbidden from tool catalogue and request endpoints.
-- Tool requests belong to the entrepreneur user. Queues use cursor pagination and backend status aggregates. Declines require a decision note; Built requires a linked published library tool; the backend returns valid next transitions.
+- Tool requests belong to the entrepreneur user. Queues use cursor pagination and backend status aggregates. Declines require a decision note; Built requires a linked published library tool; the backend returns valid next transitions. Marking a request Built clears its active decision note, preserves the previous note in the audit payload, and sends the entrepreneur a completion update centred on the available resource rather than a stale development note.
 
 ## Session Calendar Runtime (2026-07-16)
 
