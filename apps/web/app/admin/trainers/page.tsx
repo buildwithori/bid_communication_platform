@@ -2,6 +2,8 @@
 
 import { useDebouncedValue } from '@/lib/search';
 import * as React from "react";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { BookOpenCheck, CalendarDays, GraduationCap, Mail, Phone, Star, UsersRound } from "lucide-react";
 import { PageHeader, Notice } from "@/components/shared/PageHeader";
@@ -48,6 +50,10 @@ const trainerTabs: Array<{ value: TrainerTab; label: string }> = [
   { value: "directory", label: "Trainer directory" },
   { value: "workload", label: "Workload overview" },
 ];
+
+function trainerTabFromQuery(value: string | null): TrainerTab {
+  return value === "workload" ? "workload" : "directory";
+}
 
 const roleLabels: Record<TrainerRoleLabel, string> = {
   mentor: "Mentor",
@@ -111,7 +117,21 @@ function PortfolioCell({ trainer }: { trainer: TrainerRecord }) {
 }
 
 export default function AdminTrainersPage() {
-  const [activeTab, setActiveTab] = React.useState<TrainerTab>("directory");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = trainerTabFromQuery(searchParams.get("tab"));
+  const setActiveTab = React.useCallback(
+    (nextTab: TrainerTab) => {
+      if (nextTab === activeTab) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", nextTab);
+      router.push((pathname + "?" + params.toString()) as Route, {
+        scroll: false,
+      });
+    },
+    [activeTab, pathname, router, searchParams],
+  );
   const [addOpen, setAddOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<TrainerRecord | null>(null);
   const [detailId, setDetailId] = React.useState<string | null>(null);
