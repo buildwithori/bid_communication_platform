@@ -40,9 +40,9 @@ import {
   useUpdateEntrepreneurMutation,
   useUpdateEntrepreneurStatusMutation,
   type EffectiveToolAccess,
+  type EntrepreneurDirectoryStatus,
   type EntrepreneurRecord,
   type EntrepreneurSource,
-  type EntrepreneurStatus,
 } from "@/lib/api/entrepreneurs";
 import {
   useLazyBusinessStagesQuery,
@@ -87,7 +87,8 @@ export default function AdminEntrepreneursPage() {
     return () => window.clearTimeout(timeout);
   }, []);
   const [search, setSearch] = React.useState("");
-  const [status, setStatus] = React.useState<AllOr<EntrepreneurStatus>>("all");
+  const [status, setStatus] =
+    React.useState<AllOr<EntrepreneurDirectoryStatus>>("all");
   const [source, setSource] = React.useState<AllOr<EntrepreneurSource>>("all");
   const [sectorId, setSectorId] = React.useState("all");
   const [stageId, setStageId] = React.useState("all");
@@ -450,6 +451,7 @@ export default function AdminEntrepreneursPage() {
               }
             >
               <option value="all">All statuses</option>
+              <option value="invited">Invited</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="archived">Archived</option>

@@ -91,6 +91,28 @@ const entrepreneurUser = {
   role: UserRole.entrepreneur,
 };
 
+test('entrepreneur directory separates invited and active records', () => {
+  const service = new EntrepreneursService({} as never, {} as never);
+  const buildMembershipWhere = (
+    service as unknown as {
+      buildMembershipWhere: (
+        user: { id: string; role: UserRole },
+        query: { status: 'invited' | 'active' },
+      ) => { AND: unknown[] };
+    }
+  ).buildMembershipWhere.bind(service);
+  const admin = { id: 'admin-1', role: UserRole.admin };
+
+  const invited = buildMembershipWhere(admin, { status: 'invited' });
+  const active = buildMembershipWhere(admin, { status: 'active' });
+
+  assert.deepEqual(invited.AND[1], { user: { status: 'pending' } });
+  assert.deepEqual(active.AND[1], {
+    business: { status: 'active' },
+    user: { status: 'active' },
+  });
+});
+
 const fundingPayload = {
   name: 'Seed round',
   amountCents: 100_000,

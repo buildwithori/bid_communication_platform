@@ -2,6 +2,13 @@ import { Transform } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { BusinessSource, BusinessStatus } from '@prisma/client';
 
+export const entrepreneurDirectoryStatuses = [
+  ...Object.values(BusinessStatus),
+  'invited',
+] as const;
+export type EntrepreneurDirectoryStatus =
+  (typeof entrepreneurDirectoryStatuses)[number];
+
 export class EntrepreneurQueryDto {
   @IsOptional()
   @IsString()
@@ -21,8 +28,8 @@ export class EntrepreneurQueryDto {
   programmeId?: string;
 
   @IsOptional()
-  @IsIn(Object.values(BusinessStatus))
-  status?: BusinessStatus;
+  @IsIn(entrepreneurDirectoryStatuses)
+  status?: EntrepreneurDirectoryStatus;
 
   @IsOptional()
   @IsIn(Object.values(BusinessSource))

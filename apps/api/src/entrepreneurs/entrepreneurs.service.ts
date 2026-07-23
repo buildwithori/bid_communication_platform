@@ -71,7 +71,12 @@ export class EntrepreneursService {
         this.prisma.businessMembership.count({ where }),
         this.prisma.businessMembership.count({ where: baseWhere }),
         this.prisma.businessMembership.count({
-          where: { AND: [baseWhere, { business: { status: 'active' } }] },
+          where: {
+            AND: [
+              baseWhere,
+              { business: { status: 'active' }, user: { status: 'active' } },
+            ],
+          },
         }),
         this.prisma.businessMembership.count({
           where: {
@@ -563,7 +568,14 @@ export class EntrepreneursService {
 
     if (query.sectorId) filters.push({ business: { sectorId: query.sectorId } });
     if (query.stageId) filters.push({ business: { stageId: query.stageId } });
-    if (query.status) filters.push({ business: { status: query.status } });
+    if (query.status === 'invited') {
+      filters.push({ user: { status: 'pending' } });
+    } else if (query.status) {
+      filters.push({
+        business: { status: query.status },
+        ...(query.status === 'active' ? { user: { status: 'active' } } : {}),
+      });
+    }
     if (query.source) filters.push({ business: { source: query.source } });
     if (query.programmeId && programmeAccessType === 'assigned') {
       filters.push({
