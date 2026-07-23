@@ -6,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { sessionKeys } from "./keys";
 import {
   acceptSessionRequest,
@@ -16,6 +17,7 @@ import {
   declineSessionRequest,
   getSessionAvailabilityRequest,
   getSessionRequest,
+  getSessionSummaryRequest,
   listSessionsRequest,
   listSessionTeamMembersRequest,
   rescheduleSessionRequest,
@@ -25,7 +27,6 @@ import type {
   SessionAvailabilityQuery,
   SessionCompleteVariables,
   SessionNoteVariables,
-  SessionPage,
   SessionQuery,
   SessionReasonVariables,
   SessionRecord,
@@ -47,6 +48,7 @@ export function useSessionsPage(query: Omit<SessionQuery, "cursor">) {
   const result = useQuery({
     queryKey: sessionKeys.list({ ...query, cursor }),
     queryFn: () => listSessionsRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
   const resetPagination = useCallback(() => {
     setCurrentPage(1);
@@ -72,12 +74,16 @@ export function useSessionsPage(query: Omit<SessionQuery, "cursor">) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary:
-      result.data?.summary ??
-      ({ total: 0, byStatus: {} } satisfies SessionPage["summary"]),
     setPage,
     resetPagination,
   };
+}
+
+export function useSessionSummaryQuery() {
+  return useQuery({
+    queryKey: sessionKeys.summary(),
+    queryFn: getSessionSummaryRequest,
+  });
 }
 
 export function useInfiniteSessionsQuery(
@@ -91,6 +97,7 @@ export function useInfiniteSessionsQuery(
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
+    placeholderData: retainPreviousQueryData,
   });
   return {
     ...result,
@@ -168,7 +175,7 @@ function useSessionMutation<TVariables>(
     mutationFn,
     onSuccess: (data) => {
       queryClient.setQueryData(sessionKeys.detail(data.id), data);
-      void queryClient.invalidateQueries({ queryKey: sessionKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.all });
       void queryClient.invalidateQueries({
         queryKey: [...sessionKeys.all, "availability"],
       });

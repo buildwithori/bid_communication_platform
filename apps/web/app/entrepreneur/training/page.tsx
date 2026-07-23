@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
-import { Card } from '@/components/shared/Card';
+import { Card, TableSkeleton } from '@/components/shared/Card';
 import { TrainingLibrarySkeleton } from '@/components/entrepreneur/training/TrainingLibrarySkeletons';
 import {
   DataTable,
@@ -449,7 +449,9 @@ export default function TrainingLibraryPage() {
           </div>
         </TableToolbar>
 
-        {directory.rows.length > 0 ? (
+        {directory.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={7} />
+        ) : directory.rows.length > 0 ? (
           <DataTable
             columns={columns}
             rows={directory.rows}

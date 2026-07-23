@@ -95,17 +95,7 @@ export class ToolsService {
   async listTools(user: User, query: ToolQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildToolWhere(user, query);
-    const scope = this.readScopeWhere(user);
-    const [
-      rows,
-      totalItems,
-      published,
-      drafts,
-      archived,
-      global,
-      programmeTargeted,
-      entrepreneurTargeted,
-    ] = await this.prisma.$transaction([
+    const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.tool.findMany({
         where,
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -114,36 +104,6 @@ export class ToolsService {
         include: toolInclude,
       }),
       this.prisma.tool.count({ where }),
-      this.prisma.tool.count({
-        where: { AND: [scope, { status: EntrepreneurToolStatus.published }] },
-      }),
-      this.prisma.tool.count({
-        where: { AND: [scope, { status: EntrepreneurToolStatus.draft }] },
-      }),
-      this.prisma.tool.count({
-        where: { AND: [scope, { status: EntrepreneurToolStatus.archived }] },
-      }),
-      this.prisma.tool.count({
-        where: {
-          AND: [
-            scope,
-            { visibility: EntrepreneurToolVisibility.all_entrepreneurs },
-          ],
-        },
-      }),
-      this.prisma.tool.count({
-        where: {
-          AND: [scope, { visibility: EntrepreneurToolVisibility.programmes }],
-        },
-      }),
-      this.prisma.tool.count({
-        where: {
-          AND: [
-            scope,
-            { visibility: EntrepreneurToolVisibility.entrepreneurs },
-          ],
-        },
-      }),
     ]);
 
     const nextCursor = rows.length > take ? (rows[take - 1]?.id ?? null) : null;
@@ -153,14 +113,47 @@ export class ToolsService {
         .map((tool) => this.mapTool(tool, user.role === UserRole.admin)),
       nextCursor,
       totalItems,
-      summary: {
-        statuses: { published, draft: drafts, archived },
-        visibility: {
-          allEntrepreneurs: global,
-          programmes: programmeTargeted,
-          entrepreneurs: entrepreneurTargeted,
-        },
-      },
+    };
+  }
+
+  async summary(user: User) {
+    const scope = this.readScopeWhere(user);
+    const [published, draft, archived, allEntrepreneurs, programmes, entrepreneurs] =
+      await this.prisma.$transaction([
+        this.prisma.tool.count({
+          where: { AND: [scope, { status: EntrepreneurToolStatus.published }] },
+        }),
+        this.prisma.tool.count({
+          where: { AND: [scope, { status: EntrepreneurToolStatus.draft }] },
+        }),
+        this.prisma.tool.count({
+          where: { AND: [scope, { status: EntrepreneurToolStatus.archived }] },
+        }),
+        this.prisma.tool.count({
+          where: {
+            AND: [
+              scope,
+              { visibility: EntrepreneurToolVisibility.all_entrepreneurs },
+            ],
+          },
+        }),
+        this.prisma.tool.count({
+          where: {
+            AND: [scope, { visibility: EntrepreneurToolVisibility.programmes }],
+          },
+        }),
+        this.prisma.tool.count({
+          where: {
+            AND: [
+              scope,
+              { visibility: EntrepreneurToolVisibility.entrepreneurs },
+            ],
+          },
+        }),
+      ]);
+    return {
+      statuses: { published, draft, archived },
+      visibility: { allEntrepreneurs, programmes, entrepreneurs },
     };
   }
 

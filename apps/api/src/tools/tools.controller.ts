@@ -26,6 +26,12 @@ export class ToolsController {
     return this.toolsService.listTools(user, query);
   }
 
+  @Get("summary")
+  @Roles(UserRole.admin, UserRole.entrepreneur)
+  summary(@CurrentUser() user: User) {
+    return this.toolsService.summary(user);
+  }
+
   @Get("entrepreneur/:entrepreneurUserId")
   @Roles(UserRole.admin)
   listEntrepreneurTools(

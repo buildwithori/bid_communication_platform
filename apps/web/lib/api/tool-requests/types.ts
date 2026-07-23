@@ -39,8 +39,9 @@ export type ToolRequestPage = {
   items: ToolRequestRecord[];
   nextCursor: string | null;
   totalItems: number;
-  statusCounts: Record<ApiToolRequestStatus, number>;
 };
+
+export type ToolRequestSummary = Record<ApiToolRequestStatus, number>;
 
 export type CreateToolRequestPayload = {
   title: string;

@@ -2,11 +2,13 @@
 
 import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { adminKeys } from "./keys";
 import {
   acceptAdminInvitationRequest,
   getAdminProfileRequest,
   getAdminRequest,
+  getAdminSummaryRequest,
   inviteAdminRequest,
   listAdminsRequest,
   resendAdminInvitationRequest,
@@ -15,7 +17,6 @@ import {
 } from "./requests";
 import type {
   AcceptAdminInvitationPayload,
-  AdminPage,
   AdminProfilePayload,
   AdminQuery,
   AdminRecord,
@@ -40,6 +41,7 @@ export function useAdminsPage(query: AdminPageQuery) {
   const result = useQuery({
     queryKey: adminKeys.list({ ...query, cursor }),
     queryFn: () => listAdminsRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {
@@ -74,17 +76,16 @@ export function useAdminsPage(query: AdminPageQuery) {
     page,
     rows: (result.data?.items ?? []) as AdminRecord[],
     totalItems: result.data?.totalItems ?? 0,
-    summary:
-      result.data?.summary ??
-      ({
-        totalAdmins: 0,
-        activeAdmins: 0,
-        pendingInvites: 0,
-        calendarReady: 0,
-      } satisfies AdminPage["summary"]),
     setPage,
     resetPagination,
   };
+}
+
+export function useAdminSummaryQuery() {
+  return useQuery({
+    queryKey: adminKeys.summary(),
+    queryFn: getAdminSummaryRequest,
+  });
 }
 
 export function useAdminDetailQuery(id: string | null) {

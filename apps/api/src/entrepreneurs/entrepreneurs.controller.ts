@@ -34,6 +34,12 @@ export class EntrepreneursController {
     return this.entrepreneursService.listEntrepreneurs(user, query);
   }
 
+  @Get('summary')
+  @Roles(UserRole.admin, UserRole.trainer)
+  summary(@CurrentUser() user: User) {
+    return this.entrepreneursService.summary(user);
+  }
+
   @Get('me/profile')
   @Roles(UserRole.entrepreneur)
   myProfile(@CurrentUser() user: User) {

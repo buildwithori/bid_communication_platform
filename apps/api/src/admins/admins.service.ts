@@ -64,14 +64,7 @@ export class AdminsService {
   async list(query: AdminQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildWhere(query);
-    const [
-      rows,
-      totalItems,
-      totalAdmins,
-      activeAdmins,
-      pendingInvites,
-      calendarReady,
-    ] = await this.prisma.$transaction([
+    const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -80,24 +73,6 @@ export class AdminsService {
         include: adminInclude,
       }),
       this.prisma.user.count({ where }),
-      this.prisma.user.count({ where: { role: UserRole.admin } }),
-      this.prisma.user.count({
-        where: { role: UserRole.admin, status: UserStatus.active },
-      }),
-      this.prisma.user.count({
-        where: { role: UserRole.admin, status: UserStatus.pending },
-      }),
-      this.prisma.user.count({
-        where: {
-          role: UserRole.admin,
-          calendarConnections: {
-            some: {
-              provider: CalendarProvider.google,
-              status: CalendarConnectionStatus.connected,
-            },
-          },
-        },
-      }),
     ]);
 
     const visibleRows = rows.slice(0, take);
@@ -114,13 +89,32 @@ export class AdminsService {
           ? (visibleRows[visibleRows.length - 1]?.id ?? null)
           : null,
       totalItems,
-      summary: {
-        totalAdmins,
-        activeAdmins,
-        pendingInvites,
-        calendarReady,
-      },
     };
+  }
+
+  async summary() {
+    const [totalAdmins, activeAdmins, pendingInvites, calendarReady] =
+      await this.prisma.$transaction([
+        this.prisma.user.count({ where: { role: UserRole.admin } }),
+        this.prisma.user.count({
+          where: { role: UserRole.admin, status: UserStatus.active },
+        }),
+        this.prisma.user.count({
+          where: { role: UserRole.admin, status: UserStatus.pending },
+        }),
+        this.prisma.user.count({
+          where: {
+            role: UserRole.admin,
+            calendarConnections: {
+              some: {
+                provider: CalendarProvider.google,
+                status: CalendarConnectionStatus.connected,
+              },
+            },
+          },
+        }),
+      ]);
+    return { totalAdmins, activeAdmins, pendingInvites, calendarReady };
   }
 
   async get(adminId: string) {

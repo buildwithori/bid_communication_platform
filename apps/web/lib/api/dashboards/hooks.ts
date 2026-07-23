@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { dashboardKeys } from "./keys";
 import {
   getAdminDashboardRequest,
@@ -41,6 +42,7 @@ export function useAdminRecentEntrepreneursPage(
   const result = useQuery<DashboardRecentEntrepreneurPage>({
     queryKey: dashboardKeys.recentEntrepreneurs({ ...query, cursor }),
     queryFn: () => listAdminRecentEntrepreneursRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
   const resetPagination = useCallback(() => {
     setCurrentPage(1);

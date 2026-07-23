@@ -7,10 +7,12 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { toolKeys } from "./keys";
 import {
   createToolRequest,
   getToolRequest,
+  getToolSummaryRequest,
   listToolsRequest,
   updateToolRequest,
 } from "./requests";
@@ -36,7 +38,7 @@ export function useToolsPage(query: PageQuery) {
   const result = useQuery({
     queryKey: toolKeys.list({ ...query, cursor }),
     queryFn: () => listToolsRequest({ ...query, cursor }),
-    placeholderData: (previousData) => previousData,
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {
@@ -69,10 +71,16 @@ export function useToolsPage(query: PageQuery) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary: result.data?.summary,
     setPage,
     resetPagination,
   };
+}
+
+export function useToolSummaryQuery() {
+  return useQuery({
+    queryKey: toolKeys.summary(),
+    queryFn: getToolSummaryRequest,
+  });
 }
 
 export function useLazyToolsQuery({
@@ -119,7 +127,7 @@ export function useUpdateToolMutation(handlers?: MutationHandlers<ToolRecord>) {
       updateToolRequest(id, payload),
     onSuccess: (data) => {
       client.setQueryData(toolKeys.detail(data.id), data);
-      void client.invalidateQueries({ queryKey: toolKeys.lists() });
+      void client.invalidateQueries({ queryKey: toolKeys.all });
       handlers?.onSuccess?.(data);
     },
     onError: handlers?.onError,

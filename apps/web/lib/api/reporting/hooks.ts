@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { reportingKeys } from "./keys";
 import {
   createReportExportRequest,
@@ -29,6 +30,7 @@ export const useReportingOverviewQuery = (query: ReportingQuery) =>
   useQuery({
     queryKey: reportingKeys.overview(query),
     queryFn: () => getReportingOverviewRequest(query),
+    placeholderData: retainPreviousQueryData,
   });
 
 export function useOverdueUpdatesPage(
@@ -42,6 +44,7 @@ export function useOverdueUpdatesPage(
   const result = useQuery({
     queryKey: reportingKeys.overdue({ ...query, cursor }),
     queryFn: () => getOverdueUpdatesRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {

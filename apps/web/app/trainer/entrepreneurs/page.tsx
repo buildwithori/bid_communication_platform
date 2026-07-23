@@ -25,6 +25,7 @@ import { StatCard } from "@/components/shared/StatCard";
 import {
   useEntrepreneurDetailQuery,
   useEntrepreneursPage,
+  useEntrepreneurSummaryQuery,
   useProgrammeAccessQuery,
   type EntrepreneurRecord,
 } from "@/lib/api/entrepreneurs";
@@ -45,6 +46,7 @@ export default function TrainerEntrepreneursPage() {
     programmeId: programmeId === ALL ? undefined : programmeId,
     take: pageSize,
   });
+  const entrepreneurSummary = useEntrepreneurSummaryQuery();
   const programmes = useLazyProgrammesLookup({
     enabled: true,
     search: programmeSearch.trim() || undefined,
@@ -144,7 +146,10 @@ export default function TrainerEntrepreneursPage() {
     [],
   );
 
-  if (entrepreneurs.isLoading && !entrepreneurs.data) {
+  if (
+    (entrepreneurs.isLoading && !entrepreneurs.data) ||
+    (entrepreneurSummary.isLoading && !entrepreneurSummary.data)
+  ) {
     return <TrainerEntrepreneursSkeleton />;
   }
 
@@ -167,7 +172,7 @@ export default function TrainerEntrepreneursPage() {
     );
   }
 
-  const impact = entrepreneurs.summary.learnerImpact;
+  const impact = entrepreneurSummary.data?.learnerImpact;
 
   return (
     <>
@@ -179,29 +184,29 @@ export default function TrainerEntrepreneursPage() {
       <MetricGrid columns={4}>
         <StatCard
           label="Supported entrepreneurs"
-          value={entrepreneurs.summary.totalEntrepreneurs}
+          value={entrepreneurSummary.data?.totalEntrepreneurs ?? 0}
           subline="In your content-owned programmes"
           dotColor="bid"
           accent="bid"
         />
         <StatCard
           label="Average progress"
-          value={impact.averageProgrammeProgress + "%"}
-          subline={impact.trackedProgrammeProgress + " tracked programme records"}
+          value={(impact?.averageProgrammeProgress ?? 0) + "%"}
+          subline={(impact?.trackedProgrammeProgress ?? 0) + " tracked programme records"}
           dotColor="success"
           accent="success"
         />
         <StatCard
           label="Content completions"
-          value={impact.completedContent}
+          value={impact?.completedContent ?? 0}
           subline="Completed trainer-attributed assets"
           dotColor="info"
           accent="info"
         />
         <StatCard
           label="Content rating"
-          value={impact.ratingCount ? formatRating(impact.averageRating) : "—"}
-          subline={impact.ratingCount + " learner ratings"}
+          value={impact?.ratingCount ? formatRating(impact.averageRating) : "—"}
+          subline={(impact?.ratingCount ?? 0) + " learner ratings"}
           dotColor="warning"
           accent="warning"
         />
@@ -252,7 +257,9 @@ export default function TrainerEntrepreneursPage() {
           </div>
         </TableToolbar>
 
-        {entrepreneurs.rows.length > 0 ? (
+        {entrepreneurs.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={7} />
+        ) : entrepreneurs.rows.length > 0 ? (
           <DataTable
             columns={columns}
             rows={entrepreneurs.rows}

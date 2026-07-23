@@ -7,11 +7,13 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { trainerKeys } from "./keys";
 import {
   acceptTrainerInvitationRequest,
   getTrainerProfileRequest,
   getTrainerRequest,
+  getTrainerSummaryRequest,
   inviteTrainerRequest,
   listTrainersRequest,
   resendTrainerInvitationRequest,
@@ -23,7 +25,6 @@ import type {
   AcceptTrainerInvitationPayload,
   InvitationResendResult,
   InviteTrainerPayload,
-  TrainerPage,
   TrainerProfilePayload,
   TrainerQuery,
   TrainerRecord,
@@ -47,6 +48,7 @@ export function useTrainersPage(query: TrainerPageQuery) {
   const result = useQuery({
     queryKey: trainerKeys.list({ ...query, cursor }),
     queryFn: () => listTrainersRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {
@@ -81,17 +83,16 @@ export function useTrainersPage(query: TrainerPageQuery) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary:
-      result.data?.summary ??
-      ({
-        totalTrainers: 0,
-        activeTrainers: 0,
-        pendingInvites: 0,
-        calendarReady: 0,
-      } satisfies TrainerPage["summary"]),
     setPage,
     resetPagination,
   };
+}
+
+export function useTrainerSummaryQuery() {
+  return useQuery({
+    queryKey: trainerKeys.summary(),
+    queryFn: getTrainerSummaryRequest,
+  });
 }
 
 export function useLazyTrainersLookup(

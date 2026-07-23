@@ -397,13 +397,17 @@ export default function AdminProgramsPage() {
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={directory.rows}
-          rowKey={(programme) => programme.id}
-          emptyMessage="No programmes match this search."
-          tableClassName="min-w-[1060px]"
-        />
+        {directory.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={9} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={directory.rows}
+            rowKey={(programme) => programme.id}
+            emptyMessage="No programmes match this search."
+            tableClassName="min-w-[1060px]"
+          />
+        )}
         <TablePagination
           page={directory.page}
           pageSize={pageSize}

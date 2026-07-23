@@ -470,7 +470,7 @@ function CurriculumTab({
           />
         </div>
       </TableToolbar>
-      {modules.isLoading && !modules.data ? (
+      {(modules.isLoading && !modules.data) || modules.isPlaceholderData ? (
         <TableSkeleton columns={5} rows={6} />
       ) : modules.isError ? (
         <Notice>Modules could not be loaded. {modules.error.message}</Notice>
@@ -571,7 +571,7 @@ function DeliverablesTab({ programmeId }: { programmeId: string }) {
           />
         </div>
       </TableToolbar>
-      {rules.isLoading ? (
+      {rules.isLoading || rules.isPlaceholderData ? (
         <TableSkeleton columns={4} rows={5} />
       ) : rules.isError ? (
         <Notice>Deliverables could not be loaded. {rules.error.message}</Notice>
@@ -683,7 +683,7 @@ function ReadinessTab({ programme }: { programme: ProgrammeDetail }) {
           tone={capacityNeedsAttention ? 'warning' : 'neutral'}
         />
       </div>
-      {modules.isLoading && !modules.data ? (
+      {(modules.isLoading && !modules.data) || modules.isPlaceholderData ? (
         <TableSkeleton columns={3} rows={8} />
       ) : modules.isError ? (
         <Notice>Readiness details could not be loaded.</Notice>
@@ -827,7 +827,8 @@ function EntrepreneursTab({ programmeId }: { programmeId: string }) {
           />
         </div>
       </TableToolbar>
-      {entrepreneurs.isLoading && !entrepreneurs.data ? (
+      {(entrepreneurs.isLoading && !entrepreneurs.data) ||
+      entrepreneurs.isPlaceholderData ? (
         <TableSkeleton columns={4} rows={5} />
       ) : entrepreneurs.isError ? (
         <Notice>

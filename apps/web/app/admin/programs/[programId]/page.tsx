@@ -672,7 +672,7 @@ function CurriculumTable({
           />
         </div>
       </TableToolbar>
-      {modules.isLoading && !modules.data ? (
+      {(modules.isLoading && !modules.data) || modules.isPlaceholderData ? (
         <TableSkeleton columns={6} rows={pageSize} />
       ) : modules.isError ? (
         <Notice>Modules could not be loaded. {modules.error.message}</Notice>

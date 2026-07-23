@@ -10,6 +10,7 @@ import type {
   SessionReasonVariables,
   SessionRecord,
   SessionRescheduleVariables,
+  SessionSummary,
   SessionTeamMemberPage,
   SessionTeamMemberQuery,
 } from "./types";
@@ -26,6 +27,9 @@ export function listSessionsRequest(query?: SessionQuery) {
   return apiRequest<SessionPage>(
     `/sessions${queryString({ ...(query ?? {}) })}`,
   );
+}
+export function getSessionSummaryRequest() {
+  return apiRequest<SessionSummary>("/sessions/summary");
 }
 export function getSessionRequest(id: string) {
   return apiRequest<SessionRecord>(`/sessions/${id}`);

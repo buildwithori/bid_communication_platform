@@ -164,28 +164,31 @@ export class SessionsService {
             ).map((entry) => entry.sessionId),
           );
     const nextCursor = rows.length > take ? (rows[take]?.id ?? null) : null;
-    const scopedWhere = this.buildWhere(user, { ...query, status: undefined });
-    const [totalItems, total, grouped] = await Promise.all([
-      this.prisma.session.count({ where }),
-      this.prisma.session.count({ where: scopedWhere }),
-      this.prisma.session.groupBy({
-        by: ["status"],
-        where: scopedWhere,
-        _count: { _all: true },
-      }),
-    ]);
+    const totalItems = await this.prisma.session.count({ where });
     return {
       items: visibleRows.map((session) =>
         this.mapSession(session, user.role, declinedIds.has(session.id)),
       ),
       nextCursor,
       totalItems,
-      summary: {
-        total,
-        byStatus: Object.fromEntries(
-          grouped.map((item) => [item.status, item._count._all]),
-        ),
-      },
+    };
+  }
+
+  async summary(user: User) {
+    const where = this.buildWhere(user, {});
+    const [total, grouped] = await Promise.all([
+      this.prisma.session.count({ where }),
+      this.prisma.session.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+      }),
+    ]);
+    return {
+      total,
+      byStatus: Object.fromEntries(
+        grouped.map((item) => [item.status, item._count._all]),
+      ),
     };
   }
 

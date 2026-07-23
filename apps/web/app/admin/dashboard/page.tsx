@@ -20,7 +20,7 @@ import {
 import { AdminDashboardSkeleton } from "@/components/dashboard/DashboardSkeletons";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { Card, CardHeader } from "@/components/shared/Card";
+import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
 import { ChartCard } from "@/components/shared/ChartCard";
 import {
   DataTable,
@@ -252,7 +252,9 @@ export default function AdminDashboardPage() {
             <TableFilterAutocomplete value={status} onValueChange={setStatus} options={statusOptions} placeholder="All statuses" searchPlaceholder="Search statuses..." emptyMessage="No status found." />
           </div>
         </TableToolbar>
-        {recent.isError ? (
+        {recent.isPlaceholderData ? (
+          <TableSkeleton rows={pageSize} columns={7} />
+        ) : recent.isError ? (
           <Notice className="mb-0 border border-danger/20 bg-danger/5 text-danger">Recent entrepreneurs could not be loaded. <Button className="ml-2" size="sm" variant="outline" onClick={() => recent.refetch()}>Try again</Button></Notice>
         ) : (
           <DataTable columns={columns} rows={recent.rows} rowKey={(record) => record.entrepreneurUserId} emptyMessage={recent.isLoading ? "Loading recent entrepreneurs..." : "No recent entrepreneurs match this view."} />

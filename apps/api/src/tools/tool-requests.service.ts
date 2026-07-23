@@ -90,8 +90,7 @@ export class ToolRequestsService {
   async listRequests(user: User, query: ToolRequestQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildWhere(user, query);
-    const scope = this.readScopeWhere(user);
-    const [rows, totalItems, underReview, inDevelopment, built, declined] =
+    const [rows, totalItems] =
       await this.prisma.$transaction([
         this.prisma.toolRequest.findMany({
           where,
@@ -101,6 +100,20 @@ export class ToolRequestsService {
           include: toolRequestInclude,
         }),
         this.prisma.toolRequest.count({ where }),
+      ]);
+
+    const nextCursor = rows.length > take ? (rows[take - 1]?.id ?? null) : null;
+    return {
+      items: rows.slice(0, take).map((request) => this.mapRequest(request)),
+      nextCursor,
+      totalItems,
+    };
+  }
+
+  async summary(user: User) {
+    const scope = this.readScopeWhere(user);
+    const [underReview, inDevelopment, built, declined] =
+      await this.prisma.$transaction([
         this.prisma.toolRequest.count({
           where: { AND: [scope, { status: ToolRequestStatus.under_review }] },
         }),
@@ -114,19 +127,11 @@ export class ToolRequestsService {
           where: { AND: [scope, { status: ToolRequestStatus.declined }] },
         }),
       ]);
-
-    const nextCursor = rows.length > take ? (rows[take - 1]?.id ?? null) : null;
-    const statusCounts: Record<ToolRequestStatus, number> = {
+    return {
       [ToolRequestStatus.under_review]: underReview,
       [ToolRequestStatus.in_development]: inDevelopment,
       [ToolRequestStatus.built]: built,
       [ToolRequestStatus.declined]: declined,
-    };
-    return {
-      items: rows.slice(0, take).map((request) => this.mapRequest(request)),
-      nextCursor,
-      totalItems,
-      statusCounts,
     };
   }
 

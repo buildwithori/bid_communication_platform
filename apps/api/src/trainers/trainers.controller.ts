@@ -36,6 +36,12 @@ export class TrainersController {
     return this.trainersService.listTrainers(user, query);
   }
 
+  @Get('summary')
+  @Roles(UserRole.admin)
+  summary(@CurrentUser() user: User) {
+    return this.trainersService.summary(user);
+  }
+
   @Get('me/profile')
   @Roles(UserRole.trainer)
   myProfile(@CurrentUser() user: User) {

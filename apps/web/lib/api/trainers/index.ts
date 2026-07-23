@@ -5,6 +5,7 @@ export {
   useResendTrainerInvitationMutation,
   useTrainerDetailQuery,
   useTrainerProfileQuery,
+  useTrainerSummaryQuery,
   useTrainersPage,
   useUpdateTrainerMutation,
   useUpdateTrainerProfileMutation,

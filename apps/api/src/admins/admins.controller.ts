@@ -32,6 +32,11 @@ export class AdminsController {
     return this.admins.list(query);
   }
 
+  @Get("summary")
+  summary() {
+    return this.admins.summary();
+  }
+
   @Get("me/profile")
   myProfile(@CurrentUser() user: User) {
     return this.admins.myProfile(user.id);

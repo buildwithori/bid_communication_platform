@@ -177,12 +177,16 @@ export default function AdminToolAreasPage() {
             }}
           />
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={toolAreas.rows}
-          rowKey={(toolArea) => toolArea.id}
-          emptyMessage="No tool areas match this search."
-        />
+        {toolAreas.isPlaceholderData ? (
+          <TableSkeleton columns={4} rows={Math.min(pageSize, 6)} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={toolAreas.rows}
+            rowKey={(toolArea) => toolArea.id}
+            emptyMessage="No tool areas match this search."
+          />
+        )}
         <TablePagination
           page={toolAreas.page}
           pageSize={pageSize}

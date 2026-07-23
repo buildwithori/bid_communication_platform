@@ -8,6 +8,7 @@ import type {
   EntrepreneurProfilePayload,
   EntrepreneurQuery,
   EntrepreneurRecord,
+  EntrepreneurSummary,
   EntrepreneurProgrammeAccess,
   FundraisingRoundPayload,
   FundraisingRoundRecord,
@@ -62,6 +63,8 @@ function queryString(
 
 export const listEntrepreneursRequest = (query?: EntrepreneurQuery) =>
   apiRequest<EntrepreneurPage>(`/entrepreneurs${queryString(query)}`);
+export const getEntrepreneurSummaryRequest = () =>
+  apiRequest<EntrepreneurSummary>("/entrepreneurs/summary");
 export const getEntrepreneurRequest = (id: string) =>
   apiRequest<EntrepreneurRecord>(`/entrepreneurs/${id}`);
 export const getEntrepreneurProfileRequest = () =>

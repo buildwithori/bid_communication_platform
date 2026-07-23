@@ -28,6 +28,7 @@ import { Notice, PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import {
   useToolRequestDetailQuery,
+  useToolRequestSummaryQuery,
   useToolRequestsPage,
   useUpdateToolRequestMutation,
   type ToolRequestRecord,
@@ -88,6 +89,7 @@ export default function AdminToolRequestsPage() {
     toolAreaId: categoryFilter === "all" ? undefined : categoryFilter,
     take: pageSize,
   });
+  const requestSummary = useToolRequestSummaryQuery();
   const areas = useLazyToolAreasQuery({
     enabled: true,
     search: areaSearch || undefined,
@@ -204,7 +206,7 @@ export default function AdminToolRequestsPage() {
     },
   ];
 
-  const counts = requests.statusCounts;
+  const counts = requestSummary.data;
   return (
     <>
       <PageHeader
@@ -303,7 +305,7 @@ export default function AdminToolRequestsPage() {
             />
           </div>
         </TableToolbar>
-        {requests.isLoading ? (
+        {requests.isLoading || requests.isPlaceholderData ? (
           <TableSkeleton rows={6} columns={6} />
         ) : requests.isError ? (
           <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">

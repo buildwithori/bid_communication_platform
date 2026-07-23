@@ -8,7 +8,7 @@ import { ReportingPageSkeleton } from "@/components/reporting/ReportingPageSkele
 import { Badge } from "@/components/shared/Badge";
 import { BarChartRow } from "@/components/shared/BarChartRow";
 import { Button } from "@/components/shared/Button";
-import { Card, CardHeader } from "@/components/shared/Card";
+import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
 import { DatePicker } from "@/components/shared/DatePicker";
 import {
   DataTable,
@@ -543,6 +543,8 @@ export default function AdminReportingPage() {
           <Notice className="border border-danger/20 bg-danger/5 text-danger">
             The follow-up queue could not be loaded. {overdue.error.message}
           </Notice>
+        ) : overdue.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={6} />
         ) : (
           <>
             <DataTable

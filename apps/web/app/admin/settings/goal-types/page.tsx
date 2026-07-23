@@ -203,13 +203,17 @@ export default function AdminGoalTypesPage() {
             }}
           />
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={goalTypes.rows}
-          rowKey={(goalType) => goalType.id}
-          emptyMessage="No goal types match this search."
-          tableClassName="min-w-[980px]"
-        />
+        {goalTypes.isPlaceholderData ? (
+          <TableSkeleton columns={6} rows={Math.min(pageSize, 6)} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={goalTypes.rows}
+            rowKey={(goalType) => goalType.id}
+            emptyMessage="No goal types match this search."
+            tableClassName="min-w-[980px]"
+          />
+        )}
         <TablePagination
           page={goalTypes.page}
           pageSize={pageSize}

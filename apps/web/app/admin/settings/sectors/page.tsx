@@ -173,12 +173,16 @@ export default function AdminSectorsPage() {
             }}
           />
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={sectors.rows}
-          rowKey={(sector) => sector.id}
-          emptyMessage="No sectors match this search."
-        />
+        {sectors.isPlaceholderData ? (
+          <TableSkeleton columns={4} rows={Math.min(pageSize, 6)} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={sectors.rows}
+            rowKey={(sector) => sector.id}
+            emptyMessage="No sectors match this search."
+          />
+        )}
         <TablePagination
           page={sectors.page}
           pageSize={pageSize}

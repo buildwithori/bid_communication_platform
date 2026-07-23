@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { retainPreviousQueryData } from '../query-behavior';
 import { programmeKeys } from './keys';
 import { dashboardKeys } from '../dashboards/keys';
 import { deliverableKeys } from '../deliverables/keys';
@@ -68,6 +69,7 @@ export function useProgrammesPage(query: ProgrammePageQuery) {
   const result = useQuery({
     queryKey: programmeKeys.list({ ...query, cursor }),
     queryFn: () => listProgrammesRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {
@@ -155,6 +157,7 @@ export function useProgrammeModulesPage(programmeId: string, query: ProgrammeMod
   const result = useQuery({
     queryKey: programmeKeys.moduleList(programmeId, { ...query, cursor }),
     queryFn: () => listProgrammeModulesRequest(programmeId, { ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
     enabled: Boolean(programmeId),
     refetchInterval: (current) =>
       current.state.data?.items.some(
@@ -279,6 +282,7 @@ export function useProgrammeDeliverableRulesPage(programmeId: string, query: Omi
   const result = useQuery({
     queryKey: programmeKeys.deliverableRules(programmeId, { ...query, cursor }),
     queryFn: () => listProgrammeDeliverableRulesRequest(programmeId, { ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
     enabled: Boolean(programmeId),
   });
 

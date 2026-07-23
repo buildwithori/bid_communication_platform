@@ -8,6 +8,7 @@ export const sessionKeys = {
   lists: () => [...sessionKeys.all, "list"] as const,
   list: (query: Omit<SessionQuery, "cursor"> & { cursor?: string }) =>
     [...sessionKeys.lists(), query] as const,
+  summary: () => [...sessionKeys.all, "summary"] as const,
   details: () => [...sessionKeys.all, "detail"] as const,
   detail: (id: string) => [...sessionKeys.details(), id] as const,
   teamMembers: (query: Omit<SessionTeamMemberQuery, "cursor">) =>

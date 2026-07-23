@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { retainPreviousQueryData } from '../query-behavior';
 import { contentKeys } from './keys';
 import { programmeKeys } from '../programmes/keys';
 import { listToolsRequest } from '../tools/requests';
@@ -55,7 +56,7 @@ function useCursorPage(
     queryFn: () => request({ ...query, cursor }),
     enabled,
     placeholderData: preservePreviousSummary
-      ? (previousData) => previousData
+      ? retainPreviousQueryData
       : undefined,
     refetchInterval: (current) =>
       current.state.data?.items.some((item) => item.status === 'processing')
@@ -143,7 +144,7 @@ export const useContentItemsSummaryQuery = (query: ContentItemSummaryQuery) =>
   useQuery({
     queryKey: contentKeys.summary(query),
     queryFn: () => getContentItemsSummaryRequest(query),
-    placeholderData: (previousData) => previousData,
+    placeholderData: retainPreviousQueryData,
   });
 
 export const useModuleContentItemsPage = (moduleId: string, query: PageQuery, enabled = true) =>

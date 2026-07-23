@@ -42,7 +42,6 @@ export type AdminPage = {
   items: AdminRecord[];
   nextCursor: string | null;
   totalItems: number;
-  summary: AdminDirectorySummary;
 };
 
 export type AdminQuery = {

@@ -4,6 +4,7 @@ export const entrepreneurKeys = {
   all: ['entrepreneurs'] as const,
   lists: () => [...entrepreneurKeys.all, 'list'] as const,
   list: (query?: EntrepreneurQuery) => [...entrepreneurKeys.lists(), query] as const,
+  summary: () => [...entrepreneurKeys.all, 'summary'] as const,
   detail: (id: string) => [...entrepreneurKeys.all, 'detail', id] as const,
   profile: () => [...entrepreneurKeys.all, 'profile'] as const,
   records: (id: string) => [...entrepreneurKeys.detail(id), 'records'] as const,

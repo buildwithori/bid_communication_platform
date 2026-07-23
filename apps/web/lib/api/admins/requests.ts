@@ -1,6 +1,7 @@
 import { apiRequest } from "../client";
 import type {
   AcceptAdminInvitationPayload,
+  AdminDirectorySummary,
   AdminPage,
   AdminProfilePayload,
   AdminQuery,
@@ -23,6 +24,10 @@ function toQueryString(query?: AdminQuery) {
 
 export function listAdminsRequest(query?: AdminQuery) {
   return apiRequest<AdminPage>(`/admins${toQueryString(query)}`);
+}
+
+export function getAdminSummaryRequest() {
+  return apiRequest<AdminDirectorySummary>("/admins/summary");
 }
 
 export function getAdminRequest(id: string) {

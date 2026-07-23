@@ -58,7 +58,6 @@ export type TrainerPage = {
   items: TrainerRecord[];
   nextCursor: string | null;
   totalItems: number;
-  summary: TrainerSummary;
 };
 
 export type TrainerQuery = {

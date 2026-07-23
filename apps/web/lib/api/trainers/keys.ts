@@ -5,6 +5,7 @@ export const trainerKeys = {
   lists: () => [...trainerKeys.all, "list"] as const,
   list: (query?: TrainerQuery) =>
     [...trainerKeys.lists(), query ?? {}] as const,
+  summary: () => [...trainerKeys.all, "summary"] as const,
   details: () => [...trainerKeys.all, "detail"] as const,
   detail: (id: string) => [...trainerKeys.details(), id] as const,
   profile: () => [...trainerKeys.all, "profile"] as const,

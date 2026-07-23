@@ -38,6 +38,11 @@ export class SessionsController {
     return this.sessionsService.listSessions(user, query);
   }
 
+  @Get("summary")
+  summary(@CurrentUser() user: User) {
+    return this.sessionsService.summary(user);
+  }
+
   @Get("team-members")
   listTeamMembers(@Query() query: SessionTeamMemberQueryDto) {
     return this.availabilityService.listTeamMembers(query);

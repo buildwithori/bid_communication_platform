@@ -194,12 +194,16 @@ export default function AdminBusinessStagesPage() {
             }}
           />
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={stages.rows}
-          rowKey={(stage) => stage.id}
-          emptyMessage="No business stages match this search."
-        />
+        {stages.isPlaceholderData ? (
+          <TableSkeleton columns={5} rows={Math.min(pageSize, 6)} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={stages.rows}
+            rowKey={(stage) => stage.id}
+            emptyMessage="No business stages match this search."
+          />
+        )}
         <TablePagination
           page={stages.page}
           pageSize={pageSize}

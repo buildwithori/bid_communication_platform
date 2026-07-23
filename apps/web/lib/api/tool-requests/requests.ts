@@ -4,6 +4,7 @@ import type {
   ToolRequestPage,
   ToolRequestQuery,
   ToolRequestRecord,
+  ToolRequestSummary,
   UpdateToolRequestPayload,
 } from "./types";
 
@@ -20,6 +21,8 @@ function toQueryString(query?: ToolRequestQuery) {
 
 export const listToolRequestsRequest = (query?: ToolRequestQuery) =>
   apiRequest<ToolRequestPage>(`/tool-requests${toQueryString(query)}`);
+export const getToolRequestSummaryRequest = () =>
+  apiRequest<ToolRequestSummary>("/tool-requests/summary");
 
 export const getToolRequestRequest = (id: string) =>
   apiRequest<ToolRequestRecord>(`/tool-requests/${id}`);

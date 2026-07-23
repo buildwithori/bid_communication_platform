@@ -29,6 +29,12 @@ export class ToolRequestsController {
     return this.toolRequestsService.listRequests(user, query);
   }
 
+  @Get("summary")
+  @Roles(UserRole.admin, UserRole.entrepreneur)
+  summary(@CurrentUser() user: User) {
+    return this.toolRequestsService.summary(user);
+  }
+
   @Get(":id")
   @Roles(UserRole.admin, UserRole.entrepreneur)
   getRequest(@CurrentUser() user: User, @Param("id") id: string) {

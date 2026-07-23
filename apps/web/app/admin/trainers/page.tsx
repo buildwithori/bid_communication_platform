@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { BookOpenCheck, CalendarDays, GraduationCap, Mail, Phone, Star, UsersRound } from "lucide-react";
 import { PageHeader, Notice } from "@/components/shared/PageHeader";
-import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { StatCard } from "@/components/shared/StatCard";
 import { Badge } from "@/components/shared/Badge";
@@ -30,6 +30,7 @@ import {
   useInviteTrainerMutation,
   useResendTrainerInvitationMutation,
   useTrainerDetailQuery,
+  useTrainerSummaryQuery,
   useTrainersPage,
   useUpdateTrainerMutation,
   useUpdateTrainerStatusMutation,
@@ -152,6 +153,7 @@ export default function AdminTrainersPage() {
     sectorId: sectorId === "all" ? undefined : sectorId,
     take: pageSize,
   });
+  const trainerSummary = useTrainerSummaryQuery();
   const sectors = useLazySectorsQuery({
     enabled: true,
     search: sectorSearch.trim() || undefined,
@@ -379,7 +381,10 @@ export default function AdminTrainersPage() {
     })),
   ];
 
-  if (trainers.isLoading && !trainers.data) {
+  if (
+    (trainers.isLoading && !trainers.data) ||
+    (trainerSummary.isLoading && !trainerSummary.data)
+  ) {
     return <TrainersSkeleton />;
   }
 
@@ -394,10 +399,10 @@ export default function AdminTrainersPage() {
         Trainers see the entrepreneurs, programmes, sessions, and review work connected to the learning assets they support.
       </Notice>
       <MetricGrid className="mb-4">
-        <StatCard label="Total trainers" value={trainers.summary.totalTrainers} subline="Across every status" dotColor="bid" accent="bid" />
-        <StatCard label="Active trainers" value={trainers.summary.activeTrainers} subline="Can support delivery" dotColor="success" accent="success" />
-        <StatCard label="Pending invites" value={trainers.summary.pendingInvites} subline="Awaiting activation" dotColor="warning" accent="warning" />
-        <StatCard label="Calendar ready" value={trainers.summary.calendarReady} subline="Google Calendar connected" dotColor="info" accent="info" />
+        <StatCard label="Total trainers" value={trainerSummary.data?.totalTrainers ?? 0} subline="Across every status" dotColor="bid" accent="bid" />
+        <StatCard label="Active trainers" value={trainerSummary.data?.activeTrainers ?? 0} subline="Can support delivery" dotColor="success" accent="success" />
+        <StatCard label="Pending invites" value={trainerSummary.data?.pendingInvites ?? 0} subline="Awaiting activation" dotColor="warning" accent="warning" />
+        <StatCard label="Calendar ready" value={trainerSummary.data?.calendarReady ?? 0} subline="Google Calendar connected" dotColor="info" accent="info" />
       </MetricGrid>
       <Tabs value={activeTab} onChange={setActiveTab} tabs={trainerTabs} />
       <Card>
@@ -454,13 +459,17 @@ export default function AdminTrainersPage() {
           </Notice>
         ) : (
           <>
-            <DataTable
-              columns={activeTab === "directory" ? directoryColumns : workloadColumns}
-              rows={trainers.rows}
-              rowKey={(trainer) => trainer.trainerUserId}
-              emptyMessage="No trainers match these filters."
-              tableClassName={activeTab === "directory" ? "min-w-[1290px]" : "min-w-[980px]"}
-            />
+            {trainers.isPlaceholderData ? (
+              <TableSkeleton rows={Math.min(pageSize, 6)} columns={activeTab === "directory" ? 8 : 6} />
+            ) : (
+              <DataTable
+                columns={activeTab === "directory" ? directoryColumns : workloadColumns}
+                rows={trainers.rows}
+                rowKey={(trainer) => trainer.trainerUserId}
+                emptyMessage="No trainers match these filters."
+                tableClassName={activeTab === "directory" ? "min-w-[1290px]" : "min-w-[980px]"}
+              />
+            )}
             <TablePagination
               page={trainers.page}
               pageSize={pageSize}

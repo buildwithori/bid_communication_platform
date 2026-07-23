@@ -53,13 +53,14 @@ export type ToolPage = {
   items: ToolRecord[];
   nextCursor: string | null;
   totalItems: number;
-  summary: {
-    statuses: { published: number; draft: number; archived: number };
-    visibility: {
-      allEntrepreneurs: number;
-      programmes: number;
-      entrepreneurs: number;
-    };
+};
+
+export type ToolSummary = {
+  statuses: { published: number; draft: number; archived: number };
+  visibility: {
+    allEntrepreneurs: number;
+    programmes: number;
+    entrepreneurs: number;
   };
 };
 

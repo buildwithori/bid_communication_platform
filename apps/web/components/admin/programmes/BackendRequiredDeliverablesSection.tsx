@@ -332,7 +332,7 @@ export function RequiredDeliverablesSection({
             />
           </div>
         </TableToolbar>
-        {rules.isLoading ? (
+        {rules.isLoading || rules.isPlaceholderData ? (
           <TableSkeleton rows={5} columns={5} />
         ) : rules.isError ? (
           <Notice>{rules.error.message}</Notice>

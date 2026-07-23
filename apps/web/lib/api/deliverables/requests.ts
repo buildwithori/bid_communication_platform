@@ -3,12 +3,15 @@ import type {
   DeliverableFeedbackPage,
   DeliverableGroupPage,
   DeliverableGroupQuery,
+  DeliverableGroupSummary,
   DeliverableInstance,
   DeliverableInstancePage,
+  DeliverableInstanceSummary,
   DeliverableQuery,
   DeliverableReview,
   DeliverableReviewQueueItem,
   DeliverableReviewQueuePage,
+  DeliverableReviewSummary,
   DeliverableSubmissionPage,
   ReviewDeliverableVariables,
   SubmitDeliverableVariables,
@@ -34,10 +37,16 @@ export const listDeliverableGroupsRequest = (query?: DeliverableGroupQuery) =>
   apiRequest<DeliverableGroupPage>(
     "/deliverable-groups" + toQueryString(query),
   );
+export const getDeliverableGroupSummaryRequest = () =>
+  apiRequest<DeliverableGroupSummary>("/deliverable-groups/summary");
 
 export const listDeliverableInstancesRequest = (query?: DeliverableQuery) =>
   apiRequest<DeliverableInstancePage>(
     "/deliverable-instances" + toQueryString(query),
+  );
+export const getDeliverableInstanceSummaryRequest = (programmeId?: string) =>
+  apiRequest<DeliverableInstanceSummary>(
+    `/deliverable-instances/summary${programmeId ? `?programmeId=${encodeURIComponent(programmeId)}` : ""}`,
   );
 
 export const getDeliverableInstanceRequest = (id: string) =>
@@ -47,6 +56,8 @@ export const listDeliverableReviewQueueRequest = (query?: DeliverableQuery) =>
   apiRequest<DeliverableReviewQueuePage>(
     "/deliverable-reviews" + toQueryString(query),
   );
+export const getDeliverableReviewSummaryRequest = () =>
+  apiRequest<DeliverableReviewSummary>("/deliverable-reviews/summary");
 
 export const listDeliverableSubmissionsRequest = (
   instanceId: string,

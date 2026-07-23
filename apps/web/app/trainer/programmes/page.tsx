@@ -277,16 +277,20 @@ export default function TrainerProgrammesPage() {
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={directory.rows}
-          rowKey={(programme) => programme.id}
-          rowProps={(programme) => ({
-            onDoubleClick: () => openProgramme(programme),
-          })}
-          emptyMessage="No programmes match this search."
-          tableClassName="min-w-[1120px]"
-        />
+        {directory.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={7} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={directory.rows}
+            rowKey={(programme) => programme.id}
+            rowProps={(programme) => ({
+              onDoubleClick: () => openProgramme(programme),
+            })}
+            emptyMessage="No programmes match this search."
+            tableClassName="min-w-[1120px]"
+          />
+        )}
         <TablePagination
           page={directory.page}
           pageSize={pageSize}

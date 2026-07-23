@@ -23,14 +23,34 @@ export class DeliverablesController {
     return this.deliverablesService.listGroups(user, query);
   }
 
+  @Get('deliverable-groups/summary')
+  @Roles(UserRole.entrepreneur)
+  groupSummary(@CurrentUser() user: User) {
+    return this.deliverablesService.groupSummary(user);
+  }
+
   @Get('deliverable-instances')
   listInstances(@CurrentUser() user: User, @Query() query: DeliverableInstanceQueryDto) {
     return this.deliverablesService.listInstances(user, query);
   }
 
+  @Get('deliverable-instances/summary')
+  instanceSummary(
+    @CurrentUser() user: User,
+    @Query('programmeId') programmeId?: string,
+  ) {
+    return this.deliverablesService.instanceSummary(user, programmeId);
+  }
+
   @Get('deliverable-reviews')
   listReviewQueue(@CurrentUser() user: User, @Query() query: DeliverableReviewQueryDto) {
     return this.deliverablesService.listReviewQueue(user, query);
+  }
+
+  @Get('deliverable-reviews/summary')
+  @Roles(UserRole.admin, UserRole.trainer)
+  reviewSummary(@CurrentUser() user: User) {
+    return this.deliverablesService.reviewSummary(user);
   }
 
 

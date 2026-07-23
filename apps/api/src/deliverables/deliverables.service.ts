@@ -197,7 +197,7 @@ export class DeliverablesService {
           }
         : {}),
     };
-    const [programmes, totalItems, overallStatusGroups, unreadFeedbackTotal] =
+    const [programmes, totalItems] =
       await Promise.all([
         this.prisma.programme.findMany({
           where,
@@ -207,17 +207,6 @@ export class DeliverablesService {
           select: { id: true, name: true, accessType: true },
         }),
         this.prisma.programme.count({ where }),
-        this.prisma.deliverableInstance.groupBy({
-          by: ["status"],
-          where: { entrepreneurUserId: user.id },
-          _count: { _all: true },
-        }),
-        this.prisma.deliverableInstance.count({
-          where: {
-            entrepreneurUserId: user.id,
-            submissions: { some: { reviews: { some: { readAt: null } } } },
-          },
-        }),
       ]);
     const page = programmes.slice(0, take);
     const programmeIds = page.map((programme) => programme.id);
@@ -282,7 +271,26 @@ export class DeliverablesService {
       nextCursor:
         programmes.length > take ? (page[page.length - 1]?.id ?? null) : null,
       totalItems,
-      summary: this.statusSummary(overallStatusGroups),
+    };
+  }
+
+  async groupSummary(user: User) {
+    await this.recurring.ensureCurrent();
+    const [statusGroups, unreadFeedbackTotal] = await Promise.all([
+      this.prisma.deliverableInstance.groupBy({
+        by: ["status"],
+        where: { entrepreneurUserId: user.id },
+        _count: { _all: true },
+      }),
+      this.prisma.deliverableInstance.count({
+        where: {
+          entrepreneurUserId: user.id,
+          submissions: { some: { reviews: { some: { readAt: null } } } },
+        },
+      }),
+    ]);
+    return {
+      summary: this.statusSummary(statusGroups),
       unreadFeedbackTotal,
     };
   }
@@ -298,8 +306,7 @@ export class DeliverablesService {
     }
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildInstanceWhere(user, query);
-    const summaryWhere = this.buildInstanceWhere(user, query, true);
-    const [rows, totalItems, statusGroups] = await Promise.all([
+    const [rows, totalItems] = await Promise.all([
       this.prisma.deliverableInstance.findMany({
         where,
         orderBy: [{ dueDate: "asc" }, { id: "desc" }],
@@ -308,11 +315,6 @@ export class DeliverablesService {
         include: deliverableInstanceInclude,
       }),
       this.prisma.deliverableInstance.count({ where }),
-      this.prisma.deliverableInstance.groupBy({
-        by: ["status"],
-        where: summaryWhere,
-        _count: { _all: true },
-      }),
     ]);
     const pageIds = rows.slice(0, take).map((row) => row.id);
     const unreadRows = pageIds.length
@@ -331,8 +333,17 @@ export class DeliverablesService {
         .slice(0, take)
         .map((row) => this.mapInstance(row, unreadIds.has(row.id))),
       totalItems,
-      summary: this.statusSummary(statusGroups),
     };
+  }
+
+  async instanceSummary(user: User, programmeId?: string) {
+    await this.recurring.ensureCurrent();
+    const statusGroups = await this.prisma.deliverableInstance.groupBy({
+      by: ["status"],
+      where: this.buildInstanceWhere(user, { programmeId }, true),
+      _count: { _all: true },
+    });
+    return { summary: this.statusSummary(statusGroups) };
   }
 
   async listReviewQueue(user: User, query: DeliverableReviewQueryDto) {
@@ -352,11 +363,7 @@ export class DeliverablesService {
       submissions: { some: {} },
       ...overdueWhere,
     };
-    const summaryWhere = {
-      ...this.buildInstanceWhere(user, query, true),
-      submissions: { some: {} },
-    };
-    const [rows, totalItems, statusGroups, overdueReviewCount] =
+    const [rows, totalItems] =
       await Promise.all([
         this.prisma.deliverableInstance.findMany({
           where,
@@ -366,23 +373,38 @@ export class DeliverablesService {
           include: deliverableInstanceInclude,
         }),
         this.prisma.deliverableInstance.count({ where }),
-        this.prisma.deliverableInstance.groupBy({
-          by: ["status"],
-          where: summaryWhere,
-          _count: { _all: true },
-        }),
-        this.prisma.deliverableInstance.count({
-          where: {
-            ...summaryWhere,
-            dueDate: { lt: new Date() },
-            status: { not: DeliverableInstanceStatus.approved },
-          },
-        }),
       ]);
     return {
       ...toCursorPage(rows, take, (row) => row.id),
       items: rows.slice(0, take).map((row) => this.mapReviewQueueItem(row)),
       totalItems,
+    };
+  }
+
+  async reviewSummary(user: User) {
+    await this.recurring.ensureCurrent();
+    if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
+      throw new ForbiddenException("You cannot review deliverables.");
+    }
+    const where = {
+      ...this.buildInstanceWhere(user, {}, true),
+      submissions: { some: {} },
+    };
+    const [statusGroups, overdueReviewCount] = await Promise.all([
+      this.prisma.deliverableInstance.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.deliverableInstance.count({
+        where: {
+          ...where,
+          dueDate: { lt: new Date() },
+          status: { not: DeliverableInstanceStatus.approved },
+        },
+      }),
+    ]);
+    return {
       summary: this.statusSummary(statusGroups),
       overdueReviewCount,
     };

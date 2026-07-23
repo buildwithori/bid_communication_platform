@@ -326,7 +326,10 @@ export default function SchedulePage() {
     setVisibleMonth(todayDate);
   };
 
-  if (sessionsQuery.isLoading || deliverablesQuery.isLoading) {
+  if (
+    (sessionsQuery.isLoading && !sessionsQuery.data) ||
+    (deliverablesQuery.isLoading && !deliverablesQuery.data)
+  ) {
     return <SchedulePageSkeleton />;
   }
 

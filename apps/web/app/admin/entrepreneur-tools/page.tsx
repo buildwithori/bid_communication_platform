@@ -37,6 +37,7 @@ import { StatCard } from "@/components/shared/StatCard";
 import { useLazyToolAreasQuery } from "@/lib/api/settings";
 import {
   useToolsPage,
+  useToolSummaryQuery,
   useUpdateToolMutation,
   type ApiToolStatus,
   type ApiToolType,
@@ -149,6 +150,7 @@ export default function AdminEntrepreneurToolsPage() {
     visibility: visibilityFilter === "all" ? undefined : visibilityFilter,
     take: pageSize,
   });
+  const toolSummary = useToolSummaryQuery();
   const areas = useLazyToolAreasQuery({
     enabled: true,
     search: areaSearch || undefined,
@@ -301,7 +303,7 @@ export default function AdminEntrepreneurToolsPage() {
     },
   ];
 
-  const summary = tools.summary;
+  const summary = toolSummary.data;
   const targeted =
     (summary?.visibility.programmes ?? 0) +
     (summary?.visibility.entrepreneurs ?? 0);
@@ -433,7 +435,7 @@ export default function AdminEntrepreneurToolsPage() {
             </TableFilterSelect>
           </div>
         </TableToolbar>
-        {tools.isLoading ? (
+        {tools.isLoading || tools.isPlaceholderData ? (
           <TableSkeleton rows={6} columns={8} />
         ) : tools.isError ? (
           <div className="rounded-xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">

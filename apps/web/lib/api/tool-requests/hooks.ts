@@ -2,10 +2,12 @@
 
 import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { toolRequestKeys } from "./keys";
 import {
   createToolRequestRequest,
   getToolRequestRequest,
+  getToolRequestSummaryRequest,
   listToolRequestsRequest,
   updateToolRequestRequest,
 } from "./requests";
@@ -31,7 +33,7 @@ export function useToolRequestsPage(query: PageQuery) {
   const result = useQuery({
     queryKey: toolRequestKeys.list({ ...query, cursor }),
     queryFn: () => listToolRequestsRequest({ ...query, cursor }),
-    placeholderData: (previousData) => previousData,
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {
@@ -64,10 +66,16 @@ export function useToolRequestsPage(query: PageQuery) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    statusCounts: result.data?.statusCounts,
     setPage,
     resetPagination,
   };
+}
+
+export function useToolRequestSummaryQuery() {
+  return useQuery({
+    queryKey: toolRequestKeys.summary(),
+    queryFn: getToolRequestSummaryRequest,
+  });
 }
 
 export const useToolRequestDetailQuery = (id: string | null) =>
@@ -85,7 +93,7 @@ export function useCreateToolRequestMutation(
     mutationFn: (payload: CreateToolRequestPayload) =>
       createToolRequestRequest(payload),
     onSuccess: (data) => {
-      void client.invalidateQueries({ queryKey: toolRequestKeys.lists() });
+      void client.invalidateQueries({ queryKey: toolRequestKeys.all });
       handlers?.onSuccess?.(data);
     },
     onError: handlers?.onError,
@@ -101,7 +109,7 @@ export function useUpdateToolRequestMutation(
       updateToolRequestRequest(id, payload),
     onSuccess: (data) => {
       client.setQueryData(toolRequestKeys.detail(data.id), data);
-      void client.invalidateQueries({ queryKey: toolRequestKeys.lists() });
+      void client.invalidateQueries({ queryKey: toolRequestKeys.all });
       handlers?.onSuccess?.(data);
     },
     onError: handlers?.onError,

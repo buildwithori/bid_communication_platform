@@ -5,6 +5,7 @@ import type {
   ToolPayload,
   ToolQuery,
   ToolRecord,
+  ToolSummary,
 } from "./types";
 
 function toQueryString(query?: ToolQuery) {
@@ -24,6 +25,8 @@ function toQueryString(query?: ToolQuery) {
 
 export const listToolsRequest = (query?: ToolQuery) =>
   apiRequest<ToolPage>(`/tools${toQueryString(query)}`);
+export const getToolSummaryRequest = () =>
+  apiRequest<ToolSummary>("/tools/summary");
 
 export const getToolRequest = (id: string) =>
   apiRequest<ToolRecord>(`/tools/${id}`);

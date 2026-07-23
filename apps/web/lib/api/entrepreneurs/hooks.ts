@@ -7,12 +7,14 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { listProgrammesRequest } from "../programmes/requests";
 import { entrepreneurKeys } from "./keys";
 import {
   acceptEntrepreneurInvitationRequest,
   getEntrepreneurProfileRequest,
   getEntrepreneurRequest,
+  getEntrepreneurSummaryRequest,
   grantProgrammeAccessRequest,
   grantToolAccessRequest,
   hideToolAccessRequest,
@@ -38,7 +40,6 @@ import type {
   AcceptEntrepreneurInvitationPayload,
   CursorPage,
   EffectiveToolQuery,
-  EntrepreneurPage,
   EntrepreneurProfilePayload,
   EntrepreneurQuery,
   EntrepreneurRecord,
@@ -108,6 +109,7 @@ export function useEntrepreneursPage(query: PageQuery) {
   const result = useQuery({
     queryKey: entrepreneurKeys.list({ ...query, cursor }),
     queryFn: () => listEntrepreneursRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {
@@ -142,24 +144,16 @@ export function useEntrepreneursPage(query: PageQuery) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary:
-      result.data?.summary ??
-      ({
-        totalEntrepreneurs: 0,
-        activeEntrepreneurs: 0,
-        unassignedEntrepreneurs: 0,
-        withProgrammes: 0,
-        learnerImpact: {
-          averageProgrammeProgress: 0,
-          trackedProgrammeProgress: 0,
-          completedContent: 0,
-          averageRating: 0,
-          ratingCount: 0,
-        },
-      } satisfies EntrepreneurPage["summary"]),
     setPage,
     resetPagination,
   };
+}
+
+export function useEntrepreneurSummaryQuery() {
+  return useQuery({
+    queryKey: entrepreneurKeys.summary(),
+    queryFn: getEntrepreneurSummaryRequest,
+  });
 }
 
 export function useLazyEntrepreneursLookup(

@@ -7,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { settingsKeys } from "./keys";
 import {
   createBusinessStageRequest,
@@ -85,6 +86,7 @@ function useLookupPage<TRecord>(
   const result = useQuery({
     queryKey: queryKey({ ...query, cursor }),
     queryFn: () => request({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
 
   const resetPagination = useCallback(() => {

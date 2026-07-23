@@ -58,8 +58,7 @@ export class EntrepreneursService {
       ? await this.readableProgrammeAccessType(user, query.programmeId)
       : undefined;
     const where = this.buildMembershipWhere(user, query, programmeAccessType);
-    const baseWhere = this.buildMembershipWhere(user, {});
-    const [rows, totalItems, totalEntrepreneurs, activeEntrepreneurs, withProgrammes] =
+    const [rows, totalItems] =
       await this.prisma.$transaction([
         this.prisma.businessMembership.findMany({
           where,
@@ -69,6 +68,29 @@ export class EntrepreneursService {
           include: this.membershipInclude(user),
         }),
         this.prisma.businessMembership.count({ where }),
+      ]);
+
+    const visibleRows = rows.slice(0, take);
+    const [progress, settings] = await Promise.all([
+      this.progressAggregates(visibleRows.map((row) => row.user.id), user),
+      this.getDefaultTimezone(),
+    ]);
+    return {
+      items: visibleRows.map((row) =>
+        this.mapEntrepreneur(row, progress.get(row.user.id), settings),
+      ),
+      nextCursor:
+        rows.length > take
+          ? visibleRows[visibleRows.length - 1]?.id ?? null
+          : null,
+      totalItems,
+    };
+  }
+
+  async summary(user: User) {
+    const baseWhere = this.buildMembershipWhere(user, {});
+    const [totalEntrepreneurs, activeEntrepreneurs, withProgrammes, learnerImpact] =
+      await Promise.all([
         this.prisma.businessMembership.count({ where: baseWhere }),
         this.prisma.businessMembership.count({
           where: {
@@ -92,30 +114,14 @@ export class EntrepreneursService {
             ],
           },
         }),
+        this.learnerImpactSummary(user, baseWhere),
       ]);
-
-    const visibleRows = rows.slice(0, take);
-    const [progress, learnerImpact, settings] = await Promise.all([
-      this.progressAggregates(visibleRows.map((row) => row.user.id), user),
-      this.learnerImpactSummary(user, baseWhere),
-      this.getDefaultTimezone(),
-    ]);
     return {
-      items: visibleRows.map((row) =>
-        this.mapEntrepreneur(row, progress.get(row.user.id), settings),
-      ),
-      nextCursor:
-        rows.length > take
-          ? visibleRows[visibleRows.length - 1]?.id ?? null
-          : null,
-      totalItems,
-      summary: {
-        totalEntrepreneurs,
-        activeEntrepreneurs,
-        unassignedEntrepreneurs: totalEntrepreneurs - withProgrammes,
-        withProgrammes,
-        learnerImpact,
-      },
+      totalEntrepreneurs,
+      activeEntrepreneurs,
+      unassignedEntrepreneurs: totalEntrepreneurs - withProgrammes,
+      withProgrammes,
+      learnerImpact,
     };
   }
 

@@ -12,7 +12,7 @@ import { TableEmptyState, TableFilterAutocomplete, TableFilterInput, TableFilter
 import { MetricGrid } from '@/components/shared/MetricGrid';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
-import { useDeliverableGroupsPage, useLazyDeliverableGroups, type DeliverableGroup, type DeliverableGroupQuery } from '@/lib/api/deliverables';
+import { useDeliverableGroupsPage, useDeliverableGroupSummaryQuery, useLazyDeliverableGroups, type DeliverableGroup, type DeliverableGroupQuery } from '@/lib/api/deliverables';
 import { routes } from '@/lib/routes';
 import type { BadgeTone } from '@/types';
 
@@ -47,8 +47,9 @@ export default function DeliverablesPage() {
     view: statusFilter === ALL ? undefined : statusFilter,
     take: pageSize,
   });
+  const groupSummary = useDeliverableGroupSummaryQuery();
   const lookup = useLazyDeliverableGroups({ enabled: true, search: lookupSearch || undefined, take: 20 });
-  const summary = groups.summary;
+  const summary = groupSummary.data?.summary;
   const needsAction = (summary?.not_submitted ?? 0) + (summary?.overdue ?? 0) + (summary?.changes_required ?? 0);
 
   function resetFilters() {
@@ -73,10 +74,10 @@ export default function DeliverablesPage() {
         <StatCard label="Approved" value={summary?.approved ?? '—'} dotColor="success" />
       </MetricGrid>
 
-      {groups.unreadFeedbackTotal > 0 && (
+      {(groupSummary.data?.unreadFeedbackTotal ?? 0) > 0 && (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-warning/20 bg-warning-light px-4 py-3 text-sm text-warning-dark">
           <MessageSquareText className="h-4 w-4 shrink-0" />
-          {groups.unreadFeedbackTotal} deliverable{groups.unreadFeedbackTotal === 1 ? ' has' : 's have'} new BID feedback.
+          {groupSummary.data?.unreadFeedbackTotal} deliverable{groupSummary.data?.unreadFeedbackTotal === 1 ? ' has' : 's have'} new BID feedback.
         </div>
       )}
 
@@ -110,7 +111,7 @@ export default function DeliverablesPage() {
           </div>
         </TableToolbar>
 
-        {groups.isLoading ? (
+        {groups.isLoading || groups.isPlaceholderData ? (
           <DeliverableGroupsSkeleton />
         ) : groups.isError ? (
           <TableEmptyState title="Deliverables could not be loaded" description={groups.error.message} action={<Button variant="outline" onClick={() => groups.refetch()}>Try again</Button>} />

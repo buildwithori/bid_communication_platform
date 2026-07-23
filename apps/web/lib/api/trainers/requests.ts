@@ -7,6 +7,7 @@ import type {
   TrainerProfilePayload,
   TrainerQuery,
   TrainerRecord,
+  TrainerSummary,
   UpdateTrainerStatusVariables,
   UpdateTrainerVariables,
 } from "./types";
@@ -27,6 +28,10 @@ function toQueryString(query?: TrainerQuery) {
 
 export function listTrainersRequest(query?: TrainerQuery) {
   return apiRequest<TrainerPage>(`/trainers${toQueryString(query)}`);
+}
+
+export function getTrainerSummaryRequest() {
+  return apiRequest<TrainerSummary>("/trainers/summary");
 }
 
 export function getTrainerRequest(id: string) {

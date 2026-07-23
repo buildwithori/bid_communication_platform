@@ -22,6 +22,7 @@ import {
   useDeliverableFeedbackQuery,
   useDeliverableInstanceQuery,
   useDeliverableReviewQueuePage,
+  useDeliverableReviewSummaryQuery,
   useDeliverableSubmissionsQuery,
   useReviewDeliverableMutation,
   useUpdateDeliverableDueDateMutation,
@@ -75,9 +76,10 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
     take: pageSize,
     ...apiFilters(statusFilter),
   });
+  const reviewSummary = useDeliverableReviewSummaryQuery();
   const programmes = useLazyProgrammesLookup({ enabled: true, search: programmeSearch || undefined, take: 20 });
   const rows = React.useMemo(() => queue.rows.map(mapDeliverableReviewRow), [queue.rows]);
-  const summary = queue.summary;
+  const summary = reviewSummary.data?.summary;
   const today = new Date();
 
   const reviewMutation = useReviewDeliverableMutation({
@@ -143,7 +145,7 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
       <MetricGrid>
         <StatCard label="Pending review" value={summary?.submitted ?? '—'} dotColor="warning" />
         <StatCard label="Changes required" value={summary?.changes_required ?? '—'} dotColor="info" />
-        <StatCard label="Overdue review" value={queue.isLoading ? '—' : queue.overdueReviewCount} dotColor="bid" />
+        <StatCard label="Overdue review" value={reviewSummary.data?.overdueReviewCount ?? '—'} dotColor="bid" />
         <StatCard label="Approved" value={summary?.approved ?? '—'} dotColor="success" />
       </MetricGrid>
 
@@ -175,7 +177,7 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
           </div>
         </TableToolbar>
 
-        {queue.isLoading ? <ReviewQueueSkeleton /> : queue.isError ? <TableEmptyState title="Review queue could not be loaded" description={queue.error.message} action={<Button variant="outline" onClick={() => queue.refetch()}>Try again</Button>} /> : <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} emptyMessage="No submitted deliverables match this view." tableClassName="min-w-[1180px]" />}
+        {queue.isLoading || queue.isPlaceholderData ? <ReviewQueueSkeleton /> : queue.isError ? <TableEmptyState title="Review queue could not be loaded" description={queue.error.message} action={<Button variant="outline" onClick={() => queue.refetch()}>Try again</Button>} /> : <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} emptyMessage="No submitted deliverables match this view." tableClassName="min-w-[1180px]" />}
         <TablePagination page={queue.page} pageSize={pageSize} totalItems={queue.totalItems} onPageChange={queue.setPage} onPageSizeChange={(next) => { setPageSize(next); queue.resetPagination(); }} />
       </Card>
 

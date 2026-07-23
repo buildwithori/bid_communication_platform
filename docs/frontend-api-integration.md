@@ -42,3 +42,9 @@ All user-entered searches use `useDebouncedValue` from `lib/search` before reach
 Pass option-query loading state to the shared autocomplete/select primitive. The trigger renders a themed inline spinner while options are loading, so dependent fields visibly communicate repopulation after a parent value changes.
 
 Autocomplete option identity must come from the stable backend value. Display labels and descriptions belong in searchable keywords; never use display text as command identity because distinct records can share it.
+
+## Stable loading and summaries
+
+Use a page-specific skeleton only while a view has no successful data to render. Once the page is visible, search, filter, pagination, and URL-backed tab transitions must keep the header, metrics, controls, and surrounding layout mounted. Collection hooks use the shared `retainPreviousQueryData` placeholder helper, and the page replaces only the changing table, grid, or results region with its compact skeleton while `isPlaceholderData` is true.
+
+Statistics and business aggregates must not be returned by filtered list endpoints or derived from the current page of rows. Give them dedicated backend summary endpoints and feature hooks with stable query keys. Mutations invalidate both the collection and summary families; changing list filters invalidates neither the visible metric state nor the rest of the page.

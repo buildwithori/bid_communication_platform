@@ -107,18 +107,25 @@ export type DeliverableFeedback = DeliverableReview & {
 };
 
 export type DeliverableStatusSummary = Record<DeliverableStatus, number>;
+export type DeliverableGroupSummary = {
+  summary: DeliverableStatusSummary;
+  unreadFeedbackTotal: number;
+};
+export type DeliverableInstanceSummary = {
+  summary: DeliverableStatusSummary;
+};
+export type DeliverableReviewSummary = {
+  summary: DeliverableStatusSummary;
+  overdueReviewCount: number;
+};
 export type DeliverablePage<T> = {
   items: T[];
   nextCursor: string | null;
   totalItems: number;
 };
-export type DeliverableInstancePage = DeliverablePage<DeliverableInstance> & {
-  summary: DeliverableStatusSummary;
-};
-export type DeliverableReviewQueuePage = DeliverablePage<DeliverableReviewQueueItem> & {
-  summary: DeliverableStatusSummary;
-  overdueReviewCount: number;
-};
+export type DeliverableInstancePage = DeliverablePage<DeliverableInstance>;
+export type DeliverableReviewQueuePage =
+  DeliverablePage<DeliverableReviewQueueItem>;
 export type DeliverableSubmissionPage = DeliverablePage<DeliverableSubmission>;
 export type DeliverableFeedbackPage = DeliverablePage<DeliverableFeedback>;
 
@@ -155,7 +162,4 @@ export type DeliverableGroup = {
   unreadFeedback: number;
   nextDueDate: string | null;
 };
-export type DeliverableGroupPage = DeliverablePage<DeliverableGroup> & {
-  summary: DeliverableStatusSummary;
-  unreadFeedbackTotal: number;
-};
+export type DeliverableGroupPage = DeliverablePage<DeliverableGroup>;

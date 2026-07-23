@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { retainPreviousQueryData } from "../query-behavior";
 import { deliverableKeys } from "./keys";
 import {
+  getDeliverableGroupSummaryRequest,
   getDeliverableInstanceRequest,
+  getDeliverableInstanceSummaryRequest,
+  getDeliverableReviewSummaryRequest,
   listDeliverableFeedbackRequest,
   listDeliverableGroupsRequest,
   listDeliverableInstancesRequest,
@@ -52,6 +56,7 @@ export function useDeliverableGroupsPage(query: GroupPageQuery) {
   const result = useQuery({
     queryKey: deliverableKeys.groupList({ ...query, cursor }),
     queryFn: () => listDeliverableGroupsRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
   const resetPagination = useCallback(() => {
     setCurrentPage(1);
@@ -72,7 +77,14 @@ export function useDeliverableGroupsPage(query: GroupPageQuery) {
       setCurrentPage(nextPage);
     }
   }, [cursors, page, result.data?.nextCursor]);
-  return { ...result, page, rows: result.data?.items ?? [], totalItems: result.data?.totalItems ?? 0, summary: result.data?.summary, unreadFeedbackTotal: result.data?.unreadFeedbackTotal ?? 0, setPage, resetPagination };
+  return { ...result, page, rows: result.data?.items ?? [], totalItems: result.data?.totalItems ?? 0, setPage, resetPagination };
+}
+
+export function useDeliverableGroupSummaryQuery() {
+  return useQuery({
+    queryKey: deliverableKeys.groupSummary(),
+    queryFn: getDeliverableGroupSummaryRequest,
+  });
 }
 
 type PageQuery = Omit<DeliverableQuery, "cursor">;
@@ -88,6 +100,7 @@ export function useLazyDeliverableInstances(
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
+    placeholderData: retainPreviousQueryData,
   });
   return {
     ...result,
@@ -125,6 +138,7 @@ export function useDeliverableInstancesPage(query: PageQuery) {
   const result = useQuery({
     queryKey: deliverableKeys.instanceList({ ...query, cursor }),
     queryFn: () => listDeliverableInstancesRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
   const resetPagination = useCallback(() => {
     setCurrentPage(1);
@@ -150,10 +164,16 @@ export function useDeliverableInstancesPage(query: PageQuery) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary: result.data?.summary,
     setPage,
     resetPagination,
   };
+}
+
+export function useDeliverableInstanceSummaryQuery(programmeId?: string) {
+  return useQuery({
+    queryKey: deliverableKeys.instanceSummary(programmeId),
+    queryFn: () => getDeliverableInstanceSummaryRequest(programmeId),
+  });
 }
 
 export const useDeliverableInstanceQuery = (id: string | null) =>
@@ -170,6 +190,7 @@ export function useDeliverableReviewQueuePage(query: PageQuery) {
   const result = useQuery({
     queryKey: deliverableKeys.reviewQueue({ ...query, cursor }),
     queryFn: () => listDeliverableReviewQueueRequest({ ...query, cursor }),
+    placeholderData: retainPreviousQueryData,
   });
   const resetPagination = useCallback(() => {
     setCurrentPage(1);
@@ -195,11 +216,16 @@ export function useDeliverableReviewQueuePage(query: PageQuery) {
     page,
     rows: result.data?.items ?? [],
     totalItems: result.data?.totalItems ?? 0,
-    summary: result.data?.summary,
-    overdueReviewCount: result.data?.overdueReviewCount ?? 0,
     setPage,
     resetPagination,
   };
+}
+
+export function useDeliverableReviewSummaryQuery() {
+  return useQuery({
+    queryKey: deliverableKeys.reviewSummary(),
+    queryFn: getDeliverableReviewSummaryRequest,
+  });
 }
 
 export const useDeliverableSubmissionsQuery = (instanceId: string | null, enabled = true) => {

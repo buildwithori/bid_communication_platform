@@ -65,7 +65,6 @@ export type EntrepreneurPage = {
   items: EntrepreneurRecord[];
   nextCursor: string | null;
   totalItems: number;
-  summary: EntrepreneurSummary;
 };
 
 export type EntrepreneurQuery = {

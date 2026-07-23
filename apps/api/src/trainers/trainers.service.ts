@@ -72,15 +72,7 @@ export class TrainersService {
   async listTrainers(user: User, query: TrainerQueryDto) {
     const take = query.take ?? DEFAULT_TAKE;
     const where = this.buildTrainerWhere(user, query);
-    const baseWhere = this.buildTrainerWhere(user, {});
-    const [
-      rows,
-      totalItems,
-      totalTrainers,
-      activeTrainers,
-      pendingInvites,
-      calendarReady,
-    ] = await this.prisma.$transaction([
+    const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
         orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
@@ -89,29 +81,6 @@ export class TrainersService {
         include: trainerInclude,
       }),
       this.prisma.user.count({ where }),
-      this.prisma.user.count({ where: baseWhere }),
-      this.prisma.user.count({
-        where: { AND: [baseWhere, this.activeTrainerWhere()] },
-      }),
-      this.prisma.user.count({
-        where: { AND: [baseWhere, { status: UserStatus.pending }] },
-      }),
-      this.prisma.user.count({
-        where: {
-          AND: [
-            baseWhere,
-            this.activeTrainerWhere(),
-            {
-              calendarConnections: {
-                some: {
-                  provider: CalendarProvider.google,
-                  status: CalendarConnectionStatus.connected,
-                },
-              },
-            },
-          ],
-        },
-      }),
     ]);
 
     const visibleRows = rows.slice(0, take);
@@ -127,13 +96,38 @@ export class TrainersService {
           ? visibleRows[visibleRows.length - 1]?.id ?? null
           : null,
       totalItems,
-      summary: {
-        totalTrainers,
-        activeTrainers,
-        pendingInvites,
-        calendarReady,
-      },
     };
+  }
+
+  async summary(user: User) {
+    const baseWhere = this.buildTrainerWhere(user, {});
+    const [totalTrainers, activeTrainers, pendingInvites, calendarReady] =
+      await this.prisma.$transaction([
+        this.prisma.user.count({ where: baseWhere }),
+        this.prisma.user.count({
+          where: { AND: [baseWhere, this.activeTrainerWhere()] },
+        }),
+        this.prisma.user.count({
+          where: { AND: [baseWhere, { status: UserStatus.pending }] },
+        }),
+        this.prisma.user.count({
+          where: {
+            AND: [
+              baseWhere,
+              this.activeTrainerWhere(),
+              {
+                calendarConnections: {
+                  some: {
+                    provider: CalendarProvider.google,
+                    status: CalendarConnectionStatus.connected,
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ]);
+    return { totalTrainers, activeTrainers, pendingInvites, calendarReady };
   }
 
   async getTrainer(user: User, trainerUserId: string) {

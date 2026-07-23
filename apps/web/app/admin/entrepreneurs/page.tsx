@@ -8,7 +8,7 @@ import { EntrepreneurFormModal } from "@/components/admin/entrepreneurs/Entrepre
 import { Avatar } from "@/components/shared/Avatar";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
 import {
   DataTable,
   RowActions,
@@ -27,6 +27,7 @@ import {
   useEffectiveToolsQuery,
   useEntrepreneurDetailQuery,
   useEntrepreneursPage,
+  useEntrepreneurSummaryQuery,
   useGrantProgrammeAccessMutation,
   useGrantToolAccessMutation,
   useHideToolAccessMutation,
@@ -106,6 +107,7 @@ export default function AdminEntrepreneursPage() {
     stageId: stageId === "all" ? undefined : stageId,
     take: pageSize,
   });
+  const entrepreneurSummary = useEntrepreneurSummaryQuery();
   const sectors = useLazySectorsQuery({
     enabled: true,
     search: sectorLookup.search || undefined,
@@ -326,7 +328,12 @@ export default function AdminEntrepreneursPage() {
     },
   ];
 
-  if (directory.isLoading && !directory.data) return <EntrepreneursSkeleton />;
+  if (
+    (directory.isLoading && !directory.data) ||
+    (entrepreneurSummary.isLoading && !entrepreneurSummary.data)
+  ) {
+    return <EntrepreneursSkeleton />;
+  }
   const sectorOptions = [
     { value: "all", label: "All sectors" },
     ...(sectors.data?.pages.flatMap((page) => page.items) ?? []).map(
@@ -360,25 +367,25 @@ export default function AdminEntrepreneursPage() {
       <MetricGrid className="mb-4">
         <StatCard
           label="Total entrepreneurs"
-          value={directory.summary.totalEntrepreneurs}
+          value={entrepreneurSummary.data?.totalEntrepreneurs ?? 0}
           accent="bid"
           dotColor="bid"
         />
         <StatCard
           label="Active"
-          value={directory.summary.activeEntrepreneurs}
+          value={entrepreneurSummary.data?.activeEntrepreneurs ?? 0}
           accent="success"
           dotColor="success"
         />
         <StatCard
           label="Unassigned"
-          value={directory.summary.unassignedEntrepreneurs}
+          value={entrepreneurSummary.data?.unassignedEntrepreneurs ?? 0}
           accent="warning"
           dotColor="warning"
         />
         <StatCard
           label="With programmes"
-          value={directory.summary.withProgrammes}
+          value={entrepreneurSummary.data?.withProgrammes ?? 0}
           accent="info"
           dotColor="info"
         />
@@ -468,13 +475,17 @@ export default function AdminEntrepreneursPage() {
           </Notice>
         ) : (
           <>
-            <DataTable
-              columns={columns}
-              rows={directory.rows}
-              rowKey={(record) => record.entrepreneurUserId}
-              emptyMessage="No entrepreneurs match these filters."
-              tableClassName="min-w-[1540px]"
-            />
+            {directory.isPlaceholderData ? (
+              <TableSkeleton rows={Math.min(pageSize, 6)} columns={9} />
+            ) : (
+              <DataTable
+                columns={columns}
+                rows={directory.rows}
+                rowKey={(record) => record.entrepreneurUserId}
+                emptyMessage="No entrepreneurs match these filters."
+                tableClassName="min-w-[1540px]"
+              />
+            )}
             <TablePagination
               page={directory.page}
               pageSize={pageSize}

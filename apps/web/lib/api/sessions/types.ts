@@ -78,11 +78,14 @@ export type SessionQuery = {
   take?: number;
   cursor?: string;
 };
+export type SessionSummary = {
+  total: number;
+  byStatus: Partial<Record<SessionStatus, number>>;
+};
 export type SessionPage = {
   items: SessionRecord[];
   nextCursor: string | null;
   totalItems: number;
-  summary: { total: number; byStatus: Partial<Record<SessionStatus, number>> };
 };
 export type CreateSessionPayload = {
   entrepreneurUserId?: string;

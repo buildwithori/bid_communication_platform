@@ -29,6 +29,7 @@ import {
 import { AdminInviteModal } from "@/components/admin/AdminInviteModal";
 import {
   useAdminDetailQuery,
+  useAdminSummaryQuery,
   useAdminsPage,
   useInviteAdminMutation,
   useResendAdminInvitationMutation,
@@ -85,6 +86,7 @@ export default function AdminsPage() {
         : (calendar as "connected" | "not_connected"),
     take: pageSize,
   });
+  const adminSummary = useAdminSummaryQuery();
   const adminDetail = useAdminDetailQuery(viewAdminId);
   const inviteAdmin = useInviteAdminMutation({
     onSuccess: (admin) => {
@@ -207,7 +209,7 @@ export default function AdminsPage() {
     },
   ];
 
-  if (admins.isLoading) {
+  if (admins.isLoading || adminSummary.isLoading) {
     return <AdminsPageSkeleton />;
   }
 
@@ -248,28 +250,28 @@ export default function AdminsPage() {
       <MetricGrid className="mb-4">
         <StatCard
           label="Total admins"
-          value={admins.summary.totalAdmins}
+          value={adminSummary.data?.totalAdmins ?? 0}
           subline="BID team accounts"
           dotColor="bid"
           accent="bid"
         />
         <StatCard
           label="Active admins"
-          value={admins.summary.activeAdmins}
+          value={adminSummary.data?.activeAdmins ?? 0}
           subline="Can access workspace"
           dotColor="success"
           accent="success"
         />
         <StatCard
           label="Pending invites"
-          value={admins.summary.pendingInvites}
+          value={adminSummary.data?.pendingInvites ?? 0}
           subline="Awaiting account setup"
           dotColor="warning"
           accent="warning"
         />
         <StatCard
           label="Calendar ready"
-          value={admins.summary.calendarReady}
+          value={adminSummary.data?.calendarReady ?? 0}
           subline="Can own Google Meet sessions"
           dotColor="info"
           accent="info"
@@ -320,13 +322,17 @@ export default function AdminsPage() {
             />
           </div>
         </TableToolbar>
-        <DataTable
-          columns={columns}
-          rows={admins.rows}
-          rowKey={(admin) => admin.id}
-          emptyMessage="No admins match these filters."
-          tableClassName="min-w-[980px]"
-        />
+        {admins.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={6} />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={admins.rows}
+            rowKey={(admin) => admin.id}
+            emptyMessage="No admins match these filters."
+            tableClassName="min-w-[980px]"
+          />
+        )}
         <TablePagination
           page={admins.page}
           pageSize={pageSize}

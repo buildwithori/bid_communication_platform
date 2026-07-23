@@ -2,6 +2,7 @@ export {
   useAcceptAdminInvitationMutation,
   useAdminDetailQuery,
   useAdminProfileQuery,
+  useAdminSummaryQuery,
   useAdminsPage,
   useInviteAdminMutation,
   useResendAdminInvitationMutation,

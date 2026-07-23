@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { PageHeader, Notice } from "@/components/shared/PageHeader";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { StatCard } from "@/components/shared/StatCard";
-import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
+import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Modal } from "@/components/shared/Modal";
@@ -36,6 +36,7 @@ import {
   useCreateSessionMutation,
   useDeclineSessionMutation,
   useRescheduleSessionMutation,
+  useSessionSummaryQuery,
   useSessionsPage,
   type SessionRecord,
   type SessionStatus,
@@ -85,6 +86,7 @@ export function SessionManagementPage({
     type: type === ALL ? undefined : type,
     take: pageSize,
   });
+  const sessionSummary = useSessionSummaryQuery();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rescheduleTarget, setRescheduleTarget] =
     React.useState<SessionRecord | null>(null);
@@ -384,7 +386,11 @@ export function SessionManagementPage({
     [acceptSession, canHandleRequest],
   );
 
-  if (sessions.isLoading || currentUser.isLoading) {
+  if (
+    sessions.isLoading ||
+    currentUser.isLoading ||
+    (sessionSummary.isLoading && !sessionSummary.data)
+  ) {
     return <SessionManagementSkeleton />;
   }
 
@@ -404,28 +410,28 @@ export function SessionManagementPage({
       <MetricGrid columns={4}>
         <StatCard
           label="Total sessions"
-          value={sessions.summary.total}
+          value={sessionSummary.data?.total ?? 0}
           subline="In your current scope"
           dotColor="bid"
           accent="bid"
         />
         <StatCard
           label="Awaiting action"
-          value={sessions.summary.byStatus.requested ?? 0}
+          value={sessionSummary.data?.byStatus.requested ?? 0}
           subline="Open or targeted requests"
           dotColor="warning"
           accent="warning"
         />
         <StatCard
           label="Confirmed"
-          value={sessions.summary.byStatus.confirmed ?? 0}
+          value={sessionSummary.data?.byStatus.confirmed ?? 0}
           subline="Calendar event ready"
           dotColor="success"
           accent="success"
         />
         <StatCard
           label="Completed"
-          value={sessions.summary.byStatus.completed ?? 0}
+          value={sessionSummary.data?.byStatus.completed ?? 0}
           subline="Finished sessions"
           dotColor="info"
           accent="info"
@@ -484,6 +490,8 @@ export function SessionManagementPage({
           <Notice className="mb-4">
             Sessions could not be loaded. {sessions.error.message}
           </Notice>
+        ) : sessions.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={8} />
         ) : (
           <DataTable
             columns={columns}

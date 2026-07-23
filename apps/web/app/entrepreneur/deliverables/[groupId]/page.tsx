@@ -8,7 +8,7 @@ import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, FileText, MessageSqua
 import { toast } from 'sonner';
 import { Breadcrumb } from '@/components/shared/Breadcrumb';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardHeader, Skeleton } from '@/components/shared/Card';
+import { Card, CardHeader, Skeleton, TableSkeleton } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { DataTable, RowActions, TableFilterInput, TableFilterSelect, TablePagination, TableToolbar, type Column } from '@/components/shared/DataTable';
@@ -17,6 +17,7 @@ import { Modal } from '@/components/shared/Modal';
 import {
   useDeliverableFeedbackQuery,
   useDeliverableInstanceQuery,
+  useDeliverableInstanceSummaryQuery,
   useDeliverableInstancesPage,
   useDeliverableSubmissionsQuery,
   useMarkDeliverableReviewReadMutation,
@@ -80,7 +81,8 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
     status: statusFilter === ALL ? undefined : statusFilter,
     take: pageSize,
   });
-  const summary = instances.summary;
+  const instanceSummary = useDeliverableInstanceSummaryQuery(programmeId);
+  const summary = instanceSummary.data?.summary;
   const needsAction = (summary?.not_submitted ?? 0) + (summary?.overdue ?? 0) + (summary?.changes_required ?? 0);
 
   function openUpload(item?: DeliverableInstance) {
@@ -168,7 +170,13 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
     },
   ];
 
-  if (programme.isLoading || instances.isLoading) return <DeliverableWorkspaceSkeleton />;
+  if (
+    programme.isLoading ||
+    instances.isLoading ||
+    (instanceSummary.isLoading && !instanceSummary.data)
+  ) {
+    return <DeliverableWorkspaceSkeleton />;
+  }
 
   return (
     <>
@@ -199,6 +207,8 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
         </TableToolbar>
         {instances.isError ? (
           <div className="rounded-xl border border-danger/20 bg-danger-light p-4 text-sm text-danger">{instances.error.message}</div>
+        ) : instances.isPlaceholderData ? (
+          <TableSkeleton rows={Math.min(pageSize, 6)} columns={5} />
         ) : (
           <DataTable columns={columns} rows={instances.rows} rowKey={(item) => item.id} emptyMessage="No deliverables match this view." />
         )}
