@@ -270,7 +270,7 @@ function DeliverableHistoryModal({ deliverable, onClose, onResubmit }: { deliver
 
   return (
     <>
-    <Modal open={Boolean(deliverable)} onOpenChange={(open) => { if (!open) void closeAndMarkRead(); }} title={deliverable ? 'Deliverable details — ' + deliverable.deliverable : 'Deliverable details'} width="wide">
+    <Modal open={Boolean(deliverable)} onOpenChange={(open) => { if (!open) void closeAndMarkRead(); }} title={deliverable ? 'Deliverable details — ' + deliverable.deliverable : 'Deliverable details'} width="xl">
       {deliverable && (
         <div className="space-y-5">
           <div className="grid gap-3 rounded-xl border border-line bg-surface-subtle p-4 sm:grid-cols-[1fr_auto]">
