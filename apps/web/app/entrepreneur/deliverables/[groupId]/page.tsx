@@ -4,7 +4,7 @@ import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, FileText, MessageSquareText, UploadCloud } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, MessageSquareText, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Breadcrumb } from '@/components/shared/Breadcrumb';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -13,6 +13,11 @@ import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { DataTable, RowActions, TableFilterInput, TableFilterSelect, TablePagination, TableToolbar, type Column } from '@/components/shared/DataTable';
 import { UploadDeliverableModal } from '@/components/entrepreneur/UploadDeliverableModal';
+import {
+  DeliverableFilePreviewModal,
+  type DeliverableFilePreviewTarget,
+} from '@/components/deliverables/DeliverableFilePreviewModal';
+import { DeliverableSubmissionVersions } from '@/components/deliverables/DeliverableSubmissionVersions';
 import { Modal } from '@/components/shared/Modal';
 import {
   useDeliverableFeedbackQuery,
@@ -23,6 +28,7 @@ import {
   useMarkDeliverableReviewReadMutation,
   type DeliverableFeedback,
   type DeliverableInstance,
+  type DeliverableSubmission,
   type DeliverableStatus,
 } from '@/lib/api/deliverables';
 import { useProgrammeDetailQuery } from '@/lib/api/programmes';
@@ -107,7 +113,12 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
       className: 'w-[84px]',
       cell: (item) => {
         const actions = [] as Array<{ label: string; onSelect: () => void; disabled?: boolean }>;
-        if (item.latestReview) actions.push({ label: 'View history', onSelect: () => setHistoryTarget(item) });
+        if (item.submissionCount > 0) {
+          actions.push({
+            label: item.latestReview ? 'View history' : 'View submissions',
+            onSelect: () => setHistoryTarget(item),
+          });
+        }
         if (isActionable(item)) actions.push({ label: item.status === 'changes_required' ? 'Resubmit file' : 'Upload file', onSelect: () => openUpload(item) });
         if (!actions.length) actions.push({ label: 'Awaiting BID review', onSelect: () => undefined, disabled: true });
         return <RowActions actions={actions} />;
@@ -228,8 +239,24 @@ export default function DeliverableListPage({ params }: { params: { groupId: str
 function DeliverableHistoryModal({ deliverable, onClose, onResubmit }: { deliverable: DeliverableInstance | null; onClose: () => void; onResubmit: (item: DeliverableInstance) => void }) {
   const feedback = useDeliverableFeedbackQuery(deliverable?.id ?? null, Boolean(deliverable));
   const submissions = useDeliverableSubmissionsQuery(deliverable?.id ?? null, Boolean(deliverable));
+  const [previewTarget, setPreviewTarget] =
+    React.useState<DeliverableFilePreviewTarget | null>(null);
   const markRead = useMarkDeliverableReviewReadMutation({ onError: (error) => toast.error(error.message) });
   const unread = feedback.rows.filter((item) => !item.readAt);
+
+  function previewSubmission(submission: DeliverableSubmission) {
+    if (!deliverable) return;
+    setPreviewTarget({
+      deliverable: deliverable.deliverable,
+      fileName: submission.file.originalFilename,
+      fileMimeType: submission.file.mimeType,
+      fileId: submission.file.id,
+      fileSizeBytes: submission.file.sizeBytes,
+      businessName: deliverable.entrepreneur.businessName,
+      programme: deliverable.programme.name,
+      submittedAt: submission.submittedAt,
+    });
+  }
 
   async function markUnread() {
     if (!unread.length || markRead.isPending) return;
@@ -242,6 +269,7 @@ function DeliverableHistoryModal({ deliverable, onClose, onResubmit }: { deliver
   }
 
   return (
+    <>
     <Modal open={Boolean(deliverable)} onOpenChange={(open) => { if (!open) void closeAndMarkRead(); }} title={deliverable ? 'Deliverable details — ' + deliverable.deliverable : 'Deliverable details'} width="wide">
       {deliverable && (
         <div className="space-y-5">
@@ -258,13 +286,15 @@ function DeliverableHistoryModal({ deliverable, onClose, onResubmit }: { deliver
             {feedback.hasNextPage && <Button className="mt-3" variant="outline" isLoading={feedback.isFetchingNextPage} onClick={() => feedback.fetchNextPage()}>Load earlier feedback</Button>}
           </section>
 
-          <section>
-            <div className="mb-3"><div className="text-sm font-semibold text-ink">Submission versions</div><div className="mt-0.5 text-sm text-ink-muted">Every upload remains available as part of the review trail.</div></div>
-            {submissions.isLoading ? <div className="h-24 animate-pulse rounded-xl bg-surface-subtle" /> : (
-              <div className="grid gap-2">{submissions.rows.map((item, index) => <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-line bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-bid-light text-bid"><FileText className="h-4 w-4" /></span><div><div className="font-medium text-ink">{item.file.originalFilename}</div><div className="mt-0.5 text-sm text-ink-muted">{index === 0 ? 'Latest version · ' : ''}Submitted {formatDate(item.submittedAt)}</div>{item.note && <p className="mt-1 text-sm text-ink-muted">{item.note}</p>}</div></div><Badge tone={item.latestReview?.decision === 'approved' ? 'green' : item.latestReview ? 'amber' : 'blue'}>{item.latestReview?.decision === 'approved' ? 'Approved' : item.latestReview ? 'Changes requested' : 'Awaiting review'}</Badge></div>)}</div>
-            )}
-            {submissions.hasNextPage && <Button className="mt-3" variant="outline" isLoading={submissions.isFetchingNextPage} onClick={() => submissions.fetchNextPage()}>Load earlier versions</Button>}
-          </section>
+          <DeliverableSubmissionVersions
+            submissions={submissions.rows}
+            totalItems={submissions.totalItems}
+            isLoading={submissions.isLoading}
+            hasNextPage={Boolean(submissions.hasNextPage)}
+            isFetchingNextPage={submissions.isFetchingNextPage}
+            onLoadMore={() => void submissions.fetchNextPage()}
+            onPreview={previewSubmission}
+          />
 
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" isLoading={markRead.isPending} loadingLabel="Marking feedback read..." onClick={() => void closeAndMarkRead()}>Close</Button>
@@ -273,6 +303,11 @@ function DeliverableHistoryModal({ deliverable, onClose, onResubmit }: { deliver
         </div>
       )}
     </Modal>
+      <DeliverableFilePreviewModal
+        file={previewTarget}
+        onClose={() => setPreviewTarget(null)}
+      />
+    </>
   );
 }
 

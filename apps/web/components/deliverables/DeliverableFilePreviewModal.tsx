@@ -1,12 +1,22 @@
 'use client';
 
 import * as React from 'react';
-import { Download, ExternalLink, FileText, LoaderCircle } from 'lucide-react';
+import { Download, FileText, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Modal } from '@/components/shared/Modal';
 import { useSignedFileUrlQuery } from '@/lib/api/files';
-import type { DeliverableReviewRow } from '@/lib/deliverables/review-queue';
 import { cn } from '@/lib/utils';
+
+export type DeliverableFilePreviewTarget = {
+  deliverable: string;
+  fileName: string;
+  fileMimeType: string | null;
+  fileId: string | null;
+  fileSizeBytes: string | null;
+  businessName: string;
+  programme: string;
+  submittedAt: string;
+};
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
@@ -24,8 +34,8 @@ function formatFileSize(value?: string | null) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function isPdf(review: DeliverableReviewRow) {
-  return review.fileMimeType === 'application/pdf' || review.fileName.toLowerCase().endsWith('.pdf');
+function isPdf(file: DeliverableFilePreviewTarget) {
+  return file.fileMimeType === 'application/pdf' || file.fileName.toLowerCase().endsWith('.pdf');
 }
 
 function PdfPreviewLoading({ fileName }: { fileName: string }) {
@@ -76,25 +86,25 @@ function PdfPreviewFrame({ fileName, fileUrl }: { fileName: string; fileUrl: str
 }
 
 export function DeliverableFilePreviewModal({
-  review,
+  file,
   onClose,
 }: {
-  review: DeliverableReviewRow | null;
+  file: DeliverableFilePreviewTarget | null;
   onClose: () => void;
 }) {
-  const fileSize = formatFileSize(review?.fileSizeBytes);
-  const signedFile = useSignedFileUrlQuery(review?.fileId ?? undefined, Boolean(review));
+  const fileSize = formatFileSize(file?.fileSizeBytes);
+  const signedFile = useSignedFileUrlQuery(file?.fileId ?? undefined, Boolean(file));
   const fileUrl = signedFile.data?.download.url ?? null;
-  const canRenderPdf = review ? isPdf(review) && Boolean(fileUrl) : false;
+  const canRenderPdf = file ? isPdf(file) && Boolean(fileUrl) : false;
 
   return (
     <Modal
-      open={!!review}
+      open={!!file}
       onOpenChange={(open) => !open && onClose()}
-      title={review ? `Preview ${review.fileName}` : 'Preview file'}
+      title={file ? `Preview ${file.fileName}` : 'Preview file'}
       width="media"
     >
-      {review && (
+      {file && (
         <div className="space-y-4">
           <div className="rounded-xl border border-line bg-surface-subtle p-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -103,24 +113,18 @@ export function DeliverableFilePreviewModal({
                   <FileText className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-lg font-semibold text-ink">{review.deliverable}</div>
-                  <div className="mt-1 break-words text-sm text-ink-muted">{review.fileName}</div>
+                  <div className="text-lg font-semibold text-ink">{file.deliverable}</div>
+                  <div className="mt-1 break-words text-sm text-ink-muted">{file.fileName}</div>
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
-                    <span>{review.businessName}</span>
-                    <span>{review.programme}</span>
-                    <span>Submitted {formatDate(review.submittedAt)}</span>
+                    <span>{file.businessName}</span>
+                    <span>{file.programme}</span>
+                    <span>Submitted {formatDate(file.submittedAt)}</span>
                     {fileSize && <span>{fileSize}</span>}
                   </div>
                 </div>
               </div>
               {fileUrl && (
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  <Button asChild variant="outline">
-                    <a href={fileUrl} target="_blank" rel="noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                      Open
-                    </a>
-                  </Button>
                   <Button asChild>
                     <a href={fileUrl} download>
                       <Download className="h-4 w-4" />
@@ -134,12 +138,12 @@ export function DeliverableFilePreviewModal({
 
           {signedFile.isLoading ? (
             <div className="relative h-[68vh] min-h-[360px] overflow-hidden rounded-xl border border-line">
-              <PdfPreviewLoading fileName={review.fileName} />
+              <PdfPreviewLoading fileName={file.fileName} />
             </div>
           ) : canRenderPdf ? (
             <PdfPreviewFrame
-              key={`${review.fileId}:${fileUrl}`}
-              fileName={review.fileName}
+              key={`${file.fileId}:${fileUrl}`}
+              fileName={file.fileName}
               fileUrl={fileUrl ?? ''}
             />
           ) : fileUrl ? (
@@ -148,7 +152,7 @@ export function DeliverableFilePreviewModal({
                 <FileText className="mx-auto h-10 w-10 text-ink-faint" />
                 <div className="mt-4 text-base font-semibold text-ink">Preview is not available for this file type</div>
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-                  Open or download the file to review it in the appropriate application.
+                  Download the file to review it in the appropriate application.
                 </p>
               </div>
             </div>

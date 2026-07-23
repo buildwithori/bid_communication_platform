@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { FileText, MessageSquareText } from 'lucide-react';
+import { MessageSquareText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
@@ -17,6 +17,7 @@ import { Modal } from '@/components/shared/Modal';
 import { Notice, PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
 import { DeliverableFilePreviewModal } from '@/components/deliverables/DeliverableFilePreviewModal';
+import { DeliverableSubmissionVersions } from '@/components/deliverables/DeliverableSubmissionVersions';
 import { UpdateDeliverableDueDateModal } from '@/components/deliverables/UpdateDeliverableDueDateModal';
 import {
   useDeliverableFeedbackQuery,
@@ -28,6 +29,7 @@ import {
   useUpdateDeliverableDueDateMutation,
   type DeliverableFeedback,
   type DeliverableReviewQueueItem,
+  type DeliverableSubmission,
   type DeliverableStatus,
 } from '@/lib/api/deliverables';
 import { useLazyProgrammesLookup } from '@/lib/api/programmes';
@@ -39,6 +41,21 @@ type ReviewStatusFilter = typeof ALL | DeliverableReviewStatus | 'overdue';
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function submissionPreviewRow(
+  review: DeliverableReviewRow,
+  submission: DeliverableSubmission,
+): DeliverableReviewRow {
+  return {
+    ...review,
+    submissionId: submission.id,
+    fileId: submission.file.id,
+    fileName: submission.file.originalFilename,
+    fileMimeType: submission.file.mimeType,
+    fileSizeBytes: submission.file.sizeBytes,
+    submittedAt: submission.submittedAt,
+  };
 }
 
 function apiFilters(status: ReviewStatusFilter): { status?: DeliverableStatus; overdue?: boolean } {
@@ -185,26 +202,60 @@ export function DeliverableReviewQueuePage({ role }: { role: 'admin' | 'trainer'
         {linkedDeliverable.isLoading ? <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-36 w-full" /></div> : null}
         {linkedDeliverable.isError ? <Notice>This deliverable is unavailable or outside your review scope.</Notice> : null}
       </Modal>
-      <ReviewDeliverableModal key={displayedReview?.id ?? 'review'} review={displayedReview} isSaving={reviewMutation.isPending} onClose={() => !reviewMutation.isPending && closeActive()} onReview={(submissionId, decision, feedback) => reviewMutation.mutate({ submissionId, decision, feedback })} />
-      <DeliverableFilePreviewModal review={previewTarget} onClose={() => setPreviewTarget(null)} />
+      <ReviewDeliverableModal
+        key={displayedReview?.id ?? 'review'}
+        review={displayedReview}
+        isSaving={reviewMutation.isPending}
+        onClose={() => !reviewMutation.isPending && closeActive()}
+        onPreviewSubmission={(review, submission) =>
+          setPreviewTarget(submissionPreviewRow(review, submission))
+        }
+        onReview={(submissionId, decision, feedback) =>
+          reviewMutation.mutate({ submissionId, decision, feedback })
+        }
+      />
+      <DeliverableFilePreviewModal file={previewTarget} onClose={() => setPreviewTarget(null)} />
       <UpdateDeliverableDueDateModal key={dueDateTarget?.id ?? 'due-date'} review={dueDateTarget} isSaving={dueDateMutation.isPending} onClose={() => !dueDateMutation.isPending && setDueDateTarget(null)} onSave={(instanceId, dueDate, reason) => dueDateMutation.mutate({ instanceId, dueDate, reason })} />
     </>
   );
 }
 
-function ReviewDeliverableModal({ review, isSaving, onClose, onReview }: { review: DeliverableReviewRow | null; isSaving: boolean; onClose: () => void; onReview: (submissionId: string, decision: 'approved' | 'changes_required', feedback?: string) => void }) {
+function ReviewDeliverableModal({
+  review,
+  isSaving,
+  onClose,
+  onPreviewSubmission,
+  onReview,
+}: {
+  review: DeliverableReviewRow | null;
+  isSaving: boolean;
+  onClose: () => void;
+  onPreviewSubmission: (
+    review: DeliverableReviewRow,
+    submission: DeliverableSubmission,
+  ) => void;
+  onReview: (
+    submissionId: string,
+    decision: 'approved' | 'changes_required',
+    feedback?: string,
+  ) => void;
+}) {
   const form = useForm<DeliverableReviewForm>({ resolver: zodResolver(deliverableReviewSchema), defaultValues: { feedback: '' } });
   const feedback = useDeliverableFeedbackQuery(review?.id ?? null, Boolean(review));
   const submissions = useDeliverableSubmissionsQuery(review?.id ?? null, Boolean(review));
   const canReview = review?.status === 'pending-review' && Boolean(review.submissionId);
 
   return (
-    <Modal open={Boolean(review)} onOpenChange={(open) => !open && !isSaving && onClose()} title={review ? (canReview ? 'Review ' : 'Review history — ') + review.deliverable : 'Review deliverable'} width="wide">
+    <Modal open={Boolean(review)} onOpenChange={(open) => !open && !isSaving && onClose()} title={review ? (canReview ? 'Review ' : 'Review history — ') + review.deliverable : 'Review deliverable'} width="xl">
       {review && (
         <form onSubmit={form.handleSubmit((values) => { if (review.submissionId) onReview(review.submissionId, 'changes_required', values.feedback); })}>
           <div className="mb-4 rounded-xl border border-line bg-surface-subtle px-4 py-4"><div className="font-semibold text-ink">{review.fileName}</div><div className="mt-1 text-sm text-ink-muted">Submitted by {review.businessName} for {review.programme}</div><div className="mt-1 text-sm text-ink-muted">Submitted {formatDate(review.submittedAt)} · Due {formatDate(review.dueAt)} · {review.dueSource === 'manual-override' ? 'Manual override' : 'Programme rule'}</div>{review.periodStart && review.periodEnd && <div className="mt-1 text-sm text-ink-muted">Reporting period {formatDate(review.periodStart)} – {formatDate(review.periodEnd)}</div>}</div>
 
-          <ReviewHistory feedback={feedback} submissions={submissions} />
+          <ReviewHistory
+            feedback={feedback}
+            submissions={submissions}
+            onPreview={(submission) => onPreviewSubmission(review, submission)}
+          />
 
           {canReview ? (
             <>
@@ -218,11 +269,114 @@ function ReviewDeliverableModal({ review, isSaving, onClose, onReview }: { revie
   );
 }
 
-function ReviewHistory({ feedback, submissions }: { feedback: ReturnType<typeof useDeliverableFeedbackQuery>; submissions: ReturnType<typeof useDeliverableSubmissionsQuery> }) {
+function ReviewHistory({
+  feedback,
+  submissions,
+  onPreview,
+}: {
+  feedback: ReturnType<typeof useDeliverableFeedbackQuery>;
+  submissions: ReturnType<typeof useDeliverableSubmissionsQuery>;
+  onPreview: (submission: DeliverableSubmission) => void;
+}) {
   return (
     <div className="mb-5 grid gap-4 lg:grid-cols-2">
-      <section className="rounded-xl border border-line bg-card p-4"><div className="flex items-center gap-2 font-semibold text-ink"><MessageSquareText className="h-4 w-4 text-bid" />Feedback history</div>{feedback.isLoading ? <div className="mt-3 h-20 animate-pulse rounded-lg bg-surface-subtle" /> : feedback.rows.length ? <div className="mt-3 grid max-h-56 gap-2 overflow-y-auto">{feedback.rows.map((item: DeliverableFeedback) => <div key={item.id} className="rounded-lg bg-surface-subtle px-3 py-2"><div className="flex items-center justify-between gap-2 text-xs text-ink-muted"><span>{item.reviewer.name}</span><span>{formatDate(item.createdAt)}</span></div><p className="mt-1 text-sm leading-5 text-ink">{item.feedback}</p></div>)}</div> : <p className="mt-3 text-sm text-ink-muted">No previous feedback.</p>}{feedback.hasNextPage && <Button type="button" size="sm" variant="ghost" className="mt-2" isLoading={feedback.isFetchingNextPage} onClick={() => feedback.fetchNextPage()}>Load earlier feedback</Button>}</section>
-      <section className="rounded-xl border border-line bg-card p-4"><div className="flex items-center gap-2 font-semibold text-ink"><FileText className="h-4 w-4 text-bid" />Submission versions</div>{submissions.isLoading ? <div className="mt-3 h-20 animate-pulse rounded-lg bg-surface-subtle" /> : submissions.rows.length ? <div className="mt-3 grid max-h-56 gap-2 overflow-y-auto">{submissions.rows.map((item, index) => <div key={item.id} className="rounded-lg bg-surface-subtle px-3 py-2"><div className="truncate text-sm font-medium text-ink">{item.file.originalFilename}</div><div className="mt-1 text-xs text-ink-muted">{index === 0 ? 'Latest · ' : ''}{formatDate(item.submittedAt)}</div></div>)}</div> : <p className="mt-3 text-sm text-ink-muted">No submissions found.</p>}{submissions.hasNextPage && <Button type="button" size="sm" variant="ghost" className="mt-2" isLoading={submissions.isFetchingNextPage} onClick={() => submissions.fetchNextPage()}>Load earlier versions</Button>}</section>
+      <section className="min-w-0 rounded-2xl border border-line bg-card p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 font-semibold text-ink">
+              <MessageSquareText className="h-4 w-4 text-bid" />
+              Feedback history
+            </div>
+            <p className="mt-1 text-xs text-ink-muted">
+              Decisions and guidance shared with the entrepreneur.
+            </p>
+          </div>
+          {!feedback.isLoading ? (
+            <span className="rounded-full bg-surface-subtle px-2.5 py-1 text-xs font-medium text-ink-muted">
+              {feedback.totalItems}
+            </span>
+          ) : null}
+        </div>
+        {feedback.isLoading ? (
+          <HistoryListSkeleton />
+        ) : feedback.rows.length ? (
+          <div className="scrollbar-thin mt-4 grid max-h-72 gap-2 overflow-y-auto pr-1">
+            {feedback.rows.map((item: DeliverableFeedback) => (
+              <div key={item.id} className="rounded-xl border border-line bg-surface-subtle px-3.5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
+                  <span className="font-medium text-ink">{item.reviewer.name}</span>
+                  <span>{formatDate(item.createdAt)}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-ink">
+                  {item.feedback || 'No written feedback was added.'}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <HistoryEmptyState
+            icon={<MessageSquareText className="h-5 w-5" />}
+            message="No feedback has been recorded yet."
+          />
+        )}
+        {feedback.hasNextPage ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="mt-3 w-full"
+            isLoading={feedback.isFetchingNextPage}
+            onClick={() => feedback.fetchNextPage()}
+          >
+            Load earlier feedback
+          </Button>
+        ) : null}
+      </section>
+
+      <DeliverableSubmissionVersions
+        submissions={submissions.rows}
+        totalItems={submissions.totalItems}
+        isLoading={submissions.isLoading}
+        hasNextPage={Boolean(submissions.hasNextPage)}
+        isFetchingNextPage={submissions.isFetchingNextPage}
+        onLoadMore={() => void submissions.fetchNextPage()}
+        onPreview={onPreview}
+      />
+    </div>
+  );
+}
+
+function HistoryListSkeleton() {
+  return (
+    <div className="mt-4 grid gap-2" aria-label="Loading history" aria-busy="true">
+      {Array.from({ length: 2 }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 rounded-xl border border-line bg-surface-subtle p-3">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HistoryEmptyState({
+  icon,
+  message,
+}: {
+  icon: React.ReactNode;
+  message: string;
+}) {
+  return (
+    <div className="mt-4 grid min-h-28 place-items-center rounded-xl border border-dashed border-line bg-surface-subtle px-4 text-center">
+      <div>
+        <span className="mx-auto grid h-9 w-9 place-items-center rounded-lg bg-card text-ink-faint">
+          {icon}
+        </span>
+        <p className="mt-2 text-sm text-ink-muted">{message}</p>
+      </div>
     </div>
   );
 }
