@@ -924,22 +924,30 @@ function EntrepreneurDetailModal({
         <Notice>Profile could not be loaded. {error?.message}</Notice>
       ) : (
         <div className="space-y-5">
-          <section className="rounded-2xl border border-bid/15 bg-gradient-to-br from-bid-light via-white to-info-light/40 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <section className="relative isolate overflow-hidden rounded-2xl border border-bid/15 bg-gradient-to-br from-bid-light via-white to-info-light/40 p-5 dark:border-bid/25 dark:from-bid-light/80 dark:via-card dark:to-info-light/70">
+            <div
+              aria-hidden="true"
+              className="absolute -right-12 -top-16 -z-10 h-44 w-44 rounded-full bg-info/10 blur-3xl dark:bg-info/15"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute -bottom-20 left-12 -z-10 h-40 w-56 rounded-full bg-bid/10 blur-3xl dark:bg-bid/20"
+            />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
               <Avatar
                 initials={initials(record)}
                 size={72}
                 tone="brand"
-                className="ring-4 ring-white"
+                className="ring-4 ring-white shadow-lg shadow-bid/10 dark:ring-bid/30 dark:shadow-black/25"
               />
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-2xl font-semibold text-ink">
+                  <h2 className="break-words text-2xl font-semibold text-ink">
                     {record.businessName}
                   </h2>
                   <StatusBadge record={record} />
                 </div>
-                <div className="mt-2 text-ink-muted">
+                <div className="mt-1.5 text-sm font-medium text-ink-muted dark:text-foreground/70">
                   {record.representativeName}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
