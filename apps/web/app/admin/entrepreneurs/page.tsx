@@ -573,85 +573,135 @@ function ProgrammeAccessModal({
       title="Programme access"
       width="wide"
     >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-line bg-surface-subtle p-4">
-          <div className="font-semibold text-ink">
-            {access.totalItems} assigned programme
-            {access.totalItems === 1 ? "" : "s"}
-          </div>
-          <div className="mt-1 text-sm text-ink-muted">
-            The list loads in pages as access grows.
-          </div>
-        </div>
-        <div className="space-y-2">
-          {access.rows.map((item) => (
-            <div
-              key={item.grantId}
-              className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card p-3"
-            >
-              <div>
-                <div className="font-medium text-ink">{item.name}</div>
-                <div className="mt-0.5 text-sm text-ink-muted">
-                  {item.progress
-                    ? `${item.progress.percent}% progress`
-                    : "Not started"}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                isLoading={
-                  revoke.isPending && revoke.variables?.programmeId === item.id
-                }
-                onClick={() =>
-                  entrepreneurId &&
-                  revoke.mutate({ id: entrepreneurId, programmeId: item.id })
-                }
-              >
-                Revoke
-              </Button>
-            </div>
-          ))}
-        </div>
-        {access.hasNextPage ? (
+      {access.isLoading ? (
+        <ProgrammeAccessModalSkeleton />
+      ) : access.isError ? (
+        <Notice>
+          Programme access could not be loaded. {access.error.message}{" "}
           <Button
             variant="outline"
-            className="w-full"
-            isLoading={access.isFetchingNextPage}
-            onClick={() => void access.fetchNextPage()}
+            className="ml-3"
+            onClick={() => void access.refetch()}
           >
-            Load more programmes
+            Try again
           </Button>
-        ) : null}
-        <div className="grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto]">
-          <TableFilterAutocomplete
-            value={selected}
-            onValueChange={setSelected}
-            options={options}
-            placeholder="Add published programme"
-            searchPlaceholder="Search programmes..."
-            emptyMessage="No additional programme found."
-            isLoading={programmes.isFetching}
-            onSearchChange={(search) =>
-              setLookup((state) => ({ ...state, search }))
-            }
-            hasMore={Boolean(programmes.hasNextPage)}
-            onLoadMore={() => void programmes.fetchNextPage()}
-          />
-          <Button
-            disabled={!selected || !entrepreneurId}
-            isLoading={grant.isPending}
-            onClick={() =>
-              entrepreneurId &&
-              selected &&
-              grant.mutate({ id: entrepreneurId, programmeId: selected })
-            }
-          >
-            Grant access
-          </Button>
+        </Notice>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-line bg-surface-subtle p-4">
+            <div className="font-semibold text-ink">
+              {access.totalItems} assigned programme
+              {access.totalItems === 1 ? "" : "s"}
+            </div>
+            <div className="mt-1 text-sm text-ink-muted">
+              The list loads in pages as access grows.
+            </div>
+          </div>
+          <div className="space-y-2">
+            {access.rows.map((item) => (
+              <div
+                key={item.grantId}
+                className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card p-3"
+              >
+                <div>
+                  <div className="font-medium text-ink">{item.name}</div>
+                  <div className="mt-0.5 text-sm text-ink-muted">
+                    {item.progress
+                      ? `${item.progress.percent}% progress`
+                      : "Not started"}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  isLoading={
+                    revoke.isPending &&
+                    revoke.variables?.programmeId === item.id
+                  }
+                  onClick={() =>
+                    entrepreneurId &&
+                    revoke.mutate({ id: entrepreneurId, programmeId: item.id })
+                  }
+                >
+                  Revoke
+                </Button>
+              </div>
+            ))}
+            {access.rows.length === 0 ? (
+              <div className="flex min-h-[68px] items-center justify-center rounded-xl border border-dashed border-line px-4 text-center text-sm text-ink-muted">
+                No programmes have been assigned yet.
+              </div>
+            ) : null}
+          </div>
+          {access.hasNextPage ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              isLoading={access.isFetchingNextPage}
+              onClick={() => void access.fetchNextPage()}
+            >
+              Load more programmes
+            </Button>
+          ) : null}
+          <div className="grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto]">
+            <TableFilterAutocomplete
+              value={selected}
+              onValueChange={setSelected}
+              options={options}
+              placeholder="Add published programme"
+              searchPlaceholder="Search programmes..."
+              emptyMessage="No additional programme found."
+              isLoading={programmes.isFetching}
+              onSearchChange={(search) =>
+                setLookup((state) => ({ ...state, search }))
+              }
+              hasMore={Boolean(programmes.hasNextPage)}
+              onLoadMore={() => void programmes.fetchNextPage()}
+            />
+            <Button
+              disabled={!selected || !entrepreneurId}
+              isLoading={grant.isPending}
+              onClick={() =>
+                entrepreneurId &&
+                selected &&
+                grant.mutate({ id: entrepreneurId, programmeId: selected })
+              }
+            >
+              Grant access
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function ProgrammeAccessModalSkeleton() {
+  return (
+    <div
+      className="space-y-4"
+      role="status"
+      aria-label="Loading programme access"
+    >
+      <div className="rounded-xl border border-line bg-surface-subtle p-4">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-2 h-4 w-64 max-w-full" />
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card p-3">
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-5 w-56 max-w-[75%]" />
+            <Skeleton className="mt-2 h-4 w-24" />
+          </div>
+          <Skeleton className="h-9 w-20 shrink-0 rounded-lg" />
         </div>
       </div>
-    </Modal>
+      <div className="grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto]">
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-lg sm:w-28" />
+      </div>
+      <span className="sr-only">Loading programme access...</span>
+    </div>
   );
 }
 
