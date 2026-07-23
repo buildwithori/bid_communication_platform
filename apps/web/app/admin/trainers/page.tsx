@@ -495,14 +495,26 @@ function TrainerDetailModal({
         <Notice>Trainer profile could not be loaded. {error?.message}</Notice>
       ) : (
         <div className="space-y-5">
-          <section className="overflow-hidden rounded-2xl border border-bid/15 bg-gradient-to-br from-bid-light via-white to-info-light/40">
-            <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
+          <section className="relative isolate overflow-hidden rounded-2xl border border-bid/20 bg-card shadow-[0_14px_34px_rgba(72,23,48,0.08)] dark:border-bid/30 dark:shadow-[0_18px_44px_rgba(0,0,0,0.24)]">
+            <div
+              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-bid-light/90 via-card to-info-light/60 dark:from-bid-light/65 dark:via-card dark:to-info-light/40"
+              aria-hidden="true"
+            />
+            <div
+              className="pointer-events-none absolute -right-16 -top-24 -z-10 h-64 w-64 rounded-full bg-info/10 blur-3xl dark:bg-info/15"
+              aria-hidden="true"
+            />
+            <div
+              className="pointer-events-none absolute -bottom-28 left-1/4 -z-10 h-56 w-72 rounded-full bg-bid/10 blur-3xl dark:bg-bid/15"
+              aria-hidden="true"
+            />
+            <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
               <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
                 <Avatar
                   initials={initials(trainer)}
                   size={76}
                   tone={trainer.accessLevel === "guest" ? "amber" : "brand"}
-                  className="ring-4 ring-white shadow-sm"
+                  className="ring-4 ring-card shadow-[0_8px_22px_rgba(40,18,30,0.14)] dark:shadow-[0_10px_26px_rgba(0,0,0,0.3)]"
                 />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -546,7 +558,7 @@ function TrainerDetailModal({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card/85 p-4 shadow-sm backdrop-blur-sm">
+              <div className="rounded-xl border border-border bg-card/80 p-4 shadow-[0_10px_26px_rgba(42,20,32,0.08)] backdrop-blur-md dark:bg-card/90 dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
                 <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-faint">
                   Session readiness
                 </div>
