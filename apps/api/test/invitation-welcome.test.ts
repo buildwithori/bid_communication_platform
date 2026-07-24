@@ -7,6 +7,7 @@ import {
   UserStatus,
 } from "@prisma/client";
 import { AdminsService } from "../src/admins/admins.service";
+import { AuthService } from "../src/auth/auth.service";
 import { EntrepreneurManagementService } from "../src/entrepreneurs/entrepreneur-management.service";
 import { TrainerManagementService } from "../src/trainers/trainer-management.service";
 
@@ -167,6 +168,52 @@ test("accepting an admin invitation queues the admin welcome", async () => {
   });
 
   assert.deepEqual(sent, [{ to: admin.email, name: "BID Member" }]);
+});
+
+test("email verification waits for the welcome job to be accepted", async () => {
+  const entrepreneur = {
+    ...pendingUser(UserRole.entrepreneur),
+    emailVerifiedAt: null,
+    phone: null,
+    timezone: null,
+  };
+  const enqueueFailure = new Error("Email queue is unavailable");
+  const service = new AuthService(
+    {
+      emailVerificationToken: {
+        findUnique: async () => ({
+          id: "verification-1",
+          userId: entrepreneur.id,
+          consumedAt: null,
+          expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+        }),
+      },
+      $transaction: async (
+        operation: (tx: Record<string, unknown>) => Promise<unknown>,
+      ) =>
+        operation({
+          user: {
+            update: async () => ({
+              ...entrepreneur,
+              status: UserStatus.active,
+              emailVerifiedAt: new Date(),
+            }),
+          },
+          emailVerificationToken: { update: async () => ({}) },
+        }),
+    } as never,
+    {
+      sendWelcome: async () => {
+        throw enqueueFailure;
+      },
+    } as never,
+    {} as never,
+  );
+
+  await assert.rejects(
+    service.verifyEmail({ token: "verification-token" }),
+    enqueueFailure,
+  );
 });
 
 test("admin invitations persist the supplied phone number", async () => {

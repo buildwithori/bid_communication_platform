@@ -189,7 +189,7 @@ export class AuthService {
       await tx.emailVerificationToken.update({ where: { id: verificationToken.id }, data: { consumedAt: now } });
       return verifiedUser;
     });
-    void this.email.sendWelcome(user.email, this.displayName(user)).catch(() => undefined);
+    await this.email.sendWelcome(user.email, this.displayName(user));
     return { user: this.serializeUser(user) };
   }
 
