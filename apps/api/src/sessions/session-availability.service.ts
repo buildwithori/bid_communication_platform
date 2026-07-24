@@ -90,6 +90,12 @@ export class SessionAvailabilityService {
     this.assertTimezone(query.timezone);
     const dateFrom = this.parseDate(query.dateFrom, "dateFrom");
     const dateTo = this.parseDate(query.dateTo, "dateTo");
+    const today = this.zonedDateKey(new Date(), query.timezone);
+    if (query.dateFrom < today) {
+      throw new BadRequestException(
+        "Choose today or a future date for session availability.",
+      );
+    }
     const dayCount =
       Math.floor((dateTo.getTime() - dateFrom.getTime()) / 86_400_000) + 1;
     if (dayCount < 1 || dayCount > MAX_AVAILABILITY_DAYS) {
@@ -281,6 +287,9 @@ export class SessionAvailabilityService {
 
   async assertBookableTime(startAt: Date, endAt: Date, timezone: string) {
     this.assertTimezone(timezone);
+    if (startAt <= new Date()) {
+      throw new BadRequestException("Choose a future session time.");
+    }
     const policy = await this.prisma.companySettings.upsert({
       where: { singletonKey: "default" },
       update: {},

@@ -16,7 +16,11 @@ import { Button } from "@/components/shared/Button";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { Notice } from "@/components/shared/PageHeader";
 import { bookingSchema, type BookingForm } from "@/lib/forms/schemas";
-import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
+import {
+  addDaysToDateValue,
+  PLATFORM_DEFAULT_TIMEZONE,
+  todayInTimezone,
+} from "@/lib/timezones";
 import { useEntrepreneurProfileQuery } from "@/lib/api/entrepreneurs";
 import {
   useCreateSessionMutation,
@@ -26,17 +30,8 @@ import {
 } from "@/lib/api/sessions";
 import { useLazySessionTypesQuery } from "@/lib/api/settings";
 
-function dateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return year + "-" + month + "-" + day;
-}
-
-function initialDate() {
-  const next = new Date();
-  next.setDate(next.getDate() + 1);
-  return dateValue(next);
+function initialDate(timezone: string) {
+  return addDaysToDateValue(todayInTimezone(timezone), 1);
 }
 
 export function BookingModal({
@@ -56,7 +51,7 @@ export function BookingModal({
       recipient: "general",
       trainerId: "",
       topic: "",
-      date: initialDate(),
+      date: initialDate(timezone),
       time: "",
       notes: "",
     },
@@ -115,7 +110,7 @@ export function BookingModal({
         recipient: "general",
         trainerId: "",
         topic: "",
-        date: initialDate(),
+        date: initialDate(timezone),
         time: "",
         notes: "",
       });
@@ -283,6 +278,7 @@ export function BookingModal({
               render={({ field }) => (
                 <DatePicker
                   value={field.value}
+                  minDate={todayInTimezone(timezone)}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
                 />

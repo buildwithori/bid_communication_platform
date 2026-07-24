@@ -208,6 +208,7 @@ Initial access rules:
 - Archived programmes are hidden from default operational lists and become read-only unless restored.
 - Deliverable due dates come from programme deliverable rules, then become concrete `deliverable_instances.due_date` values per entrepreneur/programme submission context. Review queues must read due dates from instances, not invent them.
 - Fixed-date deliverable rules accept today or a future date only. The API compares date-only values in the acting admin's timezone and falls back to `Africa/Kigali`; frontend calendar disabling is complementary validation, not the security boundary.
+- Session availability rejects date windows beginning before today in the authenticated viewer's effective timezone. Session creation and rescheduling independently reject start instants that have already passed; frontend calendar disabling is complementary UX, not the enforcement boundary.
 - Recurring deliverables use nullable `deliverable_instances.period_start`/`period_end`. New periods are calendar-aligned, begin no earlier than programme/access eligibility, end no later than the programme end date, and are unique per rule/entrepreneur/programme/period. Generation must remain set-based and idempotent.
 - Deliverable instances link to `entrepreneur_user_id`, not `business_id`. Business context for display/reporting is derived through business membership.
 - Programme goals link to `entrepreneur_user_id`, not `business_id`, and should not include `target_date` unless a real deadline workflow is designed.

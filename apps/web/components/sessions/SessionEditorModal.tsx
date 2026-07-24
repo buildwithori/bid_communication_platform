@@ -12,7 +12,11 @@ import { Button } from "@/components/shared/Button";
 import { Modal } from "@/components/shared/Modal";
 import { Notice } from "@/components/shared/PageHeader";
 import { useCurrentUserQuery } from "@/lib/api/auth";
-import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
+import {
+  addDaysToDateValue,
+  PLATFORM_DEFAULT_TIMEZONE,
+  todayInTimezone,
+} from "@/lib/timezones";
 import { useLazyEntrepreneursLookup } from "@/lib/api/entrepreneurs";
 import {
   useLazySessionTeamMembers,
@@ -56,9 +60,7 @@ function dateValue(date: Date, timezone: string) {
 }
 
 function initialDate(timezone: string) {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return dateValue(date, timezone);
+  return addDaysToDateValue(todayInTimezone(timezone), 1);
 }
 
 export function SessionEditorModal(props: Props) {
@@ -349,6 +351,7 @@ function SessionEditorModalForm({
           <FormField label="Date">
             <DatePicker
               value={date}
+              minDate={todayInTimezone(timezone)}
               onChange={(nextDate) => {
                 setDate(nextDate);
                 setSlotStartAt("");

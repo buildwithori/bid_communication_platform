@@ -115,11 +115,34 @@ test("availability applies company hours in the company timezone and presents th
   assert.equal(result.timezone, "America/New_York");
 });
 
+test("availability rejects dates before today in the viewer timezone", async () => {
+  await assert.rejects(
+    service().getAvailability({
+      dateFrom: "2020-01-01",
+      dateTo: "2020-01-01",
+      timezone: "Africa/Kigali",
+      sessionType: "mentor_checkin",
+    }),
+    BadRequestException,
+  );
+});
+
 test("booking policy validates absolute time against the company timezone", async () => {
   await service({ defaultTimezone: "Africa/Lagos" }).assertBookableTime(
     new Date("2030-01-07T08:00:00.000Z"),
     new Date("2030-01-07T09:00:00.000Z"),
     "America/New_York",
+  );
+});
+
+test("booking policy rejects a session time that has already passed", async () => {
+  await assert.rejects(
+    service().assertBookableTime(
+      new Date("2020-01-01T09:00:00.000Z"),
+      new Date("2020-01-01T10:00:00.000Z"),
+      "Africa/Kigali",
+    ),
+    BadRequestException,
   );
 });
 

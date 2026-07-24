@@ -1597,6 +1597,7 @@ Rules:
 - Company working days and working-hour bounds are interpreted in `company_settings.default_timezone`.
 - Availability is returned in the requesting user’s effective timezone: personal user timezone, then company default, then `Africa/Kigali` as the defensive platform fallback.
 - Admins, trainers, and entrepreneurs can persist a personal IANA timezone. Invitation acceptance or the first password login may initialize a missing preference from browser detection; subsequent booking requests cannot override the saved preference with an arbitrary timezone value.
+- Availability dates must be today or later in that effective timezone, and every create/reschedule transition independently rejects a start instant that is no longer in the future.
 - Each session stores the booking timezone as a historical snapshot for calendar creation and audit context. Recipient-facing notifications and emails format the stored UTC timestamps in the recipient's current personal timezone, falling back to the company timezone and then `Africa/Kigali`; one recipient's formatted schedule must never be reused for another recipient.
 
 ### Meeting Link Creation
