@@ -266,7 +266,7 @@ export function SessionManagementPage({
                       },
                     ]
                   : []),
-                ...(!["declined", "cancelled"].includes(session.status)
+                ...(["confirmed", "completed"].includes(session.status)
                   ? [
                       "separator" as const,
                       {

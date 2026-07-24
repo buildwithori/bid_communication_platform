@@ -180,10 +180,11 @@ Session workflow rules:
 - Confirmed virtual sessions must show a provider-agnostic meeting link. Google Meet is the first provider, but UI/data should not be hard-coded to Google only.
 - Rescheduling must record previous date/time, actor, date requested, and reason so the UI can explain what changed.
 - Admin session actions should follow a state machine:
-  - Awaiting team member: message entrepreneur, accept/confirm when calendar support allows, decline with reason, reschedule, add note.
+  - Awaiting team member: message entrepreneur, accept/confirm when calendar support allows, decline with reason, and reschedule.
   - Confirmed: message entrepreneur, open meeting link, mark completed, reschedule, add note.
   - Completed: message entrepreneur and add note; no reschedule or completion action.
   - Declined: message entrepreneur only unless a future reopen flow is deliberately added.
+- Session notes belong to accepted sessions only. Requested, declined, and cancelled sessions must neither expose the add-note action nor accept note creation through the API; confirmed and completed sessions retain note history and may receive follow-up notes.
 - Admin "Nudge trainer" is distinct from entrepreneur messaging. It should target the assigned trainer and eventually send both an in-app notification and an email.
 - Trainer workspace needs a notification bell and notification modal for nudges, session requests, deliverable review reminders, and upcoming sessions.
 - Trainer calendar connection belongs in trainer settings, not the admin trainer create/edit modal. Admin manages trainer identity/access; trainers connect their own Google Calendar via an OAuth-style flow and update limited profile details.

@@ -800,6 +800,14 @@ export class SessionsService {
 
   async addNote(user: User, id: string, dto: AddSessionNoteDto) {
     const session = await this.getSessionEntity(user, id);
+    if (
+      session.status !== SessionStatus.confirmed &&
+      session.status !== SessionStatus.completed
+    ) {
+      throw new BadRequestException(
+        "Session notes can only be added after a session is accepted.",
+      );
+    }
     if (user.role === UserRole.trainer && session.ownerUserId !== user.id) {
       throw new ForbiddenException(
         "You can only add notes to sessions you own.",

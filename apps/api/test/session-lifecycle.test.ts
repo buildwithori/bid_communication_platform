@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ConflictException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import {
   NotificationChannel,
   NotificationEntityType,
@@ -425,4 +425,24 @@ test("BID team session messages are scoped to the session entrepreneur and reque
   );
   assert.deepEqual(notification?.channels, [NotificationChannel.email]);
   assert.equal(result.deliveries[0]?.status, "pending");
+});
+
+test("session notes cannot be added before the session is accepted", async () => {
+  const session = fixture();
+  const deps = dependencies(session);
+  const service = new SessionsService(
+    deps.prisma as never,
+    deps.notifications as never,
+    deps.calendar as never,
+    deps.availability as never,
+    {} as never,
+  );
+
+  await assert.rejects(
+    service.addNote(trainer as never, session.id, {
+      note: "Prepare the latest pricing model.",
+      visibility: SessionNoteVisibility.internal,
+    }),
+    BadRequestException,
+  );
 });
