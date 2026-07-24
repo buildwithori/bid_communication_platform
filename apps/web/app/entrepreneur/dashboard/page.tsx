@@ -111,7 +111,7 @@ export default function EntrepreneurDashboardPage() {
           <CardHeader title="Upcoming sessions" description="Your next support moments" actions={<Link href={routes.entrepreneur.schedule}><Button variant="outline" size="sm">View all</Button></Link>} />
           <div className="grid gap-2">
             {data.upcomingSessions.map((session) => (
-              <Link key={session.id} href={`${routes.entrepreneur.schedule}?session=${encodeURIComponent(session.id)}`} className={`rounded-md border-l-[3px] ${session.status === "confirmed" ? "border-l-info" : "border-l-warning"} bg-surface-subtle px-3 py-2 transition hover:bg-bid-light`}>
+              <Link key={session.id} href={`${routes.entrepreneur.schedule}?sessionId=${encodeURIComponent(session.id)}`} className={`rounded-md border-l-[3px] ${session.status === "confirmed" ? "border-l-info" : "border-l-warning"} bg-surface-subtle px-3 py-2 transition hover:bg-bid-light`}>
                 <div className="flex items-center gap-1.5 font-mono text-xs text-ink-muted"><Clock3 className="h-3.5 w-3.5" />{formatSessionDate(session.startsAt, session.timezone)} · {formatSessionTime(session.startsAt, session.timezone)}</div>
                 <div className="mt-1 flex items-center justify-between gap-3 text-sm font-medium"><span>{session.topic}</span><Badge tone={session.status === "confirmed" ? "green" : "amber"}>{session.status === "confirmed" ? "Confirmed" : "Requested"}</Badge></div>
               </Link>

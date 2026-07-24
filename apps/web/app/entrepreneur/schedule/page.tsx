@@ -18,6 +18,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { BookingModal } from "@/components/entrepreneur/BookingModal";
 import { LinkedSessionDetailModal } from "@/components/sessions/LinkedSessionDetailModal";
+import { useSessionDetailNavigation } from "@/components/sessions/useSessionDetailNavigation";
 import { cn } from "@/lib/utils";
 import {
   useDeliverableCalendarWindowQuery,
@@ -234,6 +235,7 @@ export default function SchedulePage() {
 }
 
 function SchedulePageContent({ timezone }: { timezone: string }) {
+  const openSessionDetail = useSessionDetailNavigation();
   const todayValue = todayInTimezone(timezone);
   const todayDate = React.useMemo(() => parseDate(todayValue), [todayValue]);
   const [bookOpen, setBookOpen] = React.useState(false);
@@ -551,6 +553,11 @@ function SchedulePageContent({ timezone }: { timezone: string }) {
                   <ScheduleEventCard
                     key={item.id}
                     item={item}
+                    onSelect={
+                      item.source === "session"
+                        ? () => openSessionDetail(item.id)
+                        : undefined
+                    }
                     onCancel={() => {
                       setCancelTarget(item);
                       setCancelReason("");
@@ -616,6 +623,10 @@ function SchedulePageContent({ timezone }: { timezone: string }) {
               item={item}
               compact
               onSelect={() => {
+                if (item.source === "session") {
+                  openSessionDetail(item.id);
+                  return;
+                }
                 setSelectedDate(item.date);
                 setVisibleMonth(parseDate(item.date));
               }}
@@ -759,13 +770,16 @@ function ScheduleEventCard({
               </span>
             )}
           </div>
-          {canCancel && onCancel && !onSelect ? (
+          {canCancel && onCancel ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="mt-3"
-              onClick={onCancel}
+              onClick={(event) => {
+                event.stopPropagation();
+                onCancel();
+              }}
             >
               Cancel session
             </Button>
@@ -789,14 +803,33 @@ function ScheduleEventCard({
 
   const className = cn(
     "rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm transition",
-    onSelect && "w-full hover:border-bid/25 hover:bg-surface-subtle",
+    onSelect &&
+      "w-full cursor-pointer hover:border-bid/35 hover:bg-bid-light/35",
   );
 
   if (onSelect) {
     return (
-      <button type="button" onClick={onSelect} className={className}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`View ${item.title}`}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            (event.key === "Enter" || event.key === " ")
+          ) {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        className={cn(
+          className,
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/25",
+        )}
+      >
         {content}
-      </button>
+      </div>
     );
   }
 

@@ -13,6 +13,7 @@ import { Button } from "@/components/shared/Button";
 import { Modal } from "@/components/shared/Modal";
 import { MessageModal } from "@/components/shared/MessageModal";
 import { LinkedSessionDetailModal } from "@/components/sessions/LinkedSessionDetailModal";
+import { useSessionDetailNavigation } from "@/components/sessions/useSessionDetailNavigation";
 import {
   SessionEditorModal,
   type SessionEditorValues,
@@ -74,6 +75,7 @@ export function SessionManagementPage({
   actor: "admin" | "trainer";
 }) {
   const currentUser = useCurrentUserQuery();
+  const openSessionDetail = useSessionDetailNavigation();
   const viewerTimezone =
     currentUser.data?.user?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
   const [search, setSearch] = React.useState("");
@@ -288,7 +290,14 @@ export function SessionManagementPage({
         header: "Session",
         cell: (session) => (
           <div className="min-w-[250px]">
-            <div className="font-medium text-ink">{session.topic}</div>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              className="cursor-pointer text-left font-medium text-ink transition-colors hover:text-bid focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/25"
+              onClick={() => openSessionDetail(session.id)}
+            >
+              {session.topic}
+            </button>
             <div className="mt-1 text-sm text-ink-muted">
               {session.typeName} ·{" "}
               {session.source === "entrepreneur_request"
@@ -400,7 +409,7 @@ export function SessionManagementPage({
         },
       },
     ],
-    [acceptSession, canHandleRequest, viewerTimezone],
+    [acceptSession, canHandleRequest, openSessionDetail, viewerTimezone],
   );
 
   if (
