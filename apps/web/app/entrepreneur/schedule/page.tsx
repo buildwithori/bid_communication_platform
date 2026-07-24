@@ -29,6 +29,11 @@ import {
   type SessionRecord,
   type SessionStatus,
 } from "@/lib/api/sessions";
+import { useEntrepreneurProfileQuery } from "@/lib/api/entrepreneurs";
+import {
+  PLATFORM_DEFAULT_TIMEZONE,
+  todayInTimezone,
+} from "@/lib/timezones";
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -145,21 +150,39 @@ function getSessionCategory(session: SessionRecord): ScheduleCategory {
   return "group-session";
 }
 
-function sessionToCalendarItem(session: SessionRecord): CalendarItem {
+function dateValueInTimezone(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function sessionToCalendarItem(
+  session: SessionRecord,
+  timezone: string,
+): CalendarItem {
   const startAt = new Date(session.startAt);
   const endAt = new Date(session.endAt);
   return {
     id: session.id,
     source: "session",
     title: session.topic,
-    date: toDateValue(startAt),
+    date: dateValueInTimezone(startAt, timezone),
     startTime: startAt.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: timezone,
     }),
     endTime: endAt.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: timezone,
     }),
     location: "virtual",
     meetingProvider: session.meetingProvider,
@@ -200,8 +223,19 @@ function isSameMonth(value: string, monthDate: Date) {
 }
 
 export default function SchedulePage() {
-  const todayDate = React.useMemo(() => new Date(), []);
-  const todayValue = React.useMemo(() => toDateValue(todayDate), [todayDate]);
+  const profile = useEntrepreneurProfileQuery();
+  const timezone = profile.data?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
+
+  if (profile.isLoading) {
+    return <SchedulePageSkeleton />;
+  }
+
+  return <SchedulePageContent key={timezone} timezone={timezone} />;
+}
+
+function SchedulePageContent({ timezone }: { timezone: string }) {
+  const todayValue = todayInTimezone(timezone);
+  const todayDate = React.useMemo(() => parseDate(todayValue), [todayValue]);
   const [bookOpen, setBookOpen] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(todayValue);
   const [visibleMonth, setVisibleMonth] = React.useState(todayDate);
@@ -225,18 +259,18 @@ export default function SchedulePage() {
   const windowStart = monthCells[0];
   const windowEnd = monthCells[monthCells.length - 1];
   const dateFrom = new Date(
-    windowStart.getFullYear(),
-    windowStart.getMonth(),
-    windowStart.getDate(),
+    Date.UTC(
+      windowStart.getFullYear(),
+      windowStart.getMonth(),
+      windowStart.getDate() - 1,
+    ),
   ).toISOString();
   const dateTo = new Date(
-    windowEnd.getFullYear(),
-    windowEnd.getMonth(),
-    windowEnd.getDate(),
-    23,
-    59,
-    59,
-    999,
+    Date.UTC(
+      windowEnd.getFullYear(),
+      windowEnd.getMonth(),
+      windowEnd.getDate() + 2,
+    ) - 1,
   ).toISOString();
   const sessionsQuery = useSessionCalendarWindowQuery({
     dateFrom,
@@ -251,12 +285,14 @@ export default function SchedulePage() {
   const calendarItems = React.useMemo(
     () =>
       sortCalendarItems([
-        ...sessionsQuery.rows.map(sessionToCalendarItem),
+        ...sessionsQuery.rows.map((session) =>
+          sessionToCalendarItem(session, timezone),
+        ),
         ...deliverablesQuery.rows
           .map(deliverableToCalendarItem)
           .filter((item): item is CalendarItem => Boolean(item)),
       ]),
-    [deliverablesQuery.rows, sessionsQuery.rows],
+    [deliverablesQuery.rows, sessionsQuery.rows, timezone],
   );
 
   const itemsByDate = React.useMemo(() => {
