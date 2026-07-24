@@ -16,6 +16,7 @@ const trainer = {
   firstName: "Tola",
   lastName: "Trainer",
   role: UserRole.trainer,
+  timezone: "Africa/Lagos",
 };
 
 function fixture(overrides: Record<string, unknown> = {}) {
@@ -57,6 +58,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
       email: "entrepreneur@bid.org",
       firstName: "Eni",
       lastName: "Founder",
+      timezone: "Africa/Accra",
       businessMemberships: [
         {
           business: {
@@ -76,6 +78,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
       firstName: "Eni",
       lastName: "Founder",
       role: UserRole.entrepreneur,
+      timezone: "Africa/Accra",
     },
     reschedules: [],
     notesHistory: [],
@@ -110,6 +113,8 @@ function dependencies(session: ReturnType<typeof fixture>) {
       state.availabilityChecks += 1;
     },
     assertBookableTime: async () => undefined,
+    resolveTimezone: async (preferred?: string | null) =>
+      preferred ?? "Africa/Kigali",
   };
   return {
     state,
@@ -305,7 +310,51 @@ test("an entrepreneur cancellation notifies the session owner with context", asy
   assert.equal(notifications[0]?.recipientUserId, trainer.id);
   assert.match(String(notifications[0]?.title), /Pricing review/);
   assert.match(String(notifications[0]?.body), /founder is travelling/i);
-  assert.match(String(notifications[0]?.body), /UTC/);
+  assert.match(String(notifications[0]?.body), /Africa\/Lagos/);
+  assert.match(String(notifications[0]?.body), /11:00/);
+});
+
+test("open session requests format the schedule for each team recipient", async () => {
+  const session = fixture();
+  const deps = dependencies(session);
+  const recipients = [
+    {
+      id: "trainer-lagos",
+      role: UserRole.trainer,
+      timezone: "Africa/Lagos",
+    },
+    {
+      id: "admin-kigali",
+      role: UserRole.admin,
+      timezone: "Africa/Kigali",
+    },
+  ];
+  let notifications: Array<Record<string, unknown>> = [];
+  const service = new SessionsService(
+    {
+      ...deps.prisma,
+      user: { findMany: async () => recipients },
+    } as never,
+    {
+      createNotifications: async (items: Array<Record<string, unknown>>) => {
+        notifications = items;
+      },
+    } as never,
+    deps.calendar as never,
+    deps.availability as never,
+    {} as never,
+  );
+
+  await (service as any).notifyTeamOfSessionRequest(
+    session.createdBy,
+    session,
+  );
+
+  assert.equal(notifications.length, 2);
+  assert.match(String(notifications[0]?.body), /11:00/);
+  assert.match(String(notifications[0]?.body), /Africa\/Lagos/);
+  assert.match(String(notifications[1]?.body), /12:00/);
+  assert.match(String(notifications[1]?.body), /Africa\/Kigali/);
 });
 
 test("session confirmation copy uses a possessive label without an extra article", () => {
@@ -319,7 +368,11 @@ test("session confirmation copy uses a possessive label without an extra article
     {} as never,
   );
 
-  const body = (service as any).sessionConfirmedBody(trainer, session);
+  const body = (service as any).sessionConfirmedBody(
+    trainer,
+    session,
+    "Africa/Accra",
+  );
 
   assert.match(body, /confirmed your 1:1 mentor check-in/);
   assert.doesNotMatch(body, /your a mentor/);

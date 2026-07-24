@@ -54,6 +54,7 @@ const sessionInclude = {
       email: true,
       firstName: true,
       lastName: true,
+      timezone: true,
       businessMemberships: {
         where: { isPrimary: true },
         take: 1,
@@ -71,6 +72,7 @@ const sessionInclude = {
       firstName: true,
       lastName: true,
       role: true,
+      timezone: true,
     },
   },
   target: {
@@ -80,6 +82,7 @@ const sessionInclude = {
       firstName: true,
       lastName: true,
       role: true,
+      timezone: true,
     },
   },
   createdBy: {
@@ -89,6 +92,7 @@ const sessionInclude = {
       firstName: true,
       lastName: true,
       role: true,
+      timezone: true,
     },
   },
   typeDefinition: {
@@ -347,7 +351,8 @@ export class SessionsService {
         created,
         NotificationType.session_confirmed,
         "Session booked: " + created.topic,
-        this.sessionConfirmedBody(created.owner ?? user, created),
+        (timezone) =>
+          this.sessionConfirmedBody(created.owner ?? user, created, timezone),
         NotificationSeverity.success,
       );
       await this.notifyTeamParticipant(
@@ -355,7 +360,7 @@ export class SessionsService {
         created,
         NotificationType.session_confirmed,
         "Session booked: " + created.topic,
-        this.sessionBookedForTeamBody(created),
+        (timezone) => this.sessionBookedForTeamBody(created, timezone),
         NotificationSeverity.success,
       );
     }
@@ -436,7 +441,7 @@ export class SessionsService {
       updated,
       NotificationType.session_confirmed,
       "Session confirmed: " + updated.topic,
-      this.sessionConfirmedBody(user, updated),
+      (timezone) => this.sessionConfirmedBody(user, updated, timezone),
       NotificationSeverity.success,
     );
 
@@ -507,7 +512,7 @@ export class SessionsService {
       updated,
       NotificationType.session_declined,
       "Session request declined: " + updated.topic,
-      this.sessionDeclinedBody(user, updated),
+      (timezone) => this.sessionDeclinedBody(user, updated, timezone),
       NotificationSeverity.warning,
     );
     return this.mapSession(updated, user.role);
@@ -554,7 +559,7 @@ export class SessionsService {
       updated,
       NotificationType.session_cancelled,
       "Session cancelled: " + updated.topic,
-      this.sessionCancelledBody(user, updated),
+      (timezone) => this.sessionCancelledBody(user, updated, timezone),
       NotificationSeverity.warning,
     );
     await this.notifyTeamParticipant(
@@ -562,7 +567,7 @@ export class SessionsService {
       updated,
       NotificationType.session_cancelled,
       "Session cancelled: " + updated.topic,
-      this.sessionCancelledBody(user, updated),
+      (timezone) => this.sessionCancelledBody(user, updated, timezone),
       NotificationSeverity.warning,
     );
     return this.mapSession(updated, user.role);
@@ -711,7 +716,14 @@ export class SessionsService {
       updated,
       NotificationType.session_rescheduled,
       "Session rescheduled: " + updated.topic,
-      this.sessionRescheduledBody(user, session, updated, dto.reason),
+      (timezone) =>
+        this.sessionRescheduledBody(
+          user,
+          session,
+          updated,
+          timezone,
+          dto.reason,
+        ),
       NotificationSeverity.info,
     );
     await this.notifyTeamParticipant(
@@ -719,7 +731,14 @@ export class SessionsService {
       updated,
       NotificationType.session_rescheduled,
       "Session rescheduled: " + updated.topic,
-      this.sessionRescheduledBody(user, session, updated, dto.reason),
+      (timezone) =>
+        this.sessionRescheduledBody(
+          user,
+          session,
+          updated,
+          timezone,
+          dto.reason,
+        ),
       NotificationSeverity.info,
     );
     return this.mapSession(updated, user.role);
@@ -776,7 +795,7 @@ export class SessionsService {
       updated,
       NotificationType.session_completed,
       "Session completed: " + updated.topic,
-      this.sessionCompletedBody(user, updated),
+      (timezone) => this.sessionCompletedBody(user, updated, timezone),
       NotificationSeverity.success,
     );
     return this.mapSession(updated, user.role);
@@ -1060,8 +1079,9 @@ export class SessionsService {
       where: {
         AND: [activeBidTeamMemberWhere()],
       },
-      select: { id: true, role: true },
+      select: { id: true, role: true, timezone: true },
     });
+    const fallbackTimezone = await this.availability.resolveTimezone();
 
     await this.notifications.createNotifications(
       recipients.map((recipient) => ({
@@ -1069,7 +1089,10 @@ export class SessionsService {
         actorUserId: actor.id,
         type: NotificationType.session_request,
         title: "Session request: " + session.topic,
-        body: this.sessionRequestBody(session),
+        body: this.sessionRequestBody(
+          session,
+          recipient.timezone ?? fallbackTimezone,
+        ),
         severity: NotificationSeverity.info,
         entityType: NotificationEntityType.session,
         entityId: session.id,
@@ -1087,17 +1110,20 @@ export class SessionsService {
     session: SessionWithInclude,
     type: NotificationType,
     title: string,
-    body: string,
+    bodyForTimezone: (timezone: string) => string,
     severity: NotificationSeverity,
   ) {
     if (actor.id === session.entrepreneurUserId) return;
+    const timezone = await this.availability.resolveTimezone(
+      session.entrepreneur.timezone,
+    );
 
     await this.notifications.createNotification({
       recipientUserId: session.entrepreneurUserId,
       actorUserId: actor.id,
       type,
       title,
-      body,
+      body: bodyForTimezone(timezone),
       severity,
       entityType: NotificationEntityType.session,
       entityId: session.id,
@@ -1111,20 +1137,25 @@ export class SessionsService {
     session: SessionWithInclude,
     type: NotificationType,
     title: string,
-    body: string,
+    bodyForTimezone: (timezone: string) => string,
     severity: NotificationSeverity,
   ) {
-    if (actor.role !== UserRole.entrepreneur) return;
-
     const includedRecipient = session.owner ?? session.target;
     const recipients = includedRecipient
-      ? [{ id: includedRecipient.id, role: includedRecipient.role }]
+      ? [
+          {
+            id: includedRecipient.id,
+            role: includedRecipient.role,
+            timezone: includedRecipient.timezone,
+          },
+        ]
       : await this.prisma.user.findMany({
           where: {
             AND: [activeBidTeamMemberWhere()],
           },
-          select: { id: true, role: true },
+          select: { id: true, role: true, timezone: true },
         });
+    const fallbackTimezone = await this.availability.resolveTimezone();
 
     await this.notifications.createNotifications(
       recipients
@@ -1134,7 +1165,7 @@ export class SessionsService {
           actorUserId: actor.id,
           type,
           title,
-          body,
+          body: bodyForTimezone(recipient.timezone ?? fallbackTimezone),
           severity,
           entityType: NotificationEntityType.session,
           entityId: session.id,
@@ -1152,7 +1183,10 @@ export class SessionsService {
     return business?.name ?? this.userName(session.entrepreneur);
   }
 
-  private sessionRequestBody(session: SessionWithInclude) {
+  private sessionRequestBody(
+    session: SessionWithInclude,
+    timezone: string,
+  ) {
     return (
       this.sessionEntrepreneurName(session) +
       " requested " +
@@ -1160,13 +1194,16 @@ export class SessionsService {
       " for “" +
       session.topic +
       "” on " +
-      this.sessionSchedule(session) +
+      this.sessionSchedule(session, timezone) +
       (session.programme ? ". Programme: " + session.programme.name : "") +
       ". Review the request details before responding."
     );
   }
 
-  private sessionBookedForTeamBody(session: SessionWithInclude) {
+  private sessionBookedForTeamBody(
+    session: SessionWithInclude,
+    timezone: string,
+  ) {
     return (
       this.sessionEntrepreneurName(session) +
       " booked " +
@@ -1174,7 +1211,7 @@ export class SessionsService {
       " for “" +
       session.topic +
       "”. It is scheduled for " +
-      this.sessionSchedule(session) +
+      this.sessionSchedule(session, timezone) +
       ". Open the session to review the participant and joining details."
     );
   }
@@ -1182,6 +1219,7 @@ export class SessionsService {
   private sessionConfirmedBody(
     actor: SessionEmailActor,
     session: SessionWithInclude,
+    timezone: string,
   ) {
     return (
       this.userName(actor) +
@@ -1190,7 +1228,7 @@ export class SessionsService {
       " for “" +
       session.topic +
       "”. It is scheduled for " +
-      this.sessionSchedule(session) +
+      this.sessionSchedule(session, timezone) +
       ". Open the session for meeting and calendar details."
     );
   }
@@ -1198,13 +1236,14 @@ export class SessionsService {
   private sessionDeclinedBody(
     actor: SessionEmailActor,
     session: SessionWithInclude,
+    timezone: string,
   ) {
     return (
       this.userName(actor) +
       " declined your request for “" +
       session.topic +
       "”, requested for " +
-      this.sessionSchedule(session) +
+      this.sessionSchedule(session, timezone) +
       ". Reason: " +
       (session.declinedReason ?? "No reason was provided") +
       ". You can review the request and book another suitable time."
@@ -1214,13 +1253,14 @@ export class SessionsService {
   private sessionCancelledBody(
     actor: SessionEmailActor,
     session: SessionWithInclude,
+    timezone: string,
   ) {
     return (
       this.userName(actor) +
       " cancelled “" +
       session.topic +
       "”, scheduled for " +
-      this.sessionSchedule(session) +
+      this.sessionSchedule(session, timezone) +
       ". Reason: " +
       (session.cancelledReason ?? "No reason was provided") +
       "."
@@ -1231,6 +1271,7 @@ export class SessionsService {
     actor: SessionEmailActor,
     previous: SessionEmailSchedule,
     updated: SessionWithInclude,
+    timezone: string,
     reason?: string,
   ) {
     return (
@@ -1238,9 +1279,9 @@ export class SessionsService {
       " moved “" +
       updated.topic +
       "” from " +
-      this.sessionSchedule(previous) +
+      this.sessionSchedule(previous, timezone) +
       " to " +
-      this.sessionSchedule(updated) +
+      this.sessionSchedule(updated, timezone) +
       (reason?.trim() ? ". Reason: " + reason.trim() : "") +
       ". Your connected calendar invitation has been updated."
     );
@@ -1249,6 +1290,7 @@ export class SessionsService {
   private sessionCompletedBody(
     actor: SessionEmailActor,
     session: SessionWithInclude,
+    timezone: string,
   ) {
     return (
       "Your session “" +
@@ -1256,22 +1298,25 @@ export class SessionsService {
       "” with " +
       this.userName(session.owner ?? actor) +
       ", scheduled for " +
-      this.sessionSchedule(session) +
+      this.sessionSchedule(session, timezone) +
       ", has been marked complete."
     );
   }
 
-  private sessionSchedule(session: SessionEmailSchedule) {
+  private sessionSchedule(
+    session: SessionEmailSchedule,
+    timezone: string,
+  ) {
     const start = new Intl.DateTimeFormat("en-GB", {
       dateStyle: "medium",
       timeStyle: "short",
-      timeZone: session.timezone,
+      timeZone: timezone,
     }).format(session.startAt);
     const end = new Intl.DateTimeFormat("en-GB", {
       timeStyle: "short",
-      timeZone: session.timezone,
+      timeZone: timezone,
     }).format(session.endAt);
-    return start + "–" + end + " (" + session.timezone + ")";
+    return start + "–" + end + " (" + timezone + ")";
   }
 
   private sessionTypeLabel(session: SessionWithInclude) {

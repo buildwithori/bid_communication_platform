@@ -1596,7 +1596,7 @@ Rules:
 - When a user accepts a request, recheck availability inside the transaction/workflow.
 - Company working days and working-hour bounds are interpreted in `company_settings.default_timezone`.
 - Availability is returned in the requesting user’s effective timezone: personal user timezone, then company default, then `Africa/Kigali` as the defensive platform fallback.
-- Each session stores the effective timezone as a historical snapshot for calendar creation and display.
+- Each session stores the booking timezone as a historical snapshot for calendar creation and audit context. Recipient-facing notifications and emails format the stored UTC timestamps in the recipient's current personal timezone, falling back to the company timezone and then `Africa/Kigali`; one recipient's formatted schedule must never be reused for another recipient.
 
 ### Meeting Link Creation
 
@@ -1621,6 +1621,7 @@ Notifications should be a full system:
 - BullMQ jobs for delivery, reminders, retries, and weekly digests
 - cursor-paged reminder and digest scans with durable unique dedupe keys, so recurring worker runs are idempotent
 - confirmed-session and outstanding-deliverable reminders run up to 24 hours before due time; weekly digests run from Monday 08:00 in each user timezone and summarize backend-computed unread and upcoming work
+- session lifecycle fanout formats dates and times separately for every recipient using that recipient's effective timezone; Google Calendar remains authoritative for attendee-local calendar display
 
 Email delivery stack:
 
