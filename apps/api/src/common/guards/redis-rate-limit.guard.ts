@@ -233,6 +233,14 @@ const POLICIES: RateLimitPolicy[] = [
     MINUTE,
     ipIdentity,
   ),
+  pathPolicy(
+    "google-calendar-webhook",
+    "POST",
+    /^\/webhooks\/google-calendar$/,
+    600,
+    MINUTE,
+    ipIdentity,
+  ),
   pathPolicy("health", "GET", /^\/health$/, 120, MINUTE, ipIdentity),
 ];
 

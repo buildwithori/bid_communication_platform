@@ -28,6 +28,8 @@ export class JobSchedulerService implements OnApplicationBootstrap {
     private readonly externalCleanupQueue: Queue,
     @InjectQueue(QUEUE_NAMES.videoReconciliation)
     private readonly videoReconciliationQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.calendarSync)
+    private readonly calendarSyncQueue: Queue,
     private readonly config: ConfigService,
   ) {}
 
@@ -47,6 +49,9 @@ export class JobSchedulerService implements OnApplicationBootstrap {
     const externalCleanupInterval = 30_000;
     const videoReconciliationInterval = this.config.getOrThrow<number>(
       "VIDEO_RECONCILIATION_INTERVAL_MS",
+    );
+    const calendarSyncInterval = this.config.getOrThrow<number>(
+      "CALENDAR_SYNC_INTERVAL_MS",
     );
 
     await Promise.all([
@@ -85,6 +90,12 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         "video-reconciliation-scheduler",
         JOB_NAMES.reconcileVideoAssets,
         videoReconciliationInterval,
+      ),
+      this.installScheduler(
+        this.calendarSyncQueue,
+        "calendar-sync-scheduler",
+        JOB_NAMES.reconcileCalendarEvents,
+        calendarSyncInterval,
       ),
     ]);
 
@@ -132,6 +143,14 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         this.startupOptions(
           JOB_NAMES.reconcileVideoAssets,
           videoReconciliationInterval,
+        ),
+      ),
+      this.calendarSyncQueue.add(
+        JOB_NAMES.reconcileCalendarEvents,
+        {},
+        this.startupOptions(
+          JOB_NAMES.reconcileCalendarEvents,
+          calendarSyncInterval,
         ),
       ),
     ]);

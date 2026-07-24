@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import {
+  CalendarAttendeeResponseStatus,
   CalendarConnectionStatus,
   CalendarProvider,
   NotificationChannel,
@@ -282,7 +283,9 @@ export class SessionsService {
       ? SessionStatus.confirmed
       : SessionStatus.requested;
     const id = randomUUID();
-    let calendarEvent: { eventId: string; meetingUrl: string } | null = null;
+    let calendarEvent: Awaited<
+      ReturnType<CalendarService["createSessionEvent"]>
+    > | null = null;
 
     if (ownerUserId) {
       calendarEvent = await this.calendar.createSessionEvent({
@@ -329,6 +332,11 @@ export class SessionsService {
               meetingProvider: dto.meetingProvider ?? "google_meet",
               meetingUrl: calendarEvent?.meetingUrl ?? null,
               calendarEventId: calendarEvent?.eventId ?? null,
+              calendarEventEtag: calendarEvent?.eventEtag ?? null,
+              calendarResponseStatus: calendarEvent?.responseStatus ?? null,
+              calendarResponseUpdatedAt:
+                calendarEvent?.responseUpdatedAt ?? null,
+              calendarLastSyncedAt: calendarEvent ? new Date() : null,
             },
             include: sessionInclude,
           }),
@@ -422,6 +430,10 @@ export class SessionsService {
               meetingProvider: "google_meet",
               meetingUrl: calendarEvent.meetingUrl,
               calendarEventId: calendarEvent.eventId,
+              calendarEventEtag: calendarEvent.eventEtag,
+              calendarResponseStatus: calendarEvent.responseStatus,
+              calendarResponseUpdatedAt: calendarEvent.responseUpdatedAt,
+              calendarLastSyncedAt: new Date(),
             },
             include: sessionInclude,
           }),
@@ -678,8 +690,13 @@ export class SessionsService {
                 ? {
                     calendarEventId: replacementEvent.eventId,
                     meetingUrl: replacementEvent.meetingUrl,
+                    calendarEventEtag: replacementEvent.eventEtag,
                   }
                 : {}),
+              calendarResponseStatus:
+                CalendarAttendeeResponseStatus.needs_action,
+              calendarResponseUpdatedAt: new Date(),
+              calendarLastSyncedAt: null,
             },
             include: sessionInclude,
           });
@@ -1220,10 +1237,7 @@ export class SessionsService {
     return business?.name ?? this.userName(session.entrepreneur);
   }
 
-  private sessionRequestBody(
-    session: SessionWithInclude,
-    timezone: string,
-  ) {
+  private sessionRequestBody(session: SessionWithInclude, timezone: string) {
     return (
       this.sessionEntrepreneurName(session) +
       " requested " +
@@ -1340,10 +1354,7 @@ export class SessionsService {
     );
   }
 
-  private sessionSchedule(
-    session: SessionEmailSchedule,
-    timezone: string,
-  ) {
+  private sessionSchedule(session: SessionEmailSchedule, timezone: string) {
     const start = new Intl.DateTimeFormat("en-GB", {
       dateStyle: "medium",
       timeStyle: "short",
@@ -1405,6 +1416,10 @@ export class SessionsService {
         session.status === SessionStatus.completed
           ? session.meetingUrl
           : null,
+      calendarResponseStatus: session.calendarResponseStatus,
+      calendarResponseUpdatedAt:
+        session.calendarResponseUpdatedAt?.toISOString() ?? null,
+      calendarLastSyncedAt: session.calendarLastSyncedAt?.toISOString() ?? null,
       declinedReason: session.declinedReason,
       cancelledReason: session.cancelledReason,
       completedAt: session.completedAt?.toISOString() ?? null,

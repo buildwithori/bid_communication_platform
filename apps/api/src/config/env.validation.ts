@@ -46,6 +46,11 @@ const envSchema = z
       .min(1)
       .max(100)
       .default(25),
+    CALENDAR_SYNC_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .default(300_000),
     EMAIL_TRANSPORT: z.enum(["smtp", "resend"]).default("smtp"),
     MAIL_FROM: z.string().min(1).default("BID Hub <no-reply@bid.local>"),
     SMTP_HOST: z.string().min(1).default("localhost"),

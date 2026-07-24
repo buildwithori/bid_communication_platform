@@ -2,17 +2,20 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   CalendarConnection,
+  CalendarAttendeeResponseStatus,
   CalendarConnectionStatus,
   CalendarProvider,
   Prisma,
   User,
 } from "@prisma/client";
 import { OAuth2Client } from "google-auth-library";
+import { createHash, randomUUID } from "node:crypto";
 import { AuditService } from "../audit/audit.service";
 import { createPlainToken } from "../auth/auth.tokens";
 import { PrismaService } from "../database/prisma.service";
@@ -26,8 +29,16 @@ const CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.freebusy",
 ];
 
+type GoogleRequest = {
+  url: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  data?: unknown;
+};
+
 @Injectable()
 export class CalendarService {
+  private readonly logger = new Logger(CalendarService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
@@ -96,17 +107,13 @@ export class CalendarService {
     const providerAccountId = profile.sub;
     const providerAccountEmail = profile.email.trim().toLowerCase();
 
-    const claimedConnection =
-      await this.prisma.calendarConnection.findFirst({
-        where: {
-          provider: CalendarProvider.google,
-          OR: [
-            { providerAccountId },
-            { providerAccountEmail },
-          ],
-        },
-        select: { userId: true },
-      });
+    const claimedConnection = await this.prisma.calendarConnection.findFirst({
+      where: {
+        provider: CalendarProvider.google,
+        OR: [{ providerAccountId }, { providerAccountEmail }],
+      },
+      select: { userId: true },
+    });
     if (claimedConnection && claimedConnection.userId !== user.id) {
       throw new ConflictException(
         "This Google Calendar is already connected to another BID Hub account.",
@@ -185,6 +192,16 @@ export class CalendarService {
       throw error;
     }
 
+    await this.ensureWatchChannel(connection.id).catch((error: unknown) => {
+      this.logger.warn(
+        JSON.stringify({
+          event: "calendar.watch.setup_deferred",
+          connectionId: connection.id,
+          error: error instanceof Error ? error.name : "UnknownError",
+        }),
+      );
+    });
+
     return this.mapConnection(connection);
   }
 
@@ -211,6 +228,7 @@ export class CalendarService {
     });
     if (!connection) return this.mapConnection(null);
 
+    await this.stopWatchChannel(connection).catch(() => undefined);
     await this.audit.capture(
       {
         action: "calendar.connection.disconnected",
@@ -270,7 +288,10 @@ export class CalendarService {
     const connection = await this.requireConnection(input.ownerUserId);
     const response = await this.googleRequest<{
       id?: string;
+      etag?: string;
+      updated?: string;
       hangoutLink?: string;
+      attendees?: Array<{ email?: string; responseStatus?: string }>;
       conferenceData?: {
         entryPoints?: Array<{ entryPointType?: string; uri?: string }>;
       };
@@ -336,7 +357,18 @@ export class CalendarService {
         "Google Calendar did not finish creating the Meet link. Try again.",
       );
     }
-    return { eventId: response.id, meetingUrl };
+    return {
+      eventId: response.id,
+      meetingUrl,
+      eventEtag: response.etag ?? null,
+      responseStatus: this.attendeeResponse(
+        response.attendees,
+        input.entrepreneurEmail,
+      ),
+      responseUpdatedAt: response.updated
+        ? new Date(response.updated)
+        : new Date(),
+    };
   }
 
   async updateSessionEvent(input: {
@@ -378,6 +410,141 @@ export class CalendarService {
     });
   }
 
+  async getSessionEvent(
+    connection: CalendarConnection,
+    eventId: string,
+    entrepreneurEmail: string,
+  ) {
+    const response = await this.googleRequest<{
+      id?: string;
+      etag?: string;
+      status?: string;
+      updated?: string;
+      attendees?: Array<{ email?: string; responseStatus?: string }>;
+    }>(
+      connection,
+      {
+        url:
+          "https://www.googleapis.com/calendar/v3/calendars/primary/events/" +
+          encodeURIComponent(eventId),
+        method: "GET",
+      },
+      { tolerateNotFound: true, preserveConnectionStatus: true },
+    );
+    if (!response) return null;
+    return {
+      eventId: response.id ?? eventId,
+      eventEtag: response.etag ?? null,
+      eventStatus: response.status ?? "confirmed",
+      responseStatus: this.attendeeResponse(
+        response.attendees,
+        entrepreneurEmail,
+      ),
+      responseUpdatedAt: response.updated
+        ? new Date(response.updated)
+        : new Date(),
+    };
+  }
+
+  async ensureWatchChannel(connectionId: string) {
+    const connection = await this.prisma.calendarConnection.findUnique({
+      where: { id: connectionId },
+    });
+    if (
+      !connection ||
+      connection.status !== CalendarConnectionStatus.connected ||
+      !this.pushNotificationsAvailable()
+    ) {
+      return null;
+    }
+    if (
+      connection.watchChannelId &&
+      connection.watchResourceId &&
+      connection.watchExpiresAt &&
+      connection.watchExpiresAt.getTime() > Date.now() + 24 * 60 * 60_000
+    ) {
+      return connection;
+    }
+
+    const previous = connection.watchChannelId
+      ? {
+          id: connection.watchChannelId,
+          resourceId: connection.watchResourceId,
+        }
+      : null;
+    const channelId = randomUUID();
+    const channelToken = createPlainToken(32);
+    await this.prisma.calendarConnection.update({
+      where: { id: connection.id },
+      data: {
+        watchChannelId: channelId,
+        watchResourceId: null,
+        watchTokenHash: this.hashChannelToken(channelToken),
+        watchExpiresAt: null,
+      },
+    });
+
+    try {
+      const channel = await this.googleRequest<{
+        id: string;
+        resourceId: string;
+        expiration?: string;
+      }>(
+        connection,
+        {
+          url: "https://www.googleapis.com/calendar/v3/calendars/primary/events/watch",
+          method: "POST",
+          data: {
+            id: channelId,
+            type: "web_hook",
+            address: this.webhookUrl(),
+            token: channelToken,
+            params: { ttl: "604800" },
+          },
+        },
+        { preserveConnectionStatus: true },
+      );
+      const updated = await this.prisma.calendarConnection.update({
+        where: { id: connection.id },
+        data: {
+          watchChannelId: channel.id,
+          watchResourceId: channel.resourceId,
+          watchExpiresAt: channel.expiration
+            ? new Date(Number(channel.expiration))
+            : new Date(Date.now() + 6 * 24 * 60 * 60_000),
+        },
+      });
+      if (previous?.resourceId) {
+        await this.stopWatchChannel(connection, previous).catch(
+          () => undefined,
+        );
+      }
+      return updated;
+    } catch (error) {
+      await this.prisma.calendarConnection.updateMany({
+        where: { id: connection.id, watchChannelId: channelId },
+        data: {
+          watchChannelId: previous?.id ?? null,
+          watchResourceId: previous?.resourceId ?? null,
+          watchTokenHash: previous ? connection.watchTokenHash : null,
+          watchExpiresAt: previous ? connection.watchExpiresAt : null,
+        },
+      });
+      throw error;
+    }
+  }
+
+  channelTokenHash(value: string) {
+    return this.hashChannelToken(value);
+  }
+
+  pushNotificationsAvailable() {
+    return (
+      new URL(this.config.getOrThrow<string>("API_PUBLIC_URL")).protocol ===
+      "https:"
+    );
+  }
+
   private async requireConnection(userId: string) {
     const connection = await this.prisma.calendarConnection.findUnique({
       where: {
@@ -395,14 +562,34 @@ export class CalendarService {
     return connection;
   }
 
+  private googleRequest<T = unknown>(
+    connection: CalendarConnection,
+    request: GoogleRequest,
+  ): Promise<T>;
+  private googleRequest<T = unknown>(
+    connection: CalendarConnection,
+    request: GoogleRequest,
+    options: {
+      tolerateNotFound: true;
+      preserveConnectionStatus?: boolean;
+    },
+  ): Promise<T | null>;
+  private googleRequest<T = unknown>(
+    connection: CalendarConnection,
+    request: GoogleRequest,
+    options: {
+      tolerateNotFound?: false;
+      preserveConnectionStatus: true;
+    },
+  ): Promise<T>;
   private async googleRequest<T = unknown>(
     connection: CalendarConnection,
-    request: {
-      url: string;
-      method: "GET" | "POST" | "PATCH" | "DELETE";
-      data?: unknown;
-    },
-  ): Promise<T> {
+    request: GoogleRequest,
+    options: {
+      tolerateNotFound?: boolean;
+      preserveConnectionStatus?: boolean;
+    } = {},
+  ): Promise<T | null> {
     const client = this.client();
     client.setCredentials({
       access_token: this.tokens.decrypt(connection.encryptedAccessToken),
@@ -433,13 +620,18 @@ export class CalendarService {
         } catch (error) {
           const status = (error as { response?: { status?: number } }).response
             ?.status;
-          if (request.method === "DELETE" && status === 404) {
-            return undefined as T;
+          if (
+            status === 404 &&
+            (request.method === "DELETE" || options.tolerateNotFound)
+          ) {
+            return null;
           }
-          await this.prisma.calendarConnection.update({
-            where: { id: connection.id },
-            data: { status: CalendarConnectionStatus.error },
-          });
+          if (!options.preserveConnectionStatus) {
+            await this.prisma.calendarConnection.update({
+              where: { id: connection.id },
+              data: { status: CalendarConnectionStatus.error },
+            });
+          }
           throw new ServiceUnavailableException(
             "Google Calendar availability is temporarily unavailable. Reconnect the calendar if the problem continues.",
           );
@@ -450,10 +642,62 @@ export class CalendarService {
 
   private calendarOperation(request: { url: string; method: string }) {
     if (request.url.includes("/freeBusy")) return "free_busy.query";
+    if (request.url.endsWith("/events/watch")) return "events.watch";
+    if (request.url.endsWith("/channels/stop")) return "channels.stop";
     if (request.method === "POST") return "event.create";
     if (request.method === "PATCH") return "event.update";
     if (request.method === "DELETE") return "event.delete";
     return "event.get";
+  }
+
+  private attendeeResponse(
+    attendees: Array<{ email?: string; responseStatus?: string }> | undefined,
+    entrepreneurEmail: string,
+  ): CalendarAttendeeResponseStatus {
+    const response = attendees?.find(
+      (attendee) =>
+        attendee.email?.trim().toLowerCase() ===
+        entrepreneurEmail.trim().toLowerCase(),
+    )?.responseStatus;
+    if (response === "accepted") {
+      return CalendarAttendeeResponseStatus.accepted;
+    }
+    if (response === "tentative") {
+      return CalendarAttendeeResponseStatus.tentative;
+    }
+    if (response === "declined") {
+      return CalendarAttendeeResponseStatus.declined;
+    }
+    return CalendarAttendeeResponseStatus.needs_action;
+  }
+
+  private async stopWatchChannel(
+    connection: CalendarConnection,
+    channel: { id: string; resourceId: string | null } = {
+      id: connection.watchChannelId ?? "",
+      resourceId: connection.watchResourceId,
+    },
+  ) {
+    if (!channel.id || !channel.resourceId) return;
+    await this.googleRequest(
+      connection,
+      {
+        url: "https://www.googleapis.com/calendar/v3/channels/stop",
+        method: "POST",
+        data: { id: channel.id, resourceId: channel.resourceId },
+      },
+      { preserveConnectionStatus: true },
+    );
+  }
+
+  private hashChannelToken(token: string) {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  private webhookUrl() {
+    return `${this.config
+      .getOrThrow<string>("API_PUBLIC_URL")
+      .replace(/\/$/, "")}/api/webhooks/google-calendar`;
   }
 
   private mapConnection(connection: CalendarConnection | null) {

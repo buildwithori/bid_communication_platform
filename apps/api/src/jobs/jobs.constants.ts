@@ -7,6 +7,7 @@ export const QUEUE_NAMES = {
   reportExports: "bid-report-exports",
   externalResourceCleanup: "bid-external-resource-cleanup",
   videoReconciliation: "bid-video-reconciliation",
+  calendarSync: "bid-calendar-sync",
 } as const;
 
 export const JOB_NAMES = {
@@ -26,6 +27,8 @@ export const JOB_NAMES = {
   generateReportExport: "generate-report-export",
   cleanupExternalResources: "cleanup-external-resources",
   reconcileVideoAssets: "reconcile-video-assets",
+  reconcileCalendarEvents: "reconcile-calendar-events",
+  reconcileCalendarConnection: "reconcile-calendar-connection",
 } as const;
 
 export const QUEUE_PREFIX = "bid-hub";

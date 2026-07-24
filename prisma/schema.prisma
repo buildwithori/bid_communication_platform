@@ -160,6 +160,13 @@ enum SessionStatus {
   completed
 }
 
+enum CalendarAttendeeResponseStatus {
+  needs_action
+  accepted
+  tentative
+  declined
+}
+
 enum SessionSource {
   entrepreneur_request
   team_created
@@ -457,6 +464,10 @@ model CalendarConnection {
   scopes                String[]
   status                CalendarConnectionStatus @default(connected)
   lastSyncedAt          DateTime?                @map("last_synced_at")
+  watchChannelId        String?                  @unique @map("watch_channel_id")
+  watchResourceId       String?                  @map("watch_resource_id")
+  watchTokenHash        String?                  @map("watch_token_hash")
+  watchExpiresAt        DateTime?                @map("watch_expires_at")
   createdAt             DateTime                 @default(now()) @map("created_at")
   updatedAt             DateTime                 @updatedAt @map("updated_at")
 
@@ -1283,30 +1294,34 @@ model DeliverableReview {
 }
 
 model Session {
-  id                 String            @id @default(cuid())
-  entrepreneurUserId String            @map("entrepreneur_user_id")
-  programmeId        String?           @map("programme_id")
-  ownerUserId        String?           @map("owner_user_id")
-  targetType         SessionTargetType @default(open_team) @map("target_type")
-  targetUserId       String?           @map("target_user_id")
-  createdById        String            @map("created_by_id")
-  type               String
-  durationMinutes    Int               @map("duration_minutes")
-  topic              String
-  notes              String?
-  source             SessionSource     @default(entrepreneur_request)
-  status             SessionStatus     @default(requested)
-  startAt            DateTime          @map("start_at")
-  endAt              DateTime          @map("end_at")
-  timezone           String            @default("Africa/Kigali")
-  meetingProvider    String            @default("google_meet") @map("meeting_provider")
-  meetingUrl         String?           @map("meeting_url")
-  calendarEventId    String?           @map("calendar_event_id")
-  declinedReason     String?           @map("declined_reason")
-  cancelledReason    String?           @map("cancelled_reason")
-  completedAt        DateTime?         @map("completed_at")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
+  id                        String                          @id @default(cuid())
+  entrepreneurUserId        String                          @map("entrepreneur_user_id")
+  programmeId               String?                         @map("programme_id")
+  ownerUserId               String?                         @map("owner_user_id")
+  targetType                SessionTargetType               @default(open_team) @map("target_type")
+  targetUserId              String?                         @map("target_user_id")
+  createdById               String                          @map("created_by_id")
+  type                      String
+  durationMinutes           Int                             @map("duration_minutes")
+  topic                     String
+  notes                     String?
+  source                    SessionSource                   @default(entrepreneur_request)
+  status                    SessionStatus                   @default(requested)
+  startAt                   DateTime                        @map("start_at")
+  endAt                     DateTime                        @map("end_at")
+  timezone                  String                          @default("Africa/Kigali")
+  meetingProvider           String                          @default("google_meet") @map("meeting_provider")
+  meetingUrl                String?                         @map("meeting_url")
+  calendarEventId           String?                         @map("calendar_event_id")
+  calendarResponseStatus    CalendarAttendeeResponseStatus? @map("calendar_response_status")
+  calendarResponseUpdatedAt DateTime?                       @map("calendar_response_updated_at")
+  calendarLastSyncedAt      DateTime?                       @map("calendar_last_synced_at")
+  calendarEventEtag         String?                         @map("calendar_event_etag")
+  declinedReason            String?                         @map("declined_reason")
+  cancelledReason           String?                         @map("cancelled_reason")
+  completedAt               DateTime?                       @map("completed_at")
+  createdAt                 DateTime                        @default(now()) @map("created_at")
+  updatedAt                 DateTime                        @updatedAt @map("updated_at")
 
   entrepreneur    User                    @relation("SessionEntrepreneur", fields: [entrepreneurUserId], references: [id])
   programme       Programme?              @relation(fields: [programmeId], references: [id])
@@ -1324,6 +1339,7 @@ model Session {
   @@index([programmeId])
   @@index([status, startAt])
   @@index([source, status])
+  @@index([ownerUserId, status, calendarEventId])
   @@map("sessions")
 }
 

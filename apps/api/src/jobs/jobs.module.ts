@@ -34,6 +34,7 @@ import { JobsHealthService } from "./jobs-health.service";
       { name: QUEUE_NAMES.reportExports },
       { name: QUEUE_NAMES.externalResourceCleanup },
       { name: QUEUE_NAMES.videoReconciliation },
+      { name: QUEUE_NAMES.calendarSync },
     ),
   ],
   providers: [TransactionalEmailQueueService, JobsHealthService],

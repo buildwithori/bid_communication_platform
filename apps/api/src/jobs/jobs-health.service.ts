@@ -22,6 +22,8 @@ export class JobsHealthService {
     private readonly externalCleanupQueue: Queue,
     @InjectQueue(QUEUE_NAMES.videoReconciliation)
     private readonly videoReconciliationQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.calendarSync)
+    private readonly calendarSyncQueue: Queue,
   ) {}
 
   async status() {
@@ -52,6 +54,7 @@ export class JobsHealthService {
         this.reportExportQueue,
         this.externalCleanupQueue,
         this.videoReconciliationQueue,
+        this.calendarSyncQueue,
       ].map(async (queue) => ({
         name: queue.name,
         counts: await queue.getJobCounts("wait", "active", "delayed", "failed"),
@@ -79,6 +82,7 @@ export class JobsHealthService {
       this.reportExportQueue,
       this.externalCleanupQueue,
       this.videoReconciliationQueue,
+      this.calendarSyncQueue,
     ];
 
     return Promise.all(
