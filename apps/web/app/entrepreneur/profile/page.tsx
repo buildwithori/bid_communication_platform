@@ -749,7 +749,7 @@ function BusinessTab({
               />
               <p className="mt-1.5 text-xs text-ink-faint">
                 {record.usesCompanyTimezone
-                  ? "Currently inherited from the company default. Saving makes this your personal timezone."
+                  ? "Currently inherited from the company default. Saving makes this your timezone."
                   : "Session times will be shown in this timezone."}
               </p>
             </>

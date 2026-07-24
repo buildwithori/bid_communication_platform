@@ -217,7 +217,7 @@ export default function TrainerSettingsPage() {
                 </div>
 
                 <FormField
-                  label="Personal timezone"
+                  label="Timezone"
                   error={form.formState.errors.timezone?.message}
                 >
                   <FormAutocomplete

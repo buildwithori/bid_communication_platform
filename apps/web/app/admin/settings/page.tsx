@@ -224,7 +224,7 @@ export default function AdminSettingsPage() {
                 </FormField>
 
                 <FormField
-                  label="Personal timezone"
+                  label="Timezone"
                   error={form.formState.errors.timezone?.message}
                 >
                   <FormAutocomplete
