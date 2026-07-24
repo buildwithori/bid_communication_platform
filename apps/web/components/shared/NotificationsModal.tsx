@@ -52,7 +52,7 @@ export function NotificationsModal({
               const tone = notification.unread ? notification.tone ?? 'info' : 'neutral';
               return (
                 <button key={notification.id} type="button" onClick={() => onNotificationClick(notification)}
-                  className={cn('flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-subtle', notification.unread && 'bg-bid-soft/35')}>
+                  className={cn('flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-subtle', notification.unread && 'bg-bid-light/35')}>
                   <span className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dotClassName[tone])} />
                   <span className="min-w-0 flex-1">
                     <span className={cn('block text-sm leading-tight text-ink', notification.unread ? 'font-semibold' : 'font-medium')}>{notification.title}</span>

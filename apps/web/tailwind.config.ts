@@ -81,6 +81,10 @@ const config: Config = {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        media: {
+          canvas: 'hsl(var(--media-canvas) / <alpha-value>)',
+          chrome: 'hsl(var(--media-chrome) / <alpha-value>)',
+        },
         // BID brand palette
         bid: {
           DEFAULT: 'hsl(var(--bid) / <alpha-value>)',
@@ -121,6 +125,7 @@ const config: Config = {
         },
         danger: {
           DEFAULT: 'hsl(var(--danger) / <alpha-value>)',
+          dark: 'hsl(var(--danger-dark) / <alpha-value>)',
           light: 'hsl(var(--danger-light) / <alpha-value>)',
         },
       },

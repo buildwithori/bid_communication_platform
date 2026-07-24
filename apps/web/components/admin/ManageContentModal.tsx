@@ -408,7 +408,7 @@ function ContentPreviewModal({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-[#111] shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-border bg-media-canvas shadow-sm">
           <ContentPreviewFrame item={item} />
         </div>
 
@@ -455,7 +455,7 @@ function ContentPreviewFrame({ item }: { item: ContentItem }) {
           playbackId={item.muxPlaybackId}
           metadataVideoTitle={item.title}
           streamType="on-demand"
-          accentColor="#8f245c"
+          accentColor="hsl(var(--primary))"
           className="block aspect-video max-h-[56vh] w-full"
         />
       </div>

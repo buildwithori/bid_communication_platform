@@ -482,7 +482,7 @@ function SchedulePageContent({ timezone }: { timezone: string }) {
                         !isSelected &&
                         "border-info/40 bg-info-light/40 text-info hover:bg-info-light/70",
                       isSelected &&
-                        "border-bid bg-bid text-white shadow-[0_10px_22px_rgba(132,39,81,0.2)] hover:bg-bid-dark",
+                        "border-bid bg-bid text-white shadow-[0_10px_22px_hsl(var(--primary)/0.22)] hover:bg-bid-dark",
                     )}
                   >
                     <span>{date.getDate()}</span>
@@ -536,7 +536,7 @@ function SchedulePageContent({ timezone }: { timezone: string }) {
             </div>
           </section>
 
-          <section className="self-start rounded-2xl border border-border bg-card p-4 shadow-[0_12px_28px_rgba(26,26,26,0.035)]">
+          <section className="self-start rounded-2xl border border-border bg-card p-4 shadow-[0_12px_28px_hsl(var(--shadow-color)/0.07)]">
             <CardHeader
               title={isSelectedToday ? "Today" : "Selected date"}
               description={formatFullDate(selectedDate)}

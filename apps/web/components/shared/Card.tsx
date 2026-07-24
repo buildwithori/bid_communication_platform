@@ -26,7 +26,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-xl bg-surface-panel shadow-[0_18px_45px_rgba(26,26,26,0.055)] transition-shadow',
+        'rounded-xl bg-surface-panel shadow-[0_18px_45px_hsl(var(--shadow-color)/0.075)] transition-shadow',
         padding === 'sm' && 'p-4',
         padding === 'md' && 'p-5',
         padding === 'lg' && 'p-6',

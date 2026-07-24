@@ -14,7 +14,6 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -22,7 +21,7 @@ import { AdminDashboardSkeleton } from "@/components/dashboard/DashboardSkeleton
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader, TableSkeleton } from "@/components/shared/Card";
-import { ChartCard } from "@/components/shared/ChartCard";
+import { ChartCard, ThemedChartTooltip } from "@/components/shared/ChartCard";
 import {
   DataTable,
   RowActions,
@@ -165,11 +164,11 @@ export default function AdminDashboardPage() {
           {data.programmeHealthPreview.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data.programmeHealthPreview} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                <CartesianGrid stroke="hsl(var(--chart-grid))" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={shortLabel} />
                 <YAxis yAxisId="count" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                 <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <ThemedChartTooltip />
                 <Bar yAxisId="count" dataKey="active" name="Active participants" stackId="people" fill="hsl(var(--chart-2))" />
                 <Bar yAxisId="count" dataKey="left" name="Left programme" stackId="people" fill="hsl(var(--chart-4))" />
                 <Bar yAxisId="count" dataKey="openSeats" name="Open seats" stackId="people" fill="hsl(var(--chart-5))" radius={[8, 8, 0, 0]} />
@@ -188,7 +187,7 @@ export default function AdminDashboardPage() {
                 <Pie data={data.sectorBreakdown} dataKey="value" nameKey="name" innerRadius={58} outerRadius={86} paddingAngle={3}>
                   {data.sectorBreakdown.map((item, index) => <Cell key={item.id} fill={chartColors[index % chartColors.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <ThemedChartTooltip cursor={false} />
               </PieChart>
             </ResponsiveContainer>
           ) : <ChartEmpty label="No sector data yet." />}
@@ -200,10 +199,10 @@ export default function AdminDashboardPage() {
           <div className="h-[185px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.fundsTrend.map((item) => ({ ...item, amount: item.amountCents / 100 }))} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
-                <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                <CartesianGrid stroke="hsl(var(--chart-grid))" vertical={false} />
                 <XAxis dataKey="month" tickFormatter={(value) => formatMonth(String(value))} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <Tooltip labelFormatter={(value) => formatMonth(String(value))} formatter={(value) => formatMoney(Number(value) * 100, data.currency)} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <ThemedChartTooltip labelFormatter={(value) => formatMonth(String(value))} formatter={(value) => formatMoney(Number(value) * 100, data.currency)} />
                 <Bar dataKey="amount" name="Funds mobilised" fill="hsl(var(--chart-1))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

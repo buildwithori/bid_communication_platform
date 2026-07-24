@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     /* shadcn/ui design tokens — mapped onto the BID palette */
     --background: 40 14% 97%; /* #f7f6f3 surface */
     --foreground: 0 0% 10%; /* #1a1a1a ink */
@@ -29,6 +30,12 @@
     --chart-3: 159deg 57% 37%; /* success */
     --chart-4: 36deg 75% 41%; /* warning */
     --chart-5: 0 0% 40%;
+    --chart-grid: 0 0% 0% / 10%;
+    --chart-cursor: 335deg 56% 34% / 8%;
+    --shadow-color: 330deg 18% 10%;
+    /* Immersive document/video surfaces remain dark in either app theme. */
+    --media-canvas: 330deg 13% 5%;
+    --media-chrome: 330deg 11% 8%;
     /* Legacy BID utilities share the global theme contract. */
     --bid: 335deg 56% 34%;
     --bid-dark: 335deg 56% 22%;
@@ -47,11 +54,13 @@
     --warning-dark: 32deg 89% 21%;
     --warning-light: 38deg 78% 92%;
     --danger: 0deg 57% 41%;
+    --danger-dark: 0deg 64% 31%;
     --danger-light: 0deg 74% 95%;
     --radius: 0.625rem; /* 10px */
   }
 
   .dark {
+    color-scheme: dark;
     --background: 330 15% 7%;
     --foreground: 330 10% 96%;
     --card: 330 14% 10%;
@@ -71,6 +80,16 @@
     --border: 0 0% 100% / 12%;
     --input: 0 0% 100% / 20%;
     --ring: 335deg 62% 56%;
+    --chart-1: 335deg 62% 56%;
+    --chart-2: 207deg 66% 58%;
+    --chart-3: 159deg 55% 48%;
+    --chart-4: 36deg 80% 58%;
+    --chart-5: 330deg 7% 68%;
+    --chart-grid: 0 0% 100% / 10%;
+    --chart-cursor: 335deg 62% 56% / 11%;
+    --shadow-color: 0deg 0% 0%;
+    --media-canvas: 330deg 13% 5%;
+    --media-chrome: 330deg 11% 8%;
     --bid: 335deg 62% 56%;
     --bid-dark: 335deg 60% 46%;
     --bid-mid: 335deg 58% 62%;
@@ -88,6 +107,7 @@
     --warning-dark: 36deg 84% 74%;
     --warning-light: 36deg 32% 17%;
     --danger: 0deg 70% 60%;
+    --danger-dark: 0deg 76% 76%;
     --danger-light: 0deg 31% 18%;
   }
 }
@@ -173,6 +193,32 @@
       hsl(var(--background));
     font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
+    scrollbar-color: hsl(var(--input)) transparent;
+  }
+
+  /* Recharts renders some presentation styles inline. These selectors keep
+     library defaults readable when the application theme changes. */
+  .recharts-wrapper {
+    color: hsl(var(--foreground));
+  }
+
+  .recharts-cartesian-grid line {
+    shape-rendering: crispEdges;
+  }
+
+  .recharts-tooltip-wrapper {
+    z-index: 30;
+    outline: none;
+  }
+
+  .recharts-default-tooltip {
+    background: hsl(var(--popover)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--popover-foreground)) !important;
+  }
+
+  .recharts-default-tooltip :is(.recharts-tooltip-label, .recharts-tooltip-item) {
+    color: hsl(var(--popover-foreground)) !important;
   }
 
   input:-webkit-autofill,

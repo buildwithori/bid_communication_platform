@@ -541,7 +541,7 @@ function TrainerDetailModal({
         <Notice>Trainer profile could not be loaded. {error?.message}</Notice>
       ) : (
         <div className="space-y-5">
-          <section className="relative isolate overflow-hidden rounded-2xl border border-bid/20 bg-card shadow-[0_14px_34px_rgba(72,23,48,0.08)] dark:border-bid/30 dark:shadow-[0_18px_44px_rgba(0,0,0,0.24)]">
+          <section className="relative isolate overflow-hidden rounded-2xl border border-bid/20 bg-card shadow-[0_14px_34px_hsl(var(--shadow-color)/0.1)] dark:border-bid/30 dark:shadow-[0_18px_44px_hsl(var(--shadow-color)/0.28)]">
             <div
               className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-bid-light/90 via-card to-info-light/60 dark:from-bid-light/65 dark:via-card dark:to-info-light/40"
               aria-hidden="true"
@@ -560,7 +560,7 @@ function TrainerDetailModal({
                   initials={initials(trainer)}
                   size={76}
                   tone={trainer.accessLevel === "guest" ? "amber" : "brand"}
-                  className="ring-4 ring-card shadow-[0_8px_22px_rgba(40,18,30,0.14)] dark:shadow-[0_10px_26px_rgba(0,0,0,0.3)]"
+                  className="ring-4 ring-card shadow-[0_8px_22px_hsl(var(--shadow-color)/0.16)] dark:shadow-[0_10px_26px_hsl(var(--shadow-color)/0.32)]"
                 />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -609,7 +609,7 @@ function TrainerDetailModal({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card/80 p-4 shadow-[0_10px_26px_rgba(42,20,32,0.08)] backdrop-blur-md dark:bg-card/90 dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
+              <div className="rounded-xl border border-border bg-card/80 p-4 shadow-[0_10px_26px_hsl(var(--shadow-color)/0.1)] backdrop-blur-md dark:bg-card/90 dark:shadow-[0_12px_30px_hsl(var(--shadow-color)/0.24)]">
                 <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-faint">
                   Session readiness
                 </div>
@@ -700,7 +700,7 @@ function TrainerDetailModal({
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-border bg-surface-panel shadow-[0_12px_32px_rgba(26,26,26,0.04)]">
+            <section className="overflow-hidden rounded-2xl border border-border bg-surface-panel shadow-[0_12px_32px_hsl(var(--shadow-color)/0.06)]">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-gradient-to-r from-bid-light/70 via-surface-panel to-info-light/30 px-4 py-4">
                 <div>
                   <h3 className="font-semibold text-ink">Programme coverage</h3>
@@ -725,7 +725,7 @@ function TrainerDetailModal({
                     {visibleProgrammes.map((programme) => (
                       <div
                         key={programme.id}
-                        className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-border bg-surface-panel px-4 py-3.5 shadow-[0_6px_18px_rgba(26,26,26,0.035)] transition hover:border-bid/25 hover:shadow-[0_10px_24px_rgba(123,29,75,0.08)] sm:flex-row sm:items-center sm:justify-between"
+                        className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-border bg-surface-panel px-4 py-3.5 shadow-[0_6px_18px_hsl(var(--shadow-color)/0.05)] transition hover:border-bid/25 hover:shadow-[0_10px_24px_hsl(var(--primary)/0.11)] sm:flex-row sm:items-center sm:justify-between"
                       >
                         <span
                           className="absolute inset-y-0 left-0 w-1 bg-bid opacity-75"
@@ -810,7 +810,7 @@ function ProfileMetric({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-[0_10px_28px_rgba(26,26,26,0.04)]">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-[0_10px_28px_hsl(var(--shadow-color)/0.06)]">
       <div className="flex items-center justify-between gap-3">
         <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone]}`}>
           {icon}

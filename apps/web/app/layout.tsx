@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { Toaster } from 'sonner';
 import { AppProviders } from '@/app/providers';
+import { AppToaster } from '@/components/theme/AppToaster';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <AppProviders>
           {children}
-          <Toaster richColors position="bottom-right" />
+          <AppToaster />
         </AppProviders>
       </body>
     </html>

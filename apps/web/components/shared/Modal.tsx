@@ -51,10 +51,10 @@ export function Modal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="modal-overlay fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
+        <DialogPrimitive.Overlay className="modal-overlay fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px] dark:bg-black/65" />
         <DialogPrimitive.Content
           className={cn(
-            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-surface-panel p-6 shadow-[0_28px_90px_rgba(26,26,26,0.22)] outline-none',
+            'modal-content fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-surface-panel p-6 shadow-[0_28px_90px_hsl(var(--shadow-color)/0.3)] outline-none',
             width === 'media' && 'max-h-[calc(100vh-24px)] p-4 sm:p-5',
             widthClass[width],
           )}

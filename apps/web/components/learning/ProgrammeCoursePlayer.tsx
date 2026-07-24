@@ -318,7 +318,7 @@ export function ProgrammeCoursePlayer({
     >
       <div className="grid xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 border-b border-line xl:border-b-0 xl:border-r">
-          <header className="flex min-h-14 items-center justify-between gap-3 border-b border-white/10 bg-[#161116] px-4 py-3 text-white sm:px-5">
+          <header className="flex min-h-14 items-center justify-between gap-3 border-b border-white/10 bg-media-chrome px-4 py-3 text-white sm:px-5">
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold">
                 {data.programme.name}
@@ -798,12 +798,12 @@ function MediaStage({
             <div
               aria-hidden={!transitioning}
               className={cn(
-                "pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[#0d0a0d]/92 px-6 text-center text-white transition-opacity duration-300 motion-reduce:transition-none",
+                "pointer-events-none absolute inset-0 z-10 grid place-items-center bg-media-canvas/90 px-6 text-center text-white transition-opacity duration-300 motion-reduce:transition-none",
                 transitioning ? "opacity-100" : "opacity-0",
               )}
             >
               <div>
-                <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-bid-pink" />
+                <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-bid" />
                 <p className="mt-3 text-sm font-semibold">Loading next lesson</p>
                 <p className="mt-1 max-w-sm truncate text-xs text-white/55">
                   {item.title}
@@ -876,7 +876,7 @@ function EmbeddedToolFrame({ title, url }: { title: string; url: string }) {
   }
 
   return (
-    <div className="relative h-[620px] w-full overflow-hidden bg-[#0d0a0d]">
+    <div className="relative h-[620px] w-full overflow-hidden bg-media-canvas">
       <iframe
         key={frameKey}
         title={title}
@@ -892,12 +892,12 @@ function EmbeddedToolFrame({ title, url }: { title: string; url: string }) {
         <div
           role="status"
           aria-live="polite"
-          className="absolute inset-0 grid place-items-center bg-[#0d0a0d] px-6 text-center text-white"
+          className="absolute inset-0 grid place-items-center bg-media-canvas px-6 text-center text-white"
         >
           <div className="max-w-sm">
-            <div className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-bid-pink/25 bg-bid-pink/10 text-bid-pink">
+            <div className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-bid/25 bg-bid/10 text-bid">
               <Wrench className="h-6 w-6" />
-              <LoaderCircle className="absolute -inset-1 h-16 w-16 animate-spin text-bid-pink/70" />
+              <LoaderCircle className="absolute -inset-1 h-16 w-16 animate-spin text-bid/70" />
             </div>
             <p className="mt-5 text-base font-semibold">
               {takingLonger
@@ -915,7 +915,7 @@ function EmbeddedToolFrame({ title, url }: { title: string; url: string }) {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="mt-4 border-white/20 bg-white/5 text-white hover:border-bid-pink/60 hover:bg-bid-pink/10 hover:text-white"
+                className="mt-4 border-white/20 bg-white/5 text-white hover:border-bid/60 hover:bg-bid/10 hover:text-white"
                 onClick={retry}
               >
                 <RotateCcw className="h-4 w-4" />
@@ -937,9 +937,9 @@ function VideoStageLoading({
   switching: boolean;
 }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-[#0d0a0d] px-6 text-center text-white">
+    <div className="absolute inset-0 grid place-items-center bg-media-canvas px-6 text-center text-white">
       <div>
-        <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-bid-pink" />
+        <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-bid" />
         <p className="mt-3 text-sm font-semibold">
           {switching ? "Loading next lesson" : "Preparing video"}
         </p>
@@ -953,7 +953,7 @@ function StageSkeleton({ tall = false }: { tall?: boolean }) {
   return (
     <div
       className={cn(
-        "bg-[#161116] p-5",
+        "bg-media-chrome p-5",
         tall
           ? "h-[620px]"
           : "grid min-h-[360px] place-items-center xl:min-h-[600px]",
@@ -980,7 +980,7 @@ function StageMessage({
   return (
     <div
       className={cn(
-        "grid place-items-center bg-[#161116] px-6 text-center text-white",
+        "grid place-items-center bg-media-chrome px-6 text-center text-white",
         compact
           ? "h-full min-h-0 py-8"
           : "min-h-[420px] py-16 xl:min-h-[600px]",
@@ -1036,7 +1036,7 @@ export function ProgrammeCoursePlayerSkeleton() {
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
       <div className="grid xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="border-b border-line xl:border-b-0 xl:border-r">
-          <div className="bg-[#161116] p-4">
+          <div className="bg-media-chrome p-4">
             <Skeleton className="h-4 w-52 bg-white/10" />
             <Skeleton className="mt-2 h-3 w-72 bg-white/10" />
           </div>

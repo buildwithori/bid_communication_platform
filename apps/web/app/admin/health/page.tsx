@@ -192,7 +192,7 @@ export default function AdminHealthPage() {
           </div>
           <div
             className={cn(
-              "flex h-28 w-28 shrink-0 items-center justify-center rounded-full border-[10px] shadow-[0_18px_45px_rgba(0,0,0,0.08)]",
+              "flex h-28 w-28 shrink-0 items-center justify-center rounded-full border-[10px] shadow-[0_18px_45px_hsl(var(--shadow-color)/0.12)]",
               operational
                 ? "border-success-light bg-success text-white"
                 : degraded

@@ -10,7 +10,6 @@ import {
   CartesianGrid,
   ReferenceLine,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -19,7 +18,7 @@ import { BookingModal } from "@/components/entrepreneur/BookingModal";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader } from "@/components/shared/Card";
-import { ChartCard } from "@/components/shared/ChartCard";
+import { ChartCard, ThemedChartTooltip } from "@/components/shared/ChartCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { Notice, PageHeader } from "@/components/shared/PageHeader";
@@ -76,10 +75,10 @@ export default function EntrepreneurDashboardPage() {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.progressTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
               <defs><linearGradient id="entrepreneurTraining" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.24} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient></defs>
-              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <CartesianGrid stroke="hsl(var(--chart-grid))" vertical={false} />
               <XAxis dataKey="date" tickFormatter={formatChartDate} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
               <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <Tooltip labelFormatter={(value) => formatChartDate(String(value))} formatter={(value) => [`${value}%`, "Training progress"]} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+              <ThemedChartTooltip labelFormatter={(value) => formatChartDate(String(value))} formatter={(value) => [`${value}%`, "Training progress"]} />
               <ReferenceLine y={100} stroke="hsl(var(--primary) / 0.22)" strokeDasharray="4 4" />
               <Area type="monotone" dataKey="progress" name="Training %" stroke="hsl(var(--primary))" fill="url(#entrepreneurTraining)" strokeWidth={3} />
             </AreaChart>

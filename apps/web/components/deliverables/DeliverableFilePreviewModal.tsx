@@ -46,9 +46,9 @@ function PdfPreviewLoading({ fileName }: { fileName: string }) {
       className="absolute inset-0 z-10 overflow-hidden bg-surface-subtle"
     >
       <div className="flex h-11 items-center gap-3 border-b border-line bg-card px-4">
-        <div className="h-3 w-7 animate-pulse rounded bg-surface-strong" />
-        <div className="h-3 w-28 animate-pulse rounded bg-surface-strong" />
-        <div className="ml-auto h-3 w-20 animate-pulse rounded bg-surface-strong" />
+        <div className="h-3 w-7 animate-pulse rounded bg-line-strong" />
+        <div className="h-3 w-28 animate-pulse rounded bg-line-strong" />
+        <div className="ml-auto h-3 w-20 animate-pulse rounded bg-line-strong" />
       </div>
       <div className="absolute inset-x-0 bottom-0 top-11 grid place-items-center overflow-hidden p-6">
         <div className="absolute inset-x-[12%] top-7 h-[calc(100%-3.5rem)] animate-pulse rounded-lg border border-line bg-card shadow-sm" />

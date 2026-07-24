@@ -465,7 +465,7 @@ function CompanySettingsForm({
           </div>
         </Card>
 
-        <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-line bg-[color:var(--background)]/95 py-4 backdrop-blur sm:flex-row">
+        <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-line bg-background/95 py-4 backdrop-blur sm:flex-row">
           <Button
             type="submit"
             disabled={hasError}

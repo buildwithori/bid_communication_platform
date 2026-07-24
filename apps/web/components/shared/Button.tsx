@@ -21,11 +21,11 @@ const buttonVariants = cva(
         outline:
           'border-[0.5px] border-line-strong bg-transparent text-ink-muted hover:border-bid/45 hover:bg-bid-light hover:text-bid',
         // .bd — info / blue button (download, add-to-programme)
-        info: 'bg-info text-white hover:bg-info-dark',
+        info: 'bg-info text-white hover:bg-info/85',
         // .bg2 — success / green button (reports)
-        success: 'bg-success text-white hover:bg-success-dark',
+        success: 'bg-success text-white hover:bg-success/85',
         // destructive — irreversible or negative action
-        destructive: 'bg-danger text-white hover:bg-danger-dark focus-visible:ring-danger',
+        destructive: 'bg-danger text-white hover:bg-danger/85 focus-visible:ring-danger',
         // .btn text-only subtle
         ghost: 'bg-transparent text-ink-muted hover:bg-surface-subtle hover:text-ink',
       },

@@ -12,7 +12,6 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -20,7 +19,7 @@ import { TrainerDashboardSkeleton } from "@/components/dashboard/DashboardSkelet
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Card, CardHeader } from "@/components/shared/Card";
-import { ChartCard } from "@/components/shared/ChartCard";
+import { ChartCard, ThemedChartTooltip } from "@/components/shared/ChartCard";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { Notice, PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
@@ -73,10 +72,10 @@ export default function TrainerDashboardPage() {
           {data.programmeProgressPreview.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.programmeProgressPreview} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                <CartesianGrid stroke="hsl(var(--chart-grid))" vertical={false} />
                 <XAxis dataKey="name" tickFormatter={shortLabel} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <ThemedChartTooltip />
                 <Bar dataKey="learners" name="Learners" fill="hsl(var(--chart-2))" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="averageProgress" name="Average progress %" fill="hsl(var(--chart-1))" radius={[8, 8, 0, 0]} />
               </BarChart>
@@ -90,7 +89,7 @@ export default function TrainerDashboardPage() {
               <PieChart>
                 <text x="50%" y="47%" textAnchor="middle" className="fill-ink text-3xl font-semibold">{data.metrics.learnersReached}</text>
                 <text x="50%" y="56%" textAnchor="middle" className="fill-ink-muted text-sm">Learners</text>
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                <ThemedChartTooltip cursor={false} />
                 <Pie data={data.progressBands} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={3}>
                   {data.progressBands.map((band, index) => <Cell key={band.name} fill={chartColors[index % chartColors.length]} />)}
                 </Pie>
@@ -105,10 +104,10 @@ export default function TrainerDashboardPage() {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.contentImpactTrend} margin={{ top: 8, right: 16, left: -18, bottom: 0 }}>
               <defs><linearGradient id="trainerContentCompletions" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.28} /><stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.02} /></linearGradient></defs>
-              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <CartesianGrid stroke="hsl(var(--chart-grid))" vertical={false} />
               <XAxis dataKey="date" tickFormatter={formatWeek} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <Tooltip labelFormatter={(value) => formatWeek(String(value))} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+              <ThemedChartTooltip labelFormatter={(value) => formatWeek(String(value))} />
               <Area type="monotone" dataKey="completions" name="Content completions" stroke="hsl(var(--chart-1))" fill="url(#trainerContentCompletions)" strokeWidth={2.5} />
             </AreaChart>
           </ResponsiveContainer>
@@ -117,10 +116,10 @@ export default function TrainerDashboardPage() {
         <ChartCard title="Review workload" description="Current deliverable states for learners in your content scope" legend={reviewRows.map((item) => ({ label: item.name, colorClassName: reviewMeta[item.status].legend }))} bodyClassName="h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={reviewRows} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <CartesianGrid stroke="hsl(var(--chart-grid))" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+              <ThemedChartTooltip />
               <Bar dataKey="value" name="Deliverables" radius={[8, 8, 0, 0]}>{reviewRows.map((item) => <Cell key={item.status} fill={item.fill} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>

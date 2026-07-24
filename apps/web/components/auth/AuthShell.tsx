@@ -32,7 +32,7 @@ export function AuthShell({
 
           <div
             className={cn(
-              'rounded-bid border border-border bg-card p-6 text-card-foreground shadow-[0_18px_45px_rgba(26,26,26,0.07)] transition-colors duration-200 dark:shadow-[0_20px_60px_rgba(0,0,0,0.32)] sm:p-8',
+              'rounded-bid border border-border bg-card p-6 text-card-foreground shadow-[0_20px_55px_hsl(var(--shadow-color)/0.16)] transition-colors duration-200 sm:p-8',
               cardClassName,
             )}
           >
