@@ -450,6 +450,7 @@ model CalendarConnection {
   id                    String                   @id @default(cuid())
   userId                String                   @map("user_id")
   provider              CalendarProvider
+  providerAccountId     String?                  @map("provider_account_id")
   providerAccountEmail  String                   @map("provider_account_email")
   encryptedAccessToken  String                   @map("encrypted_access_token")
   encryptedRefreshToken String                   @map("encrypted_refresh_token")
@@ -462,6 +463,8 @@ model CalendarConnection {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
+  @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountEmail])
   @@index([provider, status])
   @@map("calendar_connections")
 }

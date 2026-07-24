@@ -1,4 +1,13 @@
-import { Controller, Delete, Get, Post, Query, Req, Res } from "@nestjs/common";
+import {
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags } from "@nestjs/swagger";
 import { User, UserRole } from "@prisma/client";
@@ -83,8 +92,13 @@ export class CalendarController {
       return response.redirect(
         `${this.settingsUrl(user.role)}?calendar=connected`,
       );
-    } catch {
+    } catch (error) {
       this.clearCookie(response);
+      if (error instanceof ConflictException) {
+        return response.redirect(
+          `${this.settingsUrl(user.role)}?calendarError=in-use`,
+        );
+      }
       return response.redirect(
         `${this.settingsUrl(user.role)}?calendarError=failed`,
       );

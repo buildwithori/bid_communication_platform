@@ -19,6 +19,7 @@ import {
   FormRow2,
 } from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
+import { CalendarConnectionFeedback } from "@/components/settings/CalendarConnectionFeedback";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { Tabs } from "@/components/shared/Tabs";
 import {
@@ -131,6 +132,7 @@ export default function AdminSettingsPage() {
 
   return (
     <>
+      <CalendarConnectionFeedback />
       <PageHeader
         title="Admin settings"
         description="Manage the profile and calendar connection used when you own BID sessions."

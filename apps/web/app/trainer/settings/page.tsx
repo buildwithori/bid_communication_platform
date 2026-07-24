@@ -19,6 +19,7 @@ import {
   FormInput,
 } from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
+import { CalendarConnectionFeedback } from "@/components/settings/CalendarConnectionFeedback";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { Tabs } from "@/components/shared/Tabs";
 import {
@@ -142,6 +143,7 @@ export default function TrainerSettingsPage() {
 
   return (
     <>
+      <CalendarConnectionFeedback />
       <PageHeader
         title="Settings"
         description="Manage the profile and calendar details used across your trainer workspace."

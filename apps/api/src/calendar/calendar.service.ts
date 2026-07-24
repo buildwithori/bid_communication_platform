@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -8,6 +9,7 @@ import {
   CalendarConnection,
   CalendarConnectionStatus,
   CalendarProvider,
+  Prisma,
   User,
 } from "@prisma/client";
 import { OAuth2Client } from "google-auth-library";
@@ -86,9 +88,28 @@ export class CalendarService {
         }),
     );
     const profile = ticket.getPayload();
-    if (!profile?.email || !profile.email_verified) {
+    if (!profile?.sub || !profile.email || !profile.email_verified) {
       throw new BadRequestException(
-        "Google Calendar account email must be verified.",
+        "Google Calendar account identity and email must be verified.",
+      );
+    }
+    const providerAccountId = profile.sub;
+    const providerAccountEmail = profile.email.trim().toLowerCase();
+
+    const claimedConnection =
+      await this.prisma.calendarConnection.findFirst({
+        where: {
+          provider: CalendarProvider.google,
+          OR: [
+            { providerAccountId },
+            { providerAccountEmail },
+          ],
+        },
+        select: { userId: true },
+      });
+    if (claimedConnection && claimedConnection.userId !== user.id) {
+      throw new ConflictException(
+        "This Google Calendar is already connected to another BID Hub account.",
       );
     }
 
@@ -112,42 +133,57 @@ export class CalendarService {
     }
 
     const scopeValue = tokens.scope?.split(/\s+/).filter(Boolean);
-    const connection = await this.audit.capture(
-      {
-        action: "calendar.connection.connected",
-        entityType: "calendarConnection",
-        entityId: (result) => result.id,
-        summary: "Connected Google Calendar",
-        payload: { provider: CalendarProvider.google },
-      },
-      (tx) =>
-        tx.calendarConnection.upsert({
-          where: {
-            userId_provider: {
+    let connection: CalendarConnection;
+    try {
+      connection = await this.audit.capture(
+        {
+          action: "calendar.connection.connected",
+          entityType: "calendarConnection",
+          entityId: (result) => result.id,
+          summary: "Connected Google Calendar",
+          payload: { provider: CalendarProvider.google },
+        },
+        (tx) =>
+          tx.calendarConnection.upsert({
+            where: {
+              userId_provider: {
+                userId: user.id,
+                provider: CalendarProvider.google,
+              },
+            },
+            create: {
               userId: user.id,
               provider: CalendarProvider.google,
+              providerAccountId,
+              providerAccountEmail,
+              encryptedAccessToken: this.tokens.encrypt(tokens.access_token!),
+              encryptedRefreshToken: this.tokens.encrypt(refreshToken),
+              scopes: scopeValue?.length ? scopeValue : CALENDAR_SCOPES,
+              status: CalendarConnectionStatus.connected,
+              lastSyncedAt: new Date(),
             },
-          },
-          create: {
-            userId: user.id,
-            provider: CalendarProvider.google,
-            providerAccountEmail: profile.email!.trim().toLowerCase(),
-            encryptedAccessToken: this.tokens.encrypt(tokens.access_token!),
-            encryptedRefreshToken: this.tokens.encrypt(refreshToken),
-            scopes: scopeValue?.length ? scopeValue : CALENDAR_SCOPES,
-            status: CalendarConnectionStatus.connected,
-            lastSyncedAt: new Date(),
-          },
-          update: {
-            providerAccountEmail: profile.email!.trim().toLowerCase(),
-            encryptedAccessToken: this.tokens.encrypt(tokens.access_token!),
-            encryptedRefreshToken: this.tokens.encrypt(refreshToken),
-            scopes: scopeValue?.length ? scopeValue : CALENDAR_SCOPES,
-            status: CalendarConnectionStatus.connected,
-            lastSyncedAt: new Date(),
-          },
-        }),
-    );
+            update: {
+              providerAccountId,
+              providerAccountEmail,
+              encryptedAccessToken: this.tokens.encrypt(tokens.access_token!),
+              encryptedRefreshToken: this.tokens.encrypt(refreshToken),
+              scopes: scopeValue?.length ? scopeValue : CALENDAR_SCOPES,
+              status: CalendarConnectionStatus.connected,
+              lastSyncedAt: new Date(),
+            },
+          }),
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "This Google Calendar is already connected to another BID Hub account.",
+        );
+      }
+      throw error;
+    }
 
     return this.mapConnection(connection);
   }

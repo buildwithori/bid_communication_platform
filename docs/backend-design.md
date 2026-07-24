@@ -360,6 +360,7 @@ Client action
 - `email_verification_tokens`
 - `password_reset_tokens`
 - `oauth_accounts`
+- `calendar_connections`
 
 ### Role Rules
 
@@ -370,6 +371,7 @@ A user has exactly one active role at a time.
 - Admins are invited.
 - Trainers are invited.
 - Admins/trainers can connect Google Calendar after account creation.
+- One verified Google Calendar identity can be connected to only one BID Hub user. Persist the stable Google account identifier and enforce provider/account-ID plus provider/normalized-email uniqueness in the database. When migrating legacy duplicates, retain the earliest connection owner and disconnect later duplicates.
 - Role change is not supported for launch. If a person needs a different role, they should be invited/created through the correct role flow.
 - Do not model multi-role users for launch.
 - Do not create separate `admin_profiles`, `trainer_profiles`, or `entrepreneur_profiles` tables.
