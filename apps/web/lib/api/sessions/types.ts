@@ -6,6 +6,8 @@ export type SessionTargetType = "open_team" | "specific_user";
 export type SessionNoteVisibility = "internal" | "participant";
 export type CalendarAttendeeResponseStatus =
   "needs_action" | "accepted" | "tentative" | "declined";
+export type CalendarProvisioningStatus =
+  "pending" | "processing" | "ready" | "failed";
 export type SessionUser = {
   id: string;
   name: string;
@@ -46,6 +48,9 @@ export type SessionRecord = {
   timezone: string;
   meetingProvider: string;
   meetingUrl: string | null;
+  calendarProvisioningStatus: CalendarProvisioningStatus | null;
+  calendarProvisioningError: string | null;
+  calendarProvisionedAt: string | null;
   calendarResponseStatus: CalendarAttendeeResponseStatus | null;
   calendarResponseUpdatedAt: string | null;
   calendarLastSyncedAt: string | null;

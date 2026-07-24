@@ -284,11 +284,20 @@ Session workflow rules:
 - Feature 12 uses one durable session lifecycle aggregate across entrepreneur, trainer, and admin views. Requests are `requested` sessions with nullable owner and explicit open-team or specific-trainer targeting.
 - Specific-trainer booking slots come only from that active trainer's connected Google Calendar. Open-team slots exist only when at least one eligible connected admin/trainer is free, and acceptance rechecks the accepting user's Google and local availability before an atomic claim.
 - An open-team decline opts only that user out; it does not close the entrepreneur's request. A targeted-trainer decline closes the targeted request.
-- Confirmation creates a real Google Calendar event and Meet link. Reschedule updates that event, writes immutable previous/new time history and reason, and performs compensating Calendar rollback on a database race. Cancellation removes the Calendar event.
+- Confirmation is committed atomically before a retrying BullMQ job creates the real
+  Google Calendar event and Meet link. This prevents race-lost orphan events.
+  Provisioning has pending/processing/ready/failed state, stale-claim recovery,
+  scheduled cursor reconciliation, staff retry, and terminal owner notification.
+  Reschedule updates an existing event or requeues a missing one, writes immutable
+  history, and performs compensating Calendar rollback on a database race.
 - Confirmation initially records the entrepreneur calendar response as pending. The calendar sync worker separately records accepted/tentative/declined responses; a decline or external event deletion atomically cancels the session, while a reschedule resets the response to pending for the updated invitation.
 - Company settings own session working days, start/end minutes, slot interval, and the configurable IANA timezone. Session types and their durations are managed together under admin Session types settings. New and seeded settings use `Africa/Kigali`; personal timezone, company timezone, and platform fallback precedence is enforced consistently across profile and session flows.
 - The sessions frontend integration lives under `lib/api/sessions/`. Booking trainer/owner/entrepreneur lookups are lazy and cursor-paginated; schedule windows use infinite cursor loading; queue search, filters, totals, and status metrics remain backend-owned.
 - Meeting links are exposed only for real confirmed/completed Calendar-backed sessions. Internal session notes are never returned to entrepreneurs.
+- Every confirmed session also exposes an authenticated provider-neutral `.ics` file
+  with stable UID and revision. The shared session modal offers Google, Outlook, and
+  Apple/other-calendar actions, so entrepreneurs with non-Google email can retain the
+  session without connecting a calendar.
 - Admin/trainer "message entrepreneur" actions must call the authenticated session message endpoint; never use a UI-only success fallback. The backend derives the entrepreneur from the scoped session, creates a session-linked notification for the selected channel, and leaves email delivery to the notification worker. The modal stays open on failure, disables duplicate submission while pending, and reports when the recipient has disabled the chosen channel.
 
 ## Notifications And Email Completion (2026-07-16)

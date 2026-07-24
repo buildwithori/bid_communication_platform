@@ -715,6 +715,10 @@ Feature 12 uses one durable `sessions` lifecycle aggregate for both requests and
   - starts_at, ends_at, timezone
   - meeting_provider
   - meeting_url nullable
+  - calendar_uid: stable provider-neutral event identity
+  - calendar_revision: increments on reschedule/cancellation
+  - calendar_provisioning_status: pending, processing, ready, failed
+  - calendar_provisioning_error and claim/provision timestamps
   - calendar_event_id nullable
   - declined_reason, cancelled_reason, completed_at
 - `session_request_declines`
@@ -770,7 +774,12 @@ Rules:
 - Availability combines Google free/busy data with confirmed BID Hub sessions and is rechecked during create, accept, and reschedule.
 - Open-team requests remain requested until the first eligible user accepts atomically.
 - Only users with a connected supported calendar can own a Google Meet session.
-- A real Google Calendar event and Meet link are created during confirmation; placeholder links are never generated.
+- Confirmation commits the BID session first, then a retrying BullMQ job creates the
+  Google Calendar event and Meet link. The UI polls the scoped session while setup
+  is pending and exposes a staff-only retry when terminal attempts fail.
+- Every confirmed session has an authenticated `.ics` representation with a stable
+  UID and revision. Entrepreneurs can add it to Google, Outlook, Apple Calendar, or
+  another RFC 5545-compatible calendar even when their login email is not Google.
 - Rescheduling updates the same Google event, records immutable previous/new times and reason, and rolls Calendar back if the database transition loses a race.
 - Internal notes are never returned to entrepreneurs.
 
@@ -1395,10 +1404,12 @@ Sessions:
 
 - `GET /sessions`
 - `GET /sessions/:id`
+- `GET /sessions/:id/calendar`
 - `GET /sessions/team-members`
 - `GET /sessions/availability`
 - `POST /sessions`
 - `POST /sessions/:id/accept`
+- `POST /sessions/:id/calendar/retry`
 - `POST /sessions/:id/decline`
 - `POST /sessions/:id/cancel`
 - `PATCH /sessions/:id/reschedule`
@@ -1612,7 +1623,7 @@ Rules:
 - Cancel/decline cancels or marks the event based on state.
 - Store the external attendee response separately from the BID session lifecycle:
   `needs_action`, `accepted`, `tentative`, or `declined`.
-- Accepting a BID request confirms the session and creates the invitation. A Google
+- Accepting a BID request confirms the session and enqueues invitation creation. A Google
   `needs_action`, `accepted`, or `tentative` response leaves the BID session
   confirmed. A Google `declined` response or an event removed outside BID
   atomically cancels the confirmed session and notifies the owner and entrepreneur.
@@ -1635,6 +1646,10 @@ Rules:
 - Webhook and reconciliation jobs are idempotent. Session updates are
   status-constrained, audit events are deduplicated, and notification delivery uses
   durable recipient dedupe keys.
+- Calendar provisioning has its own bounded reconciliation sweep. Stale processing
+  claims are recovered, pending/failed confirmed sessions are cursor-paged into
+  retrying jobs, terminal failures notify the owner, and session confirmation remains
+  authoritative even while the external calendar is unavailable.
 
 ## 18. Email and Notification Design
 

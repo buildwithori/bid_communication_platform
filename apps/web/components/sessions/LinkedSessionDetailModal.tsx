@@ -1,16 +1,23 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarCheck2, CalendarDays, Clock3, ExternalLink, UserRound } from 'lucide-react';
+import { CalendarCheck2, CalendarDays, Clock3, ExternalLink, RefreshCw, UserRound } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { Modal } from '@/components/shared/Modal';
 import { Notice } from '@/components/shared/PageHeader';
-import { useSessionDetailQuery, type CalendarAttendeeResponseStatus, type SessionRecord, type SessionStatus } from '@/lib/api/sessions';
+import {
+  useRetrySessionCalendarMutation,
+  useSessionDetailQuery,
+  type CalendarAttendeeResponseStatus,
+  type SessionRecord,
+  type SessionStatus,
+} from '@/lib/api/sessions';
 import { useCurrentUserQuery } from '@/lib/api/auth';
 import { PLATFORM_DEFAULT_TIMEZONE } from '@/lib/timezones';
+import { AddToCalendarMenu } from './AddToCalendarMenu';
 
 const statusMeta: Record<SessionStatus, { label: string; tone: 'amber' | 'green' | 'red' | 'neutral' }> = {
   requested: { label: 'Awaiting team', tone: 'amber' },
@@ -28,6 +35,7 @@ export function LinkedSessionDetailModal() {
   const session = useSessionDetailQuery(sessionId);
   const currentUser = useCurrentUserQuery();
   const detail = session.data as SessionRecord | undefined;
+  const retryProvisioning = useRetrySessionCalendarMutation();
   const timezone =
     currentUser.data?.user?.timezone ??
     detail?.timezone ??
@@ -87,6 +95,44 @@ export function LinkedSessionDetailModal() {
             <Notice>{detail.declinedReason ?? detail.cancelledReason}</Notice>
           ) : null}
 
+          {detail.status === 'confirmed' &&
+          (detail.calendarProvisioningStatus === 'pending' ||
+            detail.calendarProvisioningStatus === 'processing') ? (
+            <Notice className="flex items-center gap-3 border border-bid/15 bg-bid-light/45 text-ink">
+              <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-bid" />
+              <span>
+                We’re preparing the calendar invitation and joining details.
+                This page will update automatically.
+              </span>
+            </Notice>
+          ) : null}
+
+          {detail.status === 'confirmed' &&
+          detail.calendarProvisioningStatus === 'failed' ? (
+            <Notice className="border border-warning/25 bg-warning/10 text-ink">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  {currentUser.data?.user?.role === 'entrepreneur'
+                    ? 'The calendar invitation is delayed. You can still add this session to your calendar below.'
+                    : detail.calendarProvisioningError ??
+                      'The calendar invitation could not be prepared. You can retry it now.'}
+                </span>
+                {currentUser.data?.user?.role !== 'entrepreneur' ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    isLoading={retryProvisioning.isPending}
+                    loadingLabel="Retrying..."
+                    onClick={() => retryProvisioning.mutate(detail.id)}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Retry calendar setup
+                  </Button>
+                ) : null}
+              </div>
+            </Notice>
+          ) : null}
+
           {detail.reschedules.length ? (
             <section>
               <h4 className="text-sm font-semibold text-ink">Reschedule history</h4>
@@ -116,6 +162,9 @@ export function LinkedSessionDetailModal() {
           ) : null}
 
           <div className="flex justify-end gap-2 border-t border-line pt-4">
+            {detail.status === 'confirmed' || detail.status === 'completed' ? (
+              <AddToCalendarMenu session={detail} />
+            ) : null}
             {detail.status === 'confirmed' && detail.meetingUrl ? (
               <Button asChild>
                 <a href={detail.meetingUrl} target="_blank" rel="noreferrer">Open Google Meet <ExternalLink className="h-4 w-4" /></a>

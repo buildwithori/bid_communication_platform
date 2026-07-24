@@ -2,6 +2,10 @@ import type { ApiErrorResponse, ApiSuccess } from '@bid/shared';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
 
+export function apiResourceUrl(path: string) {
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 type ApiErrorBody = {
   message?: string | string[];
   error?: string | ApiErrorResponse['error'];

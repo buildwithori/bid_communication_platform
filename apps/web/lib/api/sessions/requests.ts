@@ -1,4 +1,4 @@
-import { apiRequest } from "../client";
+import { apiRequest, apiResourceUrl } from "../client";
 import type {
   CreateSessionPayload,
   SessionAvailability,
@@ -56,6 +56,14 @@ export function acceptSessionRequest(id: string) {
   return apiRequest<SessionRecord>(`/sessions/${id}/accept`, {
     method: "POST",
   });
+}
+export function retrySessionCalendarRequest(id: string) {
+  return apiRequest<SessionRecord>(`/sessions/${id}/calendar/retry`, {
+    method: "POST",
+  });
+}
+export function sessionCalendarFileUrl(id: string) {
+  return apiResourceUrl(`/sessions/${encodeURIComponent(id)}/calendar`);
 }
 export function declineSessionRequest({ id, reason }: SessionReasonVariables) {
   return apiRequest<SessionRecord>(`/sessions/${id}/decline`, {

@@ -21,6 +21,7 @@ import {
   listSessionsRequest,
   listSessionTeamMembersRequest,
   rescheduleSessionRequest,
+  retrySessionCalendarRequest,
   sendSessionMessageRequest,
 } from "./requests";
 import type {
@@ -132,6 +133,10 @@ export function useSessionDetailQuery(id: string | null) {
     queryKey: sessionKeys.detail(id ?? "none"),
     queryFn: () => getSessionRequest(id as string),
     enabled: Boolean(id),
+    refetchInterval: (query) => {
+      const status = query.state.data?.calendarProvisioningStatus;
+      return status === "pending" || status === "processing" ? 2_000 : false;
+    },
   });
 }
 
@@ -199,6 +204,11 @@ export function useAcceptSessionMutation(
   handlers?: MutationHandlers<SessionRecord>,
 ) {
   return useSessionMutation<string>(acceptSessionRequest, handlers);
+}
+export function useRetrySessionCalendarMutation(
+  handlers?: MutationHandlers<SessionRecord>,
+) {
+  return useSessionMutation<string>(retrySessionCalendarRequest, handlers);
 }
 export function useDeclineSessionMutation(
   handlers?: MutationHandlers<SessionRecord>,
