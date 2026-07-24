@@ -19,27 +19,6 @@ export function SpreadsheetViewer({
   title: string;
   className?: string;
 }) {
-  const [sheet, setSheet] = React.useState<string>();
-  const [rowStart, setRowStart] = React.useState(1);
-  const [columnStart, setColumnStart] = React.useState(1);
-  const preview = useWorkbookPreviewQuery(
-    fileId ?? undefined,
-    {
-      sheet,
-      rowStart,
-      columnStart,
-      rowTake: ROW_TAKE,
-      columnTake: COLUMN_TAKE,
-    },
-    Boolean(fileId),
-  );
-
-  React.useEffect(() => {
-    setSheet(undefined);
-    setRowStart(1);
-    setColumnStart(1);
-  }, [fileId]);
-
   if (!fileId) {
     return (
       <SpreadsheetMessage
@@ -48,6 +27,41 @@ export function SpreadsheetViewer({
       />
     );
   }
+
+  return (
+    <SpreadsheetViewerContent
+      key={fileId}
+      fileId={fileId}
+      title={title}
+      className={className}
+    />
+  );
+}
+
+function SpreadsheetViewerContent({
+  fileId,
+  title,
+  className,
+}: {
+  fileId: string;
+  title: string;
+  className?: string;
+}) {
+  const [sheet, setSheet] = React.useState<string>();
+  const [rowStart, setRowStart] = React.useState(1);
+  const [columnStart, setColumnStart] = React.useState(1);
+  const preview = useWorkbookPreviewQuery(
+    fileId,
+    {
+      sheet,
+      rowStart,
+      columnStart,
+      rowTake: ROW_TAKE,
+      columnTake: COLUMN_TAKE,
+    },
+    true,
+  );
+
   if (preview.isLoading && !preview.data) {
     return <SpreadsheetSkeleton className={className} />;
   }

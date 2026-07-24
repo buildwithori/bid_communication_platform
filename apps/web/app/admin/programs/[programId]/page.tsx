@@ -2,8 +2,14 @@
 
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
+import type { Route } from 'next';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 import {
   closestCenter,
   DndContext,
@@ -82,11 +88,28 @@ import { routes } from '@/lib/routes';
 
 type WorkspaceTab = 'curriculum' | 'preview' | 'deliverables' | 'readiness';
 
+function workspaceTabFromQuery(value: string | null): WorkspaceTab {
+  return value === 'preview' || value === 'deliverables' || value === 'readiness'
+    ? value
+    : 'curriculum';
+}
+
 export default function AdminProgrammeWorkspacePage() {
   const params = useParams<{ programId: string }>();
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const programmeId = params.programId;
-  const [tab, setTab] = React.useState<WorkspaceTab>('curriculum');
+  const tab = workspaceTabFromQuery(searchParams.get('tab'));
+  const setTab = React.useCallback(
+    (nextTab: WorkspaceTab) => {
+      if (nextTab === tab) return;
+      const next = new URLSearchParams(searchParams.toString());
+      next.set('tab', nextTab);
+      router.push(`${pathname}?${next.toString()}` as Route, { scroll: false });
+    },
+    [pathname, router, searchParams, tab],
+  );
   const [previewModuleId, setPreviewModuleId] = React.useState<string | null>(
     null,
   );
@@ -287,6 +310,7 @@ export default function AdminProgrammeWorkspacePage() {
       isArchived,
       moveProgramme.isPending,
       setContentModule,
+      setTab,
     ],
   );
 

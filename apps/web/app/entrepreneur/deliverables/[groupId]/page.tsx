@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
 import type { Route } from 'next';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock3, MessageSquareText, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Breadcrumb } from '@/components/shared/Breadcrumb';
@@ -53,7 +53,8 @@ function isActionable(item: DeliverableInstance) {
   return item.status === 'not_submitted' || item.status === 'overdue' || item.status === 'changes_required';
 }
 
-export default function DeliverableListPage({ params }: { params: { groupId: string } }) {
+export default function DeliverableListPage() {
+  const params = useParams<{ groupId: string }>();
   const programmeId = params.groupId;
   const router = useRouter();
   const searchParams = useSearchParams();

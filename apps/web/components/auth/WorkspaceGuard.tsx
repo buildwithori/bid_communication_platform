@@ -2,21 +2,15 @@
 
 import * as React from 'react';
 import type { Route } from 'next';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCurrentUserQuery, type AuthUser } from '@/lib/api/auth';
-import {
-  AdminDashboardSkeleton,
-  EntrepreneurDashboardSkeleton,
-  TrainerDashboardSkeleton,
-} from '@/components/dashboard/DashboardSkeletons';
 import { WorkspaceShellSkeleton } from '@/components/layout/WorkspaceShellSkeleton';
-import { PageSkeleton } from '@/components/shared/Card';
-import { ProfilePageSkeleton } from '@/components/entrepreneur/profile/ProfileLoadingSkeletons';
-import { ContentLibrarySkeleton } from '@/components/admin/content/ContentLibrarySkeleton';
+import {
+  WorkspaceRouteSkeleton,
+  WorkspaceRouteSkeletonFallback,
+} from '@/components/loading/WorkspaceRouteSkeleton';
 import { authenticatedDestination, workspaceRouteForRole } from '@/lib/auth-navigation';
 import { routes } from '@/lib/routes';
-import { entrepreneurProfileTabFromQuery } from '@/lib/entrepreneur-profile-tabs';
-import { contentLibraryTabFromQuery } from '@/lib/content-library-tabs';
 
 type WorkspaceRole = AuthUser['role'];
 
@@ -78,42 +72,11 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
 }
 
 function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathname: string }) {
-  const isDashboard = pathname === workspaceRouteForRole(role);
-  const content = pathname === routes.entrepreneur.profile
-    ? (
-        <React.Suspense fallback={<ProfilePageSkeleton />}>
-          <UrlAwareProfileSkeleton />
-        </React.Suspense>
-      )
-    : pathname === routes.admin.content
-      ? (
-          <React.Suspense fallback={<ContentLibrarySkeleton activeType="video" />}>
-            <UrlAwareContentLibrarySkeleton />
-          </React.Suspense>
-        )
-    : isDashboard
-      ? role === 'admin'
-      ? <AdminDashboardSkeleton />
-      : role === 'trainer'
-        ? <TrainerDashboardSkeleton />
-        : <EntrepreneurDashboardSkeleton />
-    : <PageSkeleton />;
-
   return (
     <WorkspaceShellSkeleton role={role} pathname={pathname}>
-      {content}
+      <React.Suspense fallback={<WorkspaceRouteSkeletonFallback role={role} pathname={pathname} />}>
+        <WorkspaceRouteSkeleton role={role} pathname={pathname} />
+      </React.Suspense>
     </WorkspaceShellSkeleton>
   );
-}
-
-function UrlAwareContentLibrarySkeleton() {
-  const searchParams = useSearchParams();
-  const tab = contentLibraryTabFromQuery(searchParams.get('tab'));
-  return <ContentLibrarySkeleton activeType={tab} />;
-}
-
-function UrlAwareProfileSkeleton() {
-  const searchParams = useSearchParams();
-  const tab = entrepreneurProfileTabFromQuery(searchParams.get('tab'));
-  return <ProfilePageSkeleton tab={tab} />;
 }

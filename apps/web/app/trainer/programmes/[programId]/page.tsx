@@ -2,8 +2,14 @@
 
 import { useDebouncedValue } from '@/lib/search';
 import * as React from 'react';
+import type { Route } from 'next';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 import {
   ArrowLeft,
   BookOpen,
@@ -59,10 +65,35 @@ type WorkspaceTab =
   | 'readiness'
   | 'entrepreneurs';
 
+function workspaceTabFromQuery(value: string | null): WorkspaceTab {
+  if (
+    value === 'curriculum' ||
+    value === 'preview' ||
+    value === 'deliverables' ||
+    value === 'readiness' ||
+    value === 'entrepreneurs'
+  ) {
+    return value;
+  }
+  return 'overview';
+}
+
 export default function TrainerProgrammeDetailPage() {
   const params = useParams<{ programId: string }>();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const programme = useProgrammeDetailQuery(params.programId);
-  const [tab, setTab] = React.useState<WorkspaceTab>('overview');
+  const tab = workspaceTabFromQuery(searchParams.get('tab'));
+  const setTab = React.useCallback(
+    (nextTab: WorkspaceTab) => {
+      if (nextTab === tab) return;
+      const next = new URLSearchParams(searchParams.toString());
+      next.set('tab', nextTab);
+      router.push(`${pathname}?${next.toString()}` as Route, { scroll: false });
+    },
+    [pathname, router, searchParams, tab],
+  );
   const [previewModuleId, setPreviewModuleId] = React.useState<string | null>(
     null,
   );
@@ -987,37 +1018,6 @@ function ReadinessPanelItem({
             {description}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function PreviewLoading() {
-  return (
-    <div className="grid min-h-[360px] place-items-center bg-surface-subtle p-8">
-      <div className="w-full max-w-md space-y-3">
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="h-3 w-full" />
-        <Skeleton className="h-3 w-4/5" />
-      </div>
-    </div>
-  );
-}
-
-function PreviewFallback({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="grid min-h-[360px] place-items-center bg-surface-subtle p-8 text-center">
-      <div>
-        <div className="text-base font-semibold text-ink">{title}</div>
-        <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
-          {description}
-        </p>
       </div>
     </div>
   );

@@ -3,7 +3,6 @@
 import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
 import {
-  FileSpreadsheet,
   FileText,
   LayoutGrid,
   Plus,
