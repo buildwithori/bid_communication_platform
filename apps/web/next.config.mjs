@@ -10,6 +10,11 @@ const nextConfig = {
   },
   reactCompiler: true,
   typedRoutes: true,
+  images: {
+    // BID Hub currently serves trusted, bundled brand assets only. Keeping image
+    // optimization disabled removes the native image-processing attack surface.
+    unoptimized: true,
+  },
   async headers() {
     return [
       {

@@ -614,7 +614,7 @@ function CurriculumPanel({
                 aria-hidden={!isExpanded}
                 inert={!isExpanded}
                 className={cn(
-                  "grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none",
+                  "grid transition-[grid-template-rows] duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none",
                   isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                 )}
               >
