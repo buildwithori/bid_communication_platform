@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { retainPreviousQueryData } from "../query-behavior";
 import { adminKeys } from "./keys";
+import { authKeys } from "../auth/keys";
 import {
   acceptAdminInvitationRequest,
   getAdminProfileRequest,
@@ -154,6 +155,7 @@ export function useUpdateAdminProfileMutation(
     onSuccess: (data) => {
       queryClient.setQueryData(adminKeys.profile(), data);
       void queryClient.invalidateQueries({ queryKey: adminKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: authKeys.currentUser() });
       handlers?.onSuccess?.(data);
     },
     onError: handlers?.onError,

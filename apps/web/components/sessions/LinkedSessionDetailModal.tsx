@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/shared/Card';
 import { Modal } from '@/components/shared/Modal';
 import { Notice } from '@/components/shared/PageHeader';
 import { useSessionDetailQuery, type SessionRecord, type SessionStatus } from '@/lib/api/sessions';
+import { useCurrentUserQuery } from '@/lib/api/auth';
+import { PLATFORM_DEFAULT_TIMEZONE } from '@/lib/timezones';
 
 const statusMeta: Record<SessionStatus, { label: string; tone: 'amber' | 'green' | 'red' | 'neutral' }> = {
   requested: { label: 'Awaiting team', tone: 'amber' },
@@ -24,7 +26,12 @@ export function LinkedSessionDetailModal() {
   const router = useRouter();
   const sessionId = searchParams.get('sessionId');
   const session = useSessionDetailQuery(sessionId);
+  const currentUser = useCurrentUserQuery();
   const detail = session.data as SessionRecord | undefined;
+  const timezone =
+    currentUser.data?.user?.timezone ??
+    detail?.timezone ??
+    PLATFORM_DEFAULT_TIMEZONE;
 
   const close = React.useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -56,8 +63,8 @@ export function LinkedSessionDetailModal() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Detail icon={<CalendarDays className="h-4 w-4" />} label="Date" value={formatDate(detail.startAt)} />
-            <Detail icon={<Clock3 className="h-4 w-4" />} label="Time" value={formatTimeRange(detail.startAt, detail.endAt, detail.timezone)} />
+            <Detail icon={<CalendarDays className="h-4 w-4" />} label="Date" value={formatDate(detail.startAt, timezone)} />
+            <Detail icon={<Clock3 className="h-4 w-4" />} label="Time" value={formatTimeRange(detail.startAt, detail.endAt, timezone)} />
             <Detail icon={<UserRound className="h-4 w-4" />} label="Session owner" value={detail.owner?.name ?? detail.target?.name ?? 'Any available BID team member'} />
             <Detail icon={<UserRound className="h-4 w-4" />} label="Requested by" value={detail.createdBy.name} />
           </div>
@@ -79,7 +86,7 @@ export function LinkedSessionDetailModal() {
               <div className="mt-2 max-h-36 space-y-2 overflow-y-auto">
                 {detail.reschedules.map((item) => (
                   <div key={item.id} className="rounded-xl border border-line px-3 py-2 text-xs text-ink-muted">
-                    <span className="font-medium text-ink">{formatDate(item.newStartAt)} at {formatTime(item.newStartAt)}</span>
+                    <span className="font-medium text-ink">{formatDate(item.newStartAt, timezone)} at {formatTime(item.newStartAt, timezone)}</span>
                     {item.reason ? ` · ${item.reason}` : ''}
                   </div>
                 ))}
@@ -94,7 +101,7 @@ export function LinkedSessionDetailModal() {
                 {detail.notesHistory.map((item) => (
                   <div key={item.id} className="rounded-xl border border-line bg-surface-subtle px-3 py-2">
                     <p className="text-sm text-ink">{item.note}</p>
-                    <p className="mt-1 text-xs text-ink-muted">{item.author.name} · {formatDate(item.createdAt)}</p>
+                    <p className="mt-1 text-xs text-ink-muted">{item.author.name} · {formatDate(item.createdAt, timezone)}</p>
                   </div>
                 ))}
               </div>
@@ -130,12 +137,12 @@ function SessionDetailSkeleton() {
   </div>;
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function formatDate(value: string, timezone: string) {
+  return new Date(value).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: timezone });
 }
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function formatTime(value: string, timezone: string) {
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: timezone });
 }
 function formatTimeRange(start: string, end: string, timezone: string) {
-  return `${formatTime(start)} – ${formatTime(end)} · ${timezone}`;
+  return `${formatTime(start, timezone)} – ${formatTime(end, timezone)} · ${timezone}`;
 }

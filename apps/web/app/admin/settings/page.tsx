@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShieldCheck, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,12 @@ import { Card, CardHeader, Skeleton } from "@/components/shared/Card";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { StatCard } from "@/components/shared/StatCard";
 import { Button } from "@/components/shared/Button";
-import { FormField, FormInput, FormRow2 } from "@/components/shared/FormField";
+import {
+  FormAutocomplete,
+  FormField,
+  FormInput,
+  FormRow2,
+} from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { Tabs } from "@/components/shared/Tabs";
@@ -26,6 +31,7 @@ import {
   useDisconnectCalendarMutation,
 } from "@/lib/api/calendar";
 import { adminProfileSchema, type AdminProfileForm } from "@/lib/forms/schemas";
+import { detectTimezone, getTimezoneOptions } from "@/lib/timezones";
 
 type SettingsTab = "account" | "notifications";
 
@@ -54,14 +60,18 @@ export default function AdminSettingsPage() {
   );
   const profile = useAdminProfileQuery();
   const calendar = useCalendarConnectionQuery();
+  const [timezoneOpen, setTimezoneOpen] = React.useState(false);
   const form = useForm<AdminProfileForm>({
     resolver: zodResolver(adminProfileSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
       phone: "",
+      timezone: detectTimezone(),
     },
   });
+  const timezoneValue =
+    useWatch({ control: form.control, name: "timezone" }) || detectTimezone();
   const updateProfile = useUpdateAdminProfileMutation({
     onSuccess: () => toast.success("Admin profile saved"),
     onError: (error) => toast.error(error.message),
@@ -81,6 +91,7 @@ export default function AdminSettingsPage() {
       firstName: profile.data.firstName ?? "",
       lastName: profile.data.lastName ?? "",
       phone: profile.data.phone ?? "",
+      timezone: profile.data.timezone ?? detectTimezone(),
     });
   }, [form, profile.data]);
 
@@ -168,6 +179,7 @@ export default function AdminSettingsPage() {
                     firstName: values.firstName.trim(),
                     lastName: values.lastName.trim(),
                     phone: values.phone?.trim() || undefined,
+                    timezone: values.timezone,
                   }),
                 )}
                 className="space-y-4"
@@ -209,6 +221,39 @@ export default function AdminSettingsPage() {
 
                 <FormField label="Role">
                   <FormInput value="Admin" disabled />
+                </FormField>
+
+                <FormField
+                  label="Personal timezone"
+                  error={form.formState.errors.timezone?.message}
+                >
+                  <FormAutocomplete
+                    value={timezoneValue}
+                    onValueChange={(value) =>
+                      form.setValue("timezone", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    options={
+                      timezoneOpen
+                        ? getTimezoneOptions()
+                        : [
+                            {
+                              value: timezoneValue,
+                              label: timezoneValue.replaceAll("_", " "),
+                            },
+                          ]
+                    }
+                    placeholder="Select timezone"
+                    searchPlaceholder="Search timezones..."
+                    emptyMessage="No timezone found."
+                    onOpenChange={setTimezoneOpen}
+                  />
+                  <p className="mt-1.5 text-xs text-ink-muted">
+                    Session times, reminders, and calendar choices are shown in
+                    this timezone.
+                  </p>
                 </FormField>
 
                 <div className="flex justify-end border-t border-line pt-4">

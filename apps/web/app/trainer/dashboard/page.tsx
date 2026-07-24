@@ -27,6 +27,8 @@ import { StatCard } from "@/components/shared/StatCard";
 import { useTrainerDashboardQuery, type TrainerDashboard } from "@/lib/api/dashboards";
 import { formatRating } from "@/lib/format-rating";
 import { routes } from "@/lib/routes";
+import { useCurrentUserQuery } from "@/lib/api/auth";
+import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 
 const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
 const reviewMeta = {
@@ -38,6 +40,9 @@ const reviewMeta = {
 
 export default function TrainerDashboardPage() {
   const dashboard = useTrainerDashboardQuery();
+  const currentUser = useCurrentUserQuery();
+  const timezone =
+    currentUser.data?.user?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
   if (dashboard.isLoading && !dashboard.data) return <TrainerDashboardSkeleton />;
   if (dashboard.isError || !dashboard.data) {
     return (
@@ -128,7 +133,7 @@ export default function TrainerDashboardPage() {
           {data.upcomingSessions.map((session) => (
             <Link key={session.id} href={`${routes.trainer.sessions}?session=${encodeURIComponent(session.id)}`} className="flex min-h-[164px] flex-col rounded-xl border border-line bg-surface-subtle p-4 text-left transition hover:border-bid/30 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bid/20">
               <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-xs font-medium uppercase tracking-[0.04em] text-ink-muted">{session.typeName}</div><div className="mt-2 text-base font-semibold text-ink">{session.topic}</div><div className="mt-1 text-sm text-ink-muted">{session.entrepreneurName}</div></div><Badge tone={session.status === "confirmed" ? "green" : "amber"}>{session.status === "confirmed" ? "Confirmed" : "Awaiting response"}</Badge></div>
-              <div className="mt-auto flex flex-wrap gap-3 pt-5 text-sm text-ink-muted"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{formatDate(session.startsAt)}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{formatTime(session.startsAt, session.timezone)}</span></div>
+              <div className="mt-auto flex flex-wrap gap-3 pt-5 text-sm text-ink-muted"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{formatDate(session.startsAt, timezone)}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{formatTime(session.startsAt, timezone)}</span></div>
             </Link>
           ))}
           {!data.upcomingSessions.length && <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted lg:col-span-3">No upcoming sessions in your queue.</div>}
@@ -141,5 +146,5 @@ export default function TrainerDashboardPage() {
 function ChartEmpty({ label }: { label: string }) { return <div className="grid h-full place-items-center rounded-lg border border-dashed border-line px-5 text-center text-sm text-ink-muted">{label}</div>; }
 function shortLabel(value: string) { return value.length > 18 ? `${value.slice(0, 16)}…` : value; }
 function formatWeek(value: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" }); }
-function formatDate(value: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" }); }
+function formatDate(value: string, timezone: string) { return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric", timeZone: timezone }); }
 function formatTime(value: string, timezone: string) { return new Date(value).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit", timeZone: timezone }); }

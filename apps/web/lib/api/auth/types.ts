@@ -4,6 +4,7 @@ export type AuthUser = {
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
+  timezone: string | null;
   role: 'entrepreneur' | 'admin' | 'trainer';
   status: 'pending' | 'active' | 'inactive';
   emailVerifiedAt: string | null;
@@ -26,7 +27,7 @@ export type SignupPayload = {
   timezone?: string;
 };
 
-export type LoginPayload = { email: string; password: string };
+export type LoginPayload = { email: string; password: string; timezone?: string };
 export type ForgotPasswordPayload = { email: string };
 export type ResetPasswordPayload = { token: string; password: string };
 export type VerifyEmailPayload = { token: string };

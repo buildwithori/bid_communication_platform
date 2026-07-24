@@ -20,6 +20,7 @@ import {
 } from "@/lib/forms/schemas";
 import { routes } from "@/lib/routes";
 import { offerBrowserCredentialSave } from "@/lib/browser-credentials";
+import { detectTimezone } from "@/lib/timezones";
 
 type InvitationRole = "admin" | "trainer" | "entrepreneur";
 
@@ -83,11 +84,11 @@ function AcceptInvitationFormView({ invitationRole }: { invitationRole: Invitati
       onSubmit={form.handleSubmit(({ password }) => {
         if (!token || !invitationRole || isPending) return;
         if (invitationRole === "trainer") {
-          trainerMutation.mutate({ token, password });
+          trainerMutation.mutate({ token, password, timezone: detectTimezone() });
         } else if (invitationRole === "entrepreneur") {
           entrepreneurMutation.mutate({ token, password });
         } else {
-          adminMutation.mutate({ token, password });
+          adminMutation.mutate({ token, password, timezone: detectTimezone() });
         }
       })}
     >

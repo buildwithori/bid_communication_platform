@@ -20,6 +20,7 @@ import { workspaceRouteForRole } from '@/lib/auth-navigation';
 import { offerBrowserCredentialSave } from '@/lib/browser-credentials';
 import { loginSchema, type LoginForm as LoginFormValues } from '@/lib/forms/schemas';
 import { routes } from '@/lib/routes';
+import { detectTimezone } from '@/lib/timezones';
 
 const oauthErrors: Record<string, string> = {
   account_not_found: 'No BID Hub account exists for that Google email. Create an entrepreneur account first.',
@@ -58,7 +59,7 @@ function LoginForm() {
   });
 
   return (
-    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+    <form className="space-y-4" autoComplete="on" onSubmit={form.handleSubmit((values) => mutation.mutate({ ...values, timezone: detectTimezone() }))}>
       {oauthError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{oauthErrors[oauthError] ?? oauthErrors.failed}</div> : null}
       <AuthGoogleButton onClick={() => window.location.assign(getGoogleAuthUrl('login'))}>Continue with Google</AuthGoogleButton>
       <AuthDivider label="or sign in with email" />

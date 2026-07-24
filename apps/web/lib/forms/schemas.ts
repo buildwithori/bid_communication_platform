@@ -89,6 +89,7 @@ export const trainerProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
+  timezone: z.string().min(1, "Timezone is required"),
 });
 export type TrainerProfileForm = z.infer<typeof trainerProfileSchema>;
 
@@ -96,6 +97,7 @@ export const adminProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
+  timezone: z.string().min(1, "Timezone is required"),
 });
 export type AdminProfileForm = z.infer<typeof adminProfileSchema>;
 

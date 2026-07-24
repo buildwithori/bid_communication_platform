@@ -44,13 +44,15 @@ import {
   type SessionType,
 } from "@/lib/api/sessions";
 import { useLazySessionTypesQuery } from "@/lib/api/settings";
+import { PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 
 const ALL = "all";
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string, timezone: string) {
   return new Date(value).toLocaleString([], {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: timezone,
   });
 }
 
@@ -71,6 +73,8 @@ export function SessionManagementPage({
   actor: "admin" | "trainer";
 }) {
   const currentUser = useCurrentUserQuery();
+  const viewerTimezone =
+    currentUser.data?.user?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
   const [search, setSearch] = React.useState("");
   const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = React.useState<typeof ALL | SessionStatus>(ALL);
@@ -335,14 +339,15 @@ export function SessionManagementPage({
         header: "Date / time",
         cell: (session) => (
           <div className="min-w-[190px]">
-            <div>{formatDateTime(session.startAt)}</div>
+            <div>{formatDateTime(session.startAt, viewerTimezone)}</div>
             <div className="mt-1 text-sm text-ink-muted">
               Ends{" "}
               {new Date(session.endAt).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
+                timeZone: viewerTimezone,
               })}{" "}
-              · {session.timezone}
+              · {viewerTimezone}
             </div>
           </div>
         ),
@@ -391,7 +396,7 @@ export function SessionManagementPage({
         },
       },
     ],
-    [acceptSession, canHandleRequest],
+    [acceptSession, canHandleRequest, viewerTimezone],
   );
 
   if (
@@ -532,7 +537,7 @@ export function SessionManagementPage({
           messageTarget
             ? messageTarget.topic +
               " · " +
-              formatDateTime(messageTarget.startAt)
+              formatDateTime(messageTarget.startAt, viewerTimezone)
             : undefined
         }
       />

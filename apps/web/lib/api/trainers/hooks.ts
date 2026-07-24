@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import { retainPreviousQueryData } from "../query-behavior";
 import { trainerKeys } from "./keys";
+import { authKeys } from "../auth/keys";
 import {
   acceptTrainerInvitationRequest,
   getTrainerProfileRequest,
@@ -202,6 +203,7 @@ export function useUpdateTrainerProfileMutation(
     onSuccess: (data) => {
       queryClient.setQueryData(trainerKeys.profile(), data);
       void queryClient.invalidateQueries({ queryKey: trainerKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: authKeys.currentUser() });
       handlers?.onSuccess?.(data);
     },
     onError: handlers?.onError,

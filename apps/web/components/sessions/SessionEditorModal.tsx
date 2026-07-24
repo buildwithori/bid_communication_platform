@@ -44,29 +44,45 @@ type Props = {
   isSubmitting?: boolean;
 };
 
-function dateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return year + "-" + month + "-" + day;
+function dateValue(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
 }
 
-function initialDate() {
+function initialDate(timezone: string) {
   const date = new Date();
   date.setDate(date.getDate() + 1);
-  return dateValue(date);
+  return dateValue(date, timezone);
 }
 
 export function SessionEditorModal(props: Props) {
+  const currentUser = useCurrentUserQuery();
+  const viewerTimezone =
+    currentUser.data?.user?.timezone ?? PLATFORM_DEFAULT_TIMEZONE;
   const formKey = [
     props.open ? "open" : "closed",
     props.mode,
     props.actor,
     props.initialSession?.id ?? "new",
     props.initialSession?.startAt ?? "",
+    viewerTimezone,
   ].join(":");
-  return <SessionEditorModalForm key={formKey} {...props} />;
+  return (
+    <SessionEditorModalForm
+      key={formKey}
+      {...props}
+      viewerTimezone={viewerTimezone}
+    />
+  );
 }
+
+type FormProps = Props & { viewerTimezone: string };
 
 function SessionEditorModalForm({
   open,
@@ -76,10 +92,10 @@ function SessionEditorModalForm({
   initialSession,
   onSubmit,
   isSubmitting = false,
-}: Props) {
+  viewerTimezone,
+}: FormProps) {
   const currentUser = useCurrentUserQuery();
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ||
-    PLATFORM_DEFAULT_TIMEZONE;
+  const timezone = viewerTimezone;
   const initialStartAt = initialSession
     ? new Date(initialSession.startAt)
     : null;
@@ -94,7 +110,9 @@ function SessionEditorModalForm({
   );
   const [topic, setTopic] = React.useState(initialSession?.topic ?? "");
   const [date, setDate] = React.useState(
-    initialStartAt ? dateValue(initialStartAt) : initialDate(),
+    initialStartAt
+      ? dateValue(initialStartAt, timezone)
+      : initialDate(timezone),
   );
   const [slotStartAt, setSlotStartAt] = React.useState("");
   const [reason, setReason] = React.useState("");
@@ -207,6 +225,7 @@ function SessionEditorModalForm({
       label: new Date(slot.startAt).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: availability.data?.timezone ?? timezone,
       }),
     }),
   );
@@ -241,7 +260,7 @@ function SessionEditorModalForm({
       topic: topic.trim(),
       startAt: slot.startAt,
       endAt: slot.endAt,
-      timezone,
+      timezone: availability.data?.timezone ?? timezone,
       reason: reason.trim() || undefined,
     });
   };

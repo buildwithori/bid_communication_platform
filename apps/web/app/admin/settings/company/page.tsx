@@ -14,6 +14,7 @@ import {
 } from "@/components/shared/FormField";
 import { StatCard } from "@/components/shared/StatCard";
 import { MetricGrid } from "@/components/shared/MetricGrid";
+import { TimeSelect } from "@/components/shared/TimeSelect";
 import { cn } from "@/lib/utils";
 import { getTimezoneOptions, PLATFORM_DEFAULT_TIMEZONE } from "@/lib/timezones";
 import {
@@ -48,19 +49,6 @@ const slotIntervalOptions = [
   { value: "45", label: "45 minutes" },
   { value: "60", label: "60 minutes" },
 ];
-
-function minutesToTime(minutes: number) {
-  const hours = Math.floor(minutes / 60)
-    .toString()
-    .padStart(2, "0");
-  const remainder = (minutes % 60).toString().padStart(2, "0");
-  return hours + ":" + remainder;
-}
-
-function timeToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
 
 function parseOptionalDays(value: string) {
   if (!value.trim()) return null;
@@ -386,25 +374,23 @@ function CompanySettingsForm({
             </FormField>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <FormField label="Working day starts">
-                <FormInput
-                  type="time"
-                  value={minutesToTime(sessionPolicy.workdayStartMinutes)}
-                  onChange={(event) =>
+                <TimeSelect
+                  value={sessionPolicy.workdayStartMinutes}
+                  onValueChange={(minutes) =>
                     setSessionPolicy((current) => ({
                       ...current,
-                      workdayStartMinutes: timeToMinutes(event.target.value),
+                      workdayStartMinutes: minutes,
                     }))
                   }
                 />
               </FormField>
               <FormField label="Working day ends" error={sessionHoursError}>
-                <FormInput
-                  type="time"
-                  value={minutesToTime(sessionPolicy.workdayEndMinutes)}
-                  onChange={(event) =>
+                <TimeSelect
+                  value={sessionPolicy.workdayEndMinutes}
+                  onValueChange={(minutes) =>
                     setSessionPolicy((current) => ({
                       ...current,
-                      workdayEndMinutes: timeToMinutes(event.target.value),
+                      workdayEndMinutes: minutes,
                     }))
                   }
                 />

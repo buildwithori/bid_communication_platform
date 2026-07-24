@@ -20,6 +20,7 @@ export type TrainerRecord = {
   name: string;
   email: string;
   phone: string | null;
+  timezone: string | null;
   userStatus: "pending" | "active" | "inactive";
   roleLabel: TrainerRoleLabel;
   accessLevel: TrainerAccessLevel;
@@ -104,11 +105,13 @@ export type TrainerProfilePayload = {
   firstName: string;
   lastName: string;
   phone?: string;
+  timezone: string;
 };
 
 export type AcceptTrainerInvitationPayload = {
   token: string;
   password: string;
+  timezone?: string;
 };
 
 export type InvitationResendResult = {

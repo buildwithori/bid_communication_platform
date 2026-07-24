@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,11 @@ import { MetricGrid } from "@/components/shared/MetricGrid";
 import { StatCard } from "@/components/shared/StatCard";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { FormField, FormInput } from "@/components/shared/FormField";
+import {
+  FormAutocomplete,
+  FormField,
+  FormInput,
+} from "@/components/shared/FormField";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { Tabs } from "@/components/shared/Tabs";
@@ -31,6 +35,7 @@ import {
   trainerProfileSchema,
   type TrainerProfileForm,
 } from "@/lib/forms/schemas";
+import { detectTimezone, getTimezoneOptions } from "@/lib/timezones";
 
 const roleLabels = {
   mentor: "Mentor",
@@ -66,10 +71,18 @@ export default function TrainerSettingsPage() {
   );
   const profile = useTrainerProfileQuery();
   const calendar = useCalendarConnectionQuery();
+  const [timezoneOpen, setTimezoneOpen] = React.useState(false);
   const form = useForm<TrainerProfileForm>({
     resolver: zodResolver(trainerProfileSchema),
-    defaultValues: { firstName: "", lastName: "", phone: "" },
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      timezone: detectTimezone(),
+    },
   });
+  const timezoneValue =
+    useWatch({ control: form.control, name: "timezone" }) || detectTimezone();
   const updateProfile = useUpdateTrainerProfileMutation({
     onSuccess: () => toast.success("Profile settings saved"),
     onError: (error) => toast.error(error.message),
@@ -89,6 +102,7 @@ export default function TrainerSettingsPage() {
       firstName: profile.data.firstName ?? "",
       lastName: profile.data.lastName ?? "",
       phone: profile.data.phone ?? "",
+      timezone: profile.data.timezone ?? detectTimezone(),
     });
   }, [form, profile.data]);
 
@@ -201,6 +215,39 @@ export default function TrainerSettingsPage() {
                     <FormInput {...form.register("lastName")} />
                   </FormField>
                 </div>
+
+                <FormField
+                  label="Personal timezone"
+                  error={form.formState.errors.timezone?.message}
+                >
+                  <FormAutocomplete
+                    value={timezoneValue}
+                    onValueChange={(value) =>
+                      form.setValue("timezone", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    options={
+                      timezoneOpen
+                        ? getTimezoneOptions()
+                        : [
+                            {
+                              value: timezoneValue,
+                              label: timezoneValue.replaceAll("_", " "),
+                            },
+                          ]
+                    }
+                    placeholder="Select timezone"
+                    searchPlaceholder="Search timezones..."
+                    emptyMessage="No timezone found."
+                    onOpenChange={setTimezoneOpen}
+                  />
+                  <p className="mt-1.5 text-xs text-ink-muted">
+                    Session times, reminders, and calendar choices are shown in
+                    this timezone.
+                  </p>
+                </FormField>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField label="Email">

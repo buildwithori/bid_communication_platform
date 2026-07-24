@@ -8,6 +8,7 @@ export type AdminRecord = {
   name: string;
   email: string;
   phone: string | null;
+  timezone: string | null;
   avatarUrl: string | null;
   status: AdminDirectoryStatus;
   userStatus: "pending" | "active" | "inactive";
@@ -68,11 +69,13 @@ export type AdminProfilePayload = {
   firstName: string;
   lastName: string;
   phone?: string;
+  timezone: string;
 };
 
 export type AcceptAdminInvitationPayload = {
   token: string;
   password: string;
+  timezone?: string;
 };
 
 export type InvitationResendResult = {
