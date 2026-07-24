@@ -736,6 +736,7 @@ Feature 12 uses one durable `sessions` lifecycle aggregate for both requests and
   - author_id
   - note
   - visibility: internal, participant
+- Participant-facing messages are sent through the scoped session message action and notification delivery system; the client never supplies the recipient user ID.
 - `calendar_connections`
   - user_id
   - provider

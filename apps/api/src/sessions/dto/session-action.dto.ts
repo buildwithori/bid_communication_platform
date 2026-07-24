@@ -1,6 +1,7 @@
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
@@ -44,4 +45,22 @@ export class AddSessionNoteDto {
   @IsOptional()
   @IsEnum(SessionNoteVisibility)
   visibility?: SessionNoteVisibility;
+}
+
+export class SendSessionMessageDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  subject!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2000)
+  message!: string;
+
+  @IsIn(["email", "in_app"])
+  channel!: "email" | "in_app";
+
+  @IsIn(["standard", "needs-response", "urgent"])
+  priority!: "standard" | "needs-response" | "urgent";
 }

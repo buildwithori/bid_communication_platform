@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ConflictException } from "@nestjs/common";
 import {
+  NotificationChannel,
+  NotificationEntityType,
+  NotificationSeverity,
+  NotificationType,
   SessionNoteVisibility,
   SessionSource,
   SessionStatus,
@@ -376,4 +380,49 @@ test("session confirmation copy uses a possessive label without an extra article
 
   assert.match(body, /confirmed your 1:1 mentor check-in/);
   assert.doesNotMatch(body, /your a mentor/);
+});
+
+test("BID team session messages are scoped to the session entrepreneur and requested channel", async () => {
+  const session = fixture();
+  const deps = dependencies(session);
+  let notification: Record<string, unknown> | undefined;
+  const service = new SessionsService(
+    deps.prisma as never,
+    {
+      createNotification: async (input: Record<string, unknown>) => {
+        notification = input;
+        return {
+          id: "notification-1",
+          deliveries: [
+            {
+              channel: NotificationChannel.email,
+              status: "pending",
+            },
+          ],
+        };
+      },
+    } as never,
+    deps.calendar as never,
+    deps.availability as never,
+    {} as never,
+  );
+
+  const result = await service.sendMessage(trainer as never, session.id, {
+    subject: "Updated preparation details",
+    message: "Please bring your latest pricing model to this session.",
+    channel: "email",
+    priority: "needs-response",
+  });
+
+  assert.equal(notification?.recipientUserId, session.entrepreneurUserId);
+  assert.equal(notification?.actorUserId, trainer.id);
+  assert.equal(notification?.type, NotificationType.session_reminder);
+  assert.equal(notification?.severity, NotificationSeverity.warning);
+  assert.equal(notification?.entityType, NotificationEntityType.session);
+  assert.equal(
+    notification?.actionUrl,
+    `/entrepreneur/schedule?sessionId=${session.id}`,
+  );
+  assert.deepEqual(notification?.channels, [NotificationChannel.email]);
+  assert.equal(result.deliveries[0]?.status, "pending");
 });

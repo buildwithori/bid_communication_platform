@@ -33,6 +33,7 @@ import { CreateSessionDto } from "./dto/create-session.dto";
 import {
   CompleteSessionDto,
   RescheduleSessionDto,
+  SendSessionMessageDto,
   SessionReasonDto,
   AddSessionNoteDto,
 } from "./dto/session-action.dto";
@@ -842,6 +843,38 @@ export class SessionsService {
         }),
     );
     return this.getSession(user, id);
+  }
+
+  async sendMessage(user: User, id: string, dto: SendSessionMessageDto) {
+    if (user.role !== UserRole.admin && user.role !== UserRole.trainer) {
+      throw new ForbiddenException(
+        "Only BID team members can send session messages.",
+      );
+    }
+    const session = await this.getSessionEntity(user, id);
+    const severity =
+      dto.priority === "urgent"
+        ? NotificationSeverity.critical
+        : dto.priority === "needs-response"
+          ? NotificationSeverity.warning
+          : NotificationSeverity.info;
+
+    return this.notifications.createNotification({
+      recipientUserId: session.entrepreneurUserId,
+      actorUserId: user.id,
+      type: NotificationType.session_reminder,
+      title: dto.subject,
+      body: dto.message,
+      severity,
+      entityType: NotificationEntityType.session,
+      entityId: session.id,
+      actionUrl: `/entrepreneur/schedule?sessionId=${session.id}`,
+      channels: [
+        dto.channel === "in_app"
+          ? NotificationChannel.in_app
+          : NotificationChannel.email,
+      ],
+    });
   }
 
   private buildWhere(

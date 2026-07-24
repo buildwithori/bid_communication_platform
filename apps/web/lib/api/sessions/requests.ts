@@ -5,6 +5,8 @@ import type {
   SessionAvailabilityQuery,
   SessionCompleteVariables,
   SessionNoteVariables,
+  SessionMessageResult,
+  SessionMessageVariables,
   SessionPage,
   SessionQuery,
   SessionReasonVariables,
@@ -90,6 +92,15 @@ export function addSessionNoteRequest({
   ...payload
 }: SessionNoteVariables) {
   return apiRequest<SessionRecord>(`/sessions/${id}/notes`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+export function sendSessionMessageRequest({
+  id,
+  ...payload
+}: SessionMessageVariables) {
+  return apiRequest<SessionMessageResult>(`/sessions/${id}/message`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -151,3 +151,17 @@ export type SessionNoteVariables = {
   note: string;
   visibility?: SessionNoteVisibility;
 };
+export type SessionMessageVariables = {
+  id: string;
+  subject: string;
+  message: string;
+  channel: "email" | "in_app";
+  priority: "standard" | "needs-response" | "urgent";
+};
+export type SessionMessageResult = {
+  id: string;
+  deliveries: Array<{
+    channel: "email" | "in_app";
+    status: "pending" | "processing" | "sent" | "failed" | "skipped";
+  }>;
+};

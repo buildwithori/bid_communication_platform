@@ -377,6 +377,7 @@ Before merging backend work, ask:
 - Session reschedules store `session_reschedules` history and update the same Calendar event. Existing confirmed rows without Calendar event IDs are repaired by creating a real event on first reschedule; legacy placeholder URLs are not exposed.
 - `session_request_declines` records per-user opt-out from open-team requests. Trainer query scope excludes opted-out requests while leaving them open to other eligible users.
 - Participant note visibility is enforced in the response mapper; entrepreneurs cannot read internal notes.
+- Session messages are authenticated admin/trainer actions against the normal session visibility scope. The server derives the entrepreneur recipient from the session and creates a session-linked notification using the selected in-app or email channel; notification preferences remain authoritative and email is delivered asynchronously by the worker.
 
 ## Notification Delivery Runtime (2026-07-16)
 

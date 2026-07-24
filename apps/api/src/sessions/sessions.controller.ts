@@ -15,6 +15,7 @@ import {
   AddSessionNoteDto,
   CompleteSessionDto,
   RescheduleSessionDto,
+  SendSessionMessageDto,
   SessionReasonDto,
 } from "./dto/session-action.dto";
 import { SessionQueryDto } from "./dto/session-query.dto";
@@ -117,5 +118,14 @@ export class SessionsController {
     @Body() dto: AddSessionNoteDto,
   ) {
     return this.sessionsService.addNote(user, id, dto);
+  }
+
+  @Post(":id/message")
+  sendMessage(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: SendSessionMessageDto,
+  ) {
+    return this.sessionsService.sendMessage(user, id, dto);
   }
 }

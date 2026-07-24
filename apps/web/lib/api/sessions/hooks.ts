@@ -21,12 +21,15 @@ import {
   listSessionsRequest,
   listSessionTeamMembersRequest,
   rescheduleSessionRequest,
+  sendSessionMessageRequest,
 } from "./requests";
 import type {
   CreateSessionPayload,
   SessionAvailabilityQuery,
   SessionCompleteVariables,
   SessionNoteVariables,
+  SessionMessageResult,
+  SessionMessageVariables,
   SessionQuery,
   SessionReasonVariables,
   SessionRecord,
@@ -236,4 +239,13 @@ export function useAddSessionNoteMutation(
     addSessionNoteRequest,
     handlers,
   );
+}
+export function useSendSessionMessageMutation(
+  handlers?: MutationHandlers<SessionMessageResult>,
+) {
+  return useMutation<SessionMessageResult, Error, SessionMessageVariables>({
+    mutationFn: sendSessionMessageRequest,
+    onSuccess: handlers?.onSuccess,
+    onError: handlers?.onError,
+  });
 }

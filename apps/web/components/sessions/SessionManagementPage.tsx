@@ -39,6 +39,7 @@ import {
   useRescheduleSessionMutation,
   useSessionSummaryQuery,
   useSessionsPage,
+  useSendSessionMessageMutation,
   type SessionRecord,
   type SessionStatus,
   type SessionType,
@@ -116,6 +117,9 @@ export function SessionManagementPage({
     React.useState<SessionRecord | null>(null);
   const [reason, setReason] = React.useState("");
   const [note, setNote] = React.useState("");
+  const sendMessage = useSendSessionMessageMutation({
+    onError: (error) => toast.error(error.message),
+  });
 
   const { resetPagination } = sessions;
   React.useEffect(() => {
@@ -540,6 +544,39 @@ export function SessionManagementPage({
               formatDateTime(messageTarget.startAt, viewerTimezone)
             : undefined
         }
+        defaultSubject={
+          messageTarget
+            ? `Follow-up on ${messageTarget.topic}`
+            : ""
+        }
+        onSubmit={async ({ subject, message, channel, priority }) => {
+          if (!messageTarget) return;
+          const result = await sendMessage.mutateAsync({
+            id: messageTarget.id,
+            subject,
+            message,
+            channel: channel === "in-app" ? "in_app" : "email",
+            priority,
+          });
+          const delivery = result.deliveries.find(
+            (entry) =>
+              entry.channel ===
+              (channel === "in-app" ? "in_app" : "email"),
+          );
+          if (delivery?.status === "skipped") {
+            toast.info(
+              channel === "in-app"
+                ? "The recipient has disabled this in-app notification."
+                : "The recipient has disabled this email notification.",
+            );
+          } else {
+            toast.success(
+              channel === "in-app"
+                ? "In-app message sent"
+                : "Email queued for delivery",
+            );
+          }
+        }}
       />
       <ReasonModal
         target={declineTarget}

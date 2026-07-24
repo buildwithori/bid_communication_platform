@@ -17,7 +17,10 @@ interface MessageModalProps {
   defaultMessage?: string;
   showPriority?: boolean;
   onSubmit?: (
-    values: Pick<MessageForm, 'subject' | 'channel' | 'message'>,
+    values: Pick<
+      MessageForm,
+      'subject' | 'channel' | 'priority' | 'message'
+    >,
   ) => Promise<void> | void;
 }
 

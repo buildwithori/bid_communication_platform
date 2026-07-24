@@ -285,6 +285,7 @@ Session workflow rules:
 - Company settings own session working days, start/end minutes, slot interval, and the configurable IANA timezone. Session types and their durations are managed together under admin Session types settings. New and seeded settings use `Africa/Kigali`; personal timezone, company timezone, and platform fallback precedence is enforced consistently across profile and session flows.
 - The sessions frontend integration lives under `lib/api/sessions/`. Booking trainer/owner/entrepreneur lookups are lazy and cursor-paginated; schedule windows use infinite cursor loading; queue search, filters, totals, and status metrics remain backend-owned.
 - Meeting links are exposed only for real confirmed/completed Calendar-backed sessions. Internal session notes are never returned to entrepreneurs.
+- Admin/trainer "message entrepreneur" actions must call the authenticated session message endpoint; never use a UI-only success fallback. The backend derives the entrepreneur from the scoped session, creates a session-linked notification for the selected channel, and leaves email delivery to the notification worker. The modal stays open on failure, disables duplicate submission while pending, and reports when the recipient has disabled the chosen channel.
 
 ## Notifications And Email Completion (2026-07-16)
 
