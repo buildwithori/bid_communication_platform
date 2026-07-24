@@ -25,7 +25,8 @@ function useTitle() {
 
 function TrainerShell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
-  const trainer = useTrainerProfileQuery().data;
+  const trainerQuery = useTrainerProfileQuery();
+  const trainer = trainerQuery.data;
   const name = trainer?.name ?? 'Trainer';
   const initials =
     name
@@ -54,6 +55,7 @@ function TrainerShell({ children }: { children: React.ReactNode }) {
         subtitle,
         tone: 'blue',
       }}
+      userLoading={trainerQuery.isLoading && !trainer}
       title={title}
       topRightSlot={<NotificationCenter />}
     >

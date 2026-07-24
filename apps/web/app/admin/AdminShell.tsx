@@ -57,7 +57,8 @@ function initialsFor(name: string, fallback: string) {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
-  const profile = useAdminProfileQuery().data;
+  const profileQuery = useAdminProfileQuery();
+  const profile = profileQuery.data;
   const name = profile?.name ?? 'Administrator';
 
   return (
@@ -72,6 +73,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         subtitle: 'BID administrator',
         tone: 'brand',
       }}
+      userLoading={profileQuery.isLoading && !profile}
       title={title}
       topRightSlot={<NotificationCenter />}
     >

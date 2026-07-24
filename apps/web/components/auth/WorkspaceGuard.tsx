@@ -4,11 +4,6 @@ import * as React from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCurrentUserQuery, type AuthUser } from '@/lib/api/auth';
-import { WorkspaceShellSkeleton } from '@/components/layout/WorkspaceShellSkeleton';
-import {
-  WorkspaceRouteSkeleton,
-  WorkspaceRouteSkeletonFallback,
-} from '@/components/loading/WorkspaceRouteSkeleton';
 import { authenticatedDestination, workspaceRouteForRole } from '@/lib/auth-navigation';
 import { routes } from '@/lib/routes';
 
@@ -65,18 +60,13 @@ export function WorkspaceGuard({ allowedRoles, children }: { allowedRoles: Works
     if (!isAllowed) router.replace(workspaceRouteForRole(user.role));
   }, [currentUserQuery.isLoading, isAllowed, pathname, router, user]);
 
-  if (currentUserQuery.isLoading || !user || user.status !== 'active' || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !isAllowed) {
-    return <WorkspaceGuardFallback role={allowedRoles[0] ?? 'entrepreneur'} pathname={pathname} />;
+  if (currentUserQuery.isLoading) {
+    // Let the active route render its own exact loading state while the
+    // authentication check completes. API authorization remains authoritative.
+    return <>{children}</>;
+  }
+  if (!user || user.status !== 'active' || !user.emailVerifiedAt || Boolean(user.onboardingRequired) || !isAllowed) {
+    return null;
   }
   return <>{children}</>;
-}
-
-function WorkspaceGuardFallback({ role, pathname }: { role: WorkspaceRole; pathname: string }) {
-  return (
-    <WorkspaceShellSkeleton role={role} pathname={pathname}>
-      <React.Suspense fallback={<WorkspaceRouteSkeletonFallback role={role} pathname={pathname} />}>
-        <WorkspaceRouteSkeleton role={role} pathname={pathname} />
-      </React.Suspense>
-    </WorkspaceShellSkeleton>
-  );
 }

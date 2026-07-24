@@ -31,7 +31,8 @@ function useTitle() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const entrepreneur = useEntrepreneurProfileQuery().data;
+  const entrepreneurQuery = useEntrepreneurProfileQuery();
+  const entrepreneur = entrepreneurQuery.data;
   const title = useTitle();
   const name =
     entrepreneur?.representativeName ||
@@ -58,6 +59,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       brandSubtitle="Entrepreneur Platform"
       sections={entrepreneurNav}
       user={user}
+      userLoading={entrepreneurQuery.isLoading && !entrepreneur}
       title={title}
       topRightSlot={<NotificationCenter />}
     >

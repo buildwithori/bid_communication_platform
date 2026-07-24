@@ -13,6 +13,7 @@ export interface AppShellProps {
   role?: 'entrepreneur' | 'admin' | 'trainer';
   sections: NavSection[];
   user: SidebarUser;
+  userLoading?: boolean;
   title: string;
   topActions?: React.ReactNode;
   topRightSlot?: React.ReactNode;
@@ -32,6 +33,7 @@ export function AppShell({
   role,
   sections,
   user,
+  userLoading = false,
   title,
   topActions,
   topRightSlot,
@@ -46,6 +48,7 @@ export function AppShell({
       role={role}
       sections={sections}
       user={user}
+      userLoading={userLoading}
     />
   );
 

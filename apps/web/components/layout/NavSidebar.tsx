@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { BidLogo } from '@/components/shared/BidLogo';
 import { Avatar } from '@/components/shared/Avatar';
 import { Badge } from '@/components/shared/Badge';
+import { Skeleton } from '@/components/shared/Card';
 import { routes } from '@/lib/routes';
 import { useLogoutMutation } from '@/lib/api/auth';
 
@@ -37,6 +38,7 @@ export interface NavSidebarProps {
   role?: 'entrepreneur' | 'admin' | 'trainer';
   sections: NavSection[];
   user: SidebarUser;
+  userLoading?: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export function NavSidebar({
   role,
   sections,
   user,
+  userLoading = false,
 }: NavSidebarProps) {
   const pathname = usePathname();
 
@@ -128,13 +131,23 @@ export function NavSidebar({
 
       {/* User */}
       <div className="border-t border-line px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <Avatar initials={user.initials} size={34} tone={user.tone} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium leading-tight">{user.name}</div>
-            <div className="truncate text-xs text-ink-faint">{user.subtitle}</div>
+        {userLoading ? (
+          <div className="flex items-center gap-2.5" aria-label="Loading account details" aria-busy="true">
+            <Skeleton className="h-[34px] w-[34px] shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-3.5 w-28 max-w-full" />
+              <Skeleton className="h-3 w-36 max-w-full" />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2.5">
+            <Avatar initials={user.initials} size={34} tone={user.tone} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium leading-tight">{user.name}</div>
+              <div className="truncate text-xs text-ink-faint">{user.subtitle}</div>
+            </div>
+          </div>
+        )}
         <SignOutButton />
       </div>
     </div>
