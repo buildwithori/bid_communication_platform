@@ -46,6 +46,16 @@ case " $* " in
 esac
 
 if [ "$is_api_command" = "true" ] && [ "${DOCKER_PRISMA_SETUP:-false}" = "true" ]; then
+  while ! mkdir node_modules/.prisma-setup-lock 2>/dev/null; do
+    echo "Waiting for Prisma setup lock..."
+    sleep 1
+  done
+
+  cleanup_prisma_lock() {
+    rmdir node_modules/.prisma-setup-lock 2>/dev/null || true
+  }
+  trap cleanup_prisma_lock EXIT INT TERM
+
   prisma_checksum_file="node_modules/.prisma-schema.sha256"
   prisma_checksum="$(sha256sum prisma/schema.prisma | awk '{print $1}')"
   saved_prisma_checksum=""
@@ -64,6 +74,9 @@ if [ "$is_api_command" = "true" ] && [ "${DOCKER_PRISMA_SETUP:-false}" = "true" 
     echo "Applying Prisma migrations..."
     npx prisma migrate deploy
   fi
+
+  cleanup_prisma_lock
+  trap - EXIT INT TERM
 fi
 
 exec "$@"

@@ -37,7 +37,8 @@ services:
     env_file:
       - .env.local
     environment:
-      DOCKER_APPLY_MIGRATIONS: "false"
+      DOCKER_PRISMA_SETUP: "true"
+      DOCKER_APPLY_MIGRATIONS: "true"
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'node.*nest.*worker' >/dev/null"]
       interval: 10s
@@ -64,6 +65,9 @@ services:
     command: npm run email:dev
     env_file:
       - .env.local
+    environment:
+      DOCKER_PRISMA_SETUP: "true"
+      DOCKER_APPLY_MIGRATIONS: "true"
     ports:
       - "3001:3001"
     healthcheck:
