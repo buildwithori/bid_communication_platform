@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { ShieldCheck } from 'lucide-react';
+import { PublicLegalFooter } from '@/components/legal/PublicLegalFooter';
 import { BidLogo } from '@/components/shared/BidLogo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ export function AuthShell({
           </div>
 
           {footer && <div className="mt-5">{footer}</div>}
+          <PublicLegalFooter compact />
         </div>
       </section>
     </main>
