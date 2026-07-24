@@ -4,6 +4,8 @@ export type SessionStatus =
 export type SessionSource = "entrepreneur_request" | "team_created";
 export type SessionTargetType = "open_team" | "specific_user";
 export type SessionNoteVisibility = "internal" | "participant";
+export type CalendarAttendeeResponseStatus =
+  "needs_action" | "accepted" | "tentative" | "declined";
 export type SessionUser = {
   id: string;
   name: string;
@@ -44,6 +46,9 @@ export type SessionRecord = {
   timezone: string;
   meetingProvider: string;
   meetingUrl: string | null;
+  calendarResponseStatus: CalendarAttendeeResponseStatus | null;
+  calendarResponseUpdatedAt: string | null;
+  calendarLastSyncedAt: string | null;
   declinedReason: string | null;
   cancelledReason: string | null;
   completedAt: string | null;

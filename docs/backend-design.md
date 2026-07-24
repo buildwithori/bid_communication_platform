@@ -1433,6 +1433,7 @@ Files/video/calendar:
 - `GET /files/:id/signed-url`
 - `POST /video/direct-upload`
 - `POST /webhooks/mux`
+- `POST /webhooks/google-calendar`
 - `GET /calendar/google/connect-url`
 - `POST /calendar/google/callback`
 - `DELETE /calendar/connections/:id`
@@ -1609,6 +1610,31 @@ Rules:
 - Store provider, event ID, meeting URL, and owner.
 - Reschedule updates the calendar event.
 - Cancel/decline cancels or marks the event based on state.
+- Store the external attendee response separately from the BID session lifecycle:
+  `needs_action`, `accepted`, `tentative`, or `declined`.
+- Accepting a BID request confirms the session and creates the invitation. A Google
+  `needs_action`, `accepted`, or `tentative` response leaves the BID session
+  confirmed. A Google `declined` response or an event removed outside BID
+  atomically cancels the confirmed session and notifies the owner and entrepreneur.
+- Rescheduling resets the external response to `needs_action` until Google reports
+  the attendee's response to the updated invitation.
+
+### Google Calendar Response Synchronization
+
+- Create an expiring Google Events watch channel for every connected admin or
+  trainer calendar when a public HTTPS webhook is available.
+- Persist only a SHA-256 hash of the channel token. Validate the channel ID,
+  token hash, and resource ID before accepting a callback.
+- Google push notifications are change signals only. They do not contain a trusted
+  event payload, so the webhook enqueues work and the BullMQ worker fetches the
+  current event before applying any state transition.
+- Renew channels before expiry and stop replaced channels on a best-effort basis.
+- Run a scheduled cursor-paged reconciliation across all connected calendars and
+  confirmed Calendar-backed sessions. This is the correctness path when a push
+  notification is delayed, dropped, or arrives while the service is unavailable.
+- Webhook and reconciliation jobs are idempotent. Session updates are
+  status-constrained, audit events are deduplicated, and notification delivery uses
+  durable recipient dedupe keys.
 
 ## 18. Email and Notification Design
 

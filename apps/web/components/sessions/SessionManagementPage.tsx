@@ -1,13 +1,18 @@
 "use client";
 
-import { useDebouncedValue } from '@/lib/search';
+import { useDebouncedValue } from "@/lib/search";
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Notice } from "@/components/shared/PageHeader";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { StatCard } from "@/components/shared/StatCard";
-import { Card, CardHeader, Skeleton, TableSkeleton } from "@/components/shared/Card";
+import {
+  Card,
+  CardHeader,
+  Skeleton,
+  TableSkeleton,
+} from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Modal } from "@/components/shared/Modal";
@@ -404,6 +409,15 @@ export function SessionManagementPage({
                   {session.declinedReason ?? session.cancelledReason}
                 </div>
               ) : null}
+              {session.status === "confirmed" &&
+              session.calendarResponseStatus ? (
+                <div className="mt-2 text-xs text-ink-muted">
+                  Calendar:{" "}
+                  {session.calendarResponseStatus === "needs_action"
+                    ? "response pending"
+                    : session.calendarResponseStatus}
+                </div>
+              ) : null}
             </div>
           );
         },
@@ -554,9 +568,7 @@ export function SessionManagementPage({
             : undefined
         }
         defaultSubject={
-          messageTarget
-            ? `Follow-up on ${messageTarget.topic}`
-            : ""
+          messageTarget ? `Follow-up on ${messageTarget.topic}` : ""
         }
         onSubmit={async ({ subject, message, channel, priority }) => {
           if (!messageTarget) return;
@@ -569,8 +581,7 @@ export function SessionManagementPage({
           });
           const delivery = result.deliveries.find(
             (entry) =>
-              entry.channel ===
-              (channel === "in-app" ? "in_app" : "email"),
+              entry.channel === (channel === "in-app" ? "in_app" : "email"),
           );
           if (delivery?.status === "skipped") {
             toast.info(

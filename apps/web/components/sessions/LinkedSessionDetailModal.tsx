@@ -1,14 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarDays, Clock3, ExternalLink, UserRound } from 'lucide-react';
+import { CalendarCheck2, CalendarDays, Clock3, ExternalLink, UserRound } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Skeleton } from '@/components/shared/Card';
 import { Modal } from '@/components/shared/Modal';
 import { Notice } from '@/components/shared/PageHeader';
-import { useSessionDetailQuery, type SessionRecord, type SessionStatus } from '@/lib/api/sessions';
+import { useSessionDetailQuery, type CalendarAttendeeResponseStatus, type SessionRecord, type SessionStatus } from '@/lib/api/sessions';
 import { useCurrentUserQuery } from '@/lib/api/auth';
 import { PLATFORM_DEFAULT_TIMEZONE } from '@/lib/timezones';
 
@@ -67,6 +67,13 @@ export function LinkedSessionDetailModal() {
             <Detail icon={<Clock3 className="h-4 w-4" />} label="Time" value={formatTimeRange(detail.startAt, detail.endAt, timezone)} />
             <Detail icon={<UserRound className="h-4 w-4" />} label="Session owner" value={detail.owner?.name ?? detail.target?.name ?? 'Any available BID team member'} />
             <Detail icon={<UserRound className="h-4 w-4" />} label="Requested by" value={detail.createdBy.name} />
+            {detail.calendarResponseStatus ? (
+              <Detail
+                icon={<CalendarCheck2 className="h-4 w-4" />}
+                label="Calendar response"
+                value={calendarResponseLabel(detail.calendarResponseStatus)}
+              />
+            ) : null}
           </div>
 
           {detail.programme ? (
@@ -145,4 +152,10 @@ function formatTime(value: string, timezone: string) {
 }
 function formatTimeRange(start: string, end: string, timezone: string) {
   return `${formatTime(start, timezone)} – ${formatTime(end, timezone)} · ${timezone}`;
+}
+function calendarResponseLabel(status: CalendarAttendeeResponseStatus) {
+  if (status === 'accepted') return 'Accepted';
+  if (status === 'tentative') return 'Tentative';
+  if (status === 'declined') return 'Declined';
+  return 'Response pending';
 }
