@@ -352,6 +352,7 @@ export class TrainersService {
       name: [trainer.firstName, trainer.lastName].filter(Boolean).join(' ') || trainer.email,
       email: trainer.email,
       phone: trainer.phone,
+      timezone: trainer.timezone,
       userStatus: trainer.status,
       roleLabel: trainer.trainerCapability?.roleLabel ?? 'trainer',
       accessLevel: trainer.trainerCapability?.accessLevel ?? TrainerAccessLevel.full,

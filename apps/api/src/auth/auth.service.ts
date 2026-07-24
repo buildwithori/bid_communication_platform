@@ -84,7 +84,15 @@ export class AuthService {
     if (found.status === UserStatus.inactive) throw new UnauthorizedException('This account is inactive.');
     await this.assertTrainerAccess(found);
 
-    const user = await this.prisma.user.update({ where: { id: found.id }, data: { lastLoginAt: new Date() } });
+    const user = await this.prisma.user.update({
+      where: { id: found.id },
+      data: {
+        lastLoginAt: new Date(),
+        ...(!found.timezone && dto.timezone
+          ? { timezone: dto.timezone.trim() }
+          : {}),
+      },
+    });
     const sessionToken = await this.createSession(user.id);
     return {
       user: this.serializeUser(user, found.trainerCapability), sessionToken,
@@ -217,7 +225,7 @@ export class AuthService {
     > | null,
   ) {
     return {
-      id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone,
+      id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone, timezone: user.timezone,
       role: user.role, status: user.status, emailVerifiedAt: user.emailVerifiedAt,
       trainerAccessExpiresAt:
         user.role === UserRole.trainer &&

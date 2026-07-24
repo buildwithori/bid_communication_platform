@@ -7,6 +7,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsTimeZone,
   MaxLength,
   MinLength,
   ValidateIf,
@@ -94,6 +95,9 @@ export class UpdateTrainerProfileDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsTimeZone()
+  timezone!: string;
 }
 
 export class UpdateTrainerStatusDto {
@@ -110,4 +114,8 @@ export class AcceptTrainerInvitationDto {
   @MinLength(8)
   @MaxLength(128)
   password!: string;
+
+  @IsOptional()
+  @IsTimeZone()
+  timezone?: string;
 }

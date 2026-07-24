@@ -281,6 +281,7 @@ export class AdminsService {
             passwordHash,
             status: UserStatus.active,
             emailVerifiedAt: now,
+            ...(dto.timezone ? { timezone: dto.timezone.trim() } : {}),
           },
           include: adminInclude,
         });
@@ -368,6 +369,7 @@ export class AdminsService {
             firstName: dto.firstName.trim(),
             lastName: dto.lastName.trim(),
             phone: dto.phone?.trim() || null,
+            timezone: dto.timezone.trim(),
           },
           include: adminInclude,
         }),
@@ -469,6 +471,7 @@ export class AdminsService {
       name: this.displayName(admin),
       email: admin.email,
       phone: admin.phone,
+      timezone: admin.timezone,
       avatarUrl: admin.avatarUrl,
       status: this.directoryStatus(admin.status),
       userStatus: admin.status,

@@ -3,6 +3,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsTimeZone,
   MaxLength,
   MinLength,
 } from "class-validator";
@@ -37,6 +38,10 @@ export class AcceptAdminInvitationDto {
   @MinLength(8)
   @MaxLength(128)
   password!: string;
+
+  @IsOptional()
+  @IsTimeZone()
+  timezone?: string;
 }
 
 export class UpdateAdminProfileDto {
@@ -54,6 +59,9 @@ export class UpdateAdminProfileDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsTimeZone()
+  timezone!: string;
 }
 
 export class UpdateAdminStatusDto {

@@ -49,8 +49,14 @@ export class SessionsController {
   }
 
   @Get("availability")
-  getAvailability(@Query() query: SessionAvailabilityQueryDto) {
-    return this.availabilityService.getAvailability(query);
+  async getAvailability(
+    @CurrentUser() user: User,
+    @Query() query: SessionAvailabilityQueryDto,
+  ) {
+    const timezone = await this.availabilityService.resolveTimezone(
+      user.timezone,
+    );
+    return this.availabilityService.getAvailability({ ...query, timezone });
   }
 
   @Get(":id")

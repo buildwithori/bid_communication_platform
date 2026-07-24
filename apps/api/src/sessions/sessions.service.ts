@@ -226,9 +226,7 @@ export class SessionsService {
         `This session type must be ${sessionType.durationMinutes} minutes.`,
       );
     }
-    const timezone = await this.availability.resolveTimezone(
-      user.role === UserRole.entrepreneur ? user.timezone : dto.timezone,
-    );
+    const timezone = await this.availability.resolveTimezone(user.timezone);
     await this.availability.assertBookableTime(startAt, endAt, timezone);
 
     const entrepreneurUserId =
@@ -603,11 +601,8 @@ export class SessionsService {
         `This session type must be ${session.typeDefinition.durationMinutes} minutes.`,
       );
     }
-    await this.availability.assertBookableTime(
-      startAt,
-      endAt,
-      session.timezone,
-    );
+    const timezone = await this.availability.resolveTimezone(user.timezone);
+    await this.availability.assertBookableTime(startAt, endAt, timezone);
     await this.availability.assertUserAvailable(
       session.ownerUserId,
       startAt,
@@ -624,7 +619,7 @@ export class SessionsService {
           notes: session.notes,
           startAt,
           endAt,
-          timezone: session.timezone,
+          timezone,
           requestId: session.id + "-legacy-reschedule",
         });
     if (session.calendarEventId) {
@@ -635,7 +630,7 @@ export class SessionsService {
         notes: session.notes,
         startAt,
         endAt,
-        timezone: session.timezone,
+        timezone,
       });
     }
 
@@ -676,6 +671,7 @@ export class SessionsService {
             data: {
               startAt,
               endAt,
+              timezone,
               durationMinutes: session.typeDefinition.durationMinutes,
               ...(replacementEvent
                 ? {

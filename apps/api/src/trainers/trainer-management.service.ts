@@ -210,6 +210,7 @@ export class TrainerManagementService {
             passwordHash,
             status: UserStatus.active,
             emailVerifiedAt: now,
+            ...(dto.timezone ? { timezone: dto.timezone.trim() } : {}),
           },
         });
         await tx.trainerCapability.update({
@@ -366,6 +367,7 @@ export class TrainerManagementService {
             firstName: dto.firstName.trim(),
             lastName: dto.lastName.trim(),
             phone: dto.phone?.trim() || null,
+            timezone: dto.timezone.trim(),
           },
         }),
     );
