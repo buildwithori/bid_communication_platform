@@ -28,7 +28,16 @@ export function BidLogo({
           alt="BID Hub"
           width={size * 3}
           height={size}
-          className="object-contain"
+          className="object-contain dark:hidden"
+          style={{ height: size, width: 'auto' }}
+          priority
+        />
+        <Image
+          src="/BIDCP_LOGO_DARK.png"
+          alt="BID Hub"
+          width={size * 3}
+          height={size}
+          className="hidden object-contain dark:block"
           style={{ height: size, width: 'auto' }}
           priority
         />
@@ -47,7 +56,15 @@ export function BidLogo({
         alt="BID Hub"
         width={size}
         height={size}
-        className="rounded-xl object-contain"
+        className="rounded-xl object-contain dark:hidden"
+        priority
+      />
+      <Image
+        src="/BIDCP_ISOTYPE_DARK.png"
+        alt="BID Hub"
+        width={size}
+        height={size}
+        className="hidden rounded-xl object-contain dark:block"
         priority
       />
     </span>
