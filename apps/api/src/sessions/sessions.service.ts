@@ -3,12 +3,15 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "crypto";
 import {
   CalendarAttendeeResponseStatus,
   CalendarConnectionStatus,
+  CalendarProvisioningStatus,
   CalendarProvider,
   NotificationChannel,
   NotificationEntityType,
@@ -23,6 +26,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
+import { CalendarSyncQueueService } from "../calendar/calendar-sync-queue.service";
 import { CalendarService } from "../calendar/calendar.service";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -143,12 +147,16 @@ type SessionWithInclude = Prisma.SessionGetPayload<{
 
 @Injectable()
 export class SessionsService {
+  private readonly logger = new Logger(SessionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly calendar: CalendarService,
+    private readonly calendarSyncQueue: CalendarSyncQueueService,
     private readonly availability: SessionAvailabilityService,
     private readonly audit: AuditService,
+    private readonly config: ConfigService,
   ) {}
 
   async listSessions(user: User, query: SessionQueryDto) {
@@ -213,6 +221,116 @@ export class SessionsService {
     });
     if (!session) throw new NotFoundException("Session was not found.");
     return this.mapSession(session, user.role);
+  }
+
+  async calendarFile(user: User, id: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { id, ...this.scopeWhere(user) },
+      include: sessionInclude,
+    });
+    if (!session) throw new NotFoundException("Session was not found.");
+    if (
+      session.status !== SessionStatus.confirmed &&
+      session.status !== SessionStatus.completed &&
+      session.status !== SessionStatus.cancelled
+    ) {
+      throw new BadRequestException(
+        "A calendar file is available after the session is confirmed.",
+      );
+    }
+    const appUrl = this.config.getOrThrow<string>("APP_WEB_URL").replace(
+      /\/$/,
+      "",
+    );
+    const sessionUrl = `${appUrl}${this.sessionActionUrl(user.role, session.id)}`;
+    const description = [
+      session.notes?.trim(),
+      session.meetingUrl
+        ? `Join the meeting: ${session.meetingUrl}`
+        : "Open BID Hub for the latest joining details.",
+      `Session details: ${sessionUrl}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const status =
+      session.status === SessionStatus.cancelled ? "CANCELLED" : "CONFIRMED";
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//BID Hub//Session Calendar//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${this.escapeCalendarText(session.calendarUid)}`,
+      `DTSTAMP:${this.calendarTimestamp(new Date())}`,
+      `DTSTART:${this.calendarTimestamp(session.startAt)}`,
+      `DTEND:${this.calendarTimestamp(session.endAt)}`,
+      `SEQUENCE:${session.calendarRevision}`,
+      `STATUS:${status}`,
+      `SUMMARY:${this.escapeCalendarText(session.topic)}`,
+      `DESCRIPTION:${this.escapeCalendarText(description)}`,
+      `LOCATION:${this.escapeCalendarText(session.meetingUrl ?? "BID Hub")}`,
+      `URL:${this.escapeCalendarText(sessionUrl)}`,
+      `ORGANIZER;CN=${this.escapeCalendarParameter(
+        session.owner ? this.userName(session.owner) : "BID Hub",
+      )}:MAILTO:${session.owner?.email ?? "info@bidcpsme.com"}`,
+      `ATTENDEE;CN=${this.escapeCalendarParameter(
+        this.userName(session.entrepreneur),
+      )}:MAILTO:${session.entrepreneur.email}`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ];
+    const content = `${lines.map((line) => this.foldCalendarLine(line)).join("\r\n")}\r\n`;
+    return {
+      content,
+      filename: `${this.safeFilename(session.topic)}.ics`,
+    };
+  }
+
+  async retryCalendarProvisioning(user: User, id: string) {
+    this.assertTeamMember(user);
+    const session = await this.prisma.session.findFirst({
+      where: { id, ...this.scopeWhere(user) },
+      include: sessionInclude,
+    });
+    if (!session) throw new NotFoundException("Session was not found.");
+    if (session.status !== SessionStatus.confirmed || !session.ownerUserId) {
+      throw new BadRequestException(
+        "Calendar setup can only be retried for a confirmed session.",
+      );
+    }
+    if (user.role === UserRole.trainer && session.ownerUserId !== user.id) {
+      throw new ForbiddenException(
+        "You can only retry calendar setup for sessions you own.",
+      );
+    }
+    if (session.calendarEventId) return this.mapSession(session, user.role);
+    if (
+      session.calendarProvisioningStatus ===
+      CalendarProvisioningStatus.processing
+    ) {
+      return this.mapSession(session, user.role);
+    }
+
+    const queued = await this.prisma.session.updateMany({
+      where: {
+        id,
+        status: SessionStatus.confirmed,
+        calendarEventId: null,
+        calendarProvisioningStatus: {
+          not: CalendarProvisioningStatus.processing,
+        },
+      },
+      data: {
+        calendarProvisioningStatus: CalendarProvisioningStatus.pending,
+        calendarProvisioningClaimedAt: null,
+        calendarProvisioningError: null,
+      },
+    });
+    if (queued.count) {
+      await this.enqueueCalendarProvisioning(id);
+    }
+    return this.getSession(user, id);
   }
 
   async createSession(user: User, dto: CreateSessionDto) {
@@ -283,26 +401,9 @@ export class SessionsService {
       ? SessionStatus.confirmed
       : SessionStatus.requested;
     const id = randomUUID();
-    let calendarEvent: Awaited<
-      ReturnType<CalendarService["createSessionEvent"]>
-    > | null = null;
-
-    if (ownerUserId) {
-      calendarEvent = await this.calendar.createSessionEvent({
-        ownerUserId,
-        entrepreneurEmail: entrepreneur.email,
-        topic: dto.topic.trim(),
-        notes: dto.notes?.trim() || null,
-        startAt,
-        endAt,
-        timezone,
-        requestId: id,
-      });
-    }
 
     let created: SessionWithInclude;
-    try {
-      created = await this.audit.capture(
+    created = await this.audit.capture(
         {
           action: "session.created",
           entityType: "session",
@@ -330,24 +431,17 @@ export class SessionsService {
               endAt,
               timezone,
               meetingProvider: dto.meetingProvider ?? "google_meet",
-              meetingUrl: calendarEvent?.meetingUrl ?? null,
-              calendarEventId: calendarEvent?.eventId ?? null,
-              calendarEventEtag: calendarEvent?.eventEtag ?? null,
-              calendarResponseStatus: calendarEvent?.responseStatus ?? null,
-              calendarResponseUpdatedAt:
-                calendarEvent?.responseUpdatedAt ?? null,
-              calendarLastSyncedAt: calendarEvent ? new Date() : null,
+              calendarUid: `${id}@bid-hub`,
+              calendarProvisioningStatus: ownerUserId
+                ? CalendarProvisioningStatus.pending
+                : null,
             },
             include: sessionInclude,
           }),
-      );
-    } catch (error) {
-      if (calendarEvent && ownerUserId) {
-        await this.calendar
-          .deleteSessionEvent(ownerUserId, calendarEvent.eventId)
-          .catch(() => undefined);
-      }
-      throw error;
+    );
+
+    if (ownerUserId) {
+      await this.enqueueCalendarProvisioning(created.id);
     }
 
     if (created.status === SessionStatus.requested) {
@@ -396,17 +490,6 @@ export class SessionsService {
       session.endAt,
       session.id,
     );
-    const calendarEvent = await this.calendar.createSessionEvent({
-      ownerUserId: user.id,
-      entrepreneurEmail: session.entrepreneur.email,
-      topic: session.topic,
-      notes: session.notes,
-      startAt: session.startAt,
-      endAt: session.endAt,
-      timezone: session.timezone,
-      requestId: session.id,
-    });
-
     let updated: SessionWithInclude;
     try {
       updated = await this.audit.capture(
@@ -428,24 +511,20 @@ export class SessionsService {
               ownerUserId: user.id,
               status: SessionStatus.confirmed,
               meetingProvider: "google_meet",
-              meetingUrl: calendarEvent.meetingUrl,
-              calendarEventId: calendarEvent.eventId,
-              calendarEventEtag: calendarEvent.eventEtag,
-              calendarResponseStatus: calendarEvent.responseStatus,
-              calendarResponseUpdatedAt: calendarEvent.responseUpdatedAt,
-              calendarLastSyncedAt: new Date(),
+              calendarProvisioningStatus: CalendarProvisioningStatus.pending,
+              calendarProvisioningError: null,
+              calendarProvisioningClaimedAt: null,
             },
             include: sessionInclude,
           }),
       );
     } catch {
-      await this.calendar
-        .deleteSessionEvent(user.id, calendarEvent.eventId)
-        .catch(() => undefined);
       throw new ConflictException(
         "This session request was already handled. Refresh the list.",
       );
     }
+
+    await this.enqueueCalendarProvisioning(updated.id);
 
     await this.notifyEntrepreneur(
       user,
@@ -561,6 +640,10 @@ export class SessionsService {
           data: {
             status: SessionStatus.cancelled,
             cancelledReason: dto.reason.trim(),
+            calendarRevision: { increment: 1 },
+            calendarProvisioningStatus: null,
+            calendarProvisioningClaimedAt: null,
+            calendarProvisioningError: null,
           },
           include: sessionInclude,
         }),
@@ -623,18 +706,6 @@ export class SessionsService {
       session.id,
     );
 
-    const replacementEvent = session.calendarEventId
-      ? null
-      : await this.calendar.createSessionEvent({
-          ownerUserId: session.ownerUserId,
-          entrepreneurEmail: session.entrepreneur.email,
-          topic: session.topic,
-          notes: session.notes,
-          startAt,
-          endAt,
-          timezone,
-          requestId: session.id + "-legacy-reschedule",
-        });
     if (session.calendarEventId) {
       await this.calendar.updateSessionEvent({
         ownerUserId: session.ownerUserId,
@@ -686,16 +757,18 @@ export class SessionsService {
               endAt,
               timezone,
               durationMinutes: session.typeDefinition.durationMinutes,
-              ...(replacementEvent
-                ? {
-                    calendarEventId: replacementEvent.eventId,
-                    meetingUrl: replacementEvent.meetingUrl,
-                    calendarEventEtag: replacementEvent.eventEtag,
-                  }
-                : {}),
-              calendarResponseStatus:
-                CalendarAttendeeResponseStatus.needs_action,
-              calendarResponseUpdatedAt: new Date(),
+              calendarRevision: { increment: 1 },
+              calendarProvisioningStatus: session.calendarEventId
+                ? CalendarProvisioningStatus.ready
+                : CalendarProvisioningStatus.pending,
+              calendarProvisioningClaimedAt: null,
+              calendarProvisioningError: null,
+              calendarResponseStatus: session.calendarEventId
+                ? CalendarAttendeeResponseStatus.needs_action
+                : null,
+              calendarResponseUpdatedAt: session.calendarEventId
+                ? new Date()
+                : null,
               calendarLastSyncedAt: null,
             },
             include: sessionInclude,
@@ -703,11 +776,7 @@ export class SessionsService {
         },
       );
     } catch (error) {
-      if (replacementEvent) {
-        await this.calendar
-          .deleteSessionEvent(session.ownerUserId, replacementEvent.eventId)
-          .catch(() => undefined);
-      } else if (session.calendarEventId) {
+      if (session.calendarEventId) {
         await this.calendar
           .updateSessionEvent({
             ownerUserId: session.ownerUserId,
@@ -723,6 +792,10 @@ export class SessionsService {
       throw new ConflictException(
         "The session changed while it was being rescheduled. Refresh and try again.",
       );
+    }
+
+    if (!session.calendarEventId) {
+      await this.enqueueCalendarProvisioning(updated.id);
     }
 
     await this.notifyEntrepreneur(
@@ -1334,7 +1407,7 @@ export class SessionsService {
       " to " +
       this.sessionSchedule(updated, timezone) +
       (reason?.trim() ? ". Reason: " + reason.trim() : "") +
-      ". Your connected calendar invitation has been updated."
+      ". Open the session for the latest joining details and calendar options."
     );
   }
 
@@ -1416,6 +1489,13 @@ export class SessionsService {
         session.status === SessionStatus.completed
           ? session.meetingUrl
           : null,
+      calendarProvisioningStatus: session.calendarProvisioningStatus,
+      calendarProvisioningError:
+        viewerRole === UserRole.entrepreneur
+          ? null
+          : session.calendarProvisioningError,
+      calendarProvisionedAt:
+        session.calendarProvisionedAt?.toISOString() ?? null,
       calendarResponseStatus: session.calendarResponseStatus,
       calendarResponseUpdatedAt:
         session.calendarResponseUpdatedAt?.toISOString() ?? null,
@@ -1475,5 +1555,76 @@ export class SessionsService {
     return (
       [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email
     );
+  }
+
+  private sessionActionUrl(role: UserRole, sessionId: string) {
+    const root =
+      role === UserRole.entrepreneur
+        ? "/entrepreneur/schedule"
+        : role === UserRole.trainer
+          ? "/trainer/sessions"
+          : "/admin/sessions";
+    return `${root}?sessionId=${encodeURIComponent(sessionId)}`;
+  }
+
+  private async enqueueCalendarProvisioning(sessionId: string) {
+    try {
+      await this.calendarSyncQueue.enqueueSessionProvisioning(sessionId);
+    } catch (error) {
+      // The session remains pending in PostgreSQL. The scheduled provisioning
+      // sweep is the durable fallback when Redis is briefly unavailable.
+      this.logger.error(
+        JSON.stringify({
+          event: "session.calendar.enqueue_failed",
+          sessionId,
+          exception: error instanceof Error ? error.name : "UnknownError",
+        }),
+      );
+    }
+  }
+
+  private calendarTimestamp(value: Date) {
+    return value
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}Z$/, "Z");
+  }
+
+  private escapeCalendarText(value: string) {
+    return value
+      .replace(/\\/g, "\\\\")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,");
+  }
+
+  private escapeCalendarParameter(value: string) {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, " ")}"`;
+  }
+
+  private foldCalendarLine(line: string) {
+    const result: string[] = [];
+    let current = "";
+    for (const character of line) {
+      const candidate = current + character;
+      if (Buffer.byteLength(candidate, "utf8") > 73 && current) {
+        result.push(current);
+        current = ` ${character}`;
+      } else {
+        current = candidate;
+      }
+    }
+    result.push(current);
+    return result.join("\r\n");
+  }
+
+  private safeFilename(value: string) {
+    const filename = value
+      .normalize("NFKD")
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .slice(0, 80);
+    return filename || "bid-hub-session";
   }
 }

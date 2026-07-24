@@ -52,6 +52,16 @@ function fixture(overrides: Record<string, unknown> = {}) {
     meetingProvider: "google_meet",
     meetingUrl: null,
     calendarEventId: null,
+    calendarUid: "session-1@bid-hub",
+    calendarRevision: 0,
+    calendarProvisioningStatus: null,
+    calendarProvisioningError: null,
+    calendarProvisioningClaimedAt: null,
+    calendarProvisionedAt: null,
+    calendarResponseStatus: null,
+    calendarResponseUpdatedAt: null,
+    calendarLastSyncedAt: null,
+    calendarEventEtag: null,
     declinedReason: null,
     cancelledReason: null,
     completedAt: null,
@@ -93,7 +103,9 @@ function fixture(overrides: Record<string, unknown> = {}) {
 function dependencies(session: ReturnType<typeof fixture>) {
   const state = {
     availabilityChecks: 0,
+    createdEvents: 0,
     deletedEvents: [] as string[],
+    enqueuedProvisioning: [] as string[],
     updatedEvents: [] as Array<{ startAt: Date }>,
   };
   const prisma = {
@@ -101,10 +113,13 @@ function dependencies(session: ReturnType<typeof fixture>) {
   };
   const notifications = { createNotification: async () => undefined };
   const calendar = {
-    createSessionEvent: async () => ({
-      eventId: "google-event-1",
-      meetingUrl: "https://meet.google.com/real-link",
-    }),
+    createSessionEvent: async () => {
+      state.createdEvents += 1;
+      return {
+        eventId: "google-event-1",
+        meetingUrl: "https://meet.google.com/real-link",
+      };
+    },
     deleteSessionEvent: async (_ownerId: string, eventId: string) => {
       state.deletedEvents.push(eventId);
     },
@@ -129,7 +144,30 @@ function dependencies(session: ReturnType<typeof fixture>) {
   };
 }
 
-test("a lost open-request acceptance race removes the extra Google event", async () => {
+function createService(
+  deps: ReturnType<typeof dependencies>,
+  options: {
+    audit?: unknown;
+    notifications?: unknown;
+    prisma?: unknown;
+  } = {},
+) {
+  return new SessionsService(
+    (options.prisma ?? deps.prisma) as never,
+    (options.notifications ?? deps.notifications) as never,
+    deps.calendar as never,
+    {
+      enqueueSessionProvisioning: async (sessionId: string) => {
+        deps.state.enqueuedProvisioning.push(sessionId);
+      },
+    } as never,
+    deps.availability as never,
+    (options.audit ?? {}) as never,
+    { getOrThrow: () => "http://localhost:3000" } as never,
+  );
+}
+
+test("a lost open-request acceptance race creates no orphan calendar event", async () => {
   const session = fixture();
   const deps = dependencies(session);
   const audit = {
@@ -137,20 +175,16 @@ test("a lost open-request acceptance race removes the extra Google event", async
       throw new Error("status changed");
     },
   };
-  const service = new SessionsService(
-    deps.prisma as never,
-    deps.notifications as never,
-    deps.calendar as never,
-    deps.availability as never,
-    audit as never,
-  );
+  const service = createService(deps, { audit });
 
   await assert.rejects(
     service.acceptSession(trainer as never, session.id),
     ConflictException,
   );
   assert.equal(deps.state.availabilityChecks, 1);
-  assert.deepEqual(deps.state.deletedEvents, ["google-event-1"]);
+  assert.equal(deps.state.createdEvents, 0);
+  assert.deepEqual(deps.state.deletedEvents, []);
+  assert.deepEqual(deps.state.enqueuedProvisioning, []);
 });
 
 test("a database reschedule race rolls the existing Google event back", async () => {
@@ -169,13 +203,7 @@ test("a database reschedule race rolls the existing Google event back", async ()
       throw new Error("updated concurrently");
     },
   };
-  const service = new SessionsService(
-    deps.prisma as never,
-    deps.notifications as never,
-    deps.calendar as never,
-    deps.availability as never,
-    audit as never,
-  );
+  const service = createService(deps, { audit });
 
   await assert.rejects(
     service.rescheduleSession(trainer as never, session.id, {
@@ -206,13 +234,7 @@ test("leaving an open request keeps its shared status requested", async () => {
         },
       }),
   };
-  const service = new SessionsService(
-    deps.prisma as never,
-    deps.notifications as never,
-    deps.calendar as never,
-    deps.availability as never,
-    audit as never,
-  );
+  const service = createService(deps, { audit });
 
   const result = await service.declineSession(trainer as never, session.id, {
     reason: "Calendar is unavailable",
@@ -241,13 +263,7 @@ test("entrepreneurs receive participant notes but never internal notes", async (
     ],
   });
   const deps = dependencies(session);
-  const service = new SessionsService(
-    deps.prisma as never,
-    deps.notifications as never,
-    deps.calendar as never,
-    deps.availability as never,
-    {} as never,
-  );
+  const service = createService(deps);
   const entrepreneur = {
     id: "entrepreneur-1",
     role: UserRole.entrepreneur,
@@ -291,13 +307,10 @@ test("an entrepreneur cancellation notifies the session owner with context", asy
         },
       }),
   };
-  const service = new SessionsService(
-    deps.prisma as never,
-    notificationService as never,
-    deps.calendar as never,
-    deps.availability as never,
-    audit as never,
-  );
+  const service = createService(deps, {
+    notifications: notificationService,
+    audit,
+  });
   const entrepreneur = {
     id: "entrepreneur-1",
     email: "entrepreneur@bid.org",
@@ -334,20 +347,17 @@ test("open session requests format the schedule for each team recipient", async 
     },
   ];
   let notifications: Array<Record<string, unknown>> = [];
-  const service = new SessionsService(
-    {
+  const service = createService(deps, {
+    prisma: {
       ...deps.prisma,
       user: { findMany: async () => recipients },
-    } as never,
-    {
+    },
+    notifications: {
       createNotifications: async (items: Array<Record<string, unknown>>) => {
         notifications = items;
       },
-    } as never,
-    deps.calendar as never,
-    deps.availability as never,
-    {} as never,
-  );
+    },
+  });
 
   await (service as any).notifyTeamOfSessionRequest(
     session.createdBy,
@@ -364,13 +374,7 @@ test("open session requests format the schedule for each team recipient", async 
 test("session confirmation copy uses a possessive label without an extra article", () => {
   const session = fixture({ owner: trainer });
   const deps = dependencies(session);
-  const service = new SessionsService(
-    deps.prisma as never,
-    deps.notifications as never,
-    deps.calendar as never,
-    deps.availability as never,
-    {} as never,
-  );
+  const service = createService(deps);
 
   const body = (service as any).sessionConfirmedBody(
     trainer,
@@ -386,9 +390,8 @@ test("BID team session messages are scoped to the session entrepreneur and reque
   const session = fixture();
   const deps = dependencies(session);
   let notification: Record<string, unknown> | undefined;
-  const service = new SessionsService(
-    deps.prisma as never,
-    {
+  const service = createService(deps, {
+    notifications: {
       createNotification: async (input: Record<string, unknown>) => {
         notification = input;
         return {
@@ -401,11 +404,8 @@ test("BID team session messages are scoped to the session entrepreneur and reque
           ],
         };
       },
-    } as never,
-    deps.calendar as never,
-    deps.availability as never,
-    {} as never,
-  );
+    },
+  });
 
   const result = await service.sendMessage(trainer as never, session.id, {
     subject: "Updated preparation details",
@@ -430,13 +430,7 @@ test("BID team session messages are scoped to the session entrepreneur and reque
 test("session notes cannot be added before the session is accepted", async () => {
   const session = fixture();
   const deps = dependencies(session);
-  const service = new SessionsService(
-    deps.prisma as never,
-    deps.notifications as never,
-    deps.calendar as never,
-    deps.availability as never,
-    {} as never,
-  );
+  const service = createService(deps);
 
   await assert.rejects(
     service.addNote(trainer as never, session.id, {
@@ -444,5 +438,36 @@ test("session notes cannot be added before the session is accepted", async () =>
       visibility: SessionNoteVisibility.internal,
     }),
     BadRequestException,
+  );
+});
+
+test("confirmed sessions expose a stable provider-neutral calendar file", async () => {
+  const session = fixture({
+    status: SessionStatus.confirmed,
+    ownerUserId: trainer.id,
+    owner: trainer,
+    calendarUid: "stable-session-uid@bid-hub",
+    calendarRevision: 3,
+  });
+  const deps = dependencies(session);
+  const service = createService(deps);
+  const entrepreneur = {
+    id: "entrepreneur-1",
+    role: UserRole.entrepreneur,
+  };
+
+  const file = await service.calendarFile(
+    entrepreneur as never,
+    session.id,
+  );
+
+  assert.match(file.filename, /pricing-review\.ics$/i);
+  assert.match(file.content, /BEGIN:VCALENDAR\r\n/);
+  assert.match(file.content, /UID:stable-session-uid@bid-hub\r\n/);
+  assert.match(file.content, /SEQUENCE:3\r\n/);
+  assert.match(file.content, /DTSTART:20300107T100000Z\r\n/);
+  assert.match(
+    file.content,
+    /URL:http:\/\/localhost:3000\/entrepreneur\/schedule\?sessionId=session-1/,
   );
 });

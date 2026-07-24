@@ -9,6 +9,10 @@ export type CalendarConnectionSyncJob = {
   source: "webhook" | "reconciliation";
 };
 
+export type SessionCalendarProvisioningJob = {
+  sessionId: string;
+};
+
 @Injectable()
 export class CalendarSyncQueueService {
   constructor(
@@ -24,5 +28,13 @@ export class CalendarSyncQueueService {
 
   enqueueSweep(cursor: string) {
     return this.queue.add(JOB_NAMES.reconcileCalendarEvents, { cursor });
+  }
+
+  enqueueProvisioningSweep(cursor?: string) {
+    return this.queue.add(JOB_NAMES.reconcileCalendarProvisioning, { cursor });
+  }
+
+  enqueueSessionProvisioning(sessionId: string) {
+    return this.queue.add(JOB_NAMES.provisionSessionCalendar, { sessionId });
   }
 }

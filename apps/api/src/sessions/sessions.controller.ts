@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { User } from "@prisma/client";
@@ -25,6 +26,11 @@ import {
 } from "./dto/session-availability.dto";
 import { SessionAvailabilityService } from "./session-availability.service";
 import { SessionsService } from "./sessions.service";
+
+type CalendarFileResponse = {
+  setHeader(name: string, value: string): void;
+  send(body: string): void;
+};
 
 @ApiTags("sessions")
 @Controller("sessions")
@@ -65,6 +71,22 @@ export class SessionsController {
     return this.sessionsService.getSession(user, id);
   }
 
+  @Get(":id/calendar")
+  async calendarFile(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Res() response: CalendarFileResponse,
+  ) {
+    const file = await this.sessionsService.calendarFile(user, id);
+    response.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    response.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${file.filename}"`,
+    );
+    response.setHeader("Cache-Control", "private, no-store");
+    response.send(file.content);
+  }
+
   @Post()
   createSession(@CurrentUser() user: User, @Body() dto: CreateSessionDto) {
     return this.sessionsService.createSession(user, dto);
@@ -73,6 +95,14 @@ export class SessionsController {
   @Post(":id/accept")
   acceptSession(@CurrentUser() user: User, @Param("id") id: string) {
     return this.sessionsService.acceptSession(user, id);
+  }
+
+  @Post(":id/calendar/retry")
+  retryCalendarProvisioning(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+  ) {
+    return this.sessionsService.retryCalendarProvisioning(user, id);
   }
 
   @Post(":id/decline")

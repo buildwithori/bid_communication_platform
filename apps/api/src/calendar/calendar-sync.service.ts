@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import {
   CalendarAttendeeResponseStatus,
   CalendarConnectionStatus,
+  CalendarProvisioningStatus,
   CalendarProvider,
   ExternalResourceProvider,
   NotificationChannel,
@@ -24,6 +25,7 @@ import { CalendarService } from "./calendar.service";
 
 const CONNECTION_BATCH = 25;
 const SESSION_BATCH = 50;
+const PROVISIONING_STALE_AFTER_MS = 5 * 60_000;
 
 @Injectable()
 export class CalendarSyncService {
@@ -134,6 +136,179 @@ export class CalendarSyncService {
           ? (page.at(-1)?.id ?? null)
           : null,
     };
+  }
+
+  async enqueuePendingProvisioning(cursor?: string) {
+    const staleBefore = new Date(Date.now() - PROVISIONING_STALE_AFTER_MS);
+    await this.prisma.session.updateMany({
+      where: {
+        status: SessionStatus.confirmed,
+        calendarEventId: null,
+        calendarProvisioningStatus: CalendarProvisioningStatus.processing,
+        calendarProvisioningClaimedAt: { lt: staleBefore },
+      },
+      data: {
+        calendarProvisioningStatus: CalendarProvisioningStatus.pending,
+        calendarProvisioningClaimedAt: null,
+      },
+    });
+
+    const sessions = await this.prisma.session.findMany({
+      where: {
+        status: SessionStatus.confirmed,
+        ownerUserId: { not: null },
+        calendarEventId: null,
+        calendarProvisioningStatus: {
+          in: [
+            CalendarProvisioningStatus.pending,
+            CalendarProvisioningStatus.failed,
+          ],
+        },
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: SESSION_BATCH + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    const page = sessions.slice(0, SESSION_BATCH);
+    await Promise.all(
+      page.map((session) =>
+        this.queue.enqueueSessionProvisioning(session.id),
+      ),
+    );
+    return {
+      enqueued: page.length,
+      nextCursor:
+        sessions.length > SESSION_BATCH ? (page.at(-1)?.id ?? null) : null,
+    };
+  }
+
+  async provisionSessionCalendar(sessionId: string) {
+    const claimedAt = new Date();
+    const claimed = await this.prisma.session.updateMany({
+      where: {
+        id: sessionId,
+        status: SessionStatus.confirmed,
+        ownerUserId: { not: null },
+        calendarEventId: null,
+        calendarProvisioningStatus: {
+          in: [
+            CalendarProvisioningStatus.pending,
+            CalendarProvisioningStatus.failed,
+          ],
+        },
+      },
+      data: {
+        calendarProvisioningStatus: CalendarProvisioningStatus.processing,
+        calendarProvisioningClaimedAt: claimedAt,
+        calendarProvisioningError: null,
+      },
+    });
+    if (!claimed.count) return { provisioned: false, reason: "not_claimable" };
+
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { entrepreneur: { select: { email: true } } },
+    });
+    if (!session?.ownerUserId) {
+      return { provisioned: false, reason: "session_changed" };
+    }
+
+    try {
+      const event = await this.calendar.createSessionEvent({
+        ownerUserId: session.ownerUserId,
+        entrepreneurEmail: session.entrepreneur.email,
+        topic: session.topic,
+        notes: session.notes,
+        startAt: session.startAt,
+        endAt: session.endAt,
+        timezone: session.timezone,
+        requestId: session.id,
+      });
+      const provisionedAt = new Date();
+      const updated = await this.prisma.session.updateMany({
+        where: {
+          id: session.id,
+          status: SessionStatus.confirmed,
+          calendarEventId: null,
+          calendarProvisioningStatus: CalendarProvisioningStatus.processing,
+          calendarProvisioningClaimedAt: claimedAt,
+        },
+        data: {
+          meetingProvider: "google_meet",
+          meetingUrl: event.meetingUrl,
+          calendarEventId: event.eventId,
+          calendarEventEtag: event.eventEtag,
+          calendarResponseStatus: event.responseStatus,
+          calendarResponseUpdatedAt: event.responseUpdatedAt,
+          calendarLastSyncedAt: provisionedAt,
+          calendarProvisioningStatus: CalendarProvisioningStatus.ready,
+          calendarProvisioningClaimedAt: null,
+          calendarProvisioningError: null,
+          calendarProvisionedAt: provisionedAt,
+        },
+      });
+      if (!updated.count) {
+        await this.calendar
+          .deleteSessionEvent(session.ownerUserId, event.eventId)
+          .catch(() => undefined);
+        return { provisioned: false, reason: "session_changed" };
+      }
+      await this.audit.enqueue({
+        eventKey: `session.calendar_provisioned:${session.id}:${event.eventId}`,
+        actorUserId: session.ownerUserId,
+        action: "session.calendar.provisioned",
+        entityType: "session",
+        entityId: session.id,
+        summary: `Prepared calendar invitation for ${session.topic}`,
+        payload: { provider: CalendarProvider.google },
+      });
+      return { provisioned: true };
+    } catch (error) {
+      await this.prisma.session.updateMany({
+        where: {
+          id: session.id,
+          calendarProvisioningStatus: CalendarProvisioningStatus.processing,
+          calendarProvisioningClaimedAt: claimedAt,
+        },
+        data: {
+          calendarProvisioningStatus: CalendarProvisioningStatus.failed,
+          calendarProvisioningClaimedAt: null,
+          calendarProvisioningError: this.safeProvisioningFailure(),
+        },
+      });
+      throw error;
+    }
+  }
+
+  async notifyTerminalProvisioningFailure(sessionId: string) {
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: sessionId,
+        status: SessionStatus.confirmed,
+        calendarProvisioningStatus: CalendarProvisioningStatus.failed,
+      },
+      select: {
+        id: true,
+        topic: true,
+        ownerUserId: true,
+        owner: { select: { role: true } },
+      },
+    });
+    if (!session?.ownerUserId || !session.owner) return;
+    await this.notifications.createNotification({
+      recipientUserId: session.ownerUserId,
+      actorUserId: session.ownerUserId,
+      type: NotificationType.system,
+      title: `Calendar setup needs attention: ${session.topic}`,
+      body: "The session is confirmed, but its calendar invitation and meeting link could not be prepared. Open the session and retry the calendar setup.",
+      severity: NotificationSeverity.warning,
+      entityType: NotificationEntityType.session,
+      entityId: session.id,
+      actionUrl: this.sessionUrl(session.owner.role, session.id),
+      dedupeKey: `calendar-provisioning-failed:${session.id}`,
+      channels: [NotificationChannel.in_app, NotificationChannel.email],
+    });
   }
 
   async maintainWatchChannels() {
@@ -379,6 +554,9 @@ export class CalendarSyncService {
         data: {
           status: SessionStatus.cancelled,
           cancelledReason: reason,
+          calendarRevision: { increment: 1 },
+          calendarProvisioningStatus: null,
+          calendarProvisioningClaimedAt: null,
           calendarResponseStatus: responseStatus,
           calendarResponseUpdatedAt: responseUpdatedAt,
           calendarLastSyncedAt: new Date(),
@@ -450,6 +628,10 @@ export class CalendarSyncService {
     const left = Buffer.from(expected);
     const right = Buffer.from(actual);
     return left.length === right.length && timingSafeEqual(left, right);
+  }
+
+  private safeProvisioningFailure() {
+    return "The calendar provider could not prepare this session. Retry the setup or reconnect the session owner's calendar.";
   }
 
   private userName(user: {

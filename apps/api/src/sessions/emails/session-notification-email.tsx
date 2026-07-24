@@ -52,7 +52,7 @@ function sessionPresentation(type: NotificationType, role: UserRole) {
     return {
       actionLabel: "View updated session",
       supportingText:
-        "Review the new time and joining details. The connected calendar invitation has also been updated.",
+        "Review the new time and joining details in BID Hub. Calendar options are available from the session details.",
     };
   }
   if (type === NotificationType.session_completed) {
@@ -72,7 +72,7 @@ function sessionPresentation(type: NotificationType, role: UserRole) {
   return {
     actionLabel: "View confirmed session",
     supportingText:
-      "Open the session to review the confirmed time, participant, and joining details.",
+      "Open the session for the confirmed time and joining details, or add it to Google, Outlook, Apple Calendar, or another calendar.",
   };
 }
 

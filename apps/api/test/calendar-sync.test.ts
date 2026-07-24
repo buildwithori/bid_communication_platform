@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CalendarAttendeeResponseStatus,
+  CalendarProvisioningStatus,
   NotificationType,
   SessionStatus,
   UserRole,
@@ -205,4 +206,65 @@ test("the authenticated initial watch notification is safe during registration",
   });
 
   assert.equal(enqueued, false);
+});
+
+test("calendar provisioning creates the organizer event asynchronously and records readiness", async () => {
+  const updates: Array<Record<string, unknown>> = [];
+  let created = 0;
+  const sync = new CalendarSyncService(
+    {
+      session: {
+        updateMany: async (args: Record<string, unknown>) => {
+          updates.push(args);
+          return { count: 1 };
+        },
+        findUnique: async () => ({
+          id: "session-1",
+          ownerUserId: "trainer-1",
+          entrepreneurUserId: "entrepreneur-1",
+          topic: "Pricing review",
+          notes: null,
+          startAt: new Date("2030-01-07T10:00:00.000Z"),
+          endAt: new Date("2030-01-07T11:00:00.000Z"),
+          timezone: "Africa/Kigali",
+          entrepreneur: { email: "founder@non-google.example" },
+        }),
+      },
+    } as never,
+    {
+      createSessionEvent: async () => {
+        created += 1;
+        return {
+          eventId: "google-event-1",
+          eventEtag: '"etag"',
+          meetingUrl: "https://meet.google.com/example",
+          responseStatus: CalendarAttendeeResponseStatus.needs_action,
+          responseUpdatedAt: new Date("2030-01-01T00:00:00.000Z"),
+        };
+      },
+    } as never,
+    {} as never,
+    { enqueue: async () => undefined } as never,
+    {} as never,
+    {} as never,
+  );
+
+  const result = await sync.provisionSessionCalendar("session-1");
+
+  assert.deepEqual(result, { provisioned: true });
+  assert.equal(created, 1);
+  assert.equal(
+    (updates[0]?.data as { calendarProvisioningStatus: string })
+      .calendarProvisioningStatus,
+    CalendarProvisioningStatus.processing,
+  );
+  assert.equal(
+    (updates[1]?.data as { calendarProvisioningStatus: string })
+      .calendarProvisioningStatus,
+    CalendarProvisioningStatus.ready,
+  );
+  assert.equal(
+    (updates[1]?.data as { calendarEventId: string }).calendarEventId,
+    "google-event-1",
+  );
 });

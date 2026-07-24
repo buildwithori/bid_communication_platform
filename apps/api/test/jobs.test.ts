@@ -64,8 +64,10 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
     NOTIFICATION_AUTOMATION_INTERVAL_MS: 900_000,
     DELIVERABLE_RECURRENCE_INTERVAL_MS: 900_000,
     VIDEO_RECONCILIATION_INTERVAL_MS: 300_000,
+    CALENDAR_SYNC_INTERVAL_MS: 300_000,
   };
   const scheduler = new JobSchedulerService(
+    queue() as never,
     queue() as never,
     queue() as never,
     queue() as never,
@@ -77,8 +79,8 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
 
   await scheduler.onApplicationBootstrap();
 
-  assert.equal(calls.filter((call) => call.method === "schedule").length, 6);
-  assert.equal(calls.filter((call) => call.method === "add").length, 6);
+  assert.equal(calls.filter((call) => call.method === "schedule").length, 8);
+  assert.equal(calls.filter((call) => call.method === "add").length, 8);
   assert.deepEqual(
     calls
       .filter((call) => call.method === "schedule")
@@ -90,6 +92,8 @@ test("API bootstrap upserts one scheduler per periodic workflow and kicks each q
       "recurring-deliverables-scheduler",
       "external-resource-cleanup-scheduler",
       "video-reconciliation-scheduler",
+      "calendar-sync-scheduler",
+      "calendar-provisioning-scheduler",
     ],
   );
 });

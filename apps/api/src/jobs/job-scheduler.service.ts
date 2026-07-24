@@ -97,6 +97,12 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         JOB_NAMES.reconcileCalendarEvents,
         calendarSyncInterval,
       ),
+      this.installScheduler(
+        this.calendarSyncQueue,
+        "calendar-provisioning-scheduler",
+        JOB_NAMES.reconcileCalendarProvisioning,
+        calendarSyncInterval,
+      ),
     ]);
 
     await Promise.all([
@@ -150,6 +156,14 @@ export class JobSchedulerService implements OnApplicationBootstrap {
         {},
         this.startupOptions(
           JOB_NAMES.reconcileCalendarEvents,
+          calendarSyncInterval,
+        ),
+      ),
+      this.calendarSyncQueue.add(
+        JOB_NAMES.reconcileCalendarProvisioning,
+        {},
+        this.startupOptions(
+          JOB_NAMES.reconcileCalendarProvisioning,
           calendarSyncInterval,
         ),
       ),

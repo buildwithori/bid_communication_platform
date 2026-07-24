@@ -4,6 +4,7 @@ import type { Job } from "bullmq";
 import {
   CalendarConnectionSyncJob,
   CalendarSyncQueueService,
+  SessionCalendarProvisioningJob,
 } from "../../calendar/calendar-sync-queue.service";
 import { CalendarSyncService } from "../../calendar/calendar-sync.service";
 import { JOB_NAMES, QUEUE_NAMES } from "../jobs.constants";
@@ -43,11 +44,23 @@ export class CalendarSyncProcessor extends WorkerHost {
       }
       return result;
     }
+    if (job.name === JOB_NAMES.reconcileCalendarProvisioning) {
+      const cursor = (job.data as { cursor?: string }).cursor;
+      const result = await this.sync.enqueuePendingProvisioning(cursor);
+      if (result.nextCursor) {
+        await this.queue.enqueueProvisioningSweep(result.nextCursor);
+      }
+      return result;
+    }
+    if (job.name === JOB_NAMES.provisionSessionCalendar) {
+      const data = job.data as SessionCalendarProvisioningJob;
+      return this.sync.provisionSessionCalendar(data.sessionId);
+    }
     throw new Error(`Unsupported calendar sync job: ${job.name}`);
   }
 
   @OnWorkerEvent("failed")
-  onFailed(job: Job | undefined, error: Error) {
+  async onFailed(job: Job | undefined, error: Error) {
     this.logger.error(
       JSON.stringify({
         event: "calendar.sync.failed",
@@ -56,5 +69,13 @@ export class CalendarSyncProcessor extends WorkerHost {
         error: error.name,
       }),
     );
+    if (
+      job?.name === JOB_NAMES.provisionSessionCalendar &&
+      job.attemptsMade >= (job.opts.attempts ?? 1)
+    ) {
+      await this.sync.notifyTerminalProvisioningFailure(
+        (job.data as SessionCalendarProvisioningJob).sessionId,
+      );
+    }
   }
 }

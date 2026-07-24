@@ -29,6 +29,8 @@ export const JOB_NAMES = {
   reconcileVideoAssets: "reconcile-video-assets",
   reconcileCalendarEvents: "reconcile-calendar-events",
   reconcileCalendarConnection: "reconcile-calendar-connection",
+  reconcileCalendarProvisioning: "reconcile-calendar-provisioning",
+  provisionSessionCalendar: "provision-session-calendar",
 } as const;
 
 export const QUEUE_PREFIX = "bid-hub";
