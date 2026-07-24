@@ -241,6 +241,14 @@ const POLICIES: RateLimitPolicy[] = [
     MINUTE,
     ipIdentity,
   ),
+  pathPolicy(
+    "client-error-report",
+    "POST",
+    /^\/observability\/client-errors$/,
+    30,
+    MINUTE,
+    ipIdentity,
+  ),
   pathPolicy("health", "GET", /^\/health$/, 120, MINUTE, ipIdentity),
 ];
 

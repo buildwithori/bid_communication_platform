@@ -24,6 +24,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { JobSchedulingModule } from './jobs/job-scheduling.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
 import { ReportingModule } from './reporting/reporting.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { SessionAuthGuard } from './auth/guards/session-auth.guard';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
@@ -62,6 +63,7 @@ import { RedisRateLimitGuard } from './common/guards/redis-rate-limit.guard';
     JobSchedulingModule,
     DashboardsModule,
     ReportingModule,
+    ObservabilityModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SessionAuthGuard },

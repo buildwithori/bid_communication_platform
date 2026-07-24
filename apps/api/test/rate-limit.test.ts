@@ -129,6 +129,33 @@ test("missing account input remains available to DTO validation", async () => {
   assert.equal(calls, 1);
 });
 
+test("client render error reports are rate limited by IP", async () => {
+  const calls: unknown[][] = [];
+  const headers: Record<string, string | number> = {};
+  const guard = guardWith(async (...args) => {
+    calls.push(args);
+    return [1, 60_000];
+  });
+
+  await guard.canActivate(
+    contextFor(
+      {
+        ip: "203.0.113.20",
+        method: "POST",
+        originalUrl: "/api/observability/client-errors",
+      },
+      headers,
+    ),
+  );
+
+  assert.equal(calls.length, 1);
+  assert.match(
+    String(calls[0]?.[2]),
+    /^bid-hub:rate-limit:client-error-report:[a-f0-9]{64}$/,
+  );
+  assert.equal(headers["x-ratelimit-limit"], 30);
+});
+
 test("protected routes fail closed when Redis is unavailable", async () => {
   const guard = guardWith(async () => {
     throw new Error("redis connection secret");
